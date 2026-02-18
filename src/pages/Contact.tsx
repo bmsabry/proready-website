@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Send, CheckCircle2, MessageSquare, Building2, Globe } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, CheckCircle2, MessageSquare, Building2, Globe, Youtube } from 'lucide-react';
 
 const Contact = () => {
   const [submitted, setSubmitted] = useState(false);
@@ -53,6 +53,7 @@ const Contact = () => {
 
               <div className="space-y-8">
                 {[
+                  { icon: <Youtube />, title: "YouTube Channel", detail: "@ProReadyEngineer", sub: "Video tutorials & insights", link: "https://www.youtube.com/@ProReadyEngineer" },
                   { icon: <Mail />, title: "Email Us", detail: "info@proreadyengineer.com", sub: "Response within 24 hours" },
                   { icon: <Phone />, title: "Call Us", detail: "+1 (513) 849-1016", sub: "Mon-Fri, 9am-5pm EST" },
                   { icon: <MapPin />, title: "Office", detail: "9550 Mason Montgomery Rd. #162", sub: "Mason, OH 45040" }
@@ -63,7 +64,13 @@ const Contact = () => {
                     </div>
                     <div>
                       <h4 className="font-bold text-white">{item.title}</h4>
-                      <p className="text-slate-300">{item.detail}</p>
+                      {item.link ? (
+                        <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-cyan-400 transition-colors">
+                          {item.detail}
+                        </a>
+                      ) : (
+                        <p className="text-slate-300">{item.detail}</p>
+                      )}
                       <p className="text-xs text-slate-500 mt-1">{item.sub}</p>
                     </div>
                   </div>
@@ -99,7 +106,7 @@ const Contact = () => {
                   <p className="text-slate-400 mb-8">
                     Thank you for reaching out. One of our principal engineers will review your inquiry and contact you shortly.
                   </p>
-                  <button 
+                  <button
                     onClick={() => setSubmitted(false)}
                     className="btn-secondary w-full"
                   >
@@ -153,8 +160,8 @@ const Contact = () => {
                     </div>
                   </div>
 
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={loading}
                     className="btn-primary w-full flex items-center justify-center gap-2 py-4 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
