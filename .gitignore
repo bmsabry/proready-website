@@ -1,0 +1,24 @@
+# Agent Zero files
+.a0proj/
+AgentZero_Migration_Package.tar.gz
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env
+.env
+.env.local

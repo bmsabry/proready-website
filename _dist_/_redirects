@@ -1,0 +1,5 @@
+# Serve PDF files directly (must be before catch-all)
+/*.pdf /:splat.pdf 200
+
+# SPA fallback - all other routes to index.html
+/* /index.html 200
