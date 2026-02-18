@@ -32,19 +32,32 @@ const OptimizingTestCellAssembly = () => {
           </div>
 
           <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img 
-              src="/optimizing-test-cell-assembly.png" 
-              alt="Optimizing Test Cell Assembly" 
+            <img
+              src="/optimizing-test-cell-assembly.png"
+              alt="Optimizing Test Cell Assembly"
               className="w-full h-full object-cover"
             />
           </div>
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
+            <p className="text-xl text-white font-semibold mb-6">
+              <strong>Reducing Setup Time by 55% & Generating $1.4M in Value</strong>
+            </p>
+
+            <section>
+              <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">Project Snapshot</h2>
+
+              <p><strong>Industry:</strong> Aerospace / Combustion Engineering<br/>
+              <strong>Challenge:</strong> 2‑week setup times were killing schedule efficiency.<br/>
+              <strong>Result:</strong> Reduced assembly to 5 days; $125 K annual savings per cell.</p>
+            </section>
+
+            <hr className="border-slate-800 my-12" />
+
             <section>
               <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">1. Opening Hook – The Challenge</h2>
-              <p>
-                A major engine test facility faced long hardware assembly times that slowed every test campaign. Each program required roughly <strong>two weeks</strong> of setup before testing could begin—burning valuable schedule and resources. The customer’s target was simple but ambitious: <strong>cut assembly time noticeably without compromising quality or safety</strong>.
-              </p>
+
+              <p>A major engine test facility faced long hardware assembly times that slowed every test campaign. Each program required roughly <strong>two weeks</strong> of setup before testing could begin—burning valuable schedule and resources. The customer's target was simple but ambitious: <strong>cut assembly time noticeably without compromising quality or safety</strong>.</p>
             </section>
           </div>
         </motion.div>

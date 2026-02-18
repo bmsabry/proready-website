@@ -16,6 +16,7 @@ import DualModeLiquidFuelPumpingSystem from './pages/case-studies/DualModeLiquid
 import ImprovingGaseousFuelSupplySystemResponse from './pages/case-studies/ImprovingGaseousFuelSupplySystemResponse';
 import OilFiltrationParticleRemoval from './pages/case-studies/OilFiltrationParticleRemoval';
 import TestAssetProtectionLogic from './pages/case-studies/TestAssetProtectionLogic';
+import NewHighperformanceDataAcquisitionSystem from './pages/case-studies/NewHighperformanceDataAcquisitionSystem';
 import SecondaryAirImpact from './pages/insights/SecondaryAirImpact';
 import VortexBreakdown from './pages/insights/VortexBreakdown';
 import CombustorFlowEvolution from './pages/insights/CombustorFlowEvolution';
@@ -45,6 +46,7 @@ function App() {
             <Route path="/case-studies/improving-gaseous-fuel-supply-system-response" element={<ImprovingGaseousFuelSupplySystemResponse />} />
             <Route path="/case-studies/oil-filtration-and-particle-removal" element={<OilFiltrationParticleRemoval />} />
             <Route path="/case-studies/test-asset-protection-logic" element={<TestAssetProtectionLogic />} />
+          <Route path="/case-studies/new-highperformance-data-acquisition-system" element={<NewHighperformanceDataAcquisitionSystem />} />
             <Route path="/insights/secondary-air-impact" element={<SecondaryAirImpact />} />
             <Route path="/insights/vortex-breakdown" element={<VortexBreakdown />} />
             <Route path="/insights/combustor-flow-evolution" element={<CombustorFlowEvolution />} />

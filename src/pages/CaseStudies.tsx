@@ -13,6 +13,16 @@ const caseStudies = [
     author: "Dr. Bassam Abdelnabi",
     image: "/Test_Asset_Protection_Logic.jpg",
     link: "/case-studies/test-asset-protection-logic"
+      },
+  {
+    id: 11,
+    title: "New High‑Performance Data Acquisition System",
+    excerpt: "From decades-old bottleneck to dynamic, test-engineer-driven tool in 12 weeks. Delivered as MVP in 3 weeks, fully functional in 12 weeks.",
+    category: "Data Quality & Throughput",
+    date: "Feb 17, 2026",
+    author: "Dr. Bassam Abdelnabi",
+    image: "/New_HighPerformance_Data_Acquisition_System.jpg",
+    link: "/case-studies/new-highperformance-data-acquisition-system"
   },
   {
     id: 9,
