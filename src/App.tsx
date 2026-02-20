@@ -16,6 +16,7 @@ import DualModeLiquidFuelPumpingSystem from './pages/case-studies/DualModeLiquid
 import ImprovingGaseousFuelSupplySystemResponse from './pages/case-studies/ImprovingGaseousFuelSupplySystemResponse';
 import OilFiltrationParticleRemoval from './pages/case-studies/OilFiltrationParticleRemoval';
 import TestAssetProtectionLogic from './pages/case-studies/TestAssetProtectionLogic';
+import CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissioning from './pages/case-studies/CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissioning';
 import NewHighperformanceDataAcquisitionSystem from './pages/case-studies/NewHighperformanceDataAcquisitionSystem';
 import SecondaryAirImpact from './pages/insights/SecondaryAirImpact';
 import VortexBreakdown from './pages/insights/VortexBreakdown';
@@ -54,7 +55,8 @@ function App() {
             <Route path="/insights/sac-dynamics" element={<SACDynamics />} />
             <Route path="/insights/sac-aerodynamics" element={<SACAerodynamics />} />
             <Route path="/contact" element={<Contact />} />
-          </Routes>
+            <Route path="/case-studies/case-study-fuel-supply-capability-expansion-specification-procurement-and-commissioning" element={<CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissioning />} />
+      </Routes>
         </main>
         <Footer />
       </div>

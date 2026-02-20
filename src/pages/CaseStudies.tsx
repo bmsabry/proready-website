@@ -5,6 +5,17 @@ import { Link } from 'react-router-dom';
 
 const caseStudies = [
   {
+    id: 12,
+    title: "CASE STUDY: Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning",
+    excerpt: "Deliver a high‑pressure liquid‑fuel pumping system capable of both dry‑fuel and fuel‑water emulsion operation.",
+    category: "Combustion Systems",
+    date: "Feb 20, 2026",
+    author: "Dr. Bassam Abdelnabi",
+    image: "/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning.jpg",
+    link: "/case-studies/case-study-fuel-supply-capability-expansion-specification-procurement-and-commissioning"
+  },
+  
+  {
     id: 10,
     title: "Protecting Millions: Smart Logic for Combustion Testing Failures",
     excerpt: "High-value combustion test articles (hundreds of thousands of dollars each) were exposed to multiple failure scenarios with potential for catastrophic damage.",
