@@ -71,7 +71,7 @@ const Home = () => {
               & AI Solutions
             </h1>
             <p className="text-lg md:text-xl text-slate-400 max-w-3xl mx-auto mb-6 leading-relaxed">
-              ProReadyEngineer LLC provides expert consulting in gas turbine combustion, 
+              ProReadyEngineer LLC provides expert consulting in gas turbine combustion, mechanical power systems,
               advanced data analytics, and specialized technical training for engineers.
             </p>
             <div className="flex flex-col gap-2 mb-10 text-sm font-medium tracking-wide">
