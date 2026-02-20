@@ -18,13 +18,13 @@ const CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissio
           transition={{ duration: 0.6 }}
         >
           <h1 className="text-4xl md:text-6xl font-bold mb-8 leading-tight">
-            CASE STUDY: Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning
+            Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning
           </h1>
 
           <div className="flex items-center justify-end mb-12 pb-12 border-b border-slate-800">
             <a
               href="/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning.pdf"
-              download="CASE STUDY Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning.pdf"
+              download="Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning.pdf"
               className="inline-flex items-center justify-center rounded-full bg-cyan-500 px-8 py-4 text-sm font-bold text-slate-950 transition hover:bg-cyan-400 shadow-lg shadow-cyan-500/20"
             >
               Download Full PDF
@@ -34,34 +34,32 @@ const CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissio
           <div className="aspect-video rounded-3xl overflow-hidden mb-12">
             <img
               src="/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning.jpg"
-              alt="CASE STUDY: Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning"
+              alt="Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning"
               className="w-full h-full object-cover"
             />
           </div>
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
             <p className="text-xl text-white font-semibold mb-6">
-              <strong>Building Reliability by Engineering for Performance and Emergency Readiness</strong>
+              <strong>Delivering High‑Flow Natural Gas, Nitrogen Doping, and Propane Blending from Design to Operational Use</strong>
             </p>
 
             <section>
               <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">Project Snapshot</h2>
 
-              <p><strong>Industry:</strong> Aerospace / Combustion Systems Integration<br/>
-              <strong>Challenge:</strong> Deliver a high‑pressure liquid‑fuel pumping system capable of both dry‑fuel and fuel‑water emulsion operation.<br/>
-              <strong>Result:</strong> Fully integrated three‑stage skid designed, procured, and commissioned with advanced control, redundancy, and purge safety—meeting precise duty targets while ensuring safe emergency response.</p>
+              <p><strong>Industry:</strong> Aerospace / Combustion Test Facilities<br/>
+              <strong>Challenge:</strong> The test site needed higher natural‑gas flow than the utility could supply, plus new capabilities for nitrogen doping and propane blending—none of which the existing infrastructure could support.<br/>
+              <strong>Result:</strong> A fully <strong>specified, procured, and commissioned</strong> multi‑fuel supply solution (CNG + nitrogen + propane) that safely delivers the required flows and mixtures, after correcting critical sizing and specification gaps.</p>
             </section>
 
             <hr className="border-slate-800 my-12" />
 
             <section>
-              <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">1. Opening Hook – The Mission</h2>
+              <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">1. Opening Hook – The Challenge</h2>
 
-              <p>This project didn't begin with a failure to fix—it began with a <strong>capability to enable</strong>. The client required a new <strong>liquid‑fuel pumping system</strong> that could operate in both <strong>dry</strong> and <strong>emulsified fuel modes</strong> to expand their combustion‑test flexibility.</p>
+              <p>A test site needed to run <strong>higher‑flow natural‑gas tests</strong> and explore <strong>variable gas compositions</strong> (nitrogen‑diluted gas and propane‑enriched fuel). The client had already invested in a <strong>new million‑dollar gas compressor</strong>, expecting it to unlock the required capacity.</p>
 
-              <p>The target duty parameters were challenging—pressures exceeding <strong>3,000 psi</strong>, at a flow rate of <strong>1500 lb/hr</strong>, feeding six independently staged fuel circuits, and the ability to run cleanly in standard liquid‑fuel mode or mix fuel with water to form a controlled emulsion for emissions control testing.</p>
-
-              <p>Equally important, the system needed to perform <strong>safely and predictably under emergency conditions</strong>, where loss of control could mean damage worth hundreds of thousands of dollars.</p>
+              <p>However, the tests still couldn't run at the desired conditions, and nitrogen doping or propane blending <strong>weren't possible at all</strong> with the existing infrastructure. The goal of this project was to <strong>enable an entirely new fuel‑supply capability</strong> through complete <strong>specification, procurement, and commissioning</strong>.</p>
             </section>
           </div>
         </motion.div>

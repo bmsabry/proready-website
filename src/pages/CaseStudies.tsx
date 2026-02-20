@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 const caseStudies = [
   {
     id: 12,
-    title: "CASE STUDY: Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning",
+    title: "Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning",
     excerpt: "Deliver a high‑pressure liquid‑fuel pumping system capable of both dry‑fuel and fuel‑water emulsion operation.",
     category: "Combustion Systems",
     date: "Feb 20, 2026",
