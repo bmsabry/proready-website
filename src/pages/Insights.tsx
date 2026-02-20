@@ -5,6 +5,16 @@ import { Link } from 'react-router-dom';
 
 const posts = [
   {
+    id: 7,
+    title: "Transitioning DLE Combustion Systems to 100% Hydrogen Operation",
+    excerpt: "As the global energy landscape pivots toward a hydrogen economy, the aerospace and power generation sectors face a fundamental strategic necessity: redefining the kinetic boundaries of existing gas turbine hardware. Central to this transition is the understanding of laminar flame speed and flashback propensity in hydrogen combustion.",
+    date: "Feb 20, 2026",
+    author: "Dr. Bassam Abdelnabi",
+    category: "Technical Analysis",
+    image: "/Hydrogen_Impact_on_Combustor_Performance_and_NOx_Emissions.jpg",
+    link: "/insights/transitioning-dle-combustion-systems-to-100-hydrogen"
+  },
+  {
     id: 6,
     title: "A Technical Deep Dive: Quantifying the Impact of Secondary Air on DLE Combustor Emissions",
     excerpt: "The central challenge in modern Dry Low Emissions (DLE) combustion systems is the continuous drive to reduce Nitric Oxide (NOx) emissions while simultaneously managing critical operational constraints...",
