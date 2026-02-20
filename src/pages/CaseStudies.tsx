@@ -7,7 +7,7 @@ const caseStudies = [
   {
     id: 12,
     title: "Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning",
-    excerpt: "Deliver a high‑pressure liquid‑fuel pumping system capable of both dry‑fuel and fuel‑water emulsion operation.",
+    excerpt: "Enable higher‑flow natural‑gas testing with new capabilities for nitrogen doping and propane blending through complete specification, procurement, and commissioning.",
     category: "Combustion Systems",
     date: "Feb 20, 2026",
     author: "Dr. Bassam Abdelnabi",
