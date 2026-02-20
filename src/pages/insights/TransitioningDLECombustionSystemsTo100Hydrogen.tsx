@@ -16,9 +16,9 @@ const TransitioningDLECombustionSystemsTo100Hydrogen = () => {
         </Link>
 
         <motion.div
-          initial={ opacity: 0, y: 20 }
-          animate={ opacity: 1, y: 0 }
-          transition={ duration: 0.6 }
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
         >
           <div className="flex items-center gap-4 mb-6">
             <span className="flex items-center gap-1.5 text-xs font-medium text-cyan-400 uppercase tracking-wider">
@@ -58,9 +58,9 @@ const TransitioningDLECombustionSystemsTo100Hydrogen = () => {
           </div>
 
           <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img
-              src={hydrogenImg}
-              alt="Transitioning DLE Combustion Systems to 100% Hydrogen Operation"
+            <img 
+              src={hydrogenImg} 
+              alt="Transitioning DLE Combustion Systems to 100% Hydrogen Operation" 
               className="w-full h-full object-cover"
             />
           </div>
