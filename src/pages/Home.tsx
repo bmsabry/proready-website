@@ -30,6 +30,12 @@ const Home = () => {
       image: "/Zaeem.jpg"
     },
     {
+      name: "Mohamed Bakr",
+      role: "Static Equipment & Pressure Vessel Design Expert",
+      bio: "Mohamed Bakr is a seasoned Static Equipment and Pressure Vessel Design Expert with over 20 years of experience, specializing in the detailed design of piping systems and static equipment for complex Oil & Gas projects. He brings comprehensive expertise across the entire project lifecycle—from initial concept and advanced 2D/3D modeling through detailed engineering, material take-off, and final commissioning. Mohamed is highly skilled in performing rigorous design calculations for pressure vessels and heat exchangers in strict accordance with ASME Section VIII (Div. 1 & Div. 2), API 660, and TEMA standards, utilizing industry-leading software such as Compress, PV Elite, and AutoCAD. Furthermore, his profound understanding of material specifications enables the precise preparation of Material Technical Delivery Conditions (MTDC) that reflect both ASME Section II requirements and rigorous project specifications. By consistently securing ASME Inspector review and acceptance for U-stamped pressure vessels, Mohamed ensures that our clients receive safe, fully compliant, and exceptionally engineered static equipment solutions tailored to the most demanding industrial environments.",
+      image: "/Bakr.png"
+    },
+    {
       name: "Adam Bailey",
       role: "Senior Mechanical Designer",
       bio: "Adam Bailey is a seasoned Mechanical Designer with over 30 years of experience, specializing in the design and development of gas turbine combustion systems. With a deep technical background in GE frames 6B, 7EA, 9E, 7FA, and 9FA, Adam has led the design of numerous complex combustion test rigs. He uniquely bridges the gap between advanced engineering and practical production, leveraging a decade of expertise in additive manufacturing and a robust understanding of DFM (Design for Manufacturability) to optimize system performance and cost.",
