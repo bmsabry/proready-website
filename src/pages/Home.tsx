@@ -38,6 +38,12 @@ He is highly skilled in performing rigorous design calculations for pressure ves
       image: "/Bakr.png"
     },
     {
+      name: "Sherif Ahmed",
+      role: "Aerospace Propulsion & Multiphysics Expert",
+      bio: `Sherif is an Aerospace Propulsion and Multiphysics Expert who expands our capabilities into high-performance defense aviation, advanced computational thermal management, and biomechanical engineering. Within the aerospace sector, he specializes in whole-engine thermodynamic cycle modeling—having developed high-fidelity models for the F100-PW-229 afterburning turbofan to optimize nozzle control logic and ensure extreme-condition stall protection—alongside pioneering research in hypersonic fuel injection. He also brings deep component-level expertise in Conjugate Heat Transfer (CHT), designing complex internal cooling channels for gas turbine blades as well as innovative liquid-cooling architectures for high-performance computing (GPUs). Beyond traditional power and propulsion, Sherif leverages advanced Fluid-Structure Interaction (FSI) to drive MedTech innovation, most notably leading the advanced CFD/FSI design of a Nitinol aortic stent that improved renal perfusion by 19% and won the prestigious "Best Innovation in the Arab World" award from the Qatar Foundation.`,
+      image: "/Sherif.jpg"
+    },
+    {
       name: "Adam Bailey",
       role: "Senior Mechanical Designer",
       bio: "Adam Bailey is a seasoned Mechanical Designer with over 30 years of experience, specializing in the design and development of gas turbine combustion systems. With a deep technical background in GE frames 6B, 7EA, 9E, 7FA, and 9FA, Adam has led the design of numerous complex combustion test rigs. He uniquely bridges the gap between advanced engineering and practical production, leveraging a decade of expertise in additive manufacturing and a robust understanding of DFM (Design for Manufacturability) to optimize system performance and cost.",
