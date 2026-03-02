@@ -18,6 +18,7 @@ import OilFiltrationParticleRemoval from './pages/case-studies/OilFiltrationPart
 import TestAssetProtectionLogic from './pages/case-studies/TestAssetProtectionLogic';
 import CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissioning from './pages/case-studies/CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissioning';
 import NewHighperformanceDataAcquisitionSystem from './pages/case-studies/NewHighperformanceDataAcquisitionSystem';
+import ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel from './pages/case-studies/ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel';
 import SecondaryAirImpact from './pages/insights/SecondaryAirImpact';
 import TransitioningDLECombustionSystemsTo100Hydrogen from './pages/insights/TransitioningDLECombustionSystemsTo100Hydrogen';
 import VortexBreakdown from './pages/insights/VortexBreakdown';
