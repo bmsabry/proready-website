@@ -5,6 +5,16 @@ import { Link } from 'react-router-dom';
 
 const caseStudies = [
   {
+    id: 13,
+    title: "Reinstatement of Polypropylene Plant – High Pressure Blow Down Vessel",
+    excerpt: "Emergency fabrication of a 145-metric-ton pressure vessel under tight schedule and complex design constraints for post-explosion plant reinstatement at NATPET Yanbu facility.",
+    category: "Pressure Vessel Fabrication",
+    date: "Mar 2, 2026",
+    author: "Dr. Bassam Abdelnabi",
+    image: "/Reinstatement_of_Polypropylene_Plant_High_Pressure_Blow_Down_Vessel.png",
+    link: "/case-studies/reinstatement-of-polypropylene-plant-high-pressure-blow-down-vessel"
+  },
+  {
     id: 12,
     title: "Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning",
     excerpt: "Enable higher‑flow natural‑gas testing with new capabilities for nitrogen doping and propane blending through complete specification, procurement, and commissioning.",

@@ -57,6 +57,7 @@ function App() {
             <Route path="/insights/sac-dynamics" element={<SACDynamics />} />
             <Route path="/insights/sac-aerodynamics" element={<SACAerodynamics />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/case-studies/reinstatement-of-polypropylene-plant-high-pressure-blow-down-vessel" element={<ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel />} />
             <Route path="/case-studies/case-study-fuel-supply-capability-expansion-specification-procurement-and-commissioning" element={<CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissioning />} />
       </Routes>
         </main>
