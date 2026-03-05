@@ -21,6 +21,7 @@ import NewHighperformanceDataAcquisitionSystem from './pages/case-studies/NewHig
 import ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel from './pages/case-studies/ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel';
 import SecondaryAirImpact from './pages/insights/SecondaryAirImpact';
 import TransitioningDLECombustionSystemsTo100Hydrogen from './pages/insights/TransitioningDLECombustionSystemsTo100Hydrogen';
+import ImpactOfOperationalModes from "./pages/insights/ImpactOfOperationalModes"
 import VortexBreakdown from './pages/insights/VortexBreakdown';
 import CombustorFlowEvolution from './pages/insights/CombustorFlowEvolution';
 import AutomatedCombustorDesign from './pages/insights/AutomatedCombustorDesign';
@@ -52,6 +53,7 @@ function App() {
           <Route path="/case-studies/new-highperformance-data-acquisition-system" element={<NewHighperformanceDataAcquisitionSystem />} />
             <Route path="/insights/secondary-air-impact" element={<SecondaryAirImpact />} />
               <Route path="/insights/transitioning-dle-combustion-systems-to-100-hydrogen" element={<TransitioningDLECombustionSystemsTo100Hydrogen />} />
+        <Route path="/insights/operational-modes-impact" element={<ImpactOfOperationalModes />} />
             <Route path="/insights/vortex-breakdown" element={<VortexBreakdown />} />
             <Route path="/insights/combustor-flow-evolution" element={<CombustorFlowEvolution />} />
             <Route path="/insights/automated-combustor-design" element={<AutomatedCombustorDesign />} />

@@ -5,6 +5,16 @@ import { Link } from 'react-router-dom';
 
 const posts = [
   {
+    id: 8,
+    title: "The Critical Impact of Operational Modes on Gas Turbine Combustor Performance",
+    excerpt: "In the pursuit of increased power density and thermal efficiency, liner durability has solidified as the primary technical bottleneck for gas turbine longevity. The mechanical integrity of the combustor hardware is dictated by the synergy between absolute maximum metal temperatures and steep temperature gradients.",
+    date: "Mar 5, 2026",
+    author: "Dr. Bassam Abdelnabi",
+    category: "Technical Analysis",
+    image: "/Impact_of_Operational_Modes_on_Gas_Turbine_Combustor_Performance.jpg",
+    link: "/insights/operational-modes-impact"
+  },
+  {
     id: 7,
     title: "Transitioning DLE Combustion Systems to 100% Hydrogen Operation",
     excerpt: "As the global energy landscape pivots toward a hydrogen economy, the aerospace and power generation sectors face a fundamental strategic necessity: redefining the kinetic boundaries of existing gas turbine hardware. Central to this transition is the understanding of laminar flame speed and flashback propensity in hydrogen combustion.",
