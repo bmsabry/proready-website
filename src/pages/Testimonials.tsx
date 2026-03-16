@@ -185,7 +185,7 @@ const Testimonials = () => {
     {
       name: "Peter Imler",
       role: "Stratasys Direct Manufacturing Project Engineer",
-      statement: "Congratulations on 14 years at GE! It's always been a pleasure to work with you on past projects. You've been very fair, respectful, and knowledgeable in working through projects and coming up with solutions when issues arise.",
+      statement: "It's always been a pleasure to work with you on past projects. You've been very fair, respectful, and knowledgeable in working through projects and coming up with solutions when issues arise.",
       category: "Collaboration"
     }
   ];
@@ -431,8 +431,11 @@ const Testimonials = () => {
                   <p className="text-xs text-slate-500">Years Impact</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-purple-400">100%</p>
-                  <p className="text-xs text-slate-500">Positive</p>
+                  <div className="text-lg font-bold text-purple-400 leading-tight">
+                    <p>Exceeds</p>
+                    <p>Expectations</p>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">Positive</p>
                 </div>
               </div>
             </div>

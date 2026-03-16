@@ -56,11 +56,20 @@ const Footer = () => {
           </div>
         </div>
         
-        <div className="border-t border-slate-900 pt-8 flex flex-col md:row justify-between items-center text-xs text-slate-500">
-          <p>© 2026 ProReadyEngineer LLC. All rights reserved.</p>
-          <div className="flex space-x-6 mt-4 md:mt-0">
-            <a href="#" className="hover:text-slate-300">Privacy Policy</a>
-            <a href="#" className="hover:text-slate-300">Terms of Service</a>
+        <div className="border-t border-slate-900 pt-8 flex justify-center items-center text-xs text-slate-500">
+          <div className="flex items-center space-x-4">
+            <img
+              src="/Logo-small.jpg"
+              alt="ProReadyEngineer Logo"
+              className="h-8 w-auto rounded-sm opacity-80"
+            />
+            <div className="flex flex-col items-start">
+              <p>© 2026 ProReadyEngineer LLC. All rights reserved.</p>
+              <div className="flex space-x-6 mt-1">
+                <a href="#" className="hover:text-slate-300">Privacy Policy</a>
+                <a href="#" className="hover:text-slate-300">Terms of Service</a>
+              </div>
+            </div>
           </div>
         </div>
       </div>
