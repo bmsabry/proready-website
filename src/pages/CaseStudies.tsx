@@ -5,7 +5,17 @@ import { Link } from 'react-router-dom';
 
 const caseStudies = [
   {
-    id: 13,
+    id: 14,
+      title: "Recovery Reactor Feed Cooler Heat Exchanger",
+      excerpt: "Precision thermal design for a critical process stream — a code-compliant TEMA BFU shell and tube heat exchanger in SS TP316L for a chemically aggressive petrochemical environment.",
+      category: "Operational Excellence",
+      date: "Mar 17, 2026",
+      author: "Mohamed Bakr",
+      image: "/Recovery_Reactor_Feed_Cooler_Heat_Exchanger.jpg",
+      link: "/case-studies/recovery-reactor-feed-cooler-heat-exchanger"
+    },
+    {
+      id: 13,
     title: "Reinstatement of Polypropylene Plant – High Pressure Blow Down Vessel",
     excerpt: "Emergency fabrication of a 145-metric-ton pressure vessel under tight schedule and complex design constraints for post-explosion plant reinstatement at NATPET Yanbu facility.",
     category: "Pressure Vessel Fabrication",

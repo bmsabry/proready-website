@@ -19,6 +19,7 @@ import TestAssetProtectionLogic from './pages/case-studies/TestAssetProtectionLo
 import CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissioning from './pages/case-studies/CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissioning';
 import NewHighperformanceDataAcquisitionSystem from './pages/case-studies/NewHighperformanceDataAcquisitionSystem';
 import ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel from './pages/case-studies/ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel';
+import RecoveryReactorFeedCoolerHeatExchanger from './pages/case-studies/RecoveryReactorFeedCoolerHeatExchanger';
 import SecondaryAirImpact from './pages/insights/SecondaryAirImpact';
 import TransitioningDLECombustionSystemsTo100Hydrogen from './pages/insights/TransitioningDLECombustionSystemsTo100Hydrogen';
 import ImpactOfOperationalModes from "./pages/insights/ImpactOfOperationalModes"
@@ -61,6 +62,7 @@ function App() {
             <Route path="/insights/sac-aerodynamics" element={<SACAerodynamics />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/case-studies/reinstatement-of-polypropylene-plant-high-pressure-blow-down-vessel" element={<ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel />} />
+                <Route path="/case-studies/recovery-reactor-feed-cooler-heat-exchanger" element={<RecoveryReactorFeedCoolerHeatExchanger />} />
             <Route path="/case-studies/case-study-fuel-supply-capability-expansion-specification-procurement-and-commissioning" element={<CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissioning />} />
       </Routes>
         </main>
