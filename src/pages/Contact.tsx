@@ -56,7 +56,7 @@ const Contact = () => {
                   { icon: <Youtube />, title: "YouTube Channel", detail: "@ProReadyEngineer", sub: "Video tutorials & insights", link: "https://www.youtube.com/@ProReadyEngineer" },
                   { icon: <Mail />, title: "Email Us", detail: "info@proreadyengineer.com", sub: "Response within 24 hours" },
                   { icon: <Phone />, title: "Call Us", detail: "+1 (513) 849-1016", sub: "Mon-Fri, 9am-5pm EST" },
-                  { icon: <MapPin />, title: "Office", detail: "9550 Mason Montgomery Rd. #162", sub: "Mason, OH 45040" }
+                  { icon: <MapPin />, title: "Office", detail: "5325 Deerfield Blvd, # 148", sub: "Mason, OH 45040" }
                 ].map((item, i) => (
                   <div key={i} className="flex gap-6">
                     <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-cyan-400 shrink-0">
