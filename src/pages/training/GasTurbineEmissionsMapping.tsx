@@ -47,7 +47,7 @@ const CIRCUITS: Circuit[] = [
   { code: 'IM', label: 'Inner Main', color: 'bg-slate-400/80', text: 'text-slate-900' },
   { code: 'IP', label: 'Inner Pilot', color: 'bg-emerald-500/80', text: 'text-emerald-950' },
   { code: 'IE', label: 'Inner ELBO', color: 'bg-emerald-300/80', text: 'text-emerald-950' },
-  { code: 'D6', label: '+ 6th Circuit (flex-fuel)', color: 'bg-slate-700/80', text: 'text-slate-200' },
+  { code: 'OE', label: 'Outer ELBO', color: 'bg-red-900/80', text: 'text-red-100' },
 ];
 
 type Day = {
@@ -237,30 +237,9 @@ const GasTurbineEmissionsMapping = () => {
           <div className="text-xs font-mono uppercase tracking-[0.2em] text-cyan-400 mb-4">
             5-Day Expert Course · Next Cohort {NEXT_COHORT_DATE}
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold mb-8 leading-tight">
+          <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
             Gas Turbine <span className="text-gradient">Emissions Mapping</span>
           </h1>
-
-          {/* Course infographic — placed directly under the title, matching site pattern */}
-          <div className="rounded-3xl overflow-hidden border border-slate-800 bg-slate-900/50 mb-10 shadow-2xl shadow-cyan-900/10">
-            <img
-              src="/Gas_Turbine_Emissions_Mapping_Infographic.png"
-              alt="Gas Turbine Emissions Mapping — 5-day professional training infographic: the corridor, disturbances, course timeline, mitigation levers, and LFD threshold table"
-              className="w-full h-auto block"
-              loading="eager"
-            />
-          </div>
-
-          <p className="text-2xl md:text-3xl font-light text-slate-300 mb-8">
-            De-mystifying complexity — the gas turbine mapping expert course.
-          </p>
-          <p className="text-slate-400 text-lg max-w-3xl mb-10 leading-relaxed">
-            Modern DLE combustion systems look daunting — six distinct gas circuits, bounded by
-            narrow dynamics corridors and moving ambient targets. This course takes you from
-            zero gas-turbine knowledge to confident field mapper over five days, taught by a
-            practitioner with 19+ years of live mapping experience and multiple patents in the
-            field.
-          </p>
 
           <div className="flex flex-wrap items-center gap-4 mb-10">
             <a
@@ -280,6 +259,27 @@ const GasTurbineEmissionsMapping = () => {
               No payment required to register — seat held as pending.
             </span>
           </div>
+
+          {/* Course infographic — placed directly under the title, matching site pattern */}
+          <div className="rounded-3xl overflow-hidden border border-slate-800 bg-slate-900/50 mb-10 shadow-2xl shadow-cyan-900/10">
+            <img
+              src="/Mapping_Training_Infographic_3.jpg"
+              alt="Gas Turbine Emissions Mapping — De-mystifying Complexity: 6 gas circuits (OM, OP, OE, IM, IP, IE), the dynamics corridor (Φ ≈ 0.45–0.6), and 5-day course timeline"
+              className="w-full h-auto block"
+              loading="eager"
+            />
+          </div>
+
+          <p className="text-2xl md:text-3xl font-light text-slate-300 mb-8">
+            De-mystifying complexity — the gas turbine mapping expert course.
+          </p>
+          <p className="text-slate-400 text-lg mb-10 leading-relaxed">
+            Modern DLE combustion systems look daunting — six distinct gas circuits, bounded by
+            narrow dynamics corridors and moving ambient targets. This course takes you from
+            zero gas-turbine knowledge to confident field mapper over five days, taught by a
+            practitioner with 19+ years of live mapping experience and multiple patents in the
+            field.
+          </p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Stat icon={<Clock className="w-5 h-5" />} label="Duration" value="5 Days" />
