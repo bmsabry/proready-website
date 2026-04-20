@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db import get_db
 from ..deps import require_admin
-from ..models import Registration
+from ..models import Course, Registration
 from ..schemas import (
     AdminRegistrationOut,
     MarkPaidIn,
@@ -63,8 +63,14 @@ def mark_paid(body: MarkPaidIn, db: Session = Depends(get_db)) -> MarkPaidOut:
             registration=AdminRegistrationOut.model_validate(reg),
         )
 
-    # Capacity guard — don't let admin overfill the cohort.
-    if count_paid(db) >= settings.COURSE_CAPACITY:
+    # Capacity guard — read live seat cap from the Course row so admin
+    # edits to total_seats are respected. Fall back to env default if the
+    # Course row is missing for some reason.
+    course = db.execute(
+        select(Course).where(Course.code == reg.course_code)
+    ).scalar_one_or_none()
+    capacity = course.total_seats if course is not None else settings.COURSE_CAPACITY
+    if count_paid(db) >= capacity:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cohort already at capacity — cannot mark another row paid.",

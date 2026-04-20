@@ -21,8 +21,12 @@ import {
 // -----------------------------------------------------------------------------
 // Course constants
 // -----------------------------------------------------------------------------
-const COURSE_CAPACITY = 15;
-const NEXT_COHORT_DATE = 'May 15, 2026';
+// Course code matches the backend Course.code. Start date + seats are now
+// fetched from /api/courses/{code}; the constants below are fallbacks for
+// local preview before the backend is reachable.
+const COURSE_CODE = 'gas-turbine-emissions-mapping-2026-05';
+const DEFAULT_CAPACITY = 15;
+const DEFAULT_COHORT_DATE = 'May 15, 2026';
 const NOTEBOOKLM_URL =
   'https://notebooklm.google.com/notebook/39f245f9-bb92-4b02-9eee-4e37baa927ca/preview';
 
@@ -31,8 +35,19 @@ const NOTEBOOKLM_URL =
 // When unset (local dev without backend), the form simulates success so the UI
 // can be previewed without the API running.
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
-const SEATS_ENDPOINT = API_BASE ? `${API_BASE}/api/seats` : '';
+const COURSE_ENDPOINT = API_BASE ? `${API_BASE}/api/courses/${COURSE_CODE}` : '';
 const REGISTER_ENDPOINT = API_BASE ? `${API_BASE}/api/register` : '';
+
+// Parse an ISO yyyy-mm-dd date into "May 15, 2026" without timezone drift.
+const formatStartDate = (iso: string): string => {
+  const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));
+  if (!y || !m || !d) return iso;
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  return `${months[m - 1]} ${d}, ${y}`;
+};
 
 type Circuit = {
   code: string;
@@ -145,29 +160,41 @@ const IDEAL_FOR = [
 // -----------------------------------------------------------------------------
 const GasTurbineEmissionsMapping = () => {
   const [seatsTaken, setSeatsTaken] = useState<number | null>(null);
+  const [capacity, setCapacity] = useState<number>(DEFAULT_CAPACITY);
+  const [cohortDate, setCohortDate] = useState<string>(DEFAULT_COHORT_DATE);
+  const [courseStatus, setCourseStatus] = useState<'open' | 'closed'>('open');
   const [seatsLoading, setSeatsLoading] = useState(true);
   const [formState, setFormState] = useState<'idle' | 'loading' | 'success' | 'duplicate' | 'error'>(
     'idle',
   );
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Fetch live seat count. When API_BASE is empty we skip and show a conservative default.
+  // Fetch live course data (start_date + seats). Falls back to hardcoded
+  // constants when API_BASE is empty (local preview) or the request fails.
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      if (!SEATS_ENDPOINT) {
+      if (!COURSE_ENDPOINT) {
         if (!cancelled) {
-          setSeatsTaken(0); // Phase 1 placeholder — backend not wired yet
+          setSeatsTaken(0);
           setSeatsLoading(false);
         }
         return;
       }
       try {
-        const res = await fetch(SEATS_ENDPOINT, { cache: 'no-store' });
+        const res = await fetch(COURSE_ENDPOINT, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as { taken: number };
+        const data = (await res.json()) as {
+          start_date: string;
+          total_seats: number;
+          seats_taken: number;
+          status: 'open' | 'closed';
+        };
         if (!cancelled) {
-          setSeatsTaken(data.taken);
+          setSeatsTaken(data.seats_taken);
+          setCapacity(data.total_seats);
+          setCohortDate(formatStartDate(data.start_date));
+          setCourseStatus(data.status);
           setSeatsLoading(false);
         }
       } catch {
@@ -184,10 +211,11 @@ const GasTurbineEmissionsMapping = () => {
   }, []);
 
   const seatsRemaining =
-    seatsTaken === null ? COURSE_CAPACITY : Math.max(0, COURSE_CAPACITY - seatsTaken);
-  const isFull = seatsTaken !== null && seatsTaken >= COURSE_CAPACITY;
+    seatsTaken === null ? capacity : Math.max(0, capacity - seatsTaken);
+  const atCapacity = seatsTaken !== null && seatsTaken >= capacity;
+  const isFull = atCapacity || courseStatus === 'closed';
   const progressPct =
-    seatsTaken === null ? 0 : Math.min(100, (seatsTaken / COURSE_CAPACITY) * 100);
+    seatsTaken === null ? 0 : Math.min(100, (seatsTaken / capacity) * 100);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -206,10 +234,14 @@ const GasTurbineEmissionsMapping = () => {
     }
 
     try {
+      const payload = {
+        ...Object.fromEntries(formData.entries()),
+        course_code: COURSE_CODE,
+      };
       const res = await fetch(REGISTER_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(Object.fromEntries(formData.entries())),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -235,7 +267,7 @@ const GasTurbineEmissionsMapping = () => {
           className="mb-16"
         >
           <div className="text-xs font-mono uppercase tracking-[0.2em] text-cyan-400 mb-4">
-            5-Day Expert Course · Next Cohort {NEXT_COHORT_DATE}
+            5-Day Expert Course · Next Cohort {cohortDate}
           </div>
           <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
             Gas Turbine <span className="text-gradient">Emissions Mapping</span>
@@ -286,12 +318,12 @@ const GasTurbineEmissionsMapping = () => {
             <Stat
               icon={<Calendar className="w-5 h-5" />}
               label="Next Cohort"
-              value={NEXT_COHORT_DATE}
+              value={cohortDate}
             />
             <Stat
               icon={<Users className="w-5 h-5" />}
               label="Cohort Size"
-              value={`${COURSE_CAPACITY} Seats`}
+              value={`${capacity} Seats`}
             />
             <Stat icon={<Award className="w-5 h-5" />} label="Level" value="Beginner → Expert" />
           </div>
@@ -307,16 +339,18 @@ const GasTurbineEmissionsMapping = () => {
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <div>
               <div className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-1">
-                Seat availability — {NEXT_COHORT_DATE} cohort
+                Seat availability — {cohortDate} cohort
               </div>
               <div className="text-2xl font-bold">
                 {seatsLoading ? (
                   <span className="text-slate-500">Loading…</span>
-                ) : isFull ? (
+                ) : courseStatus === 'closed' ? (
+                  <span className="text-amber-400">Registration closed</span>
+                ) : atCapacity ? (
                   <span className="text-amber-400">Cohort full — waitlist only</span>
                 ) : (
                   <span>
-                    {seatsRemaining} of {COURSE_CAPACITY} seats remaining
+                    {seatsRemaining} of {capacity} seats remaining
                   </span>
                 )}
               </div>
@@ -562,12 +596,14 @@ const GasTurbineEmissionsMapping = () => {
             Register
           </div>
           <h2 className="text-3xl md:text-4xl font-bold mb-2">
-            Reserve your seat — {NEXT_COHORT_DATE} cohort
+            Reserve your seat — {cohortDate} cohort
           </h2>
           <p className="text-slate-400 mb-8">
-            {isFull
-              ? `All ${COURSE_CAPACITY} seats are taken. Join the waitlist for the next cohort.`
-              : `${seatsRemaining} of ${COURSE_CAPACITY} seats remaining.`}
+            {courseStatus === 'closed'
+              ? 'Registration is closed for this cohort.'
+              : atCapacity
+                ? `All ${capacity} seats are taken. Join the waitlist for the next cohort.`
+                : `${seatsRemaining} of ${capacity} seats remaining.`}
           </p>
 
           {formState === 'success' ? (
@@ -611,9 +647,14 @@ const GasTurbineEmissionsMapping = () => {
               <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Lock className="w-10 h-10 text-amber-400" />
               </div>
-              <h3 className="text-2xl font-bold mb-4">Cohort full</h3>
+              <h3 className="text-2xl font-bold mb-4">
+                {courseStatus === 'closed' ? 'Registration closed' : 'Cohort full'}
+              </h3>
               <p className="text-slate-400 mb-8 max-w-md mx-auto">
-                All 15 seats for the {NEXT_COHORT_DATE} cohort are taken. Email{' '}
+                {courseStatus === 'closed'
+                  ? `Registration for the ${cohortDate} cohort is closed.`
+                  : `All ${capacity} seats for the ${cohortDate} cohort are taken.`}{' '}
+                Email{' '}
                 <a
                   className="text-cyan-400 underline"
                   href="mailto:info@proreadyengineer.com?subject=Waitlist — Gas Turbine Emissions Mapping"

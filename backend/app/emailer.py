@@ -8,6 +8,7 @@ credentials while developing.
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Optional
 
 import httpx
@@ -116,6 +117,79 @@ def applicant_confirmation_html(
       </p>
       <p style="margin:24px 0 0;font-size:13px;color:#64748b;">
         Questions? Reply to this email or write to
+        <a href="mailto:info@proreadyengineer.com" style="color:#22d3ee;">info@proreadyengineer.com</a>.
+      </p>
+    </td></tr>
+  </table>
+</body></html>
+"""
+
+
+def _fmt_date(d: date) -> str:
+    """Format a date like 'May 15, 2026' — matches the COHORT_LABEL style."""
+    return d.strftime("%B %-d, %Y") if hasattr(d, "strftime") else str(d)
+
+
+def start_date_updated_html(
+    course_title: str, old_start_date: date, new_start_date: date
+) -> str:
+    """Stock template auto-sent when an admin changes a course's start date."""
+    return f"""\
+<!doctype html>
+<html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0b1220;padding:32px;color:#e2e8f0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#0f172a;border:1px solid #1e293b;border-radius:16px;overflow:hidden;">
+    <tr><td style="padding:32px;">
+      <div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#22d3ee;margin-bottom:8px;">
+        Start date updated
+      </div>
+      <h1 style="margin:0 0 16px;font-size:22px;color:#f1f5f9;">
+        {course_title} — new start date
+      </h1>
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
+        The start date for your cohort has been updated.
+      </p>
+      <table style="margin:0 0 16px;font-size:15px;">
+        <tr>
+          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Previous start</td>
+          <td style="padding:4px 0;color:#f1f5f9;">{_fmt_date(old_start_date)}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 16px 4px 0;color:#94a3b8;">New start</td>
+          <td style="padding:4px 0;color:#22d3ee;"><strong>{_fmt_date(new_start_date)}</strong></td>
+        </tr>
+      </table>
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
+        No action is required from your side — your registration remains active. If
+        the new schedule doesn't work for you, reply to this email and we'll sort it out.
+      </p>
+      <p style="margin:24px 0 0;font-size:13px;color:#64748b;">
+        Questions? Reply here or write to
+        <a href="mailto:info@proreadyengineer.com" style="color:#22d3ee;">info@proreadyengineer.com</a>.
+      </p>
+    </td></tr>
+  </table>
+</body></html>
+"""
+
+
+def broadcast_html(course_title: str, body_html: str) -> str:
+    """Wrap admin-composed HTML in a branded shell for course broadcasts."""
+    return f"""\
+<!doctype html>
+<html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0b1220;padding:32px;color:#e2e8f0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#0f172a;border:1px solid #1e293b;border-radius:16px;overflow:hidden;">
+    <tr><td style="padding:32px;">
+      <div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#22d3ee;margin-bottom:8px;">
+        Course update
+      </div>
+      <h1 style="margin:0 0 20px;font-size:20px;color:#f1f5f9;">
+        {course_title}
+      </h1>
+      <div style="font-size:15px;line-height:1.6;color:#e2e8f0;">
+        {body_html}
+      </div>
+      <p style="margin:24px 0 0;font-size:13px;color:#64748b;">
+        Questions? Reply here or write to
         <a href="mailto:info@proreadyengineer.com" style="color:#22d3ee;">info@proreadyengineer.com</a>.
       </p>
     </td></tr>

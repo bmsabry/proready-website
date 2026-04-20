@@ -1,19 +1,46 @@
 """Database models.
 
-Single table for v1 — one row per registration attempt. Status transitions:
+Tables:
+  courses        — one row per cohort/course offering
+  registrations  — one row per registration attempt, linked to a course by `course_code`
+
+Registration status transitions:
   pending -> paid      (admin marks paid after invoice clears)
   pending -> cancelled (admin releases a stale lead)
 
-Only `paid` rows count toward the 15-seat cap.
+Only `paid` rows count toward a course's seat cap.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, Index, String, func
+from sqlalchemy import Date, DateTime, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
+
+
+class Course(Base):
+    __tablename__ = "courses"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # URL-friendly identifier used in registrations.course_code and public API.
+    code: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+
+    title: Mapped[str] = mapped_column(String(200))
+    start_date: Mapped[date] = mapped_column(Date)
+    total_seats: Mapped[int] = mapped_column(Integer, default=15)
+
+    # 'open' | 'closed' — 'closed' rejects new registrations.
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class Registration(Base):
@@ -21,7 +48,8 @@ class Registration(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
-    # Cohort identifier — lets a second cohort reuse the same table later.
+    # Foreign-key-by-string to Course.code. String chosen over a real FK so
+    # admins can rename/replace courses without cascading migrations.
     course_code: Mapped[str] = mapped_column(String(128), index=True)
 
     # Applicant fields mirror the frontend form.
@@ -46,7 +74,7 @@ class Registration(Base):
     )
 
 
-# Composite index: common "count paid rows for this cohort" query.
+# Composite index: common "count paid rows for this course" query.
 Index(
     "ix_registrations_course_status",
     Registration.course_code,
