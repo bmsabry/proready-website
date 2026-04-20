@@ -76,7 +76,7 @@ export default function AdminLogin() {
   }
 
   return (
-    <section className="min-h-[80vh] flex items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 py-16 px-4">
+    <section className="min-h-[80vh] flex items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 pt-28 pb-16 px-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

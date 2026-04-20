@@ -185,7 +185,7 @@ export default function AdminDashboard() {
   }, [regs]);
 
   return (
-    <section className="min-h-[80vh] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 py-10 px-4 sm:px-6 lg:px-8">
+    <section className="min-h-[80vh] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 pt-28 pb-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
