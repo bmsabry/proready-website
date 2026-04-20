@@ -30,6 +30,8 @@ import SACDynamics from './pages/insights/SACDynamics';
 import SACAerodynamics from './pages/insights/SACAerodynamics';
 import GasTurbineEmissionsMapping from './pages/training/GasTurbineEmissionsMapping';
 import Contact from './pages/Contact';
+import AdminLogin from './pages/admin/AdminLogin';
+import AdminDashboard from './pages/admin/AdminDashboard';
 
 function App() {
   return (
@@ -63,6 +65,8 @@ function App() {
             <Route path="/insights/sac-dynamics" element={<SACDynamics />} />
             <Route path="/insights/sac-aerodynamics" element={<SACAerodynamics />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/case-studies/reinstatement-of-polypropylene-plant-high-pressure-blow-down-vessel" element={<ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel />} />
                 <Route path="/case-studies/recovery-reactor-feed-cooler-heat-exchanger" element={<RecoveryReactorFeedCoolerHeatExchanger />} />
             <Route path="/case-studies/case-study-fuel-supply-capability-expansion-specification-procurement-and-commissioning" element={<CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissioning />} />
