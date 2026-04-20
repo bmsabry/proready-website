@@ -12,13 +12,30 @@ from .config import get_settings
 
 settings = get_settings()
 
+
+def _normalize_db_url(url: str) -> str:
+    """Force the psycopg3 dialect for Postgres URLs.
+
+    Render provides `postgresql://...`, which SQLAlchemy resolves to the
+    psycopg2 driver by default. We ship `psycopg[binary]` (v3) instead, so
+    we rewrite the scheme to `postgresql+psycopg://` to pick up psycopg3.
+    """
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url[len("postgresql://") :]
+    return url
+
+
+db_url = _normalize_db_url(settings.DATABASE_URL)
+
 # For SQLite we need check_same_thread=False; harmless on Postgres.
 connect_args = (
-    {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
+    {"check_same_thread": False} if db_url.startswith("sqlite") else {}
 )
 
 engine = create_engine(
-    settings.DATABASE_URL,
+    db_url,
     connect_args=connect_args,
     pool_pre_ping=True,
     future=True,
