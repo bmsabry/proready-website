@@ -1,26 +1,29 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, Users, BookOpen, Search, Filter, ArrowRight } from 'lucide-react';
 
 const courses = [
   {
     id: 1,
+    title: "Gas Turbine Emissions Mapping",
+    category: "Thermal Fluids",
+    duration: "5 Days",
+    level: "Beginner to Expert",
+    attendees: "15 Seats",
+    description: "De-mystify DLE combustion. Master the dynamics corridor, emissions mapping strategy, and flex-fuel troubleshooting from first principles to expert level. No prior gas turbine knowledge required.",
+    nextDate: "May 15, 2026",
+    slug: "gas-turbine-emissions-mapping",
+    featured: true
+  },
+  {
+    id: 2,
     title: "Advanced Combustion Fundamentals",
     category: "Thermal Fluids",
     duration: "3 Days",
     level: "Intermediate",
     attendees: "20 Max",
     description: "Core combustion theory with practical applications for modern energy systems.",
-    nextDate: "By request"
-  },
-  {
-    id: 2,
-    title: "Gas Turbine Combustion",
-    category: "Thermal Fluids",
-    duration: "3 Days",
-    level: "Advanced",
-    attendees: "15 Max",
-    description: "Stability, emissions, and performance considerations for gas turbine combustors.",
     nextDate: "By request"
   },
   {
@@ -151,9 +154,18 @@ const Training = () => {
                 </div>
               </div>
 
-              <button className="w-full py-3 rounded-xl bg-slate-800 hover:bg-cyan-600 text-white font-semibold transition-all flex items-center justify-center gap-2 group/btn">
-                View Course Details <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-              </button>
+              {course.slug ? (
+                <Link
+                  to={`/training/${course.slug}`}
+                  className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition-all flex items-center justify-center gap-2 group/btn"
+                >
+                  View Course Details <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+                </Link>
+              ) : (
+                <button className="w-full py-3 rounded-xl bg-slate-800 hover:bg-cyan-600 text-white font-semibold transition-all flex items-center justify-center gap-2 group/btn">
+                  View Course Details <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+                </button>
+              )}
             </motion.div>
           ))}
         </div>
