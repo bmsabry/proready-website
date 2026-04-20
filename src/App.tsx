@@ -28,6 +28,7 @@ import CombustorFlowEvolution from './pages/insights/CombustorFlowEvolution';
 import AutomatedCombustorDesign from './pages/insights/AutomatedCombustorDesign';
 import SACDynamics from './pages/insights/SACDynamics';
 import SACAerodynamics from './pages/insights/SACAerodynamics';
+import GasTurbineEmissionsMapping from './pages/training/GasTurbineEmissionsMapping';
 import Contact from './pages/Contact';
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/services" element={<Services />} />
             <Route path="/training" element={<Training />} />
+            <Route path="/training/gas-turbine-emissions-mapping" element={<GasTurbineEmissionsMapping />} />
             <Route path="/insights" element={<Insights />} />
             <Route path="/case-studies" element={<CaseStudies />} />
             <Route path="/testimonials" element={<Testimonials />} />
