@@ -26,9 +26,11 @@ const NEXT_COHORT_DATE = 'May 15, 2026';
 const NOTEBOOKLM_URL =
   'https://notebooklm.google.com/notebook/39f245f9-bb92-4b02-9eee-4e37baa927ca/preview';
 
-// Backend endpoints — Phase 2 will replace these with real Render API URLs
-// TODO(Phase 2): set to https://proreadyengineer-training-api.onrender.com once deployed
-const API_BASE = ''; // empty means "not wired yet" — form simulates success
+// Backend endpoints. Set VITE_API_BASE in your deploy env to the Render URL,
+// e.g. https://proreadyengineer-training-api.onrender.com
+// When unset (local dev without backend), the form simulates success so the UI
+// can be previewed without the API running.
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
 const SEATS_ENDPOINT = API_BASE ? `${API_BASE}/api/seats` : '';
 const REGISTER_ENDPOINT = API_BASE ? `${API_BASE}/api/register` : '';
 
@@ -144,7 +146,9 @@ const IDEAL_FOR = [
 const GasTurbineEmissionsMapping = () => {
   const [seatsTaken, setSeatsTaken] = useState<number | null>(null);
   const [seatsLoading, setSeatsLoading] = useState(true);
-  const [formState, setFormState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [formState, setFormState] = useState<'idle' | 'loading' | 'success' | 'duplicate' | 'error'>(
+    'idle',
+  );
   const [formError, setFormError] = useState<string | null>(null);
 
   // Fetch live seat count. When API_BASE is empty we skip and show a conservative default.
@@ -209,12 +213,12 @@ const GasTurbineEmissionsMapping = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setFormError(data.error || `Registration failed (${res.status}).`);
+        setFormError(data.detail || data.error || `Registration failed (${res.status}).`);
         setFormState('error');
         return;
       }
-      setSeatsTaken(data.taken ?? (seatsTaken ?? 0) + 1);
-      setFormState('success');
+      if (typeof data.taken === 'number') setSeatsTaken(data.taken);
+      setFormState(data.status === 'duplicate' ? 'duplicate' : 'success');
     } catch {
       setFormError('Network error. Please try again or email info@proreadyengineer.com.');
       setFormState('error');
@@ -565,6 +569,24 @@ const GasTurbineEmissionsMapping = () => {
                 .
               </p>
             </div>
+          ) : formState === 'duplicate' ? (
+            <div className="text-center py-12">
+              <div className="w-20 h-20 bg-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-10 h-10 text-cyan-400" />
+              </div>
+              <h3 className="text-2xl font-bold mb-4">You're already registered</h3>
+              <p className="text-slate-400 mb-8 max-w-md mx-auto">
+                We already have a registration for this email address. Watch your inbox for
+                payment details — or email{' '}
+                <a
+                  className="text-cyan-400 underline"
+                  href="mailto:info@proreadyengineer.com"
+                >
+                  info@proreadyengineer.com
+                </a>{' '}
+                if you didn't receive the confirmation.
+              </p>
+            </div>
           ) : isFull ? (
             <div className="text-center py-12">
               <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -644,6 +666,17 @@ const GasTurbineEmissionsMapping = () => {
                   required
                   placeholder="Cincinnati, USA"
                 />
+              </div>
+
+              {/* Honeypot — hidden from real users, filled by bots. Submissions with a
+                  non-empty `website` value are silently dropped by the backend. Do NOT add
+                  `autocomplete="off"` — browsers will still autofill URL fields if labelled
+                  like a real one; leaving it plain works better with most bots. */}
+              <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px' }}>
+                <label>
+                  Website (leave blank)
+                  <input type="text" name="website" tabIndex={-1} autoComplete="off" />
+                </label>
               </div>
 
               <label className="flex items-start gap-3 text-xs text-slate-500 leading-relaxed">
