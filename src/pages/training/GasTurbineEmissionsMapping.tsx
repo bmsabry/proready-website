@@ -262,6 +262,25 @@ const GasTurbineEmissionsMapping = () => {
             field.
           </p>
 
+          <div className="flex flex-wrap items-center gap-4 mb-10">
+            <a
+              href="#register"
+              onClick={(e) => {
+                e.preventDefault();
+                document
+                  .getElementById('register')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className="btn-primary text-base px-8 py-4"
+            >
+              Register
+              <Send className="w-4 h-4 ml-2 inline-block -mt-0.5" />
+            </a>
+            <span className="text-sm text-slate-500">
+              No payment required to register — seat held as pending.
+            </span>
+          </div>
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Stat icon={<Clock className="w-5 h-5" />} label="Duration" value="5 Days" />
             <Stat
