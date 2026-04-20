@@ -233,9 +233,20 @@ const GasTurbineEmissionsMapping = () => {
           <div className="text-xs font-mono uppercase tracking-[0.2em] text-cyan-400 mb-4">
             5-Day Expert Course · Next Cohort {NEXT_COHORT_DATE}
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold mb-4 leading-tight">
+          <h1 className="text-4xl md:text-6xl font-bold mb-8 leading-tight">
             Gas Turbine <span className="text-gradient">Emissions Mapping</span>
           </h1>
+
+          {/* Course infographic — placed directly under the title, matching site pattern */}
+          <div className="rounded-3xl overflow-hidden border border-slate-800 bg-slate-900/50 mb-10 shadow-2xl shadow-cyan-900/10">
+            <img
+              src="/Gas_Turbine_Emissions_Mapping_Infographic.png"
+              alt="Gas Turbine Emissions Mapping — 5-day professional training infographic: the corridor, disturbances, course timeline, mitigation levers, and LFD threshold table"
+              className="w-full h-auto block"
+              loading="eager"
+            />
+          </div>
+
           <p className="text-2xl md:text-3xl font-light text-slate-300 mb-8">
             De-mystifying complexity — the gas turbine mapping expert course.
           </p>
@@ -243,7 +254,7 @@ const GasTurbineEmissionsMapping = () => {
             Modern DLE combustion systems look daunting — six distinct gas circuits, bounded by
             narrow dynamics corridors and moving ambient targets. This course takes you from
             zero gas-turbine knowledge to confident field mapper over five days, taught by a
-            practitioner with 17+ years of live mapping experience and multiple patents in the
+            practitioner with 19+ years of live mapping experience and multiple patents in the
             field.
           </p>
 
@@ -487,7 +498,7 @@ const GasTurbineEmissionsMapping = () => {
             </div>
             <h2 className="text-3xl font-bold mb-4">Bassam Abdelnabi</h2>
             <p className="text-slate-300 leading-relaxed mb-4">
-              Founder of ProReadyEngineer. 17+ years in gas-turbine combustion with 1,000+
+              Founder of ProReadyEngineer. 19+ years in gas-turbine combustion with 1,000+
               mapping tests across flex-fuel operations — 100 % propane through hydrogen
               blending. Multiple patents in combustion tuning and emissions reduction.
             </p>
@@ -583,11 +594,11 @@ const GasTurbineEmissionsMapping = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Field label="Full Name" name="full_name" required placeholder="Jane Doe" />
                 <Field
-                  label="Work Email"
+                  label="Email"
                   name="email"
                   type="email"
                   required
-                  placeholder="jane@company.com"
+                  placeholder="you@example.com"
                 />
               </div>
 
