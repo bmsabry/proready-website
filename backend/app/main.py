@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .db import Base, engine
 from .routes import admin as admin_routes
+from .routes import auth as auth_routes
 from .routes import register as register_routes
 from .routes import seats as seats_routes
 
@@ -32,13 +33,14 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
-    allow_credentials=False,
+    allow_credentials=True,  # required so /api/admin/* cookies survive
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(seats_routes.router)
 app.include_router(register_routes.router)
+app.include_router(auth_routes.router)
 app.include_router(admin_routes.router)
 
 

@@ -41,8 +41,18 @@ class Settings(BaseSettings):
     COURSE_PRICE_DISPLAY: str = ""  # e.g. "$1,950 USD". Empty = omit from email.
 
     # --- Admin auth -------------------------------------------------------
-    # Single shared bearer token. Rotate by changing the env var on Render.
+    # Single shared bearer token (server-to-server / curl escape hatch).
+    # Rotate by changing the env var on Render.
     ADMIN_TOKEN: str = ""
+
+    # Email + password login for the admin UI. Only one admin is recognised;
+    # only requests where the login email matches ADMIN_EMAIL (case-insensitive)
+    # are even considered. ADMIN_PASSWORD_HASH is a bcrypt hash of the current
+    # password. SESSION_SECRET signs the httpOnly session cookie.
+    ADMIN_EMAIL: str = "bmsabry@gmail.com"
+    ADMIN_PASSWORD_HASH: str = ""
+    SESSION_SECRET: str = ""
+    SESSION_MAX_AGE_SECONDS: int = 60 * 60 * 24 * 7  # 7 days
 
     # --- CORS -------------------------------------------------------------
     # Comma-separated origins. In prod: https://proreadyengineer.com

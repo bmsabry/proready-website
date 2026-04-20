@@ -63,3 +63,16 @@ class MarkPaidOut(BaseModel):
     ok: bool
     taken: int
     registration: AdminRegistrationOut
+
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=200)
+
+
+class MeOut(BaseModel):
+    email: EmailStr
+
+
+class OkOut(BaseModel):
+    ok: bool = True
