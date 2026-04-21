@@ -295,7 +295,7 @@ const GasTurbineEmissionsMapping = () => {
           {/* Course infographic — placed directly under the title, matching site pattern */}
           <div className="rounded-3xl overflow-hidden border border-slate-800 bg-slate-900/50 mb-10 shadow-2xl shadow-cyan-900/10">
             <img
-              src="/Mapping_Training_Infographic_3.jpg"
+              src="/Mapping_Training_Infographic_4.png"
               alt="Gas Turbine Emissions Mapping — De-mystifying Complexity: 6 gas circuits (OM, OP, OE, IM, IP, IE), the dynamics corridor (Φ ≈ 0.45–0.6), and 5-day course timeline"
               className="w-full h-auto block"
               loading="eager"
