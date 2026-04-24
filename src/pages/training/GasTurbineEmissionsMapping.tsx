@@ -67,6 +67,7 @@ const CIRCUITS: Circuit[] = [
 
 type Day = {
   n: number;
+  date: string;
   title: string;
   summary: string;
   topics: string[];
@@ -76,6 +77,7 @@ type Day = {
 const CURRICULUM: Day[] = [
   {
     n: 1,
+    date: 'May 16, 2026',
     title: 'Fundamentals of Combustion',
     summary:
       'Flame types, GT cycles, premixed vs diffusion, burning velocity, equivalence ratio basics.',
@@ -89,6 +91,7 @@ const CURRICULUM: Day[] = [
   },
   {
     n: 2,
+    date: 'May 17, 2026',
     title: 'Combustion Dynamics',
     summary:
       'Thermoacoustics, LFD vs HFD, the Rayleigh criterion, sensors, mitigation levers.',
@@ -102,6 +105,7 @@ const CURRICULUM: Day[] = [
   },
   {
     n: 3,
+    date: 'May 23, 2026',
     title: 'DLE Operations & Emissions',
     summary:
       'Lean-premixed operating window, NOx/CO trade-off, CEMS, regulatory corrections.',
@@ -115,6 +119,7 @@ const CURRICULUM: Day[] = [
   },
   {
     n: 4,
+    date: 'May 24, 2026',
     title: 'Mapping & Ambient Effects',
     summary:
       'Per-circuit fuel split optimisation, seasonal remapping, humidity and inlet T effects.',
@@ -128,6 +133,7 @@ const CURRICULUM: Day[] = [
   },
   {
     n: 5,
+    date: 'May 30, 2026',
     title: 'Flex Fuel & Troubleshooting',
     summary:
       'Hydrogen blending, Wobbe / Modified Wobbe Index, RCA for LBO, flashback, stage-down events.',
@@ -477,8 +483,11 @@ const GasTurbineEmissionsMapping = () => {
                   <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
                     {d.icon}
                   </div>
-                  <div className="text-xs font-mono uppercase tracking-wider text-slate-500">
-                    Day {d.n}
+                  <div className="leading-tight">
+                    <div className="text-xs font-mono uppercase tracking-wider text-slate-500">
+                      Day {d.n}
+                    </div>
+                    <div className="text-xs text-cyan-400 font-medium">{d.date}</div>
                   </div>
                 </div>
                 <h3 className="font-bold text-white mb-2 text-lg leading-tight">{d.title}</h3>

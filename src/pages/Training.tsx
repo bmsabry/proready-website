@@ -1,7 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, Users, BookOpen, Search, Filter, ArrowRight } from 'lucide-react';
+
+// Courses backed by the registration API expose a `code` so the card can show
+// live seats / start date instead of hardcoded values.
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
+
+// Parse "2026-05-16" -> "May 16, 2026" without timezone drift.
+const formatStartDate = (iso: string): string => {
+  const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));
+  if (!y || !m || !d) return iso;
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  return `${months[m - 1]} ${d}, ${y}`;
+};
 
 const courses = [
   {
@@ -14,6 +29,7 @@ const courses = [
     description: "De-mystify DLE combustion. Master the dynamics corridor, emissions mapping strategy, and flex-fuel troubleshooting from first principles to expert level. No prior gas turbine knowledge required.",
     nextDate: "May 15, 2026",
     slug: "gas-turbine-emissions-mapping",
+    code: "gas-turbine-emissions-mapping-2026-05",
     featured: true
   },
   {
@@ -78,12 +94,60 @@ const courses = [
   }
 ];
 
+type LiveCourseInfo = {
+  seatsRemaining: number;
+  totalSeats: number;
+  startDate: string; // already formatted "May 16, 2026"
+  status: 'open' | 'closed';
+};
+
 const Training = () => {
   const [filter, setFilter] = useState('All');
   const categories = ['All', 'Thermal Fluids', 'AI & Data'];
+  const [liveByCode, setLiveByCode] = useState<Record<string, LiveCourseInfo>>({});
 
-  const filteredCourses = filter === 'All' 
-    ? courses 
+  // Fetch live course data for any course that has a `code`. Falls back
+  // silently to the hardcoded values when the API is unreachable.
+  useEffect(() => {
+    if (!API_BASE) return;
+    let cancelled = false;
+    const codes = courses.map((c) => c.code).filter((c): c is string => Boolean(c));
+    (async () => {
+      const entries = await Promise.all(
+        codes.map(async (code) => {
+          try {
+            const res = await fetch(`${API_BASE}/api/courses/${code}`, { cache: 'no-store' });
+            if (!res.ok) return null;
+            const data = (await res.json()) as {
+              start_date: string;
+              total_seats: number;
+              seats_taken: number;
+              status: 'open' | 'closed';
+            };
+            const info: LiveCourseInfo = {
+              seatsRemaining: Math.max(0, data.total_seats - data.seats_taken),
+              totalSeats: data.total_seats,
+              startDate: formatStartDate(data.start_date),
+              status: data.status,
+            };
+            return [code, info] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (cancelled) return;
+      const map: Record<string, LiveCourseInfo> = {};
+      for (const e of entries) if (e) map[e[0]] = e[1];
+      setLiveByCode(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filteredCourses = filter === 'All'
+    ? courses
     : courses.filter(c => c.category === filter);
 
   return (
@@ -116,7 +180,17 @@ const Training = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredCourses.map((course, i) => (
+          {filteredCourses.map((course, i) => {
+            const live = course.code ? liveByCode[course.code] : undefined;
+            const seatsLabel = live
+              ? live.status === 'closed'
+                ? 'Registration closed'
+                : live.seatsRemaining === 0
+                  ? `Cohort full (${live.totalSeats} seats)`
+                  : `${live.seatsRemaining} of ${live.totalSeats} seats left`
+              : course.attendees;
+            const dateLabel = live ? live.startDate : course.nextDate;
+            return (
             <motion.div
               key={course.id}
               initial={{ opacity: 0, scale: 0.95 }}
@@ -129,7 +203,7 @@ const Training = () => {
                   {course.category}
                 </span>
               </div>
-              
+
               <h3 className="text-2xl font-bold mb-4 group-hover:text-cyan-400 transition-colors">{course.title}</h3>
               <p className="text-slate-400 text-sm mb-8 flex-grow leading-relaxed">
                 {course.description}
@@ -146,11 +220,11 @@ const Training = () => {
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <Users className="w-4 h-4 text-slate-600" />
-                  <span>{course.attendees}</span>
+                  <span>{seatsLabel}</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <Calendar className="w-4 h-4 text-slate-600" />
-                  <span>Next: {course.nextDate}</span>
+                  <span>Next: {dateLabel}</span>
                 </div>
               </div>
 
@@ -167,7 +241,8 @@ const Training = () => {
                 </button>
               )}
             </motion.div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Custom Training CTA */}
