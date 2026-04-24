@@ -94,6 +94,10 @@ class CourseOut(BaseModel):
     start_date: date
     total_seats: int
     status: Literal["open", "closed"]
+    # Per-day schedule, ordered Day 1 -> Day N. Empty list means
+    # "duration not yet scheduled". Returned as ISO strings so the
+    # browser doesn't have to deal with date-object reconstruction.
+    day_dates: List[date] = Field(default_factory=list)
     seats_taken: int = 0
     seats_remaining: int = 0
 
@@ -104,6 +108,8 @@ class CourseCreateIn(BaseModel):
     start_date: date
     total_seats: int = Field(ge=1, le=1000)
     status: Literal["open", "closed"] = "open"
+    # Optional on create — admin can fill in the schedule later.
+    day_dates: List[date] = Field(default_factory=list, max_length=60)
 
 
 class CoursePatchIn(BaseModel):
@@ -113,6 +119,9 @@ class CoursePatchIn(BaseModel):
     start_date: Optional[date] = None
     total_seats: Optional[int] = Field(default=None, ge=1, le=1000)
     status: Optional[Literal["open", "closed"]] = None
+    # Pass the full ordered list; we replace the column in one shot.
+    # Send [] to clear; omit the field to leave unchanged.
+    day_dates: Optional[List[date]] = Field(default=None, max_length=60)
 
 
 class NotifyIn(BaseModel):

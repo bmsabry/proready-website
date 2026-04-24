@@ -99,6 +99,7 @@ type LiveCourseInfo = {
   totalSeats: number;
   startDate: string; // already formatted "May 16, 2026"
   status: 'open' | 'closed';
+  numDays: number; // length of day_dates; 0 if not scheduled
 };
 
 const Training = () => {
@@ -123,12 +124,14 @@ const Training = () => {
               total_seats: number;
               seats_taken: number;
               status: 'open' | 'closed';
+              day_dates?: string[];
             };
             const info: LiveCourseInfo = {
               seatsRemaining: Math.max(0, data.total_seats - data.seats_taken),
               totalSeats: data.total_seats,
               startDate: formatStartDate(data.start_date),
               status: data.status,
+              numDays: Array.isArray(data.day_dates) ? data.day_dates.length : 0,
             };
             return [code, info] as const;
           } catch {
@@ -190,6 +193,8 @@ const Training = () => {
                   : `${live.seatsRemaining} of ${live.totalSeats} seats left`
               : course.attendees;
             const dateLabel = live ? live.startDate : course.nextDate;
+            const durationLabel =
+              live && live.numDays > 0 ? `${live.numDays} Days` : course.duration;
             return (
             <motion.div
               key={course.id}
@@ -212,7 +217,7 @@ const Training = () => {
               <div className="grid grid-cols-2 gap-4 mb-8">
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <Clock className="w-4 h-4 text-slate-600" />
-                  <span>{course.duration}</span>
+                  <span>{durationLabel}</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <BookOpen className="w-4 h-4 text-slate-600" />

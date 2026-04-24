@@ -15,6 +15,7 @@ Admin (protected):
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -43,6 +44,27 @@ log = logging.getLogger(__name__)
 
 # ----- Helpers --------------------------------------------------------------
 
+def _parse_day_dates(raw) -> List[date]:
+    """Convert the JSON-stored day_dates (list of ISO strings) to date objects.
+
+    The column is JSON-typed; whatever shape the DB returns we accept a list of
+    ISO 'YYYY-MM-DD' strings and parse them. Empty/None becomes an empty list.
+    """
+    if not raw:
+        return []
+    out: List[date] = []
+    for item in raw:
+        if isinstance(item, date):
+            out.append(item)
+        else:
+            try:
+                out.append(date.fromisoformat(str(item)))
+            except ValueError:
+                # Skip a corrupted entry rather than 500 the whole endpoint.
+                log.warning("Skipping unparseable day_dates entry: %r", item)
+    return out
+
+
 def _to_out(course: Course, db: Session) -> CourseOut:
     """Compute seats_taken and return the response model."""
     taken = int(
@@ -59,6 +81,7 @@ def _to_out(course: Course, db: Session) -> CourseOut:
         start_date=course.start_date,
         total_seats=course.total_seats,
         status=course.status,  # type: ignore[arg-type]
+        day_dates=_parse_day_dates(course.day_dates),
         seats_taken=taken,
         seats_remaining=max(course.total_seats - taken, 0),
     )
@@ -128,6 +151,7 @@ def create_course(body: CourseCreateIn, db: Session = Depends(get_db)) -> Course
         start_date=body.start_date,
         total_seats=body.total_seats,
         status=body.status,
+        day_dates=[d.isoformat() for d in body.day_dates],
     )
     db.add(course)
     db.commit()
@@ -159,6 +183,9 @@ def patch_course(
     if body.start_date is not None and body.start_date != course.start_date:
         course.start_date = body.start_date
         changed_start = True
+    if body.day_dates is not None:
+        # Replace the full list. Store as ISO strings so JSON is portable.
+        course.day_dates = [d.isoformat() for d in body.day_dates]
 
     db.commit()
     db.refresh(course)

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Index, Integer, String, func
+from sqlalchemy import JSON, Date, DateTime, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -31,6 +31,10 @@ class Course(Base):
     title: Mapped[str] = mapped_column(String(200))
     start_date: Mapped[date] = mapped_column(Date)
     total_seats: Mapped[int] = mapped_column(Integer, default=15)
+
+    # ISO date strings, ordered Day 1 -> Day N. Number of days = len(day_dates).
+    # Stored as JSON for portability (Postgres uses native json, SQLite text).
+    day_dates: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
 
     # 'open' | 'closed' — 'closed' rejects new registrations.
     status: Mapped[str] = mapped_column(String(16), default="open", index=True)

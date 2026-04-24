@@ -65,9 +65,10 @@ const CIRCUITS: Circuit[] = [
   { code: 'OE', label: 'Outer ELBO', color: 'bg-red-900/80', text: 'text-red-100' },
 ];
 
+// Curriculum content. Index 0 -> Day 1, index 1 -> Day 2, etc.
+// Dates are *not* stored here — they come from the live API (day_dates)
+// so the admin can adjust them without a code change.
 type Day = {
-  n: number;
-  date: string;
   title: string;
   summary: string;
   topics: string[];
@@ -76,8 +77,6 @@ type Day = {
 
 const CURRICULUM: Day[] = [
   {
-    n: 1,
-    date: 'May 16, 2026',
     title: 'Fundamentals of Combustion',
     summary:
       'Flame types, GT cycles, premixed vs diffusion, burning velocity, equivalence ratio basics.',
@@ -90,8 +89,6 @@ const CURRICULUM: Day[] = [
     icon: <Flame className="w-6 h-6" />,
   },
   {
-    n: 2,
-    date: 'May 17, 2026',
     title: 'Combustion Dynamics',
     summary:
       'Thermoacoustics, LFD vs HFD, the Rayleigh criterion, sensors, mitigation levers.',
@@ -104,8 +101,6 @@ const CURRICULUM: Day[] = [
     icon: <Activity className="w-6 h-6" />,
   },
   {
-    n: 3,
-    date: 'May 23, 2026',
     title: 'DLE Operations & Emissions',
     summary:
       'Lean-premixed operating window, NOx/CO trade-off, CEMS, regulatory corrections.',
@@ -118,8 +113,6 @@ const CURRICULUM: Day[] = [
     icon: <Gauge className="w-6 h-6" />,
   },
   {
-    n: 4,
-    date: 'May 24, 2026',
     title: 'Mapping & Ambient Effects',
     summary:
       'Per-circuit fuel split optimisation, seasonal remapping, humidity and inlet T effects.',
@@ -132,8 +125,6 @@ const CURRICULUM: Day[] = [
     icon: <Cloud className="w-6 h-6" />,
   },
   {
-    n: 5,
-    date: 'May 30, 2026',
     title: 'Flex Fuel & Troubleshooting',
     summary:
       'Hydrogen blending, Wobbe / Modified Wobbe Index, RCA for LBO, flashback, stage-down events.',
@@ -146,6 +137,16 @@ const CURRICULUM: Day[] = [
     icon: <Wrench className="w-6 h-6" />,
   },
 ];
+
+// Placeholder rendered for days that exist in the admin schedule but go
+// beyond the locally-defined curriculum content. Lets admins extend a
+// course past 5 days without immediately needing a code change.
+const TBD_DAY: Day = {
+  title: 'Schedule TBD',
+  summary: 'Detailed agenda for this day will be published soon.',
+  topics: ['Topic outline pending'],
+  icon: <Calendar className="w-6 h-6" />,
+};
 
 const STARTER_PROMPTS = [
   'My NOx is drifting up 5 ppm overnight at constant load — likely mapping-related root causes?',
@@ -164,12 +165,25 @@ const IDEAL_FOR = [
 // -----------------------------------------------------------------------------
 // Page component
 // -----------------------------------------------------------------------------
+// Default schedule used when the API hasn't responded yet (or is unavailable
+// in local preview). Admin can override these any time via the dashboard.
+const DEFAULT_DAY_DATES: string[] = [
+  'May 16, 2026',
+  'May 17, 2026',
+  'May 23, 2026',
+  'May 24, 2026',
+  'May 30, 2026',
+];
+
 const GasTurbineEmissionsMapping = () => {
   const [seatsTaken, setSeatsTaken] = useState<number | null>(null);
   const [capacity, setCapacity] = useState<number>(DEFAULT_CAPACITY);
   const [cohortDate, setCohortDate] = useState<string>(DEFAULT_COHORT_DATE);
   const [courseStatus, setCourseStatus] = useState<'open' | 'closed'>('open');
   const [seatsLoading, setSeatsLoading] = useState(true);
+  // Per-day dates (formatted "May 16, 2026"). Defaults to the hardcoded
+  // schedule above; replaced by the API list when day_dates is non-empty.
+  const [dayDates, setDayDates] = useState<string[]>(DEFAULT_DAY_DATES);
   const [formState, setFormState] = useState<'idle' | 'loading' | 'success' | 'duplicate' | 'error'>(
     'idle',
   );
@@ -195,12 +209,16 @@ const GasTurbineEmissionsMapping = () => {
           total_seats: number;
           seats_taken: number;
           status: 'open' | 'closed';
+          day_dates?: string[];
         };
         if (!cancelled) {
           setSeatsTaken(data.seats_taken);
           setCapacity(data.total_seats);
           setCohortDate(formatStartDate(data.start_date));
           setCourseStatus(data.status);
+          if (Array.isArray(data.day_dates) && data.day_dates.length > 0) {
+            setDayDates(data.day_dates.map(formatStartDate));
+          }
           setSeatsLoading(false);
         }
       } catch {
@@ -273,7 +291,7 @@ const GasTurbineEmissionsMapping = () => {
           className="mb-16"
         >
           <div className="text-xs font-mono uppercase tracking-[0.2em] text-cyan-400 mb-4">
-            5-Day Expert Course · Next Cohort {cohortDate}
+            {dayDates.length || CURRICULUM.length}-Day Expert Course · Next Cohort {cohortDate}
           </div>
           <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
             Gas Turbine <span className="text-gradient">Emissions Mapping</span>
@@ -320,7 +338,12 @@ const GasTurbineEmissionsMapping = () => {
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Stat icon={<Clock className="w-5 h-5" />} label="Duration" value="5 Days" />
+            <Stat
+              icon={<Clock className="w-5 h-5" />}
+              label="Duration"
+              value={`${dayDates.length || CURRICULUM.length} Days`}
+            />
+
             <Stat
               icon={<Calendar className="w-5 h-5" />}
               label="Next Cohort"
@@ -463,48 +486,61 @@ const GasTurbineEmissionsMapping = () => {
           </motion.div>
         </div>
 
-        {/* CURRICULUM TIMELINE */}
+        {/* CURRICULUM TIMELINE — number of cards is driven by the admin's */}
+        {/* day_dates list. Topics for each day come from the local CURRICULUM */}
+        {/* array; days beyond CURRICULUM.length render as a TBD placeholder. */}
         <div className="mb-16">
           <div className="text-xs font-mono uppercase tracking-[0.2em] text-cyan-400 mb-2">
             Curriculum
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-8">5-Day Arc</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {CURRICULUM.map((d, i) => (
-              <motion.div
-                key={d.n}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.05 }}
-                className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-cyan-500/50 transition-all flex flex-col"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                    {d.icon}
-                  </div>
-                  <div className="leading-tight">
-                    <div className="text-xs font-mono uppercase tracking-wider text-slate-500">
-                      Day {d.n}
+          <h2 className="text-3xl md:text-4xl font-bold mb-8">
+            {dayDates.length || CURRICULUM.length}-Day Arc
+          </h2>
+          <div
+            className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
+              (dayDates.length || CURRICULUM.length) <= 5
+                ? 'lg:grid-cols-5'
+                : 'lg:grid-cols-3'
+            }`}
+          >
+            {(dayDates.length > 0 ? dayDates : DEFAULT_DAY_DATES).map((dateLabel, i) => {
+              const day = CURRICULUM[i] ?? TBD_DAY;
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.05 }}
+                  className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-cyan-500/50 transition-all flex flex-col"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                      {day.icon}
                     </div>
-                    <div className="text-xs text-cyan-400 font-medium">{d.date}</div>
+                    <div className="leading-tight">
+                      <div className="text-xs font-mono uppercase tracking-wider text-slate-500">
+                        Day {i + 1}
+                      </div>
+                      <div className="text-xs text-cyan-400 font-medium">{dateLabel}</div>
+                    </div>
                   </div>
-                </div>
-                <h3 className="font-bold text-white mb-2 text-lg leading-tight">{d.title}</h3>
-                <p className="text-slate-400 text-sm mb-4 leading-relaxed">{d.summary}</p>
-                <ul className="space-y-2 mt-auto">
-                  {d.topics.map((t) => (
-                    <li
-                      key={t}
-                      className="text-xs text-slate-500 flex gap-2 leading-relaxed"
-                    >
-                      <CheckCircle2 className="w-3 h-3 text-cyan-500/70 shrink-0 mt-0.5" />
-                      <span>{t}</span>
-                    </li>
-                  ))}
-                </ul>
-              </motion.div>
-            ))}
+                  <h3 className="font-bold text-white mb-2 text-lg leading-tight">{day.title}</h3>
+                  <p className="text-slate-400 text-sm mb-4 leading-relaxed">{day.summary}</p>
+                  <ul className="space-y-2 mt-auto">
+                    {day.topics.map((t) => (
+                      <li
+                        key={t}
+                        className="text-xs text-slate-500 flex gap-2 leading-relaxed"
+                      >
+                        <CheckCircle2 className="w-3 h-3 text-cyan-500/70 shrink-0 mt-0.5" />
+                        <span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
 

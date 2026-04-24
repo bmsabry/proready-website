@@ -47,6 +47,9 @@ type Course = {
   start_date: string; // yyyy-mm-dd
   total_seats: number;
   status: 'open' | 'closed';
+  // Per-day schedule, ordered Day 1 -> Day N. Empty array means
+  // no schedule has been set yet. len(day_dates) is the cohort length.
+  day_dates: string[];
   seats_taken: number;
   seats_remaining: number;
 };
@@ -458,6 +461,9 @@ type CoursePatch = {
   start_date?: string;
   total_seats?: number;
   status?: 'open' | 'closed';
+  // Full ordered list of ISO yyyy-mm-dd strings. When present in the patch,
+  // the backend replaces the column wholesale. Send [] to clear.
+  day_dates?: string[];
 };
 
 type NotifyTarget = { code: string; title: string } | null;
@@ -661,6 +667,30 @@ function CoursesTab({ onAuthError }: { onAuthError: () => void }) {
               title: edit?.title ?? c.title,
               start_date: edit?.start_date ?? c.start_date,
               total_seats: edit?.total_seats ?? c.total_seats,
+              day_dates: edit?.day_dates ?? c.day_dates ?? [],
+            };
+
+            const setDayDate = (i: number, iso: string) => {
+              const next = [...values.day_dates];
+              next[i] = iso;
+              patchEdit(c.code, { day_dates: next });
+            };
+            const addDay = () => {
+              // Default new day to one day after the last entry, or to start_date.
+              const last = values.day_dates[values.day_dates.length - 1] ?? values.start_date;
+              let next = last;
+              try {
+                const d = new Date(`${last}T00:00:00`);
+                d.setDate(d.getDate() + 1);
+                next = d.toISOString().slice(0, 10);
+              } catch {
+                /* keep last */
+              }
+              patchEdit(c.code, { day_dates: [...values.day_dates, next] });
+            };
+            const removeDay = (i: number) => {
+              const next = values.day_dates.filter((_, idx) => idx !== i);
+              patchEdit(c.code, { day_dates: next });
             };
             return (
               <div
@@ -730,6 +760,58 @@ function CoursesTab({ onAuthError }: { onAuthError: () => void }) {
                       if (!Number.isNaN(n)) patchEdit(c.code, { total_seats: n });
                     }}
                   />
+                </div>
+
+                {/* Per-day schedule editor — admin can change individual day */}
+                {/* dates and add/remove days. Number of days = list length.  */}
+                <div className="mt-4">
+                  <div className="text-[11px] uppercase tracking-wider text-slate-400 flex items-center gap-1 mb-2">
+                    <Calendar className="w-3 h-3 text-slate-500" />
+                    Day-by-day schedule
+                    <span className="ml-2 text-slate-500 normal-case tracking-normal">
+                      ({values.day_dates.length} {values.day_dates.length === 1 ? 'day' : 'days'})
+                    </span>
+                  </div>
+                  {values.day_dates.length === 0 ? (
+                    <div className="text-xs text-slate-500 italic mb-2">
+                      No days scheduled. Click "Add day" to start.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {values.day_dates.map((iso, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 bg-slate-950/60 border border-slate-800 rounded-lg px-2 py-1.5"
+                        >
+                          <span className="text-[11px] font-mono text-slate-500 w-12 shrink-0">
+                            Day {i + 1}
+                          </span>
+                          <input
+                            type="date"
+                            value={iso}
+                            onChange={(e) => setDayDate(i, e.target.value)}
+                            className="flex-1 min-w-0 bg-transparent border-0 text-sm text-white focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeDay(i)}
+                            title="Remove this day"
+                            className="text-slate-500 hover:text-red-300 text-xs px-1"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={addDay}
+                    className="mt-2 inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md border border-slate-700 bg-slate-800/40 text-slate-200 hover:bg-slate-800"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add day
+                  </button>
                 </div>
 
                 {dirty && (
