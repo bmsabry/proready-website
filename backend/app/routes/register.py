@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
@@ -29,18 +29,11 @@ from ..emailer import (
 )
 from ..models import Course, Registration
 from ..schemas import RegisterIn, RegisterOut
+from ..seats import count_active
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["public"])
-
-
-def _count_paid(db: Session, course_code: str) -> int:
-    stmt = select(func.count(Registration.id)).where(
-        Registration.course_code == course_code,
-        Registration.status == "paid",
-    )
-    return int(db.execute(stmt).scalar_one())
 
 
 @router.post("/register", response_model=RegisterOut)
@@ -60,7 +53,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
         if course is not None:
             capacity = course.total_seats
         return RegisterOut(
-            taken=_count_paid(db, course_code),
+            taken=count_active(db, course_code),
             capacity=capacity,
             status="pending",
             registration_id=None,
@@ -80,7 +73,10 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
             detail="Registration for this course is closed.",
         )
 
-    taken = _count_paid(db, course_code)
+    # Capacity gate counts ACTIVE rows (paid + pending) — a registration
+    # takes a seat from the moment it lands. This matches what the public
+    # counter shows.
+    taken = count_active(db, course_code)
     if taken >= course.total_seats:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -103,7 +99,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
 
     if existing is not None:
         return RegisterOut(
-            taken=taken,
+            taken=count_active(db, course_code),
             capacity=course.total_seats,
             status="duplicate",
             registration_id=existing.id,
@@ -139,6 +135,10 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
         ),
     )
 
+    # Recount after commit so both the admin email and the response
+    # reflect the new row landing.
+    taken_after = count_active(db, course_code)
+
     # Admin notification.
     if settings.ADMIN_NOTIFY_EMAIL:
         send_email(
@@ -156,13 +156,13 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
                     "Status": reg.status,
                     "Registration ID": str(reg.id),
                 },
-                taken_after=taken,
+                taken_after=taken_after,
                 capacity=course.total_seats,
             ),
         )
 
     return RegisterOut(
-        taken=taken,
+        taken=taken_after,
         capacity=course.total_seats,
         status="pending",
         registration_id=reg.id,

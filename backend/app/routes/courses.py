@@ -66,15 +66,21 @@ def _parse_day_dates(raw) -> List[date]:
 
 
 def _to_out(course: Course, db: Session) -> CourseOut:
-    """Compute seats_taken and return the response model."""
-    taken = int(
+    """Compute seat counts and return the response model.
+
+    seats_taken = active (paid + pending) — the public counter.
+    seats_paid  = paid only — admin UI uses this for the paid/pending split.
+    """
+    counts = dict(
         db.execute(
-            select(func.count(Registration.id)).where(
+            select(Registration.status, func.count(Registration.id)).where(
                 Registration.course_code == course.code,
-                Registration.status == "paid",
-            )
-        ).scalar_one()
+            ).group_by(Registration.status)
+        ).all()
     )
+    paid = int(counts.get("paid", 0))
+    pending = int(counts.get("pending", 0))
+    active = paid + pending
     return CourseOut(
         code=course.code,
         title=course.title,
@@ -82,8 +88,9 @@ def _to_out(course: Course, db: Session) -> CourseOut:
         total_seats=course.total_seats,
         status=course.status,  # type: ignore[arg-type]
         day_dates=_parse_day_dates(course.day_dates),
-        seats_taken=taken,
-        seats_remaining=max(course.total_seats - taken, 0),
+        seats_taken=active,
+        seats_paid=paid,
+        seats_remaining=max(course.total_seats - active, 0),
     )
 
 

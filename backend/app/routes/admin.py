@@ -23,7 +23,7 @@ from ..schemas import (
     MarkPaidIn,
     MarkPaidOut,
 )
-from ..seats import count_paid
+from ..seats import count_active, count_paid
 
 router = APIRouter(
     prefix="/api/admin",
@@ -59,13 +59,15 @@ def mark_paid(body: MarkPaidIn, db: Session = Depends(get_db)) -> MarkPaidOut:
         # Idempotent — don't double-write paid_at.
         return MarkPaidOut(
             ok=True,
-            taken=count_paid(db),
+            taken=count_active(db),
             registration=AdminRegistrationOut.model_validate(reg),
         )
 
     # Capacity guard — read live seat cap from the Course row so admin
-    # edits to total_seats are respected. Fall back to env default if the
-    # Course row is missing for some reason.
+    # edits to total_seats are respected. Use count_paid (true paid count)
+    # so we don't reject promoting a pending row to paid when the cohort
+    # is "full" of pending+paid (count_active >= capacity is the normal
+    # full-cohort state once registrations match capacity).
     course = db.execute(
         select(Course).where(Course.code == reg.course_code)
     ).scalar_one_or_none()
@@ -85,7 +87,7 @@ def mark_paid(body: MarkPaidIn, db: Session = Depends(get_db)) -> MarkPaidOut:
 
     return MarkPaidOut(
         ok=True,
-        taken=count_paid(db),
+        taken=count_active(db),
         registration=AdminRegistrationOut.model_validate(reg),
     )
 
@@ -115,6 +117,6 @@ def cancel(body: CancelIn, db: Session = Depends(get_db)) -> MarkPaidOut:
 
     return MarkPaidOut(
         ok=True,
-        taken=count_paid(db),
+        taken=count_active(db),
         registration=AdminRegistrationOut.model_validate(reg),
     )

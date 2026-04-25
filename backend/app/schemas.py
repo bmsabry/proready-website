@@ -98,7 +98,12 @@ class CourseOut(BaseModel):
     # "duration not yet scheduled". Returned as ISO strings so the
     # browser doesn't have to deal with date-object reconstruction.
     day_dates: List[date] = Field(default_factory=list)
+    # `seats_taken` = active seats (paid + pending). This is the public
+    # counter — a registration takes a seat the moment it's submitted.
+    # `seats_paid` is exposed separately so the admin UI can show the
+    # paid / pending split.
     seats_taken: int = 0
+    seats_paid: int = 0
     seats_remaining: int = 0
 
 

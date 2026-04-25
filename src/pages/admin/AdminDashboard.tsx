@@ -50,7 +50,10 @@ type Course = {
   // Per-day schedule, ordered Day 1 -> Day N. Empty array means
   // no schedule has been set yet. len(day_dates) is the cohort length.
   day_dates: string[];
+  // seats_taken = active (paid + pending) — the public counter.
+  // seats_paid is the subset that have been marked paid.
   seats_taken: number;
+  seats_paid: number;
   seats_remaining: number;
 };
 
@@ -701,8 +704,14 @@ function CoursesTab({ onAuthError }: { onAuthError: () => void }) {
                   <div>
                     <div className="text-xs font-mono text-slate-500">{c.code}</div>
                     <div className="text-white font-semibold text-lg">{c.title}</div>
-                    <div className="text-xs text-slate-400 mt-1">
-                      {c.seats_taken} paid · {c.seats_remaining} seats remaining
+                    <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="text-emerald-300">{c.seats_paid} paid</span>
+                      <span className="text-slate-600">·</span>
+                      <span className="text-amber-300">
+                        {Math.max(0, c.seats_taken - c.seats_paid)} pending
+                      </span>
+                      <span className="text-slate-600">·</span>
+                      <span>{c.seats_remaining} seats remaining</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

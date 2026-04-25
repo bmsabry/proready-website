@@ -8,13 +8,14 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..db import get_db
-from ..models import Course, Registration
+from ..models import Course
 from ..schemas import SeatsOut
+from ..seats import count_active
 
 router = APIRouter(prefix="/api", tags=["public"])
 
@@ -35,16 +36,8 @@ def get_seats(
             detail=f"Course '{course_code}' not found.",
         )
 
-    taken = int(
-        db.execute(
-            select(func.count(Registration.id)).where(
-                Registration.course_code == course_code,
-                Registration.status == "paid",
-            )
-        ).scalar_one()
-    )
     return SeatsOut(
-        taken=taken,
+        taken=count_active(db, course_code),
         capacity=course.total_seats,
         cohort=course.start_date.strftime("%B %-d, %Y"),
     )
