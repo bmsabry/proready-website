@@ -103,3 +103,74 @@ class AISettings(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class AIAudit(Base):
+    """One row per tool call (or attempted tool call) made by the AI agent.
+
+    Captures enough to reconstruct what the agent did, when, with what
+    parameters, and whether it succeeded — so a compromised admin chat
+    can be reviewed and undone.
+    """
+
+    __tablename__ = "ai_audit"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    # 'tool' for an executed tool call; 'chat' for a plain assistant turn;
+    # 'cap_hit' when the daily spend cap rejected a request.
+    kind: Mapped[str] = mapped_column(String(32), index=True, default="tool")
+    tool_name: Mapped[str] = mapped_column(String(64), default="")
+    params: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    summary: Mapped[str] = mapped_column(String(500), default="")
+    error: Mapped[str | None] = mapped_column(String(2000), default=None)
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd_micro: Mapped[int] = mapped_column(Integer, default=0)
+    model: Mapped[str] = mapped_column(String(200), default="")
+
+
+class AIPendingAction(Base):
+    """A tool call the agent wants to take but that requires admin sign-off.
+
+    Created when the agent emits a 'high-stakes' tool call (any notify
+    email send, or bulk mark-paid/cancel ≥ 3 rows). The admin clicks
+    Approve in the chat UI; backend then re-validates the row, executes,
+    and marks it consumed. Expires after 10 minutes.
+    """
+
+    __tablename__ = "ai_pending_actions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tool_name: Mapped[str] = mapped_column(String(64))
+    params: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    summary: Mapped[str] = mapped_column(String(500), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+
+class AIUsageDaily(Base):
+    """Per-day rollup of token usage so the daily spend cap can be enforced.
+
+    A single row per UTC date. Token counts come from the LLM provider's
+    `usage` block. Cost is estimated using rates configured below in
+    routes/ai.py — conservative defaults that overestimate slightly so we
+    fail closed rather than fail rich.
+    """
+
+    __tablename__ = "ai_usage_daily"
+
+    date: Mapped[date] = mapped_column(Date, primary_key=True)
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd_micro: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

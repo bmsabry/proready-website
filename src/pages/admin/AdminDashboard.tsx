@@ -1384,6 +1384,153 @@ function AISettingsTab({ onAuthError }: { onAuthError: () => void }) {
           </div>
         </div>
       )}
+
+      <AIActivitySection onAuthError={onAuthError} />
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// AI activity log — viewer for the ai_audit table.
+// Shows tool calls, chat turns, and cap-rejected requests in reverse chrono.
+// -----------------------------------------------------------------------------
+
+type AuditRow = {
+  id: number;
+  created_at: string;
+  kind: string;
+  tool_name: string;
+  summary: string;
+  error?: string | null;
+  tokens_in: number;
+  tokens_out: number;
+  cost_usd: number;
+  model: string;
+};
+
+function AIActivitySection({ onAuthError }: { onAuthError: () => void }) {
+  const [rows, setRows] = useState<AuditRow[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!API_BASE) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/ai/audit?limit=100`, fetchOpts);
+      if (res.status === 401) {
+        onAuthError();
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setRows((await res.json()) as AuditRow[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Load failed.');
+    } finally {
+      setLoading(false);
+    }
+  }, [onAuthError]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const totalCost = useMemo(
+    () => (rows ? rows.reduce((sum, r) => sum + (r.cost_usd || 0), 0) : 0),
+    [rows],
+  );
+
+  return (
+    <div className="mt-8 max-w-4xl">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-cyan-300" />
+          <h3 className="text-sm font-semibold text-white">Activity log</h3>
+          <span className="text-xs text-slate-500">
+            (last 100 entries — last batch ≈ {totalCost.toFixed(4)} USD)
+          </span>
+        </div>
+        <button
+          onClick={load}
+          disabled={loading}
+          className="btn-secondary text-xs py-1.5 px-2.5 flex items-center gap-1 disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-3 text-sm text-red-300 bg-red-950/40 border border-red-900/60 rounded-lg px-3 py-2">
+          {error}
+        </div>
+      )}
+
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden">
+        {rows === null && loading && (
+          <div className="p-6 text-slate-400 text-sm">Loading…</div>
+        )}
+        {rows && rows.length === 0 && (
+          <div className="p-6 text-slate-500 text-sm italic">
+            No activity yet. The agent's tool calls, chat turns, and any cap-rejected
+            requests will land here.
+          </div>
+        )}
+        {rows && rows.length > 0 && (
+          <table className="w-full text-xs">
+            <thead className="bg-slate-950/60 text-slate-400 uppercase tracking-wider">
+              <tr>
+                <th className="px-3 py-2 text-left">When</th>
+                <th className="px-3 py-2 text-left">Kind</th>
+                <th className="px-3 py-2 text-left">Detail</th>
+                <th className="px-3 py-2 text-right">Tokens</th>
+                <th className="px-3 py-2 text-right">USD</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {rows.map((r) => (
+                <tr key={r.id} className={r.error ? 'bg-red-950/20' : ''}>
+                  <td className="px-3 py-2 text-slate-400 whitespace-nowrap">
+                    {new Date(r.created_at).toLocaleString()}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider border ${
+                        r.kind === 'tool'
+                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                          : r.kind === 'cap_hit'
+                            ? 'bg-red-500/10 text-red-300 border-red-500/30'
+                            : 'bg-slate-700/30 text-slate-400 border-slate-700'
+                      }`}
+                    >
+                      {r.kind === 'tool' ? r.tool_name || 'tool' : r.kind}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-slate-200">
+                    <div className="truncate max-w-[420px]" title={r.summary}>
+                      {r.summary}
+                    </div>
+                    {r.error && (
+                      <div className="text-red-300 text-[11px] truncate max-w-[420px]" title={r.error}>
+                        ↳ {r.error}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right text-slate-400 whitespace-nowrap">
+                    {r.tokens_in || r.tokens_out
+                      ? `${r.tokens_in}→${r.tokens_out}`
+                      : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-right text-slate-400 whitespace-nowrap">
+                    {r.cost_usd > 0 ? `$${r.cost_usd.toFixed(4)}` : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
@@ -1393,36 +1540,74 @@ function AISettingsTab({ onAuthError }: { onAuthError: () => void }) {
 // Slice 1: text-only, no tool calling. Slice 2 will add tool execution.
 // -----------------------------------------------------------------------------
 
-type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string };
+type PendingAction = {
+  id: string;
+  tool: string;
+  summary: string;
+  expires_at: string;
+};
 
-const SYSTEM_PROMPT =
-  'You are an admin assistant for the ProReadyEngineer training website. ' +
-  'Help the admin draft and review emails, plan course schedules, and think through ' +
-  'changes. Be concise. When asked to write content, deliver it ready to copy.';
+type ChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+  // Only set on assistant messages where the agent is asking for confirmation.
+  pendingAction?: PendingAction;
+  // Only set when the agent silently ran some tools — chips above the bubble.
+  actionsExecuted?: string[];
+  // True when the agent's pendingAction has been resolved (approved/denied)
+  // so we hide the buttons.
+  pendingResolved?: boolean;
+};
 
 function AdminChatWidget({ onAuthError }: { onAuthError: () => void }) {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'system', content: SYSTEM_PROMPT },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Apply an AIChatOut response to the conversation.
+   * - Adds an assistant message with the reply text
+   * - Surfaces actions_executed as a chip list above the bubble
+   * - If pending_action is set, the assistant message gets approve/deny buttons
+   */
+  function applyChatOut(prior: ChatMessage[], data: any): ChatMessage[] {
+    const next: ChatMessage = {
+      role: 'assistant',
+      content: typeof data?.content === 'string' ? data.content : '',
+      actionsExecuted:
+        Array.isArray(data?.actions_executed) && data.actions_executed.length > 0
+          ? data.actions_executed
+          : undefined,
+      pendingAction:
+        data?.pending_action && typeof data.pending_action.id === 'string'
+          ? (data.pending_action as PendingAction)
+          : undefined,
+    };
+    return [...prior, next];
+  }
 
   async function send() {
     const text = input.trim();
     if (!text || busy) return;
     setError(null);
-    const next: ChatMessage[] = [...messages, { role: 'user', content: text }];
+    const userTurn: ChatMessage = { role: 'user', content: text };
+    const next = [...messages, userTurn];
     setMessages(next);
     setInput('');
     setBusy(true);
     try {
+      // Strip out tool/pending bookkeeping — backend only wants role+content
+      // and re-derives the tool history server-side.
+      const wirePayload = {
+        messages: next.map((m) => ({ role: m.role, content: m.content })),
+      };
       const res = await fetch(`${API_BASE}/api/admin/ai/chat`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify(wirePayload),
       });
       if (res.status === 401) {
         onAuthError();
@@ -1430,16 +1615,12 @@ function AdminChatWidget({ onAuthError }: { onAuthError: () => void }) {
       }
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const detail =
-          typeof body.detail === 'string'
-            ? body.detail
-            : `HTTP ${res.status}`;
+        const detail = typeof body.detail === 'string' ? body.detail : `HTTP ${res.status}`;
         setError(detail);
-        // Roll back the optimistic user message so retrying doesn't double-send.
-        setMessages(messages);
+        setMessages(messages); // roll back the optimistic user message
         return;
       }
-      setMessages([...next, { role: 'assistant', content: body.content }]);
+      setMessages((prev) => applyChatOut(prev, body));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error.');
       setMessages(messages);
@@ -1448,13 +1629,48 @@ function AdminChatWidget({ onAuthError }: { onAuthError: () => void }) {
     }
   }
 
-  function clearHistory() {
-    setMessages([{ role: 'system', content: SYSTEM_PROMPT }]);
+  /** Approve or deny a pending action. The backend resumes the loop and
+   * may return another assistant turn (text or another pending_action). */
+  async function resolveAction(actionId: string, decision: 'approve' | 'deny') {
+    if (busy) return;
     setError(null);
+    setBusy(true);
+    // Mark the resolved bubble so its buttons disappear.
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.pendingAction?.id === actionId ? { ...m, pendingResolved: true } : m,
+      ),
+    );
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/admin/ai/actions/${actionId}/${decision}`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
+      if (res.status === 401) {
+        onAuthError();
+        return;
+      }
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof body.detail === 'string' ? body.detail : `HTTP ${res.status}`);
+        return;
+      }
+      setMessages((prev) => applyChatOut(prev, body));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Network error.');
+    } finally {
+      setBusy(false);
+    }
   }
 
-  // Visible (non-system) messages.
-  const visible = messages.filter((m) => m.role !== 'system');
+  function clearHistory() {
+    setMessages([]);
+    setError(null);
+  }
 
   return (
     <>
@@ -1472,11 +1688,12 @@ function AdminChatWidget({ onAuthError }: { onAuthError: () => void }) {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-40 w-[380px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-3rem)] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-cyan-950/30 flex flex-col overflow-hidden">
+        <div className="fixed bottom-6 right-6 z-40 w-[420px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-3rem)] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-cyan-950/30 flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-950/60">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-cyan-300" />
               <span className="text-sm font-semibold text-white">Assistant</span>
+              <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">tools on</span>
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -1497,28 +1714,79 @@ function AdminChatWidget({ onAuthError }: { onAuthError: () => void }) {
           </div>
 
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 text-sm">
-            {visible.length === 0 && (
-              <div className="text-slate-500 text-xs leading-relaxed mt-4">
-                Ask me anything — draft an email to registrants, plan a course schedule, polish
-                a sentence, suggest changes. Slice 1 is text-only; tool actions land next.
+            {messages.length === 0 && (
+              <div className="text-slate-500 text-xs leading-relaxed mt-4 space-y-2">
+                <p>I can read and edit courses, registrations, and send emails on your behalf. Try:</p>
+                <ul className="list-disc list-inside space-y-1 text-slate-400">
+                  <li>"how are seats looking on the gas turbine course?"</li>
+                  <li>"draft a reminder email to pending registrants"</li>
+                  <li>"move day 3 to May 25"</li>
+                </ul>
+                <p className="text-slate-500">
+                  Sending emails and bulk actions (≥3 rows) pause for your Approve in this chat.
+                </p>
               </div>
             )}
-            {visible.map((m, i) => (
-              <div
-                key={i}
-                className={`max-w-[85%] px-3 py-2 rounded-xl whitespace-pre-wrap leading-relaxed ${
-                  m.role === 'user'
-                    ? 'ml-auto bg-cyan-600/20 border border-cyan-500/40 text-cyan-50'
-                    : 'mr-auto bg-slate-800/70 border border-slate-700/60 text-slate-100'
-                }`}
-              >
-                {m.content}
+            {messages.map((m, i) => (
+              <div key={i} className="space-y-1">
+                {m.actionsExecuted && m.actionsExecuted.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mr-auto max-w-[85%]">
+                    {m.actionsExecuted.map((a, j) => (
+                      <span
+                        key={j}
+                        className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono truncate max-w-full"
+                        title={a}
+                      >
+                        {a.length > 80 ? a.slice(0, 80) + '…' : a}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div
+                  className={`max-w-[90%] px-3 py-2 rounded-xl whitespace-pre-wrap leading-relaxed ${
+                    m.role === 'user'
+                      ? 'ml-auto bg-cyan-600/20 border border-cyan-500/40 text-cyan-50'
+                      : 'mr-auto bg-slate-800/70 border border-slate-700/60 text-slate-100'
+                  }`}
+                >
+                  {m.content || (m.pendingAction ? '(awaiting approval — see below)' : '')}
+                </div>
+                {m.pendingAction && !m.pendingResolved && (
+                  <div className="mr-auto max-w-[90%] mt-1 p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 space-y-2">
+                    <div className="flex items-start gap-2 text-xs text-amber-200">
+                      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="font-semibold mb-0.5">Action requires your approval</div>
+                        <div className="text-amber-100/90">{m.pendingAction.summary}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        onClick={() => resolveAction(m.pendingAction!.id, 'deny')}
+                        disabled={busy}
+                        className="text-xs px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-50"
+                      >
+                        Deny
+                      </button>
+                      <button
+                        onClick={() => resolveAction(m.pendingAction!.id, 'approve')}
+                        disabled={busy}
+                        className="text-xs px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
+                      >
+                        Approve
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {m.pendingAction && m.pendingResolved && (
+                  <div className="mr-auto text-[11px] text-slate-500 italic">
+                    decision recorded — see chips above next reply
+                  </div>
+                )}
               </div>
             ))}
             {busy && (
-              <div className="mr-auto px-3 py-2 text-slate-400 text-xs italic">
-                Thinking…
-              </div>
+              <div className="mr-auto px-3 py-2 text-slate-400 text-xs italic">Thinking…</div>
             )}
             {error && (
               <div className="mr-auto max-w-[90%] px-3 py-2 rounded-xl bg-red-950/40 border border-red-900/60 text-red-200 text-xs flex items-start gap-2">

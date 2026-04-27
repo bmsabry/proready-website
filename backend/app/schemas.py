@@ -179,9 +179,41 @@ class AIChatIn(BaseModel):
     messages: List[AIChatMessage] = Field(min_length=1, max_length=200)
 
 
+class PendingActionOut(BaseModel):
+    """When an action needs admin sign-off before it fires."""
+
+    id: str
+    tool: str
+    summary: str
+    expires_at: datetime
+
+
 class AIChatOut(BaseModel):
     role: Literal["assistant"] = "assistant"
     content: str
+    # If set, the agent wants to do something high-stakes and is waiting
+    # for an Approve/Deny click. Frontend renders inline buttons.
+    pending_action: Optional[PendingActionOut] = None
+    # Short, human-readable summaries of any tools the agent ran without
+    # needing approval — surfaced as small chips in the chat UI.
+    actions_executed: List[str] = Field(default_factory=list)
     # Surface the upstream provider's reply for debugging; admins can
     # paste this when something goes wrong.
     raw_finish_reason: Optional[str] = None
+
+
+class AIAuditOut(BaseModel):
+    """One row of the audit log for the admin-facing viewer."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    id: int
+    created_at: datetime
+    kind: str
+    tool_name: str
+    summary: str
+    error: Optional[str] = None
+    tokens_in: int = 0
+    tokens_out: int = 0
+    cost_usd: float = 0.0
+    model: str = ""
