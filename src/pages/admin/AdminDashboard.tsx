@@ -995,6 +995,43 @@ function NewCourseForm({
   );
 }
 
+/**
+ * Convert plain-text email body into safe HTML for email rendering.
+ *
+ * - Escapes HTML entities so user-typed '<' and '&' don't break the markup
+ *   or get interpreted as tags.
+ * - Splits on blank lines into <p> paragraphs (so a normal "double newline
+ *   between paragraphs" pattern works as expected).
+ * - Single newlines within a paragraph become <br>.
+ * - Bare http(s)/mailto links auto-link so the recipient can click.
+ *
+ * The output is intentionally minimal HTML — designed to drop into the
+ * existing broadcast template without fighting its styles.
+ */
+function plainTextToEmailHtml(text: string): string {
+  const escape = (s: string) =>
+    s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+  const linkify = (s: string) =>
+    s.replace(
+      /(https?:\/\/[^\s<]+|mailto:[^\s<]+)/g,
+      (url) => `<a href="${url}" style="color:#22d3ee;">${url}</a>`,
+    );
+
+  const paragraphs = text.replace(/\r\n/g, '\n').split(/\n{2,}/);
+  return paragraphs
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0)
+    .map((p) => {
+      const escaped = escape(p).replace(/\n/g, '<br>');
+      return `<p style="margin:0 0 16px;">${linkify(escaped)}</p>`;
+    })
+    .join('\n');
+}
+
 function NotifyModal({
   target,
   onClose,
@@ -1009,6 +1046,9 @@ function NotifyModal({
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [audience, setAudience] = useState<'all' | 'paid' | 'pending'>('all');
+  // Plain text by default — admin types normal text, we convert to HTML.
+  // Toggle for power users who want to write raw HTML.
+  const [rawHtml, setRawHtml] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -1020,13 +1060,14 @@ function NotifyModal({
     setBusy(true);
     setErr(null);
     try {
+      const bodyHtml = rawHtml ? body : plainTextToEmailHtml(body);
       const res = await fetch(`${API_BASE}/api/admin/courses/${target.code}/notify`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: subject.trim(),
-          body_html: body,
+          body_html: bodyHtml,
           audience,
         }),
       });
@@ -1088,18 +1129,37 @@ function NotifyModal({
           <LabeledInput label="Subject" value={subject} onChange={setSubject} />
 
           <label className="block">
-            <span className="text-xs uppercase tracking-wider text-slate-400 mb-1 block">
-              Message (HTML supported)
-            </span>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs uppercase tracking-wider text-slate-400">
+                Message
+              </span>
+              <label className="flex items-center gap-2 text-[11px] text-slate-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rawHtml}
+                  onChange={(e) => setRawHtml(e.target.checked)}
+                  className="accent-cyan-500"
+                />
+                Send as raw HTML
+              </label>
+            </div>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={10}
-              placeholder="<p>Hi everyone,</p><p>A quick update…</p>"
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 font-mono"
+              placeholder={
+                rawHtml
+                  ? '<p>Hi everyone,</p><p>A quick update…</p>'
+                  : 'Hi everyone,\n\nA quick update on the cohort: …\n\nBest,\nAdam'
+              }
+              className={`w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 ${
+                rawHtml ? 'font-mono' : ''
+              }`}
             />
             <span className="text-[11px] text-slate-500 mt-1 block">
-              Use simple HTML like &lt;p&gt;, &lt;strong&gt;, &lt;a href&gt;. Plain text also works.
+              {rawHtml
+                ? 'Raw HTML mode — paste full markup. You own the formatting.'
+                : 'Just type normally. Blank lines become paragraphs, single line breaks become <br>, links auto-detect.'}
             </span>
           </label>
 
