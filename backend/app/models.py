@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, Index, Integer, String, func
+from sqlalchemy import JSON, Date, DateTime, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -84,3 +84,22 @@ Index(
     Registration.course_code,
     Registration.status,
 )
+
+
+class AISettings(Base):
+    """LLM credentials + model preference for the admin AI assistant.
+
+    Single-row table — there's only ever one config (the admin's). The API
+    key is stored Fernet-encrypted using the AI_SETTINGS_KEY env var; the
+    plaintext never touches the DB or the wire after entry.
+    """
+
+    __tablename__ = "ai_settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    api_url: Mapped[str] = mapped_column(String(500), default="")
+    api_key_encrypted: Mapped[str] = mapped_column(Text, default="")
+    model_name: Mapped[str] = mapped_column(String(200), default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

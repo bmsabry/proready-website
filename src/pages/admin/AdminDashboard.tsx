@@ -20,6 +20,12 @@ import {
   Lock,
   Unlock,
   X,
+  Sparkles,
+  MessageSquare,
+  Trash2,
+  AlertTriangle,
+  KeyRound,
+  Bot,
 } from 'lucide-react';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
@@ -86,7 +92,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [view, setView] = useState<'registrations' | 'courses'>('registrations');
+  const [view, setView] = useState<'registrations' | 'courses' | 'ai'>('registrations');
   const [regs, setRegs] = useState<Registration[] | null>(null);
   const [seats, setSeats] = useState<SeatsInfo | null>(null);
   const [adminEmail, setAdminEmail] = useState<string | null>(null);
@@ -249,9 +255,24 @@ export default function AdminDashboard() {
             <BookOpen className="w-4 h-4" />
             Courses
           </button>
+          <button
+            onClick={() => setView('ai')}
+            className={`flex items-center gap-2 text-sm px-4 py-2 border-b-2 -mb-px transition-colors ${
+              view === 'ai'
+                ? 'border-cyan-400 text-cyan-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            AI Settings
+          </button>
         </div>
 
-        {view === 'courses' ? (
+        {view === 'ai' ? (
+          <AISettingsTab
+            onAuthError={() => navigate('/admin/login', { replace: true })}
+          />
+        ) : view === 'courses' ? (
           <CoursesTab
             onAuthError={() => navigate('/admin/login', { replace: true })}
           />
@@ -267,6 +288,9 @@ export default function AdminDashboard() {
           />
         )}
       </div>
+      <AdminChatWidget
+        onAuthError={() => navigate('/admin/login', { replace: true })}
+      />
     </section>
   );
 }
@@ -1188,5 +1212,349 @@ function NotifyModal({
         </div>
       </div>
     </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// AI assistant — settings tab + floating chat panel
+// -----------------------------------------------------------------------------
+
+type AISettingsState = {
+  api_url: string;
+  model_name: string;
+  api_key_masked: string;
+  is_configured: boolean;
+};
+
+function AISettingsTab({ onAuthError }: { onAuthError: () => void }) {
+  const [state, setState] = useState<AISettingsState | null>(null);
+  const [apiUrl, setApiUrl] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [modelName, setModelName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!API_BASE) {
+      setError('VITE_API_BASE is not configured.');
+      setLoading(false);
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/ai/settings`, fetchOpts);
+      if (res.status === 401) {
+        onAuthError();
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = (await res.json()) as AISettingsState;
+      setState(body);
+      setApiUrl(body.api_url);
+      setModelName(body.model_name);
+      setApiKey(''); // never re-populate the key field — only show the mask
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Load failed.');
+    } finally {
+      setLoading(false);
+    }
+  }, [onAuthError]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function save() {
+    setError(null);
+    if (!apiUrl.trim() || !modelName.trim() || !apiKey.trim()) {
+      setError('All three fields are required to save.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/ai/settings`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_url: apiUrl.trim(),
+          api_key: apiKey.trim(),
+          model_name: modelName.trim(),
+        }),
+      });
+      if (res.status === 401) {
+        onAuthError();
+        return;
+      }
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.detail ?? `HTTP ${res.status}`);
+      setState(body as AISettingsState);
+      setApiKey('');
+      setFlash('Saved. The chat widget will use the new credentials on the next message.');
+      window.setTimeout(() => setFlash(null), 5000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <Sparkles className="w-5 h-5 text-cyan-300" />
+        <h2 className="text-lg font-semibold text-white">AI assistant settings</h2>
+      </div>
+
+      <p className="text-sm text-slate-400 mb-5 max-w-2xl">
+        Connect any OpenAI-compatible endpoint — OpenAI, OpenRouter, Together, Groq, Cloudflare AI,
+        or a self-hosted server. The key is encrypted at rest and never sent back to the browser
+        after you save.
+      </p>
+
+      {flash && (
+        <div className="mb-4 text-sm text-emerald-200 bg-emerald-950/40 border border-emerald-900/60 rounded-lg px-3 py-2">
+          {flash}
+        </div>
+      )}
+      {error && (
+        <div className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-900/60 rounded-lg px-3 py-2">
+          {error}
+        </div>
+      )}
+
+      {loading && !state ? (
+        <div className="text-slate-400 text-sm">Loading…</div>
+      ) : (
+        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 max-w-2xl space-y-4">
+          <LabeledInput
+            label="API URL (base or full /chat/completions)"
+            value={apiUrl}
+            onChange={setApiUrl}
+            icon={<KeyRound className="w-3 h-3 text-slate-500" />}
+          />
+          <LabeledInput
+            label="Model name (e.g. gpt-4o-mini, claude-3-5-sonnet, llama-3.3-70b)"
+            value={modelName}
+            onChange={setModelName}
+            icon={<Bot className="w-3 h-3 text-slate-500" />}
+          />
+          <label className="block">
+            <span className="text-[11px] uppercase tracking-wider text-slate-400 flex items-center gap-1 mb-1">
+              <Lock className="w-3 h-3 text-slate-500" />
+              API key
+              {state?.api_key_masked && (
+                <span className="ml-2 text-slate-500 normal-case tracking-normal">
+                  current: <span className="font-mono">{state.api_key_masked}</span>
+                </span>
+              )}
+            </span>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder={state?.is_configured ? 'leave blank to keep, or paste new key' : 'sk-...'}
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 font-mono"
+            />
+            <span className="text-[11px] text-slate-500 mt-1 block">
+              Saving requires entering the key again — there's no way to recover the existing one
+              from the browser.
+            </span>
+          </label>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <button
+              onClick={load}
+              disabled={saving || loading}
+              className="btn-secondary text-sm py-2 px-3 disabled:opacity-50"
+            >
+              Reload
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="btn-primary flex items-center gap-1 text-sm py-2 px-3 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Floating chat widget — appears on every /admin page once mounted.
+// Slice 1: text-only, no tool calling. Slice 2 will add tool execution.
+// -----------------------------------------------------------------------------
+
+type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string };
+
+const SYSTEM_PROMPT =
+  'You are an admin assistant for the ProReadyEngineer training website. ' +
+  'Help the admin draft and review emails, plan course schedules, and think through ' +
+  'changes. Be concise. When asked to write content, deliver it ready to copy.';
+
+function AdminChatWidget({ onAuthError }: { onAuthError: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: 'system', content: SYSTEM_PROMPT },
+  ]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function send() {
+    const text = input.trim();
+    if (!text || busy) return;
+    setError(null);
+    const next: ChatMessage[] = [...messages, { role: 'user', content: text }];
+    setMessages(next);
+    setInput('');
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/ai/chat`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: next }),
+      });
+      if (res.status === 401) {
+        onAuthError();
+        return;
+      }
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail =
+          typeof body.detail === 'string'
+            ? body.detail
+            : `HTTP ${res.status}`;
+        setError(detail);
+        // Roll back the optimistic user message so retrying doesn't double-send.
+        setMessages(messages);
+        return;
+      }
+      setMessages([...next, { role: 'assistant', content: body.content }]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Network error.');
+      setMessages(messages);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function clearHistory() {
+    setMessages([{ role: 'system', content: SYSTEM_PROMPT }]);
+    setError(null);
+  }
+
+  // Visible (non-system) messages.
+  const visible = messages.filter((m) => m.role !== 'system');
+
+  return (
+    <>
+      {/* Floating launcher button */}
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-900/40 transition-colors"
+          aria-label="Open admin AI chat"
+        >
+          <Sparkles className="w-5 h-5" />
+          <span className="text-sm font-semibold">Ask the assistant</span>
+        </button>
+      )}
+
+      {/* Chat panel */}
+      {open && (
+        <div className="fixed bottom-6 right-6 z-40 w-[380px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-3rem)] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-cyan-950/30 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-950/60">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-cyan-300" />
+              <span className="text-sm font-semibold text-white">Assistant</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={clearHistory}
+                title="New conversation"
+                className="p-1.5 text-slate-400 hover:text-white"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                title="Close"
+                className="p-1.5 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 text-sm">
+            {visible.length === 0 && (
+              <div className="text-slate-500 text-xs leading-relaxed mt-4">
+                Ask me anything — draft an email to registrants, plan a course schedule, polish
+                a sentence, suggest changes. Slice 1 is text-only; tool actions land next.
+              </div>
+            )}
+            {visible.map((m, i) => (
+              <div
+                key={i}
+                className={`max-w-[85%] px-3 py-2 rounded-xl whitespace-pre-wrap leading-relaxed ${
+                  m.role === 'user'
+                    ? 'ml-auto bg-cyan-600/20 border border-cyan-500/40 text-cyan-50'
+                    : 'mr-auto bg-slate-800/70 border border-slate-700/60 text-slate-100'
+                }`}
+              >
+                {m.content}
+              </div>
+            ))}
+            {busy && (
+              <div className="mr-auto px-3 py-2 text-slate-400 text-xs italic">
+                Thinking…
+              </div>
+            )}
+            {error && (
+              <div className="mr-auto max-w-[90%] px-3 py-2 rounded-xl bg-red-950/40 border border-red-900/60 text-red-200 text-xs flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="px-3 py-3 border-t border-slate-800 bg-slate-950/40">
+            <div className="flex items-end gap-2">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
+                rows={2}
+                placeholder="Ask… (Enter sends, Shift+Enter for newline)"
+                className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 resize-none"
+              />
+              <button
+                onClick={send}
+                disabled={busy || !input.trim()}
+                className="px-3 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Send"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

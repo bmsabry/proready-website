@@ -143,3 +143,45 @@ class NotifyOut(BaseModel):
     recipients: int
     failures: int
     failed_addresses: List[str] = Field(default_factory=list)
+
+
+# ----- AI assistant ----------------------------------------------------------
+
+class AISettingsOut(BaseModel):
+    """What the admin UI sees. The API key is masked — last 4 chars only —
+    so re-rendering the settings page never re-exposes the secret."""
+
+    # Allow `model_name` without Pydantic's protected-namespace warning.
+    model_config = ConfigDict(protected_namespaces=())
+
+    api_url: str = ""
+    model_name: str = ""
+    api_key_masked: str = ""  # e.g. "...kf2a" or "" if unset
+    is_configured: bool = False
+
+
+class AISettingsIn(BaseModel):
+    """Admin save payload. All three fields required when (re)configuring."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    api_url: str = Field(min_length=1, max_length=500)
+    api_key: str = Field(min_length=1, max_length=500)
+    model_name: str = Field(min_length=1, max_length=200)
+
+
+class AIChatMessage(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str = Field(max_length=200_000)
+
+
+class AIChatIn(BaseModel):
+    messages: List[AIChatMessage] = Field(min_length=1, max_length=200)
+
+
+class AIChatOut(BaseModel):
+    role: Literal["assistant"] = "assistant"
+    content: str
+    # Surface the upstream provider's reply for debugging; admins can
+    # paste this when something goes wrong.
+    raw_finish_reason: Optional[str] = None
