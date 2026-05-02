@@ -545,6 +545,78 @@ const GasTurbineEmissionsMapping = () => {
           </div>
         </div>
 
+        {/* DAILY SCHEDULE — applies to every cohort day. Times are fixed (no */}
+        {/* DST drift handling): the course runs in May 2026 when North */}
+        {/* America is on DST, while Algeria + Saudi Arabia are DST-free. */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mb-16"
+        >
+          <div className="text-xs font-mono uppercase tracking-[0.2em] text-cyan-400 mb-2">
+            Daily schedule
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold mb-3">Same hours every day</h2>
+          <p className="text-slate-400 text-base mb-8 max-w-2xl leading-relaxed">
+            Five teaching hours with a 10-minute break between each — keeping focus high
+            and fatigue low. Sessions stream live for all four time zones below.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {[
+              { city: 'Vancouver', label: 'Pacific Time', start: '7:00 AM', end: '12:40 PM' },
+              { city: 'New York', label: 'Eastern Time', start: '10:00 AM', end: '3:40 PM' },
+              { city: 'Algeria', label: 'UTC+1', start: '3:00 PM', end: '8:40 PM' },
+              { city: 'Saudi Arabia', label: 'UTC+3', start: '5:00 PM', end: '10:40 PM' },
+            ].map((tz) => (
+              <div
+                key={tz.city}
+                className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-cyan-500/50 transition-colors"
+              >
+                <div className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-1">
+                  {tz.label}
+                </div>
+                <div className="text-base font-semibold text-cyan-400 mb-3">{tz.city}</div>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="text-xl font-bold text-white tabular-nums">{tz.start}</span>
+                  <span className="text-slate-600">→</span>
+                  <span className="text-xl font-bold text-white tabular-nums">{tz.end}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Hour-by-hour ruler — anchored to Eastern Time so it stays compact */}
+          <div className="rounded-2xl bg-slate-900/50 border border-slate-800 p-5">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div className="text-xs font-mono uppercase tracking-wider text-slate-500">
+                Hour-by-hour · Eastern Time
+              </div>
+              <div className="text-[11px] text-slate-500">10-minute break between hours</div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              {[
+                { n: 1, time: '10:00 – 11:00' },
+                { n: 2, time: '11:10 – 12:10' },
+                { n: 3, time: '12:20 – 13:20' },
+                { n: 4, time: '13:30 – 14:30' },
+                { n: 5, time: '14:40 – 15:40' },
+              ].map(({ n, time }) => (
+                <div
+                  key={n}
+                  className="px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-800 flex items-center gap-2"
+                >
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 shrink-0">
+                    Hr {n}
+                  </span>
+                  <span className="text-slate-200 font-mono tabular-nums text-xs">{time}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+
         {/* NOTEBOOKLM INTERACTIVE DEMO */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
