@@ -105,10 +105,10 @@ const CURRICULUM: Day[] = [
     summary:
       'Lean-premixed operating window, NOx/CO trade-off, CEMS, regulatory corrections.',
     topics: [
-      'The DLE operating window φ ≈ 0.45–0.6',
       'Thermal-NOx exponential sensitivity to flame temperature',
       'CO surge near the lean limit',
       'CEMS calibration drift and regulatory corrections',
+      'Learn hands on using the LMS100 interactive simulator',
     ],
     icon: <Gauge className="w-6 h-6" />,
   },
