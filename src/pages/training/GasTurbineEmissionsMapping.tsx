@@ -618,6 +618,134 @@ const GasTurbineEmissionsMapping = () => {
           </div>
         </motion.div>
 
+        {/* PRICING — Founding Cohort offer for the first live cohort */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mb-16"
+        >
+          <div className="text-xs font-mono uppercase tracking-[0.2em] text-cyan-400 mb-2">
+            Pricing
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold mb-3">Founding Cohort Pricing</h2>
+          <p className="text-slate-400 text-base mb-8 max-w-2xl leading-relaxed">
+            For the first live offering, this advanced training is available at a special
+            Founding Cohort price.
+          </p>
+
+          {/* Price hero */}
+          <div className="rounded-3xl bg-gradient-to-br from-cyan-900/20 via-slate-900/60 to-blue-900/20 border border-cyan-500/30 p-8 md:p-10 mb-8">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+              <div>
+                <div className="text-xs font-mono uppercase tracking-wider text-cyan-300 mb-2">
+                  Founding cohort · per seat
+                </div>
+                <div className="flex items-baseline gap-3 flex-wrap">
+                  <span className="text-5xl md:text-6xl font-bold text-white tabular-nums">
+                    $1,000
+                  </span>
+                  <div className="flex flex-col text-sm">
+                    <span className="text-slate-500 line-through tabular-nums">$3,000</span>
+                    <span className="text-slate-500">regular future price</span>
+                  </div>
+                </div>
+              </div>
+              <a href="#register" className="btn-primary text-base px-8 py-4 self-start md:self-auto">
+                Reserve my seat
+                <Send className="w-4 h-4 ml-2 inline-block -mt-0.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* Value framing */}
+          <div className="space-y-4 text-slate-300 leading-relaxed mb-10 max-w-3xl">
+            <p>
+              Your seat includes live instructor-led training, AI-based gas turbine engine
+              simulator access, course materials, and the opportunity to ask your questions
+              directly during the live sessions.
+            </p>
+            <p>
+              This course is designed to help you understand the real logic behind gas turbine
+              emissions mapping — including fuel splits, NOx, CO, combustion dynamics, safe
+              operating windows, and practical mapping decisions.
+            </p>
+            <p className="text-slate-400">
+              You are not just attending a class. You are building practical mapping
+              understanding through expert instruction, realistic simulator-based learning,
+              and direct interaction with the instructor.
+            </p>
+          </div>
+
+          {/* Included grid */}
+          <div className="text-xs font-mono uppercase tracking-[0.2em] text-cyan-400 mb-4">
+            Included with your seat
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {[
+              {
+                icon: <Users className="w-5 h-5" />,
+                title: 'Live training with Bassam Abdelnabi',
+                body: 'Learn directly from an instructor with deep real-world gas turbine combustion and mapping experience.',
+              },
+              {
+                icon: <MessageSquare className="w-5 h-5" />,
+                title: 'Direct Q&A during the course',
+                body: 'Ask your specific questions during the live sessions and connect the training concepts to real field situations.',
+              },
+              {
+                icon: <Activity className="w-5 h-5" />,
+                title: 'AI-based engine simulator access',
+                body: 'Use an interactive simulator to make the mapping process more practical, visual, and realistic.',
+              },
+              {
+                icon: <Award className="w-5 h-5" />,
+                title: 'Course materials and reference content',
+                body: 'Receive access to the course content so you can review the concepts after the live sessions.',
+              },
+              {
+                icon: <Wrench className="w-5 h-5" />,
+                title: 'Practical mapping examples',
+                body: 'Work through examples that connect fuel splits, emissions behavior, dynamics, operability, and safe mapping decisions.',
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-cyan-500/50 transition-colors flex flex-col"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                    {item.icon}
+                  </div>
+                  <h3 className="font-semibold text-white text-sm leading-tight">{item.title}</h3>
+                </div>
+                <p className="text-slate-400 text-sm leading-relaxed">{item.body}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* First-offering-only note */}
+          <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-5 mb-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-sm leading-relaxed">
+              <div className="text-amber-200 font-semibold mb-1">First offering only</div>
+              <p className="text-amber-100/90">
+                The $1,000 Founding Cohort price is available only for the first live offering.
+                Future offerings are expected to return to the regular $3,000 per seat price.
+              </p>
+            </div>
+          </div>
+
+          {/* Groups */}
+          <p className="text-slate-500 text-sm leading-relaxed">
+            For teams enrolling multiple engineers,{' '}
+            <Link to="/contact" className="text-cyan-400 hover:text-cyan-300 underline">
+              contact ProReadyEngineer
+            </Link>{' '}
+            for group registration options.
+          </p>
+        </motion.div>
+
         {/* NOTEBOOKLM INTERACTIVE DEMO */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
