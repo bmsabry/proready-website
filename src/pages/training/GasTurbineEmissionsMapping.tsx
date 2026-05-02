@@ -108,6 +108,7 @@ const CURRICULUM: Day[] = [
       'Thermal-NOx exponential sensitivity to flame temperature',
       'CO surge near the lean limit',
       'CEMS calibration drift and regulatory corrections',
+      'How to define the mapped conditions',
       'Learn hands on using the LMS100 interactive simulator',
     ],
     icon: <Gauge className="w-6 h-6" />,
