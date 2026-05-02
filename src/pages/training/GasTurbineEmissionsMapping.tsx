@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Calendar,
@@ -674,8 +675,15 @@ const GasTurbineEmissionsMapping = () => {
             <h2 className="text-3xl font-bold mb-4">Bassam Abdelnabi</h2>
             <p className="text-slate-300 leading-relaxed mb-4">
               Founder of ProReadyEngineer. 19+ years in gas-turbine combustion with 1,000+
-              mapping tests across flex-fuel operations — 100 % propane through hydrogen
-              blending. Multiple patents in combustion tuning and emissions reduction.
+              mapping tests across flex-fuel operations — from 100% propane to hydrogen
+              blending. Multiple patents in gas-turbine combustion and emissions reduction.
+              Bassam has trained and mentored dozens of engineers, helping them understand
+              complex combustion and mapping concepts with practical, real-world clarity.
+              See reviews in the{' '}
+              <Link to="/testimonials" className="text-cyan-400 hover:text-cyan-300 underline">
+                Testimonials section
+              </Link>
+              {' '}on proreadyengineer.com.
             </p>
             <p className="text-slate-400 text-sm leading-relaxed">
               The course is built around field-grade decisions, not textbook theory. Every
