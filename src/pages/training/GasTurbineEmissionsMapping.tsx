@@ -50,22 +50,6 @@ const formatStartDate = (iso: string): string => {
   return `${months[m - 1]} ${d}, ${y}`;
 };
 
-type Circuit = {
-  code: string;
-  label: string;
-  color: string;
-  text: string;
-};
-
-const CIRCUITS: Circuit[] = [
-  { code: 'OM', label: 'Outer Main', color: 'bg-orange-500/80', text: 'text-orange-100' },
-  { code: 'OP', label: 'Outer Pilot', color: 'bg-red-500/80', text: 'text-red-100' },
-  { code: 'IM', label: 'Inner Main', color: 'bg-slate-400/80', text: 'text-slate-900' },
-  { code: 'IP', label: 'Inner Pilot', color: 'bg-emerald-500/80', text: 'text-emerald-950' },
-  { code: 'IE', label: 'Inner ELBO', color: 'bg-emerald-300/80', text: 'text-emerald-950' },
-  { code: 'OE', label: 'Outer ELBO', color: 'bg-red-900/80', text: 'text-red-100' },
-];
-
 // Curriculum content. Index 0 -> Day 1, index 1 -> Day 2, etc.
 // Dates are *not* stored here — they come from the live API (day_dates)
 // so the admin can adjust them without a code change.
@@ -408,85 +392,6 @@ const GasTurbineEmissionsMapping = () => {
             />
           </div>
         </motion.div>
-
-        {/* FLYER — Combustion system + Dynamics corridor */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
-          {/* Left: 6 circuits */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            className="p-8 rounded-3xl bg-slate-900/50 border border-slate-800"
-          >
-            <div className="text-xs font-mono uppercase tracking-wider text-amber-400 mb-2">
-              The Complex Combustion System
-            </div>
-            <h3 className="text-2xl font-bold mb-4">6 distinct gas circuits</h3>
-            <p className="text-slate-400 text-sm leading-relaxed mb-6">
-              Modern DLE combustors route fuel through multiple independently-metered circuits.
-              Each has its own response curve, its own instability signature, and its own role
-              in the emissions / dynamics trade-off. Mastering them is the whole game.
-            </p>
-            <div className="space-y-3">
-              {CIRCUITS.map((c) => (
-                <div
-                  key={c.code}
-                  className="flex items-center gap-4 p-3 rounded-xl bg-slate-950/60 border border-slate-800"
-                >
-                  <span
-                    className={`w-14 h-10 rounded-lg flex items-center justify-center font-mono font-bold text-sm ${c.color} ${c.text}`}
-                  >
-                    {c.code}
-                  </span>
-                  <span className="text-slate-300 text-sm">{c.label}</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Right: Dynamics Corridor */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            className="p-8 rounded-3xl bg-slate-900/50 border border-slate-800"
-          >
-            <div className="text-xs font-mono uppercase tracking-wider text-cyan-400 mb-2">
-              Master Dynamics Boundaries
-            </div>
-            <h3 className="text-2xl font-bold mb-4">The dynamics corridor</h3>
-            <p className="text-slate-400 text-sm leading-relaxed mb-6">
-              Every operating point lives inside a narrow corridor bounded above by{' '}
-              <span className="text-amber-400 font-semibold">HFD limits</span> (NOx-rich side)
-              and below by{' '}
-              <span className="text-cyan-400 font-semibold">LFD limits</span> (CO + lean-blowout
-              side). You'll learn to map <em>logic</em>, not recipes.
-            </p>
-
-            {/* Dynamics corridor schematic */}
-            <div className="relative h-40 rounded-2xl bg-gradient-to-b from-amber-500/10 via-cyan-500/10 to-cyan-500/10 border border-slate-800 overflow-hidden mb-4">
-              <div className="absolute inset-x-0 top-0 h-px bg-amber-500/60"></div>
-              <div className="absolute inset-x-0 bottom-0 h-px bg-cyan-500/60"></div>
-              <div className="absolute top-2 left-3 text-[10px] font-mono text-amber-400">
-                HFD LIMIT — NOx (rich)
-              </div>
-              <div className="absolute bottom-2 left-3 text-[10px] font-mono text-cyan-400">
-                LFD LIMIT — CO + LBO (lean)
-              </div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-xs font-mono text-slate-400 mb-1">DLE operating window</div>
-                  <div className="text-3xl font-bold text-white">φ ≈ Min – Max</div>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-slate-500 text-xs leading-relaxed">
-              Bounded by LFD and crucial HFD limits. The skill is knowing which lever —
-              pilot biasing, ELBO, T_flame trim — to pull when the corridor narrows on you.
-            </p>
-          </motion.div>
-        </div>
 
         {/* CURRICULUM TIMELINE — number of cards is driven by the admin's */}
         {/* day_dates list. Topics for each day come from the local CURRICULUM */}
