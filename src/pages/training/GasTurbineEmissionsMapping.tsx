@@ -584,14 +584,14 @@ const GasTurbineEmissionsMapping = () => {
 
           {/* Included grid */}
           <div className="text-xs font-mono uppercase tracking-[0.2em] text-cyan-400 mb-4">
-            Included with your seat
+            What You Get with Your Seat
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
             {[
               {
                 icon: <Activity className="w-5 h-5" />,
                 title: 'Interactive AI-Based Engine Simulator',
-                body: 'Use an interactive simulator to make the mapping process more practical, visual, and realistic.',
+                body: 'Use a realistic simulator to see how mapping decisions affect fuel splits, NOx, CO, combustion dynamics, and safe operating windows.',
               },
               {
                 icon: <Users className="w-5 h-5" />,
@@ -611,7 +611,7 @@ const GasTurbineEmissionsMapping = () => {
               {
                 icon: <Award className="w-5 h-5" />,
                 title: 'Course Materials and Reference Content',
-                body: 'Receive access to the course content so you can review the concepts after the live sessions.',
+                body: 'Receive access to the course content so you can review key concepts after the live sessions.',
               },
             ].map((item) => (
               <div
