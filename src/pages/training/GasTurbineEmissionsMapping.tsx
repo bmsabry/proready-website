@@ -589,29 +589,29 @@ const GasTurbineEmissionsMapping = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
             {[
               {
+                icon: <Activity className="w-5 h-5" />,
+                title: 'Interactive AI-Based Engine Simulator',
+                body: 'Use an interactive simulator to make the mapping process more practical, visual, and realistic.',
+              },
+              {
                 icon: <Users className="w-5 h-5" />,
-                title: 'Live training with Bassam Abdelnabi',
+                title: 'Live Training with Bassam Abdelnabi',
                 body: 'Learn directly from an instructor with deep real-world gas turbine combustion and mapping experience.',
               },
               {
                 icon: <MessageSquare className="w-5 h-5" />,
-                title: 'Direct Q&A during the course',
+                title: 'Direct Q&A During the Course',
                 body: 'Ask your specific questions during the live sessions and connect the training concepts to real field situations.',
               },
               {
-                icon: <Activity className="w-5 h-5" />,
-                title: 'AI-based engine simulator access',
-                body: 'Use an interactive simulator to make the mapping process more practical, visual, and realistic.',
+                icon: <Wrench className="w-5 h-5" />,
+                title: 'Practical Mapping Examples',
+                body: 'Work through examples that connect fuel splits, emissions behavior, dynamics, operability, and safe mapping decisions.',
               },
               {
                 icon: <Award className="w-5 h-5" />,
-                title: 'Course materials and reference content',
+                title: 'Course Materials and Reference Content',
                 body: 'Receive access to the course content so you can review the concepts after the live sessions.',
-              },
-              {
-                icon: <Wrench className="w-5 h-5" />,
-                title: 'Practical mapping examples',
-                body: 'Work through examples that connect fuel splits, emissions behavior, dynamics, operability, and safe mapping decisions.',
               },
             ].map((item) => (
               <div
