@@ -297,7 +297,7 @@ const GasTurbineEmissionsMapping = () => {
               Register
               <Send className="w-4 h-4 ml-2 inline-block -mt-0.5" />
             </a>
-            <span className="text-sm text-slate-500">
+            <span className="text-sm text-slate-400">
               No payment required to register — seat held as pending.
             </span>
           </div>
@@ -358,7 +358,7 @@ const GasTurbineEmissionsMapping = () => {
               </div>
               <div className="text-2xl font-bold">
                 {seatsLoading ? (
-                  <span className="text-slate-500">Loading…</span>
+                  <span className="text-slate-400">Loading…</span>
                 ) : courseStatus === 'closed' ? (
                   <span className="text-amber-400">Registration closed</span>
                 ) : atCapacity ? (
@@ -438,7 +438,7 @@ const GasTurbineEmissionsMapping = () => {
                     {day.topics.map((t) => (
                       <li
                         key={t}
-                        className="text-xs text-slate-500 flex gap-2 leading-relaxed"
+                        className="text-xs text-slate-400 flex gap-2 leading-relaxed"
                       >
                         <CheckCircle2 className="w-3 h-3 text-cyan-500/70 shrink-0 mt-0.5" />
                         <span>{t}</span>
@@ -499,7 +499,7 @@ const GasTurbineEmissionsMapping = () => {
               <div className="text-xs font-mono uppercase tracking-wider text-slate-500">
                 Hour-by-hour · Eastern Time
               </div>
-              <div className="text-[11px] text-slate-500">10-minute break between hours</div>
+              <div className="text-[11px] text-slate-400">10-minute break between hours</div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               {[
@@ -552,7 +552,7 @@ const GasTurbineEmissionsMapping = () => {
                   </span>
                   <div className="flex flex-col text-sm">
                     <span className="text-slate-500 line-through tabular-nums">$3,000</span>
-                    <span className="text-slate-500">regular future price</span>
+                    <span className="text-slate-400">regular future price</span>
                   </div>
                 </div>
               </div>
@@ -642,7 +642,7 @@ const GasTurbineEmissionsMapping = () => {
           </div>
 
           {/* Groups */}
-          <p className="text-slate-500 text-sm leading-relaxed">
+          <p className="text-slate-400 text-sm leading-relaxed">
             For teams enrolling multiple engineers,{' '}
             <Link to="/contact" className="text-cyan-400 hover:text-cyan-300 underline">
               contact ProReadyEngineer
@@ -694,7 +694,7 @@ const GasTurbineEmissionsMapping = () => {
           >
             Open the interactive demo <ExternalLink className="w-4 h-4" />
           </a>
-          <p className="text-xs text-slate-500 mt-3">
+          <p className="text-xs text-slate-400 mt-3">
             Opens in a new tab. Source-grounded answers with citations. No sign-up required.
           </p>
         </motion.div>
@@ -736,7 +736,7 @@ const GasTurbineEmissionsMapping = () => {
                 </li>
               ))}
             </ul>
-            <p className="text-xs text-slate-500 mt-6 leading-relaxed">
+            <p className="text-xs text-slate-400 mt-6 leading-relaxed">
               No prior gas turbine knowledge required. You'll leave able to map similar
               systems end-to-end.
             </p>
@@ -898,7 +898,7 @@ const GasTurbineEmissionsMapping = () => {
                 </label>
               </div>
 
-              <label className="flex items-start gap-3 text-xs text-slate-500 leading-relaxed">
+              <label className="flex items-start gap-3 text-xs text-slate-400 leading-relaxed">
                 <input
                   type="checkbox"
                   name="consent"
@@ -921,7 +921,7 @@ const GasTurbineEmissionsMapping = () => {
                 <Send className="w-4 h-4" />
               </button>
 
-              <p className="text-[10px] text-slate-600 text-center uppercase tracking-widest">
+              <p className="text-[10px] text-slate-400 text-center uppercase tracking-widest">
                 Secure · 15 seats per cohort · Auto-locks when full
               </p>
             </form>
