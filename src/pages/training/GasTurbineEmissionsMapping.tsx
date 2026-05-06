@@ -94,7 +94,7 @@ const CURRICULUM: Day[] = [
       'CO surge near the lean limit',
       'CEMS calibration drift and regulatory corrections',
       'How to define the mapped conditions',
-      'Learn hands on using the LMS100 interactive simulator',
+      'Learn hands on using the Engine interactive simulator',
     ],
     icon: <Gauge className="w-6 h-6" />,
   },
