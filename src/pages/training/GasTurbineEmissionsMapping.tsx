@@ -539,27 +539,38 @@ const GasTurbineEmissionsMapping = () => {
             Founding Cohort price.
           </p>
 
-          {/* Price hero */}
+          {/* Price hero — contact-for-pricing with 60% discount badge */}
           <div className="rounded-3xl bg-gradient-to-br from-cyan-900/20 via-slate-900/60 to-blue-900/20 border border-cyan-500/30 p-8 md:p-10 mb-8">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
               <div>
-                <div className="text-xs font-mono uppercase tracking-wider text-cyan-300 mb-2">
-                  Founding cohort · per seat
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs font-mono uppercase tracking-wider mb-4">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  60% Founding Cohort discount
                 </div>
-                <div className="flex items-baseline gap-3 flex-wrap">
-                  <span className="text-5xl md:text-6xl font-bold text-white tabular-nums">
-                    $1,000
-                  </span>
-                  <div className="flex flex-col text-sm">
-                    <span className="text-slate-500 line-through tabular-nums">$3,000</span>
-                    <span className="text-slate-400">regular future price</span>
-                  </div>
+                <div className="text-2xl md:text-3xl font-bold text-white mb-2">
+                  Contact us for pricing
                 </div>
+                <p className="text-slate-400 text-sm leading-relaxed max-w-xl">
+                  The Founding Cohort price reflects a 60% discount off the regular per-seat
+                  rate. Reach out and we'll share details, send an invoice, and confirm your
+                  seat.
+                </p>
               </div>
-              <a href="#register" className="btn-primary text-base px-8 py-4 self-start md:self-auto">
-                Reserve my seat
-                <Send className="w-4 h-4 ml-2 inline-block -mt-0.5" />
-              </a>
+              <div className="flex flex-col gap-3 shrink-0">
+                <Link
+                  to="/contact"
+                  className="btn-primary text-base px-8 py-4 inline-flex items-center justify-center gap-2"
+                >
+                  Contact us
+                  <ExternalLink className="w-4 h-4" />
+                </Link>
+                <a
+                  href="#register"
+                  className="text-center text-sm text-cyan-300 hover:text-cyan-200 underline"
+                >
+                  Or reserve my seat now
+                </a>
+              </div>
             </div>
           </div>
 
@@ -635,8 +646,8 @@ const GasTurbineEmissionsMapping = () => {
             <div className="text-sm leading-relaxed">
               <div className="text-amber-200 font-semibold mb-1">First offering only</div>
               <p className="text-amber-100/90">
-                The $1,000 Founding Cohort price is available only for the first live offering.
-                Future offerings are expected to return to the regular $3,000 per seat price.
+                The 60% Founding Cohort discount is available only for the first live offering.
+                Future offerings will return to the regular per-seat price.
               </p>
             </div>
           </div>
