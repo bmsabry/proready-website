@@ -26,6 +26,8 @@ import {
   AlertTriangle,
   KeyRound,
   Bot,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
@@ -1561,6 +1563,7 @@ type ChatMessage = {
 
 function AdminChatWidget({ onAuthError }: { onAuthError: () => void }) {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1688,7 +1691,11 @@ function AdminChatWidget({ onAuthError }: { onAuthError: () => void }) {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-40 w-[420px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-3rem)] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-cyan-950/30 flex flex-col overflow-hidden">
+        <div
+          className={`fixed bottom-6 right-6 z-40 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-cyan-950/30 flex flex-col overflow-hidden transition-all duration-200 ${
+            expanded ? 'w-[820px] h-[80vh]' : 'w-[420px] h-[600px]'
+          }`}
+        >
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-950/60">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-cyan-300" />
@@ -1696,6 +1703,13 @@ function AdminChatWidget({ onAuthError }: { onAuthError: () => void }) {
               <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">tools on</span>
             </div>
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                title={expanded ? 'Shrink panel' : 'Expand panel'}
+                className="p-1.5 text-slate-400 hover:text-white"
+              >
+                {expanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
               <button
                 onClick={clearHistory}
                 title="New conversation"
@@ -1743,11 +1757,12 @@ function AdminChatWidget({ onAuthError }: { onAuthError: () => void }) {
                   </div>
                 )}
                 <div
-                  className={`max-w-[90%] px-3 py-2 rounded-xl whitespace-pre-wrap leading-relaxed ${
+                  className={`max-w-[90%] px-3 py-2 rounded-xl whitespace-pre-wrap leading-relaxed break-words overflow-wrap-anywhere ${
                     m.role === 'user'
                       ? 'ml-auto bg-cyan-600/20 border border-cyan-500/40 text-cyan-50'
                       : 'mr-auto bg-slate-800/70 border border-slate-700/60 text-slate-100'
                   }`}
+                  style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
                 >
                   {m.content || (m.pendingAction ? '(awaiting approval — see below)' : '')}
                 </div>
