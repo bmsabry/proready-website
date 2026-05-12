@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Send,
   AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
 
 // -----------------------------------------------------------------------------
