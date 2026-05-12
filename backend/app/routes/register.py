@@ -6,7 +6,9 @@ Behavior:
     and do nothing. Bots won't know they failed.
   * Course lookup: resolves payload.course_code (or settings.COURSE_CODE as
     fallback) to a Course row. 404 if missing, 409 if status != 'open'.
-  * Duplicate detection by (course_code, email): returns status='duplicate'
+  * Duplicate detection by (course_code, email, status IN paid|pending):
+    a cancelled prior row does NOT block — admin-cancelled people can rejoin.
+    For active duplicates, returns status='duplicate'
     with the current taken count and does NOT send another email.
   * Cohort-full check: if paid seats already = course.total_seats, reject.
   * On success: row inserted with status='pending', confirmation email sent
@@ -88,14 +90,18 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
 
     email_normalized = payload.email.lower().strip()
 
-    # Idempotency — if this email has already registered for this cohort,
-    # surface the existing row rather than creating a second lead.
+    # Idempotency — if this email has an ACTIVE registration for this cohort
+    # (paid or pending), surface the existing row rather than creating a
+    # second lead. Cancelled rows DO NOT block re-registration — a person
+    # who cancelled previously is allowed to rejoin, and a fresh pending row
+    # is created alongside the historical cancelled one.
     existing = db.execute(
         select(Registration).where(
             Registration.course_code == course_code,
             Registration.email == email_normalized,
+            Registration.status.in_(("paid", "pending")),
         )
-    ).scalar_one_or_none()
+    ).scalars().first()
 
     if existing is not None:
         return RegisterOut(
