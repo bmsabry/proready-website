@@ -317,7 +317,7 @@ const GasTurbineEmissionsMapping = () => {
             De-mystifying complexity — the gas turbine mapping expert course.
           </p>
           <p className="text-slate-400 text-lg mb-10 leading-relaxed">
-            Modern DLE combustion systems look daunting — six distinct gas circuits, bounded by
+            Modern DLE combustion systems look daunting — five distinct gas circuits, bounded by
             narrow dynamics corridors and moving ambient targets. This course takes you from
             zero gas-turbine knowledge to confident field mapper over five days, taught by a
             practitioner with 19+ years of live mapping experience and multiple patents in the
