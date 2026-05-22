@@ -80,7 +80,7 @@ const CURRICULUM: Day[] = [
       'Thermoacoustics, LFD vs HFD, the Rayleigh criterion, sensors, mitigation levers.',
     topics: [
       'Low-Frequency Dynamics (LFD) 150–1000 Hz',
-      'High-Frequency Dynamics (HFD) >1000 Hz (architecture-specific)',
+      'High-Frequency Dynamics (HFD) >1000 Hz',
       'Rayleigh criterion and pressure–heat-release phasing',
       'Mitigation: pilot biasing, ELBO, T_flame trim',
     ],
