@@ -29,8 +29,6 @@ import {
 const COURSE_CODE = 'gas-turbine-emissions-mapping-2026-05';
 const DEFAULT_CAPACITY = 15;
 const DEFAULT_COHORT_DATE = 'May 15, 2026';
-const NOTEBOOKLM_URL =
-  'https://notebooklm.google.com/notebook/39f245f9-bb92-4b02-9eee-4e37baa927ca/preview';
 
 // Backend endpoints. Set VITE_API_BASE in your deploy env to the Render URL,
 // e.g. https://proreadyengineer-training-api.onrender.com
@@ -134,12 +132,6 @@ const TBD_DAY: Day = {
   topics: ['Topic outline pending'],
   icon: <Calendar className="w-6 h-6" />,
 };
-
-const STARTER_PROMPTS = [
-  'My NOx is drifting up 5 ppm overnight at constant load — likely mapping-related root causes?',
-  'Walk me through a systematic emissions mapping sweep on a dual-fuel DLE combustor.',
-  'Explain how φ governs the operating envelope when ambient T3 deviates ±15 °C from design.',
-];
 
 const IDEAL_FOR = [
   'Field Mappers',
@@ -660,54 +652,6 @@ const GasTurbineEmissionsMapping = () => {
               contact ProReadyEngineer
             </Link>{' '}
             for group registration options.
-          </p>
-        </motion.div>
-
-        {/* NOTEBOOKLM INTERACTIVE DEMO */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mb-16 p-8 md:p-12 rounded-[2.5rem] bg-gradient-to-br from-cyan-900/20 via-slate-900/40 to-blue-900/20 border border-cyan-500/20"
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <MessageSquare className="w-6 h-6 text-cyan-400" />
-            <div className="text-xs font-mono uppercase tracking-[0.2em] text-cyan-400">
-              Try before you enrol
-            </div>
-          </div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ask the course brain anything.
-          </h2>
-          <p className="text-slate-300 text-lg max-w-3xl mb-8 leading-relaxed">
-            The full training material is indexed in an interactive notebook. Ask any question
-            about DLE mapping, flame dynamics, emissions tuning, or field RCA — you'll get an
-            answer pulled directly from the source material, with chapter citations. If the
-            answer is shallow, the course won't be a fit. If it cites the right chapters, you'll
-            know.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
-            {STARTER_PROMPTS.map((p) => (
-              <div
-                key={p}
-                className="p-4 rounded-xl bg-slate-950/50 border border-slate-800 text-sm text-slate-300 leading-relaxed"
-              >
-                <span className="text-cyan-400 font-mono text-xs mr-2">Try:</span>"{p}"
-              </div>
-            ))}
-          </div>
-
-          <a
-            href={NOTEBOOKLM_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 btn-primary"
-          >
-            Open the interactive demo <ExternalLink className="w-4 h-4" />
-          </a>
-          <p className="text-xs text-slate-400 mt-3">
-            Opens in a new tab. Source-grounded answers with citations. No sign-up required.
           </p>
         </motion.div>
 
