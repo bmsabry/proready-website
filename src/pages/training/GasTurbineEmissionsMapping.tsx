@@ -193,10 +193,14 @@ const GasTurbineEmissionsMapping = () => {
         if (!cancelled) {
           setSeatsTaken(data.seats_taken);
           setCapacity(data.total_seats);
-          setCohortDate(formatStartDate(data.start_date));
           setCourseStatus(data.status);
+          // day_dates is the source of truth for cohort start/length when present.
+          // Fall back to start_date only if day_dates is missing or empty.
           if (Array.isArray(data.day_dates) && data.day_dates.length > 0) {
             setDayDates(data.day_dates.map(formatStartDate));
+            setCohortDate(formatStartDate(data.day_dates[0]));
+          } else {
+            setCohortDate(formatStartDate(data.start_date));
           }
           setSeatsLoading(false);
         }
