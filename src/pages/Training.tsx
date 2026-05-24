@@ -126,10 +126,16 @@ const Training = () => {
               status: 'open' | 'closed';
               day_dates?: string[];
             };
+            // Prefer day_dates[0] over start_date so the listing matches
+            // the detail page when admin updates the daily schedule.
+            const startIso =
+              Array.isArray(data.day_dates) && data.day_dates.length > 0
+                ? data.day_dates[0]
+                : data.start_date;
             const info: LiveCourseInfo = {
               seatsRemaining: Math.max(0, data.total_seats - data.seats_taken),
               totalSeats: data.total_seats,
-              startDate: formatStartDate(data.start_date),
+              startDate: formatStartDate(startIso),
               status: data.status,
               numDays: Array.isArray(data.day_dates) ? data.day_dates.length : 0,
             };
