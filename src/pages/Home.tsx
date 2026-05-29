@@ -92,7 +92,7 @@ He is highly skilled in performing rigorous design calculations for pressure ves
               <p className="text-cyan-400/90">
                 SAM.GOV Small Business | CAGE: 18X84 | UEI: RLHYXFN7JJN5
               </p>
-              <p className="text-slate-500 max-w-2xl mx-auto text-xs uppercase tracking-widest leading-relaxed">
+              <p className="text-slate-400 max-w-2xl mx-auto text-xs uppercase tracking-widest leading-relaxed">
                 NAICS CODES: 541330: Primary - Engineering Services <span className="mx-2 text-slate-700">•</span> 
                 611430: Professional and Management Development Training <span className="mx-2 text-slate-700">•</span> 
                 541611: Consulting Services

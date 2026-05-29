@@ -162,7 +162,7 @@ const CaseStudies = () => {
                     {study.category}
                   </span>
                   <span className="text-slate-600">•</span>
-                  <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5 text-xs text-slate-400">
                     <Calendar className="w-3 h-3" />
                     {study.date}
                   </span>

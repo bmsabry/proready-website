@@ -178,7 +178,7 @@ const Training = () => {
                 onClick={() => setFilter(cat)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   filter === cat 
-                    ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/20' 
+                    ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-900/20' 
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -221,19 +221,19 @@ const Training = () => {
               </p>
 
               <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
                   <Clock className="w-4 h-4 text-slate-600" />
                   <span>{durationLabel}</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
                   <BookOpen className="w-4 h-4 text-slate-600" />
                   <span>{course.level}</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
                   <Users className="w-4 h-4 text-slate-600" />
                   <span>{seatsLabel}</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
                   <Calendar className="w-4 h-4 text-slate-600" />
                   <span>Next: {dateLabel}</span>
                 </div>
@@ -242,12 +242,12 @@ const Training = () => {
               {course.slug ? (
                 <Link
                   to={`/training/${course.slug}`}
-                  className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition-all flex items-center justify-center gap-2 group/btn"
+                  className="w-full py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold transition-all flex items-center justify-center gap-2 group/btn"
                 >
                   View Course Details <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
                 </Link>
               ) : (
-                <button className="w-full py-3 rounded-xl bg-slate-800 hover:bg-cyan-600 text-white font-semibold transition-all flex items-center justify-center gap-2 group/btn">
+                <button className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold transition-all flex items-center justify-center gap-2 group/btn">
                   View Course Details <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
                 </button>
               )}

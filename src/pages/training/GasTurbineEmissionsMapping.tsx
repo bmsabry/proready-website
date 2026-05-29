@@ -350,7 +350,7 @@ const GasTurbineEmissionsMapping = () => {
         >
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <div>
-              <div className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-1">
+              <div className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">
                 Seat availability — {cohortDate} cohort
               </div>
               <div className="text-2xl font-bold">
@@ -423,7 +423,7 @@ const GasTurbineEmissionsMapping = () => {
                       {day.icon}
                     </div>
                     <div className="leading-tight">
-                      <div className="text-xs font-mono uppercase tracking-wider text-slate-500">
+                      <div className="text-xs font-mono uppercase tracking-wider text-slate-400">
                         Day {i + 1}
                       </div>
                       <div className="text-xs text-cyan-400 font-medium">{dateLabel}</div>
@@ -477,7 +477,7 @@ const GasTurbineEmissionsMapping = () => {
                 key={tz.city}
                 className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-cyan-500/50 transition-colors"
               >
-                <div className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-1">
+                <div className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">
                   {tz.label}
                 </div>
                 <div className="text-base font-semibold text-cyan-400 mb-3">{tz.city}</div>
@@ -493,7 +493,7 @@ const GasTurbineEmissionsMapping = () => {
           {/* Hour-by-hour ruler — anchored to Eastern Time so it stays compact */}
           <div className="rounded-2xl bg-slate-900/50 border border-slate-800 p-5">
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <div className="text-xs font-mono uppercase tracking-wider text-slate-500">
+              <div className="text-xs font-mono uppercase tracking-wider text-slate-400">
                 Hour-by-hour · Eastern Time
               </div>
               <div className="text-[11px] text-slate-400">10-minute break between hours</div>
@@ -510,7 +510,7 @@ const GasTurbineEmissionsMapping = () => {
                   key={n}
                   className="px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-800 flex items-center gap-2"
                 >
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 shrink-0">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 shrink-0">
                     Hr {n}
                   </span>
                   <span className="text-slate-200 font-mono tabular-nums text-xs">{time}</span>
@@ -820,10 +820,11 @@ const GasTurbineEmissionsMapping = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">
+                  <label htmlFor="years_experience" className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">
                     Years of Experience
                   </label>
                   <select
+                    id="years_experience"
                     name="years_experience"
                     required
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors text-slate-200"
@@ -906,7 +907,7 @@ const Stat = ({
 }) => (
   <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800">
     <div className="flex items-center gap-2 text-cyan-400 mb-2">{icon}</div>
-    <div className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-1">
+    <div className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">
       {label}
     </div>
     <div className="text-sm font-bold text-white">{value}</div>
@@ -927,10 +928,11 @@ const Field = ({
   placeholder?: string;
 }) => (
   <div className="space-y-2">
-    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">
+    <label htmlFor={name} className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">
       {label}
     </label>
     <input
+      id={name}
       name={name}
       type={type}
       required={required}

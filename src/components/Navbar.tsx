@@ -67,8 +67,14 @@ const Navbar = () => {
 
           {/* Mobile Menu Button */}
           <div className="md:hidden">
-            <button onClick={() => setIsOpen(!isOpen)} className="text-slate-300">
-              {isOpen ? <X /> : <Menu />}
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="text-slate-300"
+              aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isOpen}
+              aria-controls="mobile-menu"
+            >
+              {isOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
             </button>
           </div>
         </div>
@@ -76,7 +82,7 @@ const Navbar = () => {
 
       {/* Mobile Nav */}
       {isOpen && (
-        <div className="md:hidden glass absolute top-full left-0 w-full py-4 px-4 space-y-4 border-t border-slate-800">
+        <div id="mobile-menu" className="md:hidden glass absolute top-full left-0 w-full py-4 px-4 space-y-4 border-t border-slate-800">
           {navLinks.map((link) => (
             <Link
               key={link.name}

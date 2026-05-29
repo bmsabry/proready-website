@@ -71,7 +71,7 @@ const Contact = () => {
                       ) : (
                         <p className="text-slate-300">{item.detail}</p>
                       )}
-                      <p className="text-xs text-slate-500 mt-1">{item.sub}</p>
+                      <p className="text-xs text-slate-400 mt-1">{item.sub}</p>
                     </div>
                   </div>
                 ))}
@@ -116,34 +116,34 @@ const Contact = () => {
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {error && (
-                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+                    <div role="alert" className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
                       {error}
                     </div>
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Full Name</label>
+                      <label htmlFor="name" className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Full Name</label>
                       <div className="relative">
-                        <input required name="name" type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors" placeholder="John Doe" />
+                        <input required id="name" name="name" type="text" autoComplete="name" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors" placeholder="John Doe" />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Email Address</label>
-                      <input required name="email" type="email" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors" placeholder="john@company.com" />
+                      <label htmlFor="email" className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Email Address</label>
+                      <input required id="email" name="email" type="email" autoComplete="email" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors" placeholder="john@company.com" />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Company</label>
+                      <label htmlFor="company" className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Company</label>
                       <div className="relative">
-                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
-                        <input name="company" type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors" placeholder="Engineering Corp" />
+                        <Building2 aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input id="company" name="company" type="text" autoComplete="organization" className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors" placeholder="Engineering Corp" />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Inquiry Type</label>
-                      <select name="inquiry_type" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors appearance-none text-slate-400">
+                      <label htmlFor="inquiry_type" className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Inquiry Type</label>
+                      <select id="inquiry_type" name="inquiry_type" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors appearance-none text-slate-400">
                         <option>Consulting Services</option>
                         <option>Training & Workshops</option>
                         <option>AI & Data Analytics</option>
@@ -153,10 +153,10 @@ const Contact = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Project Details</label>
+                    <label htmlFor="message" className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Project Details</label>
                     <div className="relative">
-                      <MessageSquare className="absolute left-4 top-4 w-4 h-4 text-slate-600" />
-                      <textarea required name="message" rows={4} className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors resize-none" placeholder="Tell us about your technical requirements..."></textarea>
+                      <MessageSquare aria-hidden="true" className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
+                      <textarea required id="message" name="message" rows={4} className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors resize-none" placeholder="Tell us about your technical requirements..."></textarea>
                     </div>
                   </div>
 
@@ -168,7 +168,7 @@ const Contact = () => {
                     {loading ? 'Sending...' : 'Send Inquiry'} <Send className="w-4 h-4" />
                   </button>
                   
-                  <p className="text-[10px] text-slate-600 text-center uppercase tracking-widest">
+                  <p className="text-[10px] text-slate-400 text-center uppercase tracking-widest">
                     Secure & Confidential Engineering Consultation
                   </p>
                 </form>

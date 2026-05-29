@@ -23,7 +23,7 @@ const SACDynamics = () => {
               Technical Analysis
             </span>
             <span className="text-slate-600">•</span>
-            <span className="flex items-center gap-1.5 text-xs text-slate-500">
+            <span className="flex items-center gap-1.5 text-xs text-slate-400">
               <Calendar className="w-3 h-3" />
               Jan 26, 2026
             </span>
@@ -40,7 +40,7 @@ const SACDynamics = () => {
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-200">Dr. Bassam Abdelnabi</p>
-                <p className="text-xs text-slate-500">Principal Consultant, Gas Turbine Combustion Expert</p>
+                <p className="text-xs text-slate-400">Principal Consultant, Gas Turbine Combustion Expert</p>
               </div>
             </div>
             <div>

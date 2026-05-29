@@ -142,7 +142,7 @@ export default function AdminLogin() {
           </button>
         </form>
 
-        <p className="text-xs text-slate-500 mt-6 leading-relaxed">
+        <p className="text-xs text-slate-400 mt-6 leading-relaxed">
           Access is restricted to the configured admin email. Sessions last 7 days and are
           kept in a signed, httpOnly cookie.
         </p>

@@ -121,7 +121,7 @@ const Insights = () => {
                     {post.category}
                   </span>
                   <span className="text-slate-600">•</span>
-                  <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5 text-xs text-slate-400">
                     <Calendar className="w-3 h-3" />
                     {post.date}
                   </span>
@@ -161,8 +161,12 @@ const Insights = () => {
             </p>
           </div>
           <div className="flex w-full md:w-auto gap-3">
+            <label htmlFor="newsletter-email" className="sr-only">Email address for newsletter</label>
             <input 
+              id="newsletter-email"
+              name="email"
               type="email" 
+              autoComplete="email"
               placeholder="engineering@company.com" 
               className="flex-grow md:w-64 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
             />

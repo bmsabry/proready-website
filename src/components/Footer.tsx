@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Linkedin, Twitter, Mail } from 'lucide-react';
+import { Youtube, Mail } from 'lucide-react';
 
 const Footer = () => {
   return (
@@ -43,20 +43,17 @@ const Footer = () => {
           <div>
             <h4 className="text-white font-semibold mb-6">Connect</h4>
             <div className="flex space-x-4">
-              <a href="#" className="p-2 bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-cyan-400">
-                <Linkedin className="w-5 h-5" />
+              <a href="https://www.youtube.com/@ProReadyEngineer" target="_blank" rel="noopener noreferrer" aria-label="ProReadyEngineer on YouTube" className="p-2 bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-cyan-400">
+                <Youtube className="w-5 h-5" aria-hidden="true" />
               </a>
-              <a href="#" className="p-2 bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-cyan-400">
-                <Twitter className="w-5 h-5" />
-              </a>
-              <a href="mailto:info@proreadyengineer.com" className="p-2 bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-cyan-400">
-                <Mail className="w-5 h-5" />
+              <a href="mailto:info@proreadyengineer.com" aria-label="Email ProReadyEngineer" className="p-2 bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-cyan-400">
+                <Mail className="w-5 h-5" aria-hidden="true" />
               </a>
             </div>
           </div>
         </div>
         
-        <div className="border-t border-slate-900 pt-8 flex justify-center items-center text-xs text-slate-500">
+        <div className="border-t border-slate-900 pt-8 flex justify-center items-center text-xs text-slate-400">
           <div className="flex items-center space-x-4">
             <img
               src="/Logo-small.jpg"

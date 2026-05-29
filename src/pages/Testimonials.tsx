@@ -351,15 +351,18 @@ const Testimonials = () => {
               <div className="flex justify-center gap-4 mt-6">
                 <button
                   onClick={prevFeatured}
+                  aria-label="Previous testimonial"
                   className="p-2 rounded-full bg-slate-800 border border-slate-700 hover:border-amber-500/50 hover:bg-amber-500/10 transition-all group"
                 >
-                  <ChevronLeft className="w-4 h-4 text-slate-400 group-hover:text-amber-400" />
+                  <ChevronLeft aria-hidden="true" className="w-4 h-4 text-slate-400 group-hover:text-amber-400" />
                 </button>
                 <div className="flex items-center gap-2">
                   {featuredTestimonials.map((_, i) => (
                     <button
                       key={i}
                       onClick={() => setActiveFeatured(i)}
+                      aria-label={`Show testimonial ${i + 1}`}
+                      aria-current={i === activeFeatured}
                       className={`h-2 rounded-full transition-all ${
                         i === activeFeatured 
                           ? 'w-6 bg-amber-400' 
@@ -370,9 +373,10 @@ const Testimonials = () => {
                 </div>
                 <button
                   onClick={nextFeatured}
+                  aria-label="Next testimonial"
                   className="p-2 rounded-full bg-slate-800 border border-slate-700 hover:border-amber-500/50 hover:bg-amber-500/10 transition-all group"
                 >
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-400" />
+                  <ChevronRight aria-hidden="true" className="w-4 h-4 text-slate-400 group-hover:text-amber-400" />
                 </button>
               </div>
             </div>
@@ -424,18 +428,18 @@ const Testimonials = () => {
               <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-800">
                 <div className="text-center">
                   <p className="text-2xl font-bold text-amber-400">{allTestimonials.length}</p>
-                  <p className="text-xs text-slate-500">Total Reviews</p>
+                  <p className="text-xs text-slate-400">Total Reviews</p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-cyan-400">15+</p>
-                  <p className="text-xs text-slate-500">Years Impact</p>
+                  <p className="text-xs text-slate-400">Years Impact</p>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-purple-400 leading-tight">
                     <p>Exceeds</p>
                     <p>Expectations</p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">Positive</p>
+                  <p className="text-xs text-slate-400 mt-1">Positive</p>
                 </div>
               </div>
             </div>
@@ -493,7 +497,7 @@ const Testimonials = () => {
                     <p className="font-semibold text-white group-hover:text-cyan-400 transition-colors">
                       {testimonial.name}
                     </p>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-slate-400">
                       {testimonial.role}
                     </p>
                   </div>
