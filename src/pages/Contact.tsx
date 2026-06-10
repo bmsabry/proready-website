@@ -4,9 +4,9 @@ import { Reveal, PageHero } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
 
 const inputClass =
-  'w-full bg-slate-900/60 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30 transition-colors';
+  'w-full bg-slate-900/60 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30 transition-colors';
 
-const labelClass = 'block text-xs font-mono font-medium text-slate-400 uppercase tracking-widest mb-2';
+const labelClass = 'block text-xs font-mono font-medium text-slate-300 uppercase tracking-widest mb-2';
 
 const RequiredMark = () => (
   <span className="text-cyan-400 ml-1" aria-hidden="true">
@@ -114,7 +114,7 @@ const Contact = () => {
                         {React.cloneElement(item.icon, { className: 'w-5 h-5' })}
                       </div>
                       <div>
-                        <h3 className="text-xs font-mono uppercase tracking-widest text-slate-500">{item.title}</h3>
+                        <h3 className="text-xs font-mono uppercase tracking-widest text-slate-400">{item.title}</h3>
                         {item.href ? (
                           <a
                             href={item.href}
@@ -126,7 +126,7 @@ const Contact = () => {
                         ) : (
                           <p className="font-medium text-slate-200">{item.detail}</p>
                         )}
-                        <p className="text-xs text-slate-400 mt-0.5">{item.sub}</p>
+                        <p className="text-xs text-slate-300 mt-0.5">{item.sub}</p>
                       </div>
                     </div>
                   ))}
@@ -138,21 +138,21 @@ const Contact = () => {
                     <ShieldCheck className="w-4 h-4" aria-hidden="true" />
                     Federal Contracting
                   </h3>
-                  <dl className="font-mono text-xs text-slate-400 space-y-1.5">
+                  <dl className="font-mono text-xs text-slate-300 space-y-1.5">
                     <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">SAM.gov</dt>
+                      <dt className="text-slate-400">SAM.gov</dt>
                       <dd className="text-slate-300">Registered Small Business</dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">CAGE</dt>
+                      <dt className="text-slate-400">CAGE</dt>
                       <dd className="text-slate-300">18X84</dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">UEI</dt>
+                      <dt className="text-slate-400">UEI</dt>
                       <dd className="text-slate-300">RLHYXFN7JJN5</dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">NAICS</dt>
+                      <dt className="text-slate-400">NAICS</dt>
                       <dd className="text-slate-300">541330 · 611430 · 541611</dd>
                     </div>
                   </dl>
@@ -160,7 +160,7 @@ const Contact = () => {
 
                 {/* What to expect */}
                 <div>
-                  <h3 className="text-xs font-mono uppercase tracking-widest text-slate-500 mb-4">What to Expect</h3>
+                  <h3 className="text-xs font-mono uppercase tracking-widest text-slate-400 mb-4">What to Expect</h3>
                   <ul className="space-y-3">
                     {[
                       { icon: <Clock aria-hidden="true" />, text: 'Response within 1 business day' },
@@ -190,7 +190,7 @@ const Contact = () => {
                       <CheckCircle2 className="w-10 h-10 text-cyan-400" aria-hidden="true" />
                     </div>
                     <h2 className="text-2xl font-bold mb-4">Message Received</h2>
-                    <p className="text-slate-400 mb-8 max-w-md mx-auto">
+                    <p className="text-slate-300 mb-8 max-w-md mx-auto">
                       Thank you for reaching out. One of our principal engineers will review your inquiry and contact you shortly.
                     </p>
                     <button onClick={() => setSubmitted(false)} className="btn-secondary">
@@ -294,7 +294,7 @@ const Contact = () => {
                       {loading ? 'Sending...' : 'Send Inquiry'} <Send className="w-4 h-4" aria-hidden="true" />
                     </button>
 
-                    <p className="text-[10px] font-mono text-slate-500 text-center uppercase tracking-widest">
+                    <p className="text-[10px] font-mono text-slate-400 text-center uppercase tracking-widest">
                       Secure & Confidential Engineering Consultation
                     </p>
                   </form>

@@ -89,7 +89,7 @@ export default function AdminLogin() {
           </div>
           <div>
             <h1 className="text-xl font-semibold text-white">Admin sign-in</h1>
-            <p className="text-sm text-slate-400">ProReadyEngineer training dashboard</p>
+            <p className="text-sm text-slate-300">ProReadyEngineer training dashboard</p>
           </div>
         </div>
 
@@ -142,7 +142,7 @@ export default function AdminLogin() {
           </button>
         </form>
 
-        <p className="text-xs text-slate-400 mt-6 leading-relaxed">
+        <p className="text-xs text-slate-300 mt-6 leading-relaxed">
           Access is restricted to the configured admin email. Sessions last 7 days and are
           kept in a signed, httpOnly cookie.
         </p>

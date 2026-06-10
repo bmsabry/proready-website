@@ -359,7 +359,7 @@ const GasTurbineEmissionsMapping = () => {
                 Register
                 <Send className="w-4 h-4" aria-hidden="true" />
               </a>
-              <span className="text-sm text-slate-400">
+              <span className="text-sm text-slate-300">
                 No payment required to register. Your seat is held as pending.
               </span>
             </div>
@@ -374,7 +374,7 @@ const GasTurbineEmissionsMapping = () => {
               />
             </div>
 
-            <p className="text-slate-400 text-lg mb-10 leading-relaxed max-w-4xl">
+            <p className="text-slate-300 text-lg mb-10 leading-relaxed max-w-4xl">
               Modern DLE combustion systems look daunting: five distinct gas circuits, bounded by
               narrow dynamics corridors and moving ambient targets. This course takes you from
               zero gas-turbine knowledge to confident field mapper over five days, taught by a
@@ -414,12 +414,12 @@ const GasTurbineEmissionsMapping = () => {
         <div className="anim-enter mb-16 p-6 md:p-8 card">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <div>
-              <div className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">
+              <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-1">
                 Seat availability: {cohortDate} cohort
               </div>
               <div className="text-2xl font-bold">
                 {seatsLoading ? (
-                  <span className="text-slate-400">Loading…</span>
+                  <span className="text-slate-300">Loading…</span>
                 ) : courseStatus === 'closed' ? (
                   <span className="text-amber-400">Registration closed</span>
                 ) : atCapacity ? (
@@ -482,19 +482,19 @@ const GasTurbineEmissionsMapping = () => {
                       {day.icon}
                     </div>
                     <div className="leading-tight">
-                      <div className="text-xs font-mono uppercase tracking-wider text-slate-400">
+                      <div className="text-xs font-mono uppercase tracking-wider text-slate-300">
                         Day {i + 1}
                       </div>
                       <div className="text-xs font-mono text-cyan-400 font-medium">{dateLabel}</div>
                     </div>
                   </div>
                   <h3 className="font-bold text-white mb-2 text-lg leading-tight">{day.title}</h3>
-                  <p className="text-slate-400 text-sm mb-4 leading-relaxed">{day.summary}</p>
+                  <p className="text-slate-300 text-sm mb-4 leading-relaxed">{day.summary}</p>
                   <ul className="space-y-2 mt-auto">
                     {day.topics.map((t) => (
                       <li
                         key={t}
-                        className="text-xs text-slate-400 flex gap-2 leading-relaxed"
+                        className="text-xs text-slate-300 flex gap-2 leading-relaxed"
                       >
                         <CheckCircle2 className="w-3 h-3 text-cyan-500/70 shrink-0 mt-0.5" aria-hidden="true" />
                         <span>{t}</span>
@@ -515,7 +515,7 @@ const GasTurbineEmissionsMapping = () => {
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-3">
             Same hours every day
           </h2>
-          <p className="text-slate-400 text-base mb-8 max-w-2xl leading-relaxed">
+          <p className="text-slate-300 text-base mb-8 max-w-2xl leading-relaxed">
             Five teaching hours with a 10-minute break between each, keeping focus high
             and fatigue low. Sessions stream live for all four time zones below.
           </p>
@@ -531,13 +531,13 @@ const GasTurbineEmissionsMapping = () => {
                 key={tz.city}
                 className="card card-hover p-5"
               >
-                <div className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">
+                <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-1">
                   {tz.label}
                 </div>
                 <div className="text-base font-semibold text-cyan-400 mb-3">{tz.city}</div>
                 <div className="flex items-baseline gap-2 flex-wrap font-mono">
                   <span className="text-xl font-bold text-white tabular-nums">{tz.start}</span>
-                  <span className="text-slate-600">→</span>
+                  <span className="text-slate-500">→</span>
                   <span className="text-xl font-bold text-white tabular-nums">{tz.end}</span>
                 </div>
               </div>
@@ -547,10 +547,10 @@ const GasTurbineEmissionsMapping = () => {
           {/* Hour-by-hour ruler — anchored to Eastern Time so it stays compact */}
           <div className="card p-5">
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <div className="text-xs font-mono uppercase tracking-wider text-slate-400">
+              <div className="text-xs font-mono uppercase tracking-wider text-slate-300">
                 Hour-by-hour · Eastern Time
               </div>
-              <div className="text-[11px] text-slate-400">10-minute break between hours</div>
+              <div className="text-[11px] text-slate-300">10-minute break between hours</div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               {[
@@ -564,7 +564,7 @@ const GasTurbineEmissionsMapping = () => {
                   key={n}
                   className="px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-800 flex items-center gap-2"
                 >
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 shrink-0">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300 shrink-0">
                     Hr {n}
                   </span>
                   <span className="text-slate-200 font-mono tabular-nums text-xs">{time}</span>
@@ -590,7 +590,7 @@ const GasTurbineEmissionsMapping = () => {
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-3">
             Founding Cohort Pricing
           </h2>
-          <p className="text-slate-400 text-base mb-8 max-w-2xl leading-relaxed">
+          <p className="text-slate-300 text-base mb-8 max-w-2xl leading-relaxed">
             For the first live offering, this advanced training is available at a special
             Founding Cohort price.
           </p>
@@ -610,7 +610,7 @@ const GasTurbineEmissionsMapping = () => {
                 <div className="text-2xl md:text-3xl font-bold text-white mb-2">
                   Contact us for pricing
                 </div>
-                <p className="text-slate-400 text-sm leading-relaxed max-w-xl">
+                <p className="text-slate-300 text-sm leading-relaxed max-w-xl">
                   The Founding Cohort price reflects a 60% discount off the regular per-seat
                   rate. Reach out and we'll share details, send an invoice, and confirm your
                   seat.
@@ -646,7 +646,7 @@ const GasTurbineEmissionsMapping = () => {
               emissions mapping, including fuel splits, NOx, CO, combustion dynamics, safe
               operating windows, and practical mapping decisions.
             </p>
-            <p className="text-slate-400">
+            <p className="text-slate-300">
               You are not just attending a class. You are building practical mapping
               understanding through expert instruction, realistic simulator-based learning,
               and direct interaction with the instructor.
@@ -693,7 +693,7 @@ const GasTurbineEmissionsMapping = () => {
                   </div>
                   <h3 className="font-semibold text-white text-sm leading-tight">{item.title}</h3>
                 </div>
-                <p className="text-slate-400 text-sm leading-relaxed">{item.body}</p>
+                <p className="text-slate-300 text-sm leading-relaxed">{item.body}</p>
               </div>
             ))}
           </div>
@@ -711,7 +711,7 @@ const GasTurbineEmissionsMapping = () => {
           </div>
 
           {/* Groups */}
-          <p className="text-slate-400 text-sm leading-relaxed">
+          <p className="text-slate-300 text-sm leading-relaxed">
             For teams enrolling multiple engineers,{' '}
             <Link to="/contact" className="text-cyan-400 hover:text-cyan-300 underline">
               contact ProReadyEngineer
@@ -737,7 +737,7 @@ const GasTurbineEmissionsMapping = () => {
               </Link>
               {' '}on proreadyengineer.com.
             </p>
-            <p className="text-slate-400 text-sm leading-relaxed">
+            <p className="text-slate-300 text-sm leading-relaxed">
               The course is built around field-grade decisions, not textbook theory. Every
               section answers "what would you do at 2 a.m. when the operator calls" rather
               than "what does the textbook say."
@@ -753,7 +753,7 @@ const GasTurbineEmissionsMapping = () => {
                 </li>
               ))}
             </ul>
-            <p className="text-xs text-slate-400 mt-6 leading-relaxed">
+            <p className="text-xs text-slate-300 mt-6 leading-relaxed">
               No prior gas turbine knowledge required. You'll leave able to map similar
               systems end-to-end.
             </p>
@@ -766,7 +766,7 @@ const GasTurbineEmissionsMapping = () => {
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-2">
             Reserve your seat — {cohortDate} cohort
           </h2>
-          <p className="text-slate-400 mb-8 font-mono text-sm">
+          <p className="text-slate-300 mb-8 font-mono text-sm">
             {courseStatus === 'closed'
               ? 'Registration is closed for this cohort.'
               : atCapacity
@@ -780,7 +780,7 @@ const GasTurbineEmissionsMapping = () => {
                 <CheckCircle2 className="w-10 h-10 text-cyan-400" aria-hidden="true" />
               </div>
               <h3 className="text-2xl font-bold mb-4">Registration received</h3>
-              <p className="text-slate-400 mb-8 max-w-md mx-auto">
+              <p className="text-slate-300 mb-8 max-w-md mx-auto">
                 Thanks — we'll send a confirmation email with payment details and pre-read
                 material within 24 hours. If you don't see it, check spam or email{' '}
                 <a
@@ -798,7 +798,7 @@ const GasTurbineEmissionsMapping = () => {
                 <CheckCircle2 className="w-10 h-10 text-cyan-400" aria-hidden="true" />
               </div>
               <h3 className="text-2xl font-bold mb-4">You're already registered</h3>
-              <p className="text-slate-400 mb-8 max-w-md mx-auto">
+              <p className="text-slate-300 mb-8 max-w-md mx-auto">
                 We already have a registration for this email address. Watch your inbox for
                 payment details — or email{' '}
                 <a
@@ -818,7 +818,7 @@ const GasTurbineEmissionsMapping = () => {
               <h3 className="text-2xl font-bold mb-4">
                 {courseStatus === 'closed' ? 'Registration closed' : 'Cohort full'}
               </h3>
-              <p className="text-slate-400 mb-8 max-w-md mx-auto">
+              <p className="text-slate-300 mb-8 max-w-md mx-auto">
                 {courseStatus === 'closed'
                   ? `Registration for the ${cohortDate} cohort is closed.`
                   : `All ${capacity} seats for the ${cohortDate} cohort are taken.`}{' '}
@@ -908,7 +908,7 @@ const GasTurbineEmissionsMapping = () => {
                 </label>
               </div>
 
-              <label className="flex items-start gap-3 text-xs text-slate-400 leading-relaxed">
+              <label className="flex items-start gap-3 text-xs text-slate-300 leading-relaxed">
                 <input
                   type="checkbox"
                   name="consent"
@@ -931,7 +931,7 @@ const GasTurbineEmissionsMapping = () => {
                 <Send className="w-4 h-4" aria-hidden="true" />
               </button>
 
-              <p className="text-[10px] text-slate-400 text-center uppercase tracking-widest font-mono">
+              <p className="text-[10px] text-slate-300 text-center uppercase tracking-widest font-mono">
                 Secure · 15 seats per cohort · Auto-locks when full
               </p>
             </form>
@@ -969,7 +969,7 @@ const Stat = ({
 }) => (
   <div className="p-4 card">
     <div className="flex items-center gap-2 text-cyan-400 mb-2">{icon}</div>
-    <div className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">
+    <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-1">
       {label}
     </div>
     <div className="text-sm font-bold text-white font-mono">{value}</div>
@@ -999,7 +999,7 @@ const Field = ({
       type={type}
       required={required}
       placeholder={placeholder}
-      className="w-full bg-slate-900/60 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-400 transition-colors"
+      className="w-full bg-slate-900/60 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
     />
   </div>
 );

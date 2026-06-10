@@ -333,7 +333,7 @@ const Testimonials = () => {
                   aria-label="Previous testimonial"
                   className="p-2 rounded-full bg-slate-900 border border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
                 >
-                  <ChevronLeft aria-hidden="true" className="w-4 h-4 text-slate-400 group-hover:text-cyan-400" />
+                  <ChevronLeft aria-hidden="true" className="w-4 h-4 text-slate-300 group-hover:text-cyan-400" />
                 </button>
                 <div className="flex items-center gap-2">
                   {featuredTestimonials.map((_, i) => (
@@ -355,7 +355,7 @@ const Testimonials = () => {
                   aria-label="Next testimonial"
                   className="p-2 rounded-full bg-slate-900 border border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
                 >
-                  <ChevronRight aria-hidden="true" className="w-4 h-4 text-slate-400 group-hover:text-cyan-400" />
+                  <ChevronRight aria-hidden="true" className="w-4 h-4 text-slate-300 group-hover:text-cyan-400" />
                 </button>
               </div>
             </Reveal>
@@ -364,7 +364,7 @@ const Testimonials = () => {
             <Reveal delay={0.1}>
               <div className="card h-full p-6">
                 <h3 className="text-lg font-semibold text-white mb-1 text-center">Sentiment Analysis</h3>
-                <p className="text-sm text-slate-400 text-center mb-4 font-mono">
+                <p className="text-sm text-slate-300 text-center mb-4 font-mono">
                   Themes from {allTestimonials.length} testimonials
                 </p>
 
@@ -406,15 +406,15 @@ const Testimonials = () => {
                 <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-800">
                   <div className="text-center">
                     <p className="font-display text-2xl font-bold text-gradient">{allTestimonials.length}</p>
-                    <p className="text-xs font-mono uppercase tracking-widest text-slate-400 mt-1">Reviews</p>
+                    <p className="text-xs font-mono uppercase tracking-widest text-slate-300 mt-1">Reviews</p>
                   </div>
                   <div className="text-center">
                     <p className="font-display text-2xl font-bold text-gradient">15+</p>
-                    <p className="text-xs font-mono uppercase tracking-widest text-slate-400 mt-1">Years Impact</p>
+                    <p className="text-xs font-mono uppercase tracking-widest text-slate-300 mt-1">Years Impact</p>
                   </div>
                   <div className="text-center">
                     <p className="font-display text-2xl font-bold text-gradient">100%</p>
-                    <p className="text-xs font-mono uppercase tracking-widest text-slate-400 mt-1">Positive</p>
+                    <p className="text-xs font-mono uppercase tracking-widest text-slate-300 mt-1">Positive</p>
                   </div>
                 </div>
               </div>
@@ -438,7 +438,7 @@ const Testimonials = () => {
                 <figure className="group card card-hover p-6">
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <Quote className="w-6 h-6 text-cyan-500/50 shrink-0" aria-hidden="true" />
-                    <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded-full bg-slate-800/80 text-slate-400 group-hover:bg-cyan-500/10 group-hover:text-cyan-400 transition-colors text-right">
+                    <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded-full bg-slate-800/80 text-slate-300 group-hover:bg-cyan-500/10 group-hover:text-cyan-400 transition-colors text-right">
                       {testimonial.category}
                     </span>
                   </div>
@@ -451,7 +451,7 @@ const Testimonials = () => {
                     <p className="font-semibold text-white group-hover:text-cyan-400 transition-colors">
                       {testimonial.name}
                     </p>
-                    <p className="text-xs text-slate-500 mt-0.5">{testimonial.role}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{testimonial.role}</p>
                   </figcaption>
                 </figure>
               </Reveal>

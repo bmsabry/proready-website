@@ -11,7 +11,7 @@ const NotFound = () => {
       <div className="container-site text-center">
         <p className="font-mono text-sm text-cyan-500 mb-4">404</p>
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Page not found</h1>
-        <p className="text-slate-400 max-w-md mx-auto mb-8">
+        <p className="text-slate-300 max-w-md mx-auto mb-8">
           That address doesn't match anything on our site. It may have moved, or the link may be out of date.
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-4">

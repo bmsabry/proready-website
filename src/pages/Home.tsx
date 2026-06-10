@@ -162,7 +162,7 @@ const TeamCard = ({ member, index }: { member: TeamMember; index: number }) => {
         </div>
         <p
           id={bioId}
-          className="text-slate-400 text-sm leading-relaxed mt-5 whitespace-pre-line"
+          className="text-slate-300 text-sm leading-relaxed mt-5 whitespace-pre-line"
           style={expanded ? undefined : clampStyle}
         >
           {member.bio}
@@ -215,7 +215,7 @@ const Home = () => {
               <span className="text-gradient">Thermal Fluid</span> &amp; AI Engineering
               <br className="hidden md:block" /> for Problems Declared Unsolvable
             </h1>
-            <p className="text-lg md:text-xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed">
+            <p className="text-lg md:text-xl text-slate-300 max-w-3xl mx-auto mb-10 leading-relaxed">
               ProReadyEngineer LLC provides expert consulting in gas turbine combustion, mechanical
               power systems, advanced data analytics, and specialized technical training for engineers.
             </p>
@@ -234,13 +234,13 @@ const Home = () => {
       {/* ---------- Federal credentials strip ---------- */}
       <section className="border-y border-slate-800/60 bg-slate-900/20">
         <div className="container-site py-4">
-          <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-xs tracking-wider text-slate-400 text-center">
+          <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-xs tracking-wider text-slate-300 text-center">
             <span>SAM.gov Small Business</span>
-            <span className="text-slate-700" aria-hidden="true">|</span>
+            <span className="text-slate-500" aria-hidden="true">|</span>
             <span>CAGE 18X84</span>
-            <span className="text-slate-700" aria-hidden="true">|</span>
+            <span className="text-slate-500" aria-hidden="true">|</span>
             <span>UEI RLHYXFN7JJN5</span>
-            <span className="text-slate-700" aria-hidden="true">|</span>
+            <span className="text-slate-500" aria-hidden="true">|</span>
             <span>NAICS 541330 / 611430 / 541611</span>
           </p>
         </div>
@@ -274,7 +274,7 @@ const Home = () => {
                     {pillar.icon}
                   </div>
                   <h3 className="text-xl font-bold mb-4">{pillar.title}</h3>
-                  <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-1">{pillar.desc}</p>
+                  <p className="text-slate-300 text-sm leading-relaxed mb-6 flex-1">{pillar.desc}</p>
                   <Link to={pillar.link} className="btn-ghost hover:gap-3">
                     Learn more <ArrowRight className="w-4 h-4" aria-hidden="true" />
                   </Link>
@@ -303,7 +303,7 @@ const Home = () => {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold mb-2">{item.title}</h3>
-                    <p className="text-slate-400 text-sm leading-relaxed">{item.desc}</p>
+                    <p className="text-slate-300 text-sm leading-relaxed">{item.desc}</p>
                   </div>
                 </div>
               </Reveal>
@@ -346,7 +346,7 @@ const Home = () => {
                   <h3 className="text-xl font-bold mb-3 group-hover:text-cyan-300 transition-colors">
                     {work.title}
                   </h3>
-                  <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-1">{work.outcome}</p>
+                  <p className="text-slate-300 text-sm leading-relaxed mb-6 flex-1">{work.outcome}</p>
                   <span className="btn-ghost">
                     Read the case study <ArrowRight className="w-4 h-4" aria-hidden="true" />
                   </span>

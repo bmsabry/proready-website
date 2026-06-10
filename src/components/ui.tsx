@@ -62,7 +62,7 @@ export const SectionHeading = ({
     {eyebrow && <span className="eyebrow mb-4">{eyebrow}</span>}
     <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-3 mb-4">{title}</h2>
     {subtitle && (
-      <p className={`text-slate-400 leading-relaxed ${align === 'center' ? 'max-w-2xl mx-auto' : 'max-w-2xl'}`}>
+      <p className={`text-slate-300 leading-relaxed ${align === 'center' ? 'max-w-2xl mx-auto' : 'max-w-2xl'}`}>
         {subtitle}
       </p>
     )}
@@ -119,7 +119,7 @@ export const StatCounter = ({
       <div className="font-display text-4xl md:text-5xl font-bold text-white tabular-nums">
         {prefix}{n.toLocaleString()}{suffix}
       </div>
-      <div className="mt-2 text-xs font-mono uppercase tracking-widest text-slate-400">{label}</div>
+      <div className="mt-2 text-xs font-mono uppercase tracking-widest text-slate-300">{label}</div>
     </div>
   );
 };
@@ -144,7 +144,7 @@ export const CTABand = ({
     <div className="container-site">
       <Reveal className="card text-center px-6 py-16 md:px-16">
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">{title}</h2>
-        <p className="text-slate-400 max-w-2xl mx-auto mb-8">{subtitle}</p>
+        <p className="text-slate-300 max-w-2xl mx-auto mb-8">{subtitle}</p>
         <div className="flex flex-col sm:flex-row justify-center gap-4">
           <Link to={primaryTo} className="btn-primary">
             {primaryLabel} <ArrowRight className="w-4 h-4" aria-hidden="true" />
@@ -177,7 +177,7 @@ export const PageHero = ({
       <div className="anim-hero">
         {eyebrow && <span className="eyebrow mb-5">{eyebrow}</span>}
         <h1 className="text-4xl md:text-6xl font-bold tracking-tight mt-4 mb-6">{title}</h1>
-        {subtitle && <p className="text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed">{subtitle}</p>}
+        {subtitle && <p className="text-lg text-slate-300 max-w-3xl mx-auto leading-relaxed">{subtitle}</p>}
         {children}
       </div>
     </div>

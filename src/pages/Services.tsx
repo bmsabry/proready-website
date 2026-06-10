@@ -159,12 +159,12 @@ const PracticeSection = ({ practice, flip }: { practice: Practice; flip: boolean
         {/* Copy + capabilities */}
         <Reveal className={flip ? 'lg:order-2' : ''}>
           <div className="flex items-center gap-3 mb-5">
-            <span className="font-mono text-xs text-slate-500 tracking-widest">{practice.index}</span>
+            <span className="font-mono text-xs text-slate-400 tracking-widest">{practice.index}</span>
             <span className="h-px w-10 bg-slate-700" aria-hidden="true" />
             <span className="eyebrow">{practice.eyebrow}</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-5">{practice.title}</h2>
-          <p className="text-slate-400 leading-relaxed mb-8">{practice.description}</p>
+          <p className="text-slate-300 leading-relaxed mb-8">{practice.description}</p>
           <ul className="grid grid-cols-1 gap-3.5">
             {practice.capabilities.map((cap) => (
               <li key={cap} className="flex items-start gap-3 text-sm text-slate-300 leading-relaxed">
@@ -190,7 +190,7 @@ const PracticeSection = ({ practice, flip }: { practice: Practice; flip: boolean
                   className: `w-10 h-10 ${practice.accent}`,
                 })}
               </div>
-              <p className="font-mono text-xs uppercase tracking-widest text-slate-400 mb-6">
+              <p className="font-mono text-xs uppercase tracking-widest text-slate-300 mb-6">
                 {practice.visualLabel}
               </p>
               <div className="flex flex-wrap justify-center gap-2">
@@ -260,10 +260,10 @@ const Services = () => {
                 <div className="card card-hover h-full p-6 relative">
                   <span className="font-mono text-xs text-cyan-400 tracking-widest">{step.n}</span>
                   <h3 className="text-lg font-bold mt-3 mb-2">{step.title}</h3>
-                  <p className="text-sm text-slate-400 leading-relaxed">{step.desc}</p>
+                  <p className="text-sm text-slate-300 leading-relaxed">{step.desc}</p>
                   {i < processSteps.length - 1 && (
                     <ArrowRight
-                      className="hidden lg:block absolute top-1/2 -right-4 -translate-y-1/2 w-4 h-4 text-slate-600"
+                      className="hidden lg:block absolute top-1/2 -right-4 -translate-y-1/2 w-4 h-4 text-slate-500"
                       aria-hidden="true"
                     />
                   )}
@@ -289,7 +289,7 @@ const Services = () => {
                     {m.icon}
                   </div>
                   <h3 className="text-xl font-bold mb-3">{m.title}</h3>
-                  <p className="text-sm text-slate-400 leading-relaxed">{m.desc}</p>
+                  <p className="text-sm text-slate-300 leading-relaxed">{m.desc}</p>
                 </div>
               </Reveal>
             ))}

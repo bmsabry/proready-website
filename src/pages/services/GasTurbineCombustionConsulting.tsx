@@ -154,7 +154,7 @@ const GasTurbineCombustionConsulting = () => {
               <Reveal key={w.title} className="h-full">
                 <Link to={w.link} className="card card-hover h-full flex flex-col p-8 group">
                   <h3 className="text-lg font-bold mb-3 group-hover:text-cyan-300 transition-colors">{w.title}</h3>
-                  <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-1">{w.desc}</p>
+                  <p className="text-slate-300 text-sm leading-relaxed mb-6 flex-1">{w.desc}</p>
                   <span className="btn-ghost">
                     Read more <ArrowRight className="w-4 h-4" aria-hidden="true" />
                   </span>
@@ -172,7 +172,7 @@ const GasTurbineCombustionConsulting = () => {
             {faqs.map((f) => (
               <Reveal key={f.q}>
                 <h3 className="text-lg font-semibold mb-2">{f.q}</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">{f.a}</p>
+                <p className="text-slate-300 text-sm leading-relaxed">{f.a}</p>
               </Reveal>
             ))}
           </div>

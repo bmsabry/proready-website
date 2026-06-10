@@ -228,7 +228,7 @@ const Training = () => {
                 <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-4">
                   {flagship.title}
                 </h2>
-                <p className="text-slate-400 leading-relaxed mb-8">{flagship.description}</p>
+                <p className="text-slate-300 leading-relaxed mb-8">{flagship.description}</p>
 
                 <div className="flex flex-wrap gap-3 mb-8">
                   <MonoBadge icon={<Calendar className="w-3.5 h-3.5" aria-hidden="true" />}>
@@ -290,7 +290,7 @@ const Training = () => {
                     {item.icon}
                   </div>
                   <h3 className="text-lg font-bold mb-3">{item.title}</h3>
-                  <p className="text-slate-400 text-sm leading-relaxed">{item.body}</p>
+                  <p className="text-slate-300 text-sm leading-relaxed">{item.body}</p>
                 </div>
               </Reveal>
             ))}
@@ -314,29 +314,29 @@ const Training = () => {
                     <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20">
                       {course.category}
                     </span>
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-slate-300 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
                       Coming Soon
                     </span>
                   </div>
                   <h3 className="text-lg font-bold mb-3 leading-snug">{course.title}</h3>
-                  <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">
+                  <p className="text-slate-300 text-sm leading-relaxed mb-6 flex-grow">
                     {course.description}
                   </p>
-                  <div className="grid grid-cols-2 gap-3 text-xs font-mono text-slate-400 mb-6">
+                  <div className="grid grid-cols-2 gap-3 text-xs font-mono text-slate-300 mb-6">
                     <span className="flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
+                      <Clock className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
                       {course.duration}
                     </span>
                     <span className="flex items-center gap-2">
-                      <BookOpen className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
+                      <BookOpen className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
                       {course.level}
                     </span>
                     <span className="flex items-center gap-2">
-                      <Users className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
+                      <Users className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
                       {course.attendees}
                     </span>
                     <span className="flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
+                      <Calendar className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
                       {course.nextDate}
                     </span>
                   </div>

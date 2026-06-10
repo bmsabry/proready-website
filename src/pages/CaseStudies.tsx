@@ -172,7 +172,7 @@ const CaseStudies = () => {
                 className={`px-4 py-2 rounded-full text-xs font-mono uppercase tracking-wider border transition-all duration-200 ${
                   filter === f
                     ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
-                    : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                    : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-600 hover:text-slate-200'
                 }`}
               >
                 {f}
@@ -197,8 +197,8 @@ const CaseStudies = () => {
                       <span className="text-[11px] font-mono uppercase tracking-widest text-cyan-400">
                         {study.category}
                       </span>
-                      <span className="text-slate-700" aria-hidden="true">/</span>
-                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                      <span className="text-slate-500" aria-hidden="true">/</span>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
                         <Calendar className="w-3 h-3" aria-hidden="true" />
                         {study.date}
                       </span>
@@ -209,12 +209,12 @@ const CaseStudies = () => {
                         {study.title}
                       </Link>
                     </h3>
-                    <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">
+                    <p className="text-slate-300 text-sm leading-relaxed mb-6 flex-grow">
                       {study.excerpt}
                     </p>
 
                     <div className="flex items-center justify-between pt-5 border-t border-slate-800/80">
-                      <span className="inline-flex items-center gap-2 text-xs text-slate-500">
+                      <span className="inline-flex items-center gap-2 text-xs text-slate-400">
                         <User className="w-3.5 h-3.5" aria-hidden="true" />
                         {study.author}
                       </span>

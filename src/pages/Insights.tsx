@@ -120,8 +120,8 @@ const Insights = () => {
                       <span className="text-[11px] font-mono uppercase tracking-widest text-cyan-400">
                         {post.category}
                       </span>
-                      <span className="text-slate-700" aria-hidden="true">/</span>
-                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                      <span className="text-slate-500" aria-hidden="true">/</span>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
                         <Calendar className="w-3 h-3" aria-hidden="true" />
                         {post.date}
                       </span>
@@ -132,12 +132,12 @@ const Insights = () => {
                         {post.title}
                       </Link>
                     </h3>
-                    <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">
+                    <p className="text-slate-300 text-sm leading-relaxed mb-6 flex-grow">
                       {post.excerpt}
                     </p>
 
                     <div className="flex items-center justify-between pt-5 border-t border-slate-800/80">
-                      <span className="inline-flex items-center gap-2 text-xs text-slate-500">
+                      <span className="inline-flex items-center gap-2 text-xs text-slate-400">
                         <User className="w-3.5 h-3.5" aria-hidden="true" />
                         {post.author}
                       </span>
@@ -156,7 +156,7 @@ const Insights = () => {
             <div className="card p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8">
               <div className="max-w-md">
                 <h2 className="text-2xl font-bold mb-2">Stay Updated</h2>
-                <p className="text-slate-400 text-sm">
+                <p className="text-slate-300 text-sm">
                   Get our latest technical papers and case studies delivered directly to your inbox.
                 </p>
               </div>

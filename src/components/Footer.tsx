@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom';
 import { Youtube, Mail, ArrowRight } from 'lucide-react';
 
 const FooterHeading = ({ children }: { children: React.ReactNode }) => (
-  <h2 className="text-xs font-mono font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
+  <h2 className="text-xs font-mono font-semibold uppercase tracking-[0.18em] text-slate-400 mb-6">
     {children}
   </h2>
 );
 
 const FooterLink = ({ to, children }: { to: string; children: React.ReactNode }) => (
   <li>
-    <Link to={to} className="text-sm text-slate-400 hover:text-cyan-400 transition-colors">
+    <Link to={to} className="text-sm text-slate-300 hover:text-cyan-400 transition-colors">
       {children}
     </Link>
   </li>
@@ -32,11 +32,11 @@ const Footer = () => {
                 ProReady<span className="text-cyan-400">Engineer</span>
               </span>
             </Link>
-            <p className="text-sm text-slate-400 leading-relaxed max-w-sm mb-6">
+            <p className="text-sm text-slate-300 leading-relaxed max-w-sm mb-6">
               Ex-GE, PhD-led consulting in gas turbine combustion, thermal fluid sciences,
               high-pressure test infrastructure, and industrial AI.
             </p>
-            <div className="font-mono text-[11px] leading-5 uppercase tracking-wider text-slate-500 space-y-1">
+            <div className="font-mono text-xs leading-6 uppercase tracking-wider text-slate-300 space-y-1">
               <p>SAM.gov Small Business</p>
               <p>CAGE 18X84 · UEI RLHYXFN7JJN5</p>
               <p>NAICS 541330 · 611430 · 541611</p>
@@ -69,7 +69,7 @@ const Footer = () => {
           {/* CTA */}
           <div>
             <FooterHeading>Start a Conversation</FooterHeading>
-            <p className="text-sm text-slate-400 leading-relaxed mb-5">
+            <p className="text-sm text-slate-300 leading-relaxed mb-5">
               Tell us about your toughest technical problem.
             </p>
             <Link to="/contact" className="btn-secondary px-5 py-2.5 text-sm mb-7">
@@ -81,14 +81,14 @@ const Footer = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="ProReadyEngineer on YouTube"
-                className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg hover:border-slate-600 hover:bg-slate-800 transition-colors text-slate-400 hover:text-cyan-400"
+                className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg hover:border-slate-600 hover:bg-slate-800 transition-colors text-slate-300 hover:text-cyan-400"
               >
                 <Youtube className="w-5 h-5" aria-hidden="true" />
               </a>
               <a
                 href="mailto:info@proreadyengineer.com"
                 aria-label="Email ProReadyEngineer"
-                className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg hover:border-slate-600 hover:bg-slate-800 transition-colors text-slate-400 hover:text-cyan-400"
+                className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg hover:border-slate-600 hover:bg-slate-800 transition-colors text-slate-300 hover:text-cyan-400"
               >
                 <Mail className="w-5 h-5" aria-hidden="true" />
               </a>
@@ -97,9 +97,9 @@ const Footer = () => {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-14 lg:mt-16 pt-7 border-t border-slate-800/70 flex flex-col-reverse sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+        <div className="mt-14 lg:mt-16 pt-7 border-t border-slate-800/70 flex flex-col-reverse sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
           <p>© {new Date().getFullYear()} ProReadyEngineer LLC. All rights reserved.</p>
-          <p className="font-mono text-[11px] tracking-wide text-slate-600">
+          <p className="font-mono text-xs tracking-wide text-slate-400">
             combustion · hydrogen · AI
           </p>
         </div>
