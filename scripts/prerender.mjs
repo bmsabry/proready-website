@@ -54,7 +54,9 @@ for (const route of PRERENDER_ROUTES) {
     let out = template.replace(/<!-- seo:start -->[\s\S]*?<!-- seo:end -->/, () => `<!-- seo:start -->\n    ${seoBlock(seo)}\n    <!-- seo:end -->`);
     out = out.replace('<div id="root"></div>', () => `<div id="root" data-ssr="${route.path}">${appHtml}</div>`);
 
-    const file = route.path === '/' ? 'dist/index.html' : join('dist', route.path, 'index.html');
+    // foo.html (not foo/index.html): Pages serves it at the clean URL /foo
+    // with no trailing-slash redirect, preserving already-indexed URLs.
+    const file = route.path === '/' ? 'dist/index.html' : join('dist', `${route.path}.html`);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, out);
     console.log(`  ✓ ${route.path} (${(appHtml.length / 1024).toFixed(1)} kB)`);
