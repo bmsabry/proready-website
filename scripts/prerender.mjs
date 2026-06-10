@@ -2,8 +2,12 @@
  * Build-time prerenderer.
  * Runs after `vite build` (client) + `vite build --ssr` (server bundle).
  * Renders every public route to static HTML with per-page head tags and
- * JSON-LD baked in, writes dist/spa.html as the client-render fallback
- * shell (admin + unknown routes), and generates dist/sitemap.xml.
+ * JSON-LD baked in, and generates dist/sitemap.xml.
+ *
+ * No _redirects file: Cloudflare Pages redirects SHADOW static assets, so a
+ * catch-all rewrite would hijack the prerendered pages. Without _redirects,
+ * Pages serves static assets first and falls back to /index.html (SPA mode)
+ * for unknown paths such as /admin.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -12,9 +16,6 @@ const ORIGIN = 'https://proreadyengineer.com';
 const { render, PRERENDER_ROUTES } = await import('../dist-ssr/entry-server.js');
 
 const template = readFileSync('dist/index.html', 'utf8');
-
-// Pristine SPA shell for non-prerendered routes (admin, 404 fallback).
-writeFileSync('dist/spa.html', template);
 
 const escAttr = (s) =>
   String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -51,7 +52,7 @@ for (const route of PRERENDER_ROUTES) {
     if (!seo) throw new Error('page did not register SEO metadata (usePageMeta missing?)');
 
     let out = template.replace(/<!-- seo:start -->[\s\S]*?<!-- seo:end -->/, () => `<!-- seo:start -->\n    ${seoBlock(seo)}\n    <!-- seo:end -->`);
-    out = out.replace('<div id="root"></div>', () => `<div id="root">${appHtml}</div>`);
+    out = out.replace('<div id="root"></div>', () => `<div id="root" data-ssr="${route.path}">${appHtml}</div>`);
 
     const file = route.path === '/' ? 'dist/index.html' : join('dist', route.path, 'index.html');
     mkdirSync(dirname(file), { recursive: true });

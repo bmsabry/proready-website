@@ -1,7 +1,0 @@
-# Serve PDF files directly (must be before catch-all)
-/*.pdf /:splat.pdf 200
-
-# Client-rendered fallback for routes without prerendered HTML
-# (admin pages, unknown URLs). Prerendered static pages are served
-# directly by Cloudflare Pages before this rule applies.
-/* /spa.html 200

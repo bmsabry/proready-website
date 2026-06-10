@@ -13,9 +13,14 @@ const app = (
   </React.StrictMode>
 );
 
-// Prerendered pages ship real HTML; hydrate it. Fallback shell renders fresh.
-if (container.hasChildNodes()) {
+// Prerendered pages ship real HTML for their own route; hydrate it.
+// If the fallback served another route's HTML (e.g. /admin gets the home
+// shell from Pages' SPA fallback), discard it and render fresh.
+const ssrPath = container.getAttribute('data-ssr');
+const here = window.location.pathname.replace(/\/+$/, '') || '/';
+if (container.hasChildNodes() && ssrPath === here) {
   hydrateRoot(container, app);
 } else {
+  container.replaceChildren();
   createRoot(container).render(app);
 }
