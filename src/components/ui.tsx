@@ -1,28 +1,50 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, useInView } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-/* ---------- Reveal: standard scroll-in animation wrapper ---------- */
+/* ---------- Reveal: scroll-in animation wrapper ----------
+   SEO/no-JS safe: content renders visible by default. On mount, elements
+   still below the viewport are eased in as they scroll into view. */
 export const Reveal = ({
   children,
   delay = 0,
   className,
+  id,
 }: {
   children: React.ReactNode;
   delay?: number;
   className?: string;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: 24 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true, margin: '-60px' }}
-    transition={{ duration: 0.55, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
-    className={className}
-  >
-    {children}
-  </motion.div>
-);
+  id?: string;
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (el.getBoundingClientRect().top < window.innerHeight * 0.92) return;
+
+    el.classList.add('reveal-pre');
+    if (delay) el.style.transitionDelay = `${delay}s`;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          el.classList.add('reveal-in');
+          io.disconnect();
+        }
+      },
+      { rootMargin: '0px 0px -60px 0px' }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [delay]);
+
+  return (
+    <div ref={ref} id={id} className={className}>
+      {children}
+    </div>
+  );
+};
 
 /* ---------- SectionHeading: eyebrow + title + subtitle ---------- */
 export const SectionHeading = ({
@@ -47,7 +69,8 @@ export const SectionHeading = ({
   </Reveal>
 );
 
-/* ---------- StatCounter: animated count-up metric ---------- */
+/* ---------- StatCounter: metric with count-up on first view ----------
+   Renders the final value in static HTML; animates only on scroll-in. */
 export const StatCounter = ({
   value,
   suffix = '',
@@ -60,28 +83,40 @@ export const StatCounter = ({
   label: string;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-40px' });
-  const [n, setN] = useState(0);
+  const [n, setN] = useState(value);
 
   useEffect(() => {
-    if (!inView) return;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced) { setN(value); return; }
-    const dur = 1200;
-    const t0 = performance.now();
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (el.getBoundingClientRect().top < window.innerHeight * 0.95) return;
+
     let raf = 0;
-    const tick = (t: number) => {
-      const p = Math.min((t - t0) / dur, 1);
-      setN(Math.round(value * (1 - Math.pow(1 - p, 3))));
-      if (p < 1) raf = requestAnimationFrame(tick);
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0].isIntersecting) return;
+        io.disconnect();
+        const dur = 1100;
+        const t0 = performance.now();
+        const tick = (t: number) => {
+          const p = Math.min((t - t0) / dur, 1);
+          setN(Math.round(value * (1 - Math.pow(1 - p, 3))));
+          if (p < 1) raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      },
+      { rootMargin: '-40px' }
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(raf);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [inView, value]);
+  }, [value]);
 
   return (
     <div ref={ref} className="text-center">
-      <div className="font-display text-4xl md:text-5xl font-bold text-gradient tabular-nums">
+      <div className="font-display text-4xl md:text-5xl font-bold text-white tabular-nums">
         {prefix}{n.toLocaleString()}{suffix}
       </div>
       <div className="mt-2 text-xs font-mono uppercase tracking-widest text-slate-400">{label}</div>
@@ -92,7 +127,7 @@ export const StatCounter = ({
 /* ---------- CTABand: closing call-to-action section ---------- */
 export const CTABand = ({
   title = 'Have an "unsolvable" engineering problem?',
-  subtitle = "Talk directly with the experts who design, test, and fix the world's most demanding combustion and thermal-fluid systems.",
+  subtitle = 'Talk directly with the engineers who design, test, and fix demanding combustion and thermal-fluid systems.',
   primaryLabel = 'Consult with Experts',
   primaryTo = '/contact',
   secondaryLabel,
@@ -106,10 +141,8 @@ export const CTABand = ({
   secondaryTo?: string;
 }) => (
   <section className="section-pad relative overflow-hidden">
-    <div className="absolute inset-0 -z-10 bg-hero-radial" />
     <div className="container-site">
-      <Reveal className="card relative overflow-hidden text-center px-6 py-16 md:px-16">
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[60%] h-48 bg-cyan-500/10 blur-[100px] rounded-full pointer-events-none" />
+      <Reveal className="card text-center px-6 py-16 md:px-16">
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">{title}</h2>
         <p className="text-slate-400 max-w-2xl mx-auto mb-8">{subtitle}</p>
         <div className="flex flex-col sm:flex-row justify-center gap-4">
@@ -141,12 +174,12 @@ export const PageHero = ({
     <div className="hero-backdrop" />
     <div className="absolute inset-0 -z-10 bg-hero-radial" />
     <div className="container-site text-center">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+      <div className="anim-hero">
         {eyebrow && <span className="eyebrow mb-5">{eyebrow}</span>}
         <h1 className="text-4xl md:text-6xl font-bold tracking-tight mt-4 mb-6">{title}</h1>
         {subtitle && <p className="text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed">{subtitle}</p>}
         {children}
-      </motion.div>
+      </div>
     </div>
   </section>
 );

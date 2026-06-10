@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, User, Tag, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -15,11 +14,7 @@ const OptimizingTestCellAssembly = () => {
           Back to Case Studies
         </Link>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
+        <div className="anim-enter">
           <h1 className="text-3xl md:text-5xl font-bold mb-8 leading-tight">
             Optimizing Test Cell Assembly
           </h1>
@@ -63,7 +58,7 @@ const OptimizingTestCellAssembly = () => {
               <p>A major engine test facility faced long hardware assembly times that slowed every test campaign. Each program required roughly <strong>two weeks</strong> of setup before testing could begin—burning valuable schedule and resources. The customer's target was simple but ambitious: <strong>cut assembly time noticeably without compromising quality or safety</strong>.</p>
             </section>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

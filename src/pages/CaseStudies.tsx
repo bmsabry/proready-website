@@ -144,7 +144,7 @@ const caseStudies = [
 
 const CaseStudies = () => {
   usePageMeta(
-    'Case Studies — Proven Results in Gas Turbine & Thermal-Fluid Engineering',
+    'Case Studies: Proven Results in Gas Turbine & Thermal-Fluid Engineering',
     'Real projects, measurable outcomes: test infrastructure, emissions measurement, fuel systems, and oil & gas process engineering delivered by ProReadyEngineer.'
   );
 
@@ -171,7 +171,7 @@ const CaseStudies = () => {
                 aria-pressed={filter === f}
                 className={`px-4 py-2 rounded-full text-xs font-mono uppercase tracking-wider border transition-all duration-200 ${
                   filter === f
-                    ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 shadow-glow-cyan'
+                    ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
                     : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200'
                 }`}
               >

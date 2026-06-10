@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -18,11 +17,7 @@ const TransitioningDLECombustionSystemsTo100Hydrogen = () => {
           Back to Research Insights
         </Link>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
+        <div className="anim-enter">
           <div className="flex items-center gap-4 mb-6">
             <span className="flex items-center gap-1.5 text-xs font-medium text-cyan-400 uppercase tracking-wider">
               <Tag className="w-3 h-3" />
@@ -82,7 +77,7 @@ const TransitioningDLECombustionSystemsTo100Hydrogen = () => {
               </p>
             </section>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

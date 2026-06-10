@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
@@ -14,6 +14,11 @@ const Contact = lazy(() => import('./pages/Contact'));
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const GasTurbineEmissionsMapping = lazy(() => import('./pages/training/GasTurbineEmissionsMapping'));
+
+const GasTurbineCombustionConsulting = lazy(() => import('./pages/services/GasTurbineCombustionConsulting'));
+const IndustrialAIConsulting = lazy(() => import('./pages/services/IndustrialAIConsulting'));
+const TestCellDesign = lazy(() => import('./pages/services/TestCellDesign'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 const OptimizingTestCellAssembly = lazy(() => import('./pages/case-studies/OptimizingTestCellAssembly'));
 const EnhancingTestExecutionCostEfficiency = lazy(() => import('./pages/case-studies/EnhancingTestExecutionCostEfficiency'));
@@ -45,7 +50,7 @@ const PageLoader = () => (
 
 function App() {
   return (
-    <Router>
+    <>
       <ScrollToTop />
       <div className="min-h-screen flex flex-col">
         <a href="#main-content" className="skip-link">Skip to main content</a>
@@ -55,6 +60,9 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/services" element={<Services />} />
+              <Route path="/services/gas-turbine-combustion" element={<GasTurbineCombustionConsulting />} />
+              <Route path="/services/industrial-ai" element={<IndustrialAIConsulting />} />
+              <Route path="/services/test-cell-design" element={<TestCellDesign />} />
               <Route path="/training" element={<Training />} />
               <Route path="/training/gas-turbine-emissions-mapping" element={<GasTurbineEmissionsMapping />} />
               <Route path="/insights" element={<Insights />} />
@@ -83,12 +91,13 @@ function App() {
               <Route path="/contact" element={<Contact />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </main>
         <Footer />
       </div>
-    </Router>
+    </>
   );
 }
 

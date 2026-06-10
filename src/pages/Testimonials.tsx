@@ -7,7 +7,7 @@ import { usePageMeta } from '../lib/meta';
 
 const Testimonials = () => {
   usePageMeta(
-    'Testimonials — What Leaders, Engineers & Clients Say',
+    'Testimonials: What Leaders, Engineers & Clients Say',
     'Thirty first-hand testimonials from chief engineers, principal engineers, technicians, and industry partners on the dedication, technical excellence, and impact of working with ProReadyEngineer.'
   );
 
@@ -429,7 +429,7 @@ const Testimonials = () => {
           <SectionHeading
             eyebrow="The Full Record"
             title={<>All <span className="text-gradient">Testimonials</span></>}
-            subtitle="Every word, unedited — from leadership, peers, technicians, and clients."
+            subtitle="Every word, unedited, from leadership, peers, technicians, and clients."
           />
 
           <div className="columns-1 md:columns-2 xl:columns-3 gap-6 [column-fill:_balance]">

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import {
   Calendar,
   Users,
@@ -19,6 +18,7 @@ import {
   AlertTriangle,
   Sparkles,
 } from 'lucide-react';
+import { Reveal } from '../../components/ui';
 import { usePageMeta } from '../../lib/meta';
 
 // -----------------------------------------------------------------------------
@@ -56,7 +56,7 @@ const COURSE_JSONLD = JSON.stringify({
   '@type': 'Course',
   name: 'Gas Turbine Emissions Mapping',
   description:
-    'Five-day live expert course on DLE gas turbine emissions mapping: combustion fundamentals, combustion dynamics, DLE operations, fuel-split mapping, ambient effects, flex fuel, and troubleshooting — taught by a practitioner with 19+ years of field mapping experience.',
+    'Five-day live expert course on DLE gas turbine emissions mapping: combustion fundamentals, combustion dynamics, DLE operations, fuel-split mapping, ambient effects, flex fuel, and troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
   provider: {
     '@type': 'Organization',
     name: 'ProReadyEngineer LLC',
@@ -172,7 +172,27 @@ const DEFAULT_DAY_DATES: string[] = [
 const GasTurbineEmissionsMapping = () => {
   usePageMeta(
     'Gas Turbine Emissions Mapping Course',
-    'Five-day live expert course on DLE gas turbine emissions mapping — combustion fundamentals, dynamics, fuel splits, ambient effects, and flex-fuel troubleshooting. Taught by a practitioner with 19+ years of field experience.',
+    'Five-day live expert course on DLE gas turbine emissions mapping: combustion fundamentals, dynamics, fuel splits, ambient effects, and flex-fuel troubleshooting. Taught by a practitioner with 19+ years of field experience.',
+    {
+      image: 'https://proreadyengineer.com/Gas_Turbine_Emissions_Mapping_Infographic.png',
+      jsonLd: {
+        '@context': 'https://schema.org',
+        '@type': 'Course',
+        name: 'Gas Turbine Emissions Mapping',
+        description:
+          'Five-day live expert course on DLE gas turbine emissions mapping: combustion fundamentals, dynamics, fuel splits, ambient effects, and flex-fuel troubleshooting.',
+        provider: { '@id': 'https://proreadyengineer.com/#org' },
+        hasCourseInstance: [
+          {
+            '@type': 'CourseInstance',
+            courseMode: 'Online',
+            courseWorkload: 'P5D',
+            instructor: { '@type': 'Person', name: 'Dr. Bassam Abdelnabi', jobTitle: 'Principal Consultant, Gas Turbine Combustion Expert' },
+          },
+        ],
+        offers: { '@type': 'Offer', category: 'Paid' },
+      },
+    },
   );
 
   const [seatsTaken, setSeatsTaken] = useState<number | null>(null);
@@ -294,17 +314,13 @@ const GasTurbineEmissionsMapping = () => {
         <div className="hero-backdrop" />
         <div className="absolute inset-0 -z-10 bg-hero-radial" />
         <div className="container-site">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
+          <div className="anim-enter">
             <span className="eyebrow mb-5">Flagship Course</span>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mt-4 mb-6 leading-tight">
               Gas Turbine <span className="text-gradient">Emissions Mapping</span>
             </h1>
             <p className="text-xl md:text-2xl font-light text-slate-300 mb-8 max-w-3xl">
-              De-mystifying complexity — the gas turbine mapping expert course.
+              De-mystifying complexity: the gas turbine mapping expert course.
             </p>
 
             {/* Key facts band — live data in mono */}
@@ -344,7 +360,7 @@ const GasTurbineEmissionsMapping = () => {
                 <Send className="w-4 h-4" aria-hidden="true" />
               </a>
               <span className="text-sm text-slate-400">
-                No payment required to register — seat held as pending.
+                No payment required to register. Your seat is held as pending.
               </span>
             </div>
 
@@ -359,7 +375,7 @@ const GasTurbineEmissionsMapping = () => {
             </div>
 
             <p className="text-slate-400 text-lg mb-10 leading-relaxed max-w-4xl">
-              Modern DLE combustion systems look daunting — five distinct gas circuits, bounded by
+              Modern DLE combustion systems look daunting: five distinct gas circuits, bounded by
               narrow dynamics corridors and moving ambient targets. This course takes you from
               zero gas-turbine knowledge to confident field mapper over five days, taught by a
               practitioner with 19+ years of live mapping experience and multiple patents in the
@@ -389,22 +405,17 @@ const GasTurbineEmissionsMapping = () => {
                 value="Beginner → Expert"
               />
             </div>
-          </motion.div>
+          </div>
         </div>
       </section>
 
       <div className="container-site">
         {/* SEATS BAR */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="mb-16 p-6 md:p-8 card"
-        >
+        <div className="anim-enter mb-16 p-6 md:p-8 card">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <div>
               <div className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">
-                Seat availability — {cohortDate} cohort
+                Seat availability: {cohortDate} cohort
               </div>
               <div className="text-2xl font-bold">
                 {seatsLoading ? (
@@ -412,7 +423,7 @@ const GasTurbineEmissionsMapping = () => {
                 ) : courseStatus === 'closed' ? (
                   <span className="text-amber-400">Registration closed</span>
                 ) : atCapacity ? (
-                  <span className="text-amber-400">Cohort full — waitlist only</span>
+                  <span className="text-amber-400">Cohort full, waitlist only</span>
                 ) : (
                   <span className="font-mono tabular-nums">
                     {seatsRemaining} of {capacity} seats remaining
@@ -441,7 +452,7 @@ const GasTurbineEmissionsMapping = () => {
               style={{ width: `${progressPct}%` }}
             />
           </div>
-        </motion.div>
+        </div>
 
         {/* CURRICULUM TIMELINE — number of cards is driven by the admin's */}
         {/* day_dates list. Topics for each day come from the local CURRICULUM */}
@@ -461,12 +472,9 @@ const GasTurbineEmissionsMapping = () => {
             {(dayDates.length > 0 ? dayDates : DEFAULT_DAY_DATES).map((dateLabel, i) => {
               const day = CURRICULUM[i] ?? TBD_DAY;
               return (
-                <motion.div
+                <Reveal
                   key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.05 }}
+                  delay={i * 0.05}
                   className="card card-hover p-6 flex flex-col"
                 >
                   <div className="flex items-center gap-3 mb-4">
@@ -493,7 +501,7 @@ const GasTurbineEmissionsMapping = () => {
                       </li>
                     ))}
                   </ul>
-                </motion.div>
+                </Reveal>
               );
             })}
           </div>
@@ -502,18 +510,13 @@ const GasTurbineEmissionsMapping = () => {
         {/* DAILY SCHEDULE — applies to every cohort day. Times are fixed (no */}
         {/* DST drift handling): the course runs in May 2026 when North */}
         {/* America is on DST, while Algeria + Saudi Arabia are DST-free. */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mb-16"
-        >
+        <Reveal className="mb-16">
           <span className="eyebrow mb-4">Daily Schedule</span>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-3">
             Same hours every day
           </h2>
           <p className="text-slate-400 text-base mb-8 max-w-2xl leading-relaxed">
-            Five teaching hours with a 10-minute break between each — keeping focus high
+            Five teaching hours with a 10-minute break between each, keeping focus high
             and fatigue low. Sessions stream live for all four time zones below.
           </p>
 
@@ -569,30 +572,20 @@ const GasTurbineEmissionsMapping = () => {
               ))}
             </div>
           </div>
-        </motion.div>
+        </Reveal>
 
         {/* COURSE MAP INFOGRAPHIC */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mb-16 card overflow-hidden"
-        >
+        <Reveal className="mb-16 card overflow-hidden">
           <img
             src="/Gas_Turbine_Emissions_Mapping_Infographic.png"
             alt="Course overview infographic — DLE emissions mapping workflow from combustion fundamentals through fuel-split optimisation to flex-fuel troubleshooting"
             className="w-full h-auto block"
             loading="lazy"
           />
-        </motion.div>
+        </Reveal>
 
         {/* PRICING — Founding Cohort offer for the first live cohort */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mb-16"
-        >
+        <Reveal className="mb-16">
           <span className="eyebrow mb-4">Pricing</span>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-3">
             Founding Cohort Pricing
@@ -650,7 +643,7 @@ const GasTurbineEmissionsMapping = () => {
             </p>
             <p>
               This course is designed to help you understand the real logic behind gas turbine
-              emissions mapping — including fuel splits, NOx, CO, combustion dynamics, safe
+              emissions mapping, including fuel splits, NOx, CO, combustion dynamics, safe
               operating windows, and practical mapping decisions.
             </p>
             <p className="text-slate-400">
@@ -725,7 +718,7 @@ const GasTurbineEmissionsMapping = () => {
             </Link>{' '}
             for group registration options.
           </p>
-        </motion.div>
+        </Reveal>
 
         {/* INSTRUCTOR */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
@@ -734,7 +727,7 @@ const GasTurbineEmissionsMapping = () => {
             <h2 className="text-3xl font-bold tracking-tight mt-4 mb-4">Bassam Abdelnabi</h2>
             <p className="text-slate-300 leading-relaxed mb-4">
               Founder of ProReadyEngineer. 19+ years in gas-turbine combustion with 1,000+
-              mapping tests across flex-fuel operations — from 100% propane to hydrogen
+              mapping tests across flex-fuel operations, from 100% propane to hydrogen
               blending. Multiple patents in gas-turbine combustion and emissions reduction.
               Bassam has trained and mentored dozens of engineers, helping them understand
               complex combustion and mapping concepts with practical, real-world clarity.
@@ -768,13 +761,7 @@ const GasTurbineEmissionsMapping = () => {
         </div>
 
         {/* REGISTRATION FORM */}
-        <motion.div
-          id="register"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="p-8 md:p-12 card scroll-mt-28"
-        >
+        <Reveal id="register" className="p-8 md:p-12 card scroll-mt-28">
           <span className="eyebrow mb-4">Register</span>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-2">
             Reserve your seat — {cohortDate} cohort
@@ -949,7 +936,7 @@ const GasTurbineEmissionsMapping = () => {
               </p>
             </form>
           )}
-        </motion.div>
+        </Reveal>
       </div>
     </div>
   );

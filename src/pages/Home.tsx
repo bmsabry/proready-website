@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import {
   ArrowRight,
   Atom,
@@ -73,7 +72,7 @@ He is highly skilled in performing rigorous design calculations for pressure ves
 const pillars = [
   {
     title: "Thermal Fluid Sciences",
-    desc: "Gas turbine combustion, heat transfer, and high-pressure test infrastructure — engineered from first principles, from concept through commissioning.",
+    desc: "Gas turbine combustion, heat transfer, and high-pressure test infrastructure, engineered from first principles through commissioning.",
     icon: <Flame className="w-8 h-8 text-orange-500" aria-hidden="true" />,
     link: "/services",
   },
@@ -85,7 +84,7 @@ const pillars = [
   },
   {
     title: "Training & Workshops",
-    desc: "Expert-led courses in combustion, emissions mapping, CFD, and data science — built by practitioners who have done the work, for engineers who will.",
+    desc: "Courses in combustion, emissions mapping, CFD, and data science, built by practitioners who have done the work themselves.",
     icon: <GraduationCap className="w-8 h-8 text-blue-500" aria-hidden="true" />,
     link: "/training",
   },
@@ -94,7 +93,7 @@ const pillars = [
 const differentiators = [
   {
     title: "Physics-First AI",
-    desc: "We pair PhD-level domain physics with production-grade machine learning — not black boxes. Models you can interrogate, trust, and deploy.",
+    desc: "PhD-level domain physics paired with production-grade machine learning. No black boxes: models you can interrogate and deploy.",
     icon: <Atom className="w-6 h-6 text-cyan-400" aria-hidden="true" />,
   },
   {
@@ -104,7 +103,7 @@ const differentiators = [
   },
   {
     title: "“Don't Take No for an Answer”",
-    desc: "A track record of resolving technical crises previously declared unsolvable — under schedule pressure, at full operating conditions.",
+    desc: "A track record of resolving technical crises previously declared unsolvable, under schedule pressure and at full operating conditions.",
     icon: <Target className="w-6 h-6 text-cyan-400" aria-hidden="true" />,
   },
   {
@@ -122,7 +121,7 @@ const featuredWork = [
   },
   {
     title: "Multichannel Emissions Sampling",
-    outcome: "A faster, simpler multichannel sampling system delivered in eight weeks — at 62% lower cost.",
+    outcome: "A faster, simpler multichannel sampling system delivered in eight weeks at 62% lower cost.",
     link: "/case-studies/multichannel-emissions-sampling",
   },
   {
@@ -209,18 +208,9 @@ const Home = () => {
           />
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/70 to-slate-950" />
         </div>
-        <div className="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-500/10 blur-[120px] rounded-full" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
-        </div>
-
         <div className="container-site text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <span className="eyebrow mb-6">Engineering the Future of Energy</span>
+          <div className="anim-enter">
+            <span className="eyebrow mb-6">Combustion &middot; Test Infrastructure &middot; Industrial AI</span>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mt-6 mb-8 max-w-5xl mx-auto">
               <span className="text-gradient">Thermal Fluid</span> &amp; AI Engineering
               <br className="hidden md:block" /> for Problems Declared Unsolvable
@@ -237,7 +227,7 @@ const Home = () => {
                 Explore Services
               </Link>
             </div>
-          </motion.div>
+          </div>
         </div>
       </section>
 
@@ -262,7 +252,7 @@ const Home = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
             <StatCounter value={100} suffix="+" label="Years Combined Experience" />
             <StatCounter value={12} suffix="+" label="Sample Case Studies" />
-            <StatCounter value={31} label="Experts Testimonials" />
+            <StatCounter value={31} label="Expert Testimonials" />
             <StatCounter value={7} label="Senior Experts" />
           </div>
         </div>
@@ -343,8 +333,8 @@ const Home = () => {
         <div className="container-site">
           <SectionHeading
             eyebrow="Featured Work"
-            title="Proof, not promises"
-            subtitle="A sample of the problems we have already solved — read how we did it."
+            title="Selected work"
+            subtitle="A sample of the problems we have already solved, and how."
           />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {featuredWork.map((work, i) => (

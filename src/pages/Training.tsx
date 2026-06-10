@@ -116,12 +116,12 @@ const WHY_TRAIN = [
   {
     icon: <Award className="w-6 h-6" aria-hidden="true" />,
     title: 'Practitioners, Not Lecturers',
-    body: 'Taught by the engineers who design, test, and troubleshoot these systems — ex-GE, PhD-led, with patents in the field.',
+    body: 'Taught by the engineers who design, test, and troubleshoot these systems: ex-GE, PhD-led, with patents in the field.',
   },
   {
     icon: <FlaskConical className="w-6 h-6" aria-hidden="true" />,
     title: 'Real Test-Cell Data & Field Experience',
-    body: 'Lessons built on thousands of live mapping tests and real field events — not idealized textbook cases.',
+    body: 'Lessons built on thousands of live mapping tests and real field events, not idealized textbook cases.',
   },
   {
     icon: <MessagesSquare className="w-6 h-6" aria-hidden="true" />,
@@ -211,7 +211,7 @@ const Training = () => {
             <span className="text-gradient">Build These Systems</span>
           </>
         }
-        subtitle="Specialized courses taught by the engineers who design and test gas turbines, combustion systems, and industrial AI — ex-GE, PhD-led, field-proven."
+        subtitle="Specialized courses taught by the engineers who design and test gas turbines, combustion systems, and industrial AI. Ex-GE, PhD-led, field-proven."
       />
 
       {/* FLAGSHIP COURSE */}
@@ -263,7 +263,7 @@ const Training = () => {
                 >
                   <img
                     src="/Gas_Turbine_Emissions_Mapping_Infographic.png"
-                    alt="Gas Turbine Emissions Mapping course infographic — DLE combustion circuits, dynamics corridor, and mapping workflow"
+                    alt="Gas Turbine Emissions Mapping course infographic: DLE combustion circuits, dynamics corridor, and mapping workflow"
                     className="w-full h-auto block"
                     loading="lazy"
                   />
@@ -280,7 +280,7 @@ const Training = () => {
           <SectionHeading
             eyebrow="Why Train With Us"
             title="Field-Grade Knowledge, Transferred Directly"
-            subtitle="Every course is built around the decisions you actually face in the test cell and the field — not slides recycled from a textbook."
+            subtitle="Every course is built around the decisions you actually face in the test cell and the field, not slides recycled from a textbook."
           />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {WHY_TRAIN.map((item, i) => (
@@ -352,7 +352,7 @@ const Training = () => {
 
       <CTABand
         title="Need Training Built Around Your Fleet?"
-        subtitle="We tailor any program to your hardware, your data, and your team's experience level — delivered on-site or live online."
+        subtitle="We tailor any program to your hardware, your data, and your team's experience level. Delivered on-site or live online."
         primaryLabel="Ask About Custom Training"
         primaryTo="/contact"
       />

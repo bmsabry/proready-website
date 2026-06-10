@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, User, Tag, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -15,11 +14,7 @@ const ImprovingGaseousFuelSupplySystemResponse = () => {
           Back to Case Studies
         </Link>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
+        <div className="anim-enter">
           <h1 className="text-3xl md:text-5xl font-bold mb-8 leading-tight">
             Improving Gaseous Fuel Supply System Response
           </h1>
@@ -67,7 +62,7 @@ const ImprovingGaseousFuelSupplySystemResponse = () => {
               </p>
             </section>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

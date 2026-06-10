@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -15,11 +14,7 @@ const CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissio
           Back to Case Studies
         </Link>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
+        <div className="anim-enter">
           <h1 className="text-3xl md:text-5xl font-bold mb-8 leading-tight">
             Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning
           </h1>
@@ -65,7 +60,7 @@ const CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissio
               <p>However, the tests still couldn't run at the desired conditions, and nitrogen doping or propane blending <strong>weren't possible at all</strong> with the existing infrastructure. The goal of this project was to <strong>enable an entirely new fuel‑supply capability</strong> through complete <strong>specification, procurement, and commissioning</strong>.</p>
             </section>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

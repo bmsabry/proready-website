@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -15,11 +14,7 @@ const RecoveryReactorFeedCoolerHeatExchanger = () => {
           Back to Case Studies
         </Link>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
+        <div className="anim-enter">
           <h1 className="text-3xl md:text-5xl font-bold mb-8 leading-tight">
             Recovery Reactor Feed Cooler Heat Exchanger
           </h1>
@@ -64,7 +59,7 @@ const RecoveryReactorFeedCoolerHeatExchanger = () => {
             <p>In petrochemical processing, the condition of a reactor feed stream is critical. Feed temperature directly influences <strong>reaction selectivity, yield, and catalyst life</strong>. Delivering feed at the wrong temperature&#8212;even temporarily&#8212;can cause runaway reactions, catalyst degradation, or unsafe operating conditions.</p>
             <p className="mt-4">This project required the engineering and fabrication of a <strong>Recovery Reactor Feed Cooler</strong>, a heat exchanger tasked with precisely conditioning the process stream before it enters the reactor. The challenge was not just thermal performance&#8212;it was delivering that performance <strong>reliably, safely, and durably</strong> in a chemically aggressive environment where material selection, code compliance, and mechanical integrity were non-negotiable.</p>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

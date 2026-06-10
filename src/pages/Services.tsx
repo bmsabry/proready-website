@@ -31,15 +31,25 @@ const practices: Practice[] = [
     description:
       'Expert consulting in high-temperature fluid dynamics and combustion systems, with a focus on gas turbine efficiency and emissions. From first-principles design to test-cell commissioning, we cover the full lifecycle of high-energy thermal hardware.',
     capabilities: [
-      'Gas turbine combustion design & troubleshooting — DLN/DLE systems, lean blowout, combustion dynamics, and emissions compliance',
-      'Hydrogen & alternative fuels — combustor adaptation for H2 blends, syngas, and liquid fuels including crude oil',
-      'Emissions mapping & optimization — experimental design, data interpretation, and digital twin–driven tuning',
-      'High-pressure test cell & facility engineering — design, specification, sizing, and commissioning',
+      'Gas turbine combustion design & troubleshooting: DLN/DLE systems, lean blowout, combustion dynamics, and emissions compliance',
+      'Hydrogen & alternative fuels: combustor adaptation for H2 blends, syngas, and liquid fuels including crude oil',
+      'Emissions mapping & optimization: experimental design, data interpretation, and digital-twin-driven tuning',
+      'High-pressure test cell & facility engineering: design, specification, sizing, and commissioning',
       'Test execution automation, including auto-mapping for faster, more repeatable campaigns',
       'Computational Fluid Dynamics (CFD) & conjugate heat transfer analysis',
       'Finite Element Analysis (FEA) & structural integrity assessment',
       'ASME pressure vessel & static equipment design',
     ],
+    footnote: (
+      <div className="flex flex-wrap gap-x-6 gap-y-2 mt-6">
+        <Link to="/services/gas-turbine-combustion" className="btn-ghost">
+          Combustion consulting in depth <ArrowRight className="w-4 h-4" aria-hidden="true" />
+        </Link>
+        <Link to="/services/test-cell-design" className="btn-ghost">
+          Test cell design in depth <ArrowRight className="w-4 h-4" aria-hidden="true" />
+        </Link>
+      </div>
+    ),
     visualLabel: 'Combustion Systems',
     visualTags: ['DLN / DLE', 'H2 & Flex-Fuel', 'CFD · CHT', 'ASME BPVC'],
   },
@@ -52,7 +62,7 @@ const practices: Practice[] = [
     accent: 'text-cyan-400',
     glow: 'from-cyan-500/10',
     description:
-      'Bridging the gap between physics-based engineering and modern machine learning to unlock hidden insights in your data. Unlike generic data science firms, we understand the underlying physics of your systems — so models are not just accurate, but physically consistent and explainable.',
+      'Bridging the gap between physics-based engineering and modern machine learning to unlock hidden insights in your data. Unlike generic data science firms, we understand the underlying physics of your systems, so models are not just accurate but physically consistent and explainable.',
     capabilities: [
       'Physics-informed machine learning & neural networks grounded in governing equations',
       'Computer vision for automated inspection and defect detection',
@@ -60,9 +70,14 @@ const practices: Practice[] = [
       'Predictive maintenance & reliability models that anticipate failures before they happen',
       'Anomaly detection in high-frequency sensor data',
       'Digital twin development for performance monitoring and optimization',
-      'Production-grade data pipelines & decision systems — not throwaway notebooks',
+      'Production-grade data pipelines & decision systems, not throwaway notebooks',
       'Test automation that closes the loop between experiment and model',
     ],
+    footnote: (
+      <Link to="/services/industrial-ai" className="btn-ghost mt-6">
+        Industrial AI consulting in depth <ArrowRight className="w-4 h-4" aria-hidden="true" />
+      </Link>
+    ),
     visualLabel: 'Physics-First AI',
     visualTags: ['Physics-Informed ML', 'Computer Vision', 'Bayesian UQ', 'Digital Twins'],
   },
@@ -77,7 +92,7 @@ const practices: Practice[] = [
     description:
       'Instructor-led courses taught by industry veterans who have designed, tested, and fielded the systems they teach. We empower engineering teams with the latest tools and methodologies through hands-on technical training — on-site, online, or hybrid.',
     capabilities: [
-      'Gas Turbine Emissions Mapping — our flagship 5-day course, from first principles to expert level',
+      'Gas Turbine Emissions Mapping: our flagship 5-day course, from first principles to expert level',
       'Advanced Combustion Fundamentals',
       'Gas Turbine Combustion',
       'Fundamentals of Turbomachinery',
@@ -105,12 +120,12 @@ const processSteps = [
   {
     n: '02',
     title: 'Diagnose',
-    desc: 'We dig into the data, drawings, and test results to isolate root causes — not symptoms.',
+    desc: 'We dig into the data, drawings, and test results to isolate root causes, not symptoms.',
   },
   {
     n: '03',
     title: 'Solve',
-    desc: 'Analysis, simulation, redesign, or model development — executed by senior experts, validated against physics.',
+    desc: 'Analysis, simulation, redesign, or model development, executed by senior engineers and validated against physics.',
   },
   {
     n: '04',

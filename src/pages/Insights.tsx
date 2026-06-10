@@ -89,7 +89,7 @@ const posts = [
 
 const Insights = () => {
   usePageMeta(
-    'Research Insights — Combustion, Thermal-Fluid & Hydrogen Deep Dives',
+    'Research Insights: Combustion, Thermal-Fluid & Hydrogen Deep Dives',
     'From the lab to your desk: technical deep dives into gas turbine combustion, DLE emissions, hydrogen transition, vortex dynamics, and combustor design from ProReadyEngineer.'
   );
 
@@ -98,7 +98,7 @@ const Insights = () => {
       <PageHero
         eyebrow="Research Insights"
         title={<>From the <span className="text-gradient">Lab</span></>}
-        subtitle="Deep dives into thermal-fluid sciences, combustion research, and the application of AI in modern engineering — written by the engineers doing the work."
+        subtitle="Deep dives into thermal-fluid sciences, combustion research, and the application of AI in modern engineering, written by the engineers doing the work."
       />
 
       <section className="pb-20 lg:pb-28">
@@ -179,7 +179,7 @@ const Insights = () => {
 
       <CTABand
         title="Want this expertise on your problem?"
-        subtitle="The same rigor behind these analyses goes into every client engagement — from combustion test campaigns to hydrogen readiness studies."
+        subtitle="The same rigor behind these analyses goes into every client engagement, from combustion test campaigns to hydrogen readiness studies."
         primaryLabel="Consult with Experts"
         secondaryLabel="See Proven Results"
         secondaryTo="/case-studies"

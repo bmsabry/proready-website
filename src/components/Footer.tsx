@@ -47,9 +47,10 @@ const Footer = () => {
           <nav aria-label="Expertise">
             <FooterHeading>Expertise</FooterHeading>
             <ul className="space-y-3.5">
-              <FooterLink to="/services#thermal-fluid">Thermal Fluid Sciences</FooterLink>
-              <FooterLink to="/services#thermal-fluid">Gas Turbine Combustion</FooterLink>
-              <FooterLink to="/services#industrial-ai">Industrial AI &amp; Data Analytics</FooterLink>
+              <FooterLink to="/services/gas-turbine-combustion">Gas Turbine Combustion</FooterLink>
+              <FooterLink to="/services/test-cell-design">Test Cell Design &amp; Commissioning</FooterLink>
+              <FooterLink to="/services/industrial-ai">Industrial AI &amp; Data Analytics</FooterLink>
+              <FooterLink to="/services">All Services</FooterLink>
               <FooterLink to="/training">Training &amp; Workshops</FooterLink>
             </ul>
           </nav>

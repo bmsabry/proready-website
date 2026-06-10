@@ -17,7 +17,7 @@ const RequiredMark = () => (
 const Contact = () => {
   usePageMeta(
     'Contact',
-    'Talk directly with senior gas turbine combustion, thermal-fluid, and industrial AI experts. Response within one business day. SAM.gov registered small business — CAGE 18X84.'
+    'Talk directly with senior gas turbine combustion, thermal-fluid, and industrial AI experts. Response within one business day. SAM.gov registered small business, CAGE 18X84.'
   );
 
   const [submitted, setSubmitted] = useState(false);
@@ -164,7 +164,7 @@ const Contact = () => {
                   <ul className="space-y-3">
                     {[
                       { icon: <Clock aria-hidden="true" />, text: 'Response within 1 business day' },
-                      { icon: <ShieldCheck aria-hidden="true" />, text: 'NDA-friendly — confidentiality from the first conversation' },
+                      { icon: <ShieldCheck aria-hidden="true" />, text: 'NDA-friendly: confidentiality from the first conversation' },
                       { icon: <Users aria-hidden="true" />, text: 'Direct access to senior experts, not account managers' },
                     ].map((item) => (
                       <li key={item.text} className="flex items-start gap-3 text-sm text-slate-300">
