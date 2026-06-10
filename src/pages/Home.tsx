@@ -208,6 +208,10 @@ const Home = () => {
           />
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/70 to-slate-950" />
         </div>
+        <div className="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-500/10 blur-[120px] rounded-full" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
+        </div>
         <div className="container-site text-center">
           <div className="anim-enter">
             <span className="eyebrow mb-6">Combustion &middot; Test Infrastructure &middot; Industrial AI</span>

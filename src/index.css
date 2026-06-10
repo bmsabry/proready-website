@@ -53,14 +53,15 @@
 }
 
 @layer components {
-  /* Historically a cyan->blue gradient; now a solid accent for a more
-     restrained, professional look. Class name kept to avoid a mass rename. */
+  /* Brand signature: cyan-to-blue gradient headline accent. Part of the
+     ProReadyEngineer visual identity used across other brand materials —
+     do not replace with a flat color. */
   .text-gradient {
-    @apply text-cyan-400;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500;
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold rounded-lg transition-colors duration-200;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold rounded-lg transition-all duration-200 shadow-glow-cyan hover:shadow-[0_0_55px_-10px_rgba(34,211,238,0.5)] hover:-translate-y-0.5;
   }
 
   .btn-secondary {
@@ -76,7 +77,7 @@
     @apply rounded-2xl bg-brand-surface/80 border border-slate-800/80 shadow-card backdrop-blur-sm transition-all duration-300;
   }
   .card-hover {
-    @apply hover:border-slate-600;
+    @apply hover:border-cyan-500/30 hover:shadow-glow-cyan hover:-translate-y-1;
   }
 
   .glass {
@@ -87,7 +88,7 @@
   }
 
   .eyebrow {
-    @apply block text-cyan-400 text-xs font-mono font-medium uppercase tracking-[0.22em];
+    @apply inline-flex items-center gap-2 py-1 px-3 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono font-medium uppercase tracking-widest;
   }
 
   .section-pad {

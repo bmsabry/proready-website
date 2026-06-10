@@ -116,7 +116,7 @@ export const StatCounter = ({
 
   return (
     <div ref={ref} className="text-center">
-      <div className="font-display text-4xl md:text-5xl font-bold text-white tabular-nums">
+      <div className="font-display text-4xl md:text-5xl font-bold text-gradient tabular-nums">
         {prefix}{n.toLocaleString()}{suffix}
       </div>
       <div className="mt-2 text-xs font-mono uppercase tracking-widest text-slate-300">{label}</div>
@@ -141,8 +141,10 @@ export const CTABand = ({
   secondaryTo?: string;
 }) => (
   <section className="section-pad relative overflow-hidden">
+    <div className="absolute inset-0 -z-10 bg-hero-radial" />
     <div className="container-site">
-      <Reveal className="card text-center px-6 py-16 md:px-16">
+      <Reveal className="card relative overflow-hidden text-center px-6 py-16 md:px-16">
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[60%] h-48 bg-cyan-500/10 blur-[100px] rounded-full pointer-events-none" aria-hidden="true" />
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">{title}</h2>
         <p className="text-slate-300 max-w-2xl mx-auto mb-8">{subtitle}</p>
         <div className="flex flex-col sm:flex-row justify-center gap-4">

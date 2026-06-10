@@ -171,7 +171,7 @@ const CaseStudies = () => {
                 aria-pressed={filter === f}
                 className={`px-4 py-2 rounded-full text-xs font-mono uppercase tracking-wider border transition-all duration-200 ${
                   filter === f
-                    ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
+                    ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 shadow-glow-cyan'
                     : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-600 hover:text-slate-200'
                 }`}
               >
