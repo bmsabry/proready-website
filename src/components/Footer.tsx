@@ -100,7 +100,7 @@ const Footer = () => {
         <div className="mt-14 lg:mt-16 pt-7 border-t border-slate-800/70 flex flex-col-reverse sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
           <p>© {new Date().getFullYear()} ProReadyEngineer LLC. All rights reserved.</p>
           <p className="font-mono text-xs tracking-wide text-slate-400">
-            combustion · hydrogen · AI
+            combustion · industrial AI · training
           </p>
         </div>
       </div>
