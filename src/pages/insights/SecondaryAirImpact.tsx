@@ -3,7 +3,10 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { usePageMeta } from '../../lib/meta';
 const SecondaryAirImpact = () => {
+  usePageMeta('Secondary Air Impact on DLE Combustor Emissions', 'Quantifying how secondary air used for cooling, dilution, and leakage management affects NOx emissions in Dry Low Emissions combustion systems.');
+
   return (
     <div className="pt-32 pb-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -29,14 +32,14 @@ const SecondaryAirImpact = () => {
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-bold mb-8 leading-tight">
+          <h1 className="text-3xl md:text-5xl font-bold mb-8 leading-tight">
             A Technical Deep Dive: Quantifying the Impact of Secondary Air on DLE Combustor Emissions
           </h1>
 
           <div className="flex items-center justify-between gap-4 mb-12 pb-12 border-b border-slate-800">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
-                <img src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" className="w-full h-full object-cover" />
+                <img loading="lazy" decoding="async" src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" className="w-full h-full object-cover" />
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-200">Dr. Bassam Abdelnabi</p>
@@ -47,7 +50,7 @@ const SecondaryAirImpact = () => {
               <a
                 href="/impact-of-secondary-air-on-emissions.pdf"
                 download="impact-of-secondary-air-on-emissions.pdf"
-                className="inline-flex items-center justify-center rounded-full bg-cyan-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
+                className="btn-primary rounded-full"
               >
                 Download Full PDF
               </a>
@@ -55,7 +58,7 @@ const SecondaryAirImpact = () => {
           </div>
 
           <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img 
+            <img loading="lazy" decoding="async" 
               src="/impact-secondary-air-emissions.jpg" 
               alt="Secondary Air Impact Visualization" 
               className="w-full h-full object-cover"

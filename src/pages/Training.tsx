@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Calendar, Clock, Users, BookOpen, Search, Filter, ArrowRight } from 'lucide-react';
+import {
+  Calendar,
+  Clock,
+  Users,
+  BookOpen,
+  ArrowRight,
+  Award,
+  FlaskConical,
+  MessagesSquare,
+} from 'lucide-react';
+import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
+import { usePageMeta } from '../lib/meta';
 
 // Courses backed by the registration API expose a `code` so the card can show
 // live seats / start date instead of hardcoded values.
@@ -102,9 +112,30 @@ type LiveCourseInfo = {
   numDays: number; // length of day_dates; 0 if not scheduled
 };
 
+const WHY_TRAIN = [
+  {
+    icon: <Award className="w-6 h-6" aria-hidden="true" />,
+    title: 'Practitioners, Not Lecturers',
+    body: 'Taught by the engineers who design, test, and troubleshoot these systems — ex-GE, PhD-led, with patents in the field.',
+  },
+  {
+    icon: <FlaskConical className="w-6 h-6" aria-hidden="true" />,
+    title: 'Real Test-Cell Data & Field Experience',
+    body: 'Lessons built on thousands of live mapping tests and real field events — not idealized textbook cases.',
+  },
+  {
+    icon: <MessagesSquare className="w-6 h-6" aria-hidden="true" />,
+    title: 'Small Cohorts, Direct Q&A',
+    body: 'Limited seats keep every session interactive. Bring your hardest questions straight to the instructor.',
+  },
+];
+
 const Training = () => {
-  const [filter, setFilter] = useState('All');
-  const categories = ['All', 'Thermal Fluids', 'AI & Data'];
+  usePageMeta(
+    'Professional Training',
+    'Specialized gas turbine, combustion, and industrial AI training taught by the engineers who design and test these systems. Live cohorts with real test-cell data and direct Q&A.',
+  );
+
   const [liveByCode, setLiveByCode] = useState<Record<string, LiveCourseInfo>>({});
 
   // Fetch live course data for any course that has a `code`. Falls back
@@ -155,119 +186,192 @@ const Training = () => {
     };
   }, []);
 
-  const filteredCourses = filter === 'All'
-    ? courses
-    : courses.filter(c => c.category === filter);
+  const flagship = courses.find((c) => c.featured)!;
+  const upcoming = courses.filter((c) => !c.featured);
+
+  const flagshipLive = flagship.code ? liveByCode[flagship.code] : undefined;
+  const flagshipSeatsLabel = flagshipLive
+    ? flagshipLive.status === 'closed'
+      ? 'Registration closed'
+      : flagshipLive.seatsRemaining === 0
+        ? `Cohort full (${flagshipLive.totalSeats} seats)`
+        : `${flagshipLive.seatsRemaining} of ${flagshipLive.totalSeats} seats left`
+    : flagship.attendees;
+  const flagshipDateLabel = flagshipLive ? flagshipLive.startDate : flagship.nextDate;
+  const flagshipDurationLabel =
+    flagshipLive && flagshipLive.numDays > 0 ? `${flagshipLive.numDays} Days` : flagship.duration;
 
   return (
-    <div className="pt-32 pb-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
-          <div className="max-w-2xl">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">Training & <span className="text-gradient">Workshops</span></h1>
-            <p className="text-slate-400 text-lg">
-              Upskill your engineering team with our specialized technical courses. 
-              We offer both scheduled public workshops and custom corporate training.
-            </p>
+    <div className="pb-4">
+      <PageHero
+        eyebrow="Professional Training"
+        title={
+          <>
+            Train With the Engineers Who{' '}
+            <span className="text-gradient">Build These Systems</span>
+          </>
+        }
+        subtitle="Specialized courses taught by the engineers who design and test gas turbines, combustion systems, and industrial AI — ex-GE, PhD-led, field-proven."
+      />
+
+      {/* FLAGSHIP COURSE */}
+      <section className="container-site pb-8">
+        <Reveal>
+          <div className="relative card overflow-hidden p-8 md:p-12">
+            <div
+              className="absolute -top-32 -right-24 w-96 h-96 bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none"
+              aria-hidden="true"
+            />
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-center relative">
+              <div className="lg:col-span-3">
+                <span className="eyebrow mb-5">Flagship Course · Live Cohort</span>
+                <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-4">
+                  {flagship.title}
+                </h2>
+                <p className="text-slate-400 leading-relaxed mb-8">{flagship.description}</p>
+
+                <div className="flex flex-wrap gap-3 mb-8">
+                  <MonoBadge icon={<Calendar className="w-3.5 h-3.5" aria-hidden="true" />}>
+                    Next: {flagshipDateLabel}
+                  </MonoBadge>
+                  <MonoBadge icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />}>
+                    {flagshipSeatsLabel}
+                  </MonoBadge>
+                  <MonoBadge icon={<Clock className="w-3.5 h-3.5" aria-hidden="true" />}>
+                    {flagshipDurationLabel}
+                  </MonoBadge>
+                  <MonoBadge icon={<BookOpen className="w-3.5 h-3.5" aria-hidden="true" />}>
+                    {flagship.level}
+                  </MonoBadge>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Link to={`/training/${flagship.slug}`} className="btn-primary">
+                    View Course & Register{' '}
+                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                  </Link>
+                  <Link to="/contact" className="btn-secondary">
+                    Ask a Question
+                  </Link>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2">
+                <Link
+                  to={`/training/${flagship.slug}`}
+                  className="block rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/50 hover:border-cyan-500/40 transition-colors"
+                >
+                  <img
+                    src="/Gas_Turbine_Emissions_Mapping_Infographic.png"
+                    alt="Gas Turbine Emissions Mapping course infographic — DLE combustion circuits, dynamics corridor, and mapping workflow"
+                    className="w-full h-auto block"
+                    loading="lazy"
+                  />
+                </Link>
+              </div>
+            </div>
           </div>
-          
-          <div className="flex items-center gap-4 bg-slate-900 p-1 rounded-xl border border-slate-800">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setFilter(cat)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  filter === cat 
-                    ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-900/20' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {cat}
-              </button>
+        </Reveal>
+      </section>
+
+      {/* WHY TRAIN WITH US */}
+      <section className="section-pad">
+        <div className="container-site">
+          <SectionHeading
+            eyebrow="Why Train With Us"
+            title="Field-Grade Knowledge, Transferred Directly"
+            subtitle="Every course is built around the decisions you actually face in the test cell and the field — not slides recycled from a textbook."
+          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {WHY_TRAIN.map((item, i) => (
+              <Reveal key={item.title} delay={i * 0.08}>
+                <div className="card card-hover p-8 h-full">
+                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-5">
+                    {item.icon}
+                  </div>
+                  <h3 className="text-lg font-bold mb-3">{item.title}</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">{item.body}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>
+      </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredCourses.map((course, i) => {
-            const live = course.code ? liveByCode[course.code] : undefined;
-            const seatsLabel = live
-              ? live.status === 'closed'
-                ? 'Registration closed'
-                : live.seatsRemaining === 0
-                  ? `Cohort full (${live.totalSeats} seats)`
-                  : `${live.seatsRemaining} of ${live.totalSeats} seats left`
-              : course.attendees;
-            const dateLabel = live ? live.startDate : course.nextDate;
-            const durationLabel =
-              live && live.numDays > 0 ? `${live.numDays} Days` : course.duration;
-            return (
-            <motion.div
-              key={course.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.1 }}
-              className="group bg-slate-900/50 border border-slate-800 rounded-3xl p-8 hover:border-cyan-500/50 transition-all flex flex-col"
-            >
-              <div className="flex justify-between items-start mb-6">
-                <span className="px-3 py-1 rounded-full bg-slate-800 text-cyan-400 text-xs font-mono uppercase tracking-wider border border-slate-700">
-                  {course.category}
-                </span>
-              </div>
-
-              <h3 className="text-2xl font-bold mb-4 group-hover:text-cyan-400 transition-colors">{course.title}</h3>
-              <p className="text-slate-400 text-sm mb-8 flex-grow leading-relaxed">
-                {course.description}
-              </p>
-
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <Clock className="w-4 h-4 text-slate-600" />
-                  <span>{durationLabel}</span>
+      {/* UPCOMING / COMING SOON */}
+      <section className="pb-20">
+        <div className="container-site">
+          <SectionHeading
+            eyebrow="More Programs"
+            title="Coming Soon & By Request"
+            subtitle="These programs run as scheduled public cohorts or tailored corporate deliveries. Contact us to schedule one for your team."
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {upcoming.map((course, i) => (
+              <Reveal key={course.id} delay={(i % 3) * 0.07}>
+                <div className="card card-hover p-7 h-full flex flex-col">
+                  <div className="flex items-center justify-between gap-3 mb-5">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20">
+                      {course.category}
+                    </span>
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
+                      Coming Soon
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold mb-3 leading-snug">{course.title}</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">
+                    {course.description}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 text-xs font-mono text-slate-400 mb-6">
+                    <span className="flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
+                      {course.duration}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <BookOpen className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
+                      {course.level}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
+                      {course.attendees}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <Calendar className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
+                      {course.nextDate}
+                    </span>
+                  </div>
+                  <Link to="/contact" className="btn-ghost mt-auto">
+                    Request This Course <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                  </Link>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <BookOpen className="w-4 h-4 text-slate-600" />
-                  <span>{course.level}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <Users className="w-4 h-4 text-slate-600" />
-                  <span>{seatsLabel}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <Calendar className="w-4 h-4 text-slate-600" />
-                  <span>Next: {dateLabel}</span>
-                </div>
-              </div>
-
-              {course.slug ? (
-                <Link
-                  to={`/training/${course.slug}`}
-                  className="w-full py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold transition-all flex items-center justify-center gap-2 group/btn"
-                >
-                  View Course Details <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                </Link>
-              ) : (
-                <button className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold transition-all flex items-center justify-center gap-2 group/btn">
-                  View Course Details <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                </button>
-              )}
-            </motion.div>
-            );
-          })}
+              </Reveal>
+            ))}
+          </div>
         </div>
+      </section>
 
-        {/* Custom Training CTA */}
-        <div className="mt-20 p-12 rounded-[3rem] bg-gradient-to-r from-cyan-900/20 to-blue-900/20 border border-cyan-500/20 text-center">
-          <h2 className="text-3xl font-bold mb-4">Need a Custom Workshop?</h2>
-          <p className="text-slate-400 max-w-2xl mx-auto mb-8">
-            We can tailor any of our courses to your specific industry challenges and data sets. 
-            Available for on-site or remote delivery.
-          </p>
-          <button className="btn-primary">Request Custom Training</button>
-        </div>
-      </div>
+      <CTABand
+        title="Need Training Built Around Your Fleet?"
+        subtitle="We tailor any program to your hardware, your data, and your team's experience level — delivered on-site or live online."
+        primaryLabel="Ask About Custom Training"
+        primaryTo="/contact"
+      />
     </div>
   );
 };
+
+/* ---------- Mono badge for live course facts ---------- */
+const MonoBadge = ({
+  icon,
+  children,
+}: {
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) => (
+  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/70 border border-slate-700/80 text-xs font-mono text-slate-300">
+    <span className="text-cyan-400">{icon}</span>
+    {children}
+  </span>
+);
 
 export default Training;

@@ -3,10 +3,13 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { usePageMeta } from '../../lib/meta';
 const bassamImg = '/Bassam.jpg';
 const aerodynamicsImg = '/SAC_Aerodynamics.jpg';
 
 const SACAerodynamics = () => {
+  usePageMeta('Aerodynamics of a Single Annular Combustor', 'Experimental investigation of the aerodynamics within a realistic Single Annular Combustor sector and their role in combustion stability, emissions, and dynamics.');
+
   return (
     <div className="pt-32 pb-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -32,14 +35,14 @@ const SACAerodynamics = () => {
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-bold mb-8 leading-tight">
+          <h1 className="text-3xl md:text-5xl font-bold mb-8 leading-tight">
             Aerodynamics of a Single Annular Combustor
           </h1>
 
           <div className="flex items-center justify-between gap-4 mb-12 pb-12 border-b border-slate-800">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
-                <img src={bassamImg} alt="Dr. Bassam Abdelnabi" className="w-full h-full object-cover" />
+                <img loading="lazy" decoding="async" src={bassamImg} alt="Dr. Bassam Abdelnabi" className="w-full h-full object-cover" />
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-200">Dr. Bassam Abdelnabi</p>
@@ -50,7 +53,7 @@ const SACAerodynamics = () => {
               <a
                 href="/SAC Aerodynamics.pdf"
                 download="SAC Aerodynamics.pdf"
-                className="inline-flex items-center justify-center rounded-full bg-cyan-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
+                className="btn-primary rounded-full"
               >
                 Download Full PDF
               </a>
@@ -58,7 +61,7 @@ const SACAerodynamics = () => {
           </div>
 
           <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img 
+            <img loading="lazy" decoding="async" 
               src={aerodynamicsImg} 
               alt="Aerodynamics of a Single Annular Combustor" 
               className="w-full h-full object-cover"

@@ -7,15 +7,22 @@
     @apply bg-slate-950 text-slate-50 antialiased;
   }
 
-  /* Always show a visible keyboard-focus indicator (WCAG 2.4.7).
-     Uses !important so it is never suppressed by utility `outline-none`. */
+  h1, h2, h3, h4 {
+    @apply font-display;
+  }
+
+  ::selection {
+    background-color: rgba(34, 211, 238, 0.3);
+  }
+
+  /* Visible keyboard-focus indicator (WCAG 2.4.7). */
   :focus-visible {
-    outline: 2px solid #22d3ee; /* cyan-400 */
+    outline: 2px solid #22d3ee;
     outline-offset: 2px;
     border-radius: 2px;
   }
 
-  /* Respect users who ask for reduced motion (WCAG 2.3.3 / vestibular safety). */
+  /* Reduced motion (WCAG 2.3.3). */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -28,7 +35,7 @@
   }
 }
 
-/* Skip-to-content link: hidden until focused (WCAG 2.4.1). */
+/* Skip-to-content link (WCAG 2.4.1). */
 .skip-link {
   position: absolute;
   left: 1rem;
@@ -36,8 +43,8 @@
   z-index: 100;
   padding: 0.625rem 1rem;
   border-radius: 0.5rem;
-  background-color: #06b6d4; /* cyan-500 */
-  color: #020617; /* slate-950 */
+  background-color: #06b6d4;
+  color: #020617;
   font-weight: 600;
   transition: top 0.15s ease-in-out;
 }
@@ -45,15 +52,73 @@
   top: 1rem;
 }
 
-.text-gradient {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500;
-}
+@layer components {
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500;
+  }
 
-/* Primary button: dark text on bright cyan = 8.3:1 contrast (WCAG 1.4.3). */
-.btn-primary {
-  @apply px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold rounded-lg transition-all duration-200 shadow-lg shadow-cyan-900/20;
-}
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold rounded-lg transition-all duration-200 shadow-glow-cyan hover:shadow-[0_0_55px_-10px_rgba(34,211,238,0.5)] hover:-translate-y-0.5;
+  }
 
-.btn-secondary {
-  @apply px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg border border-slate-700 transition-all duration-200;
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-900/80 hover:bg-slate-800 text-white font-semibold rounded-lg border border-slate-700/80 hover:border-slate-500 transition-all duration-200;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 text-cyan-400 text-sm font-medium hover:text-cyan-300 transition-colors;
+  }
+
+  /* Elevated card with hairline top highlight */
+  .card {
+    @apply rounded-2xl bg-brand-surface/80 border border-slate-800/80 shadow-card backdrop-blur-sm transition-all duration-300;
+  }
+  .card-hover {
+    @apply hover:border-cyan-500/30 hover:shadow-glow-cyan hover:-translate-y-1;
+  }
+
+  .glass {
+    background: rgba(8, 13, 24, 0.78);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 py-1 px-3 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono font-medium uppercase tracking-widest;
+  }
+
+  .section-pad {
+    @apply py-20 lg:py-28;
+  }
+
+  .container-site {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Technical/blueprint backdrop for hero sections */
+  .hero-backdrop {
+    @apply absolute inset-0 -z-10 bg-grid-pattern bg-grid;
+    mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 40%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 40%, transparent 100%);
+  }
+
+  .prose-dark {
+    @apply text-slate-300 leading-relaxed;
+  }
+  .prose-dark h2 {
+    @apply text-2xl font-bold text-white mt-10 mb-4;
+  }
+  .prose-dark h3 {
+    @apply text-xl font-semibold text-white mt-8 mb-3;
+  }
+  .prose-dark p {
+    @apply mb-4;
+  }
+  .prose-dark ul {
+    @apply list-disc pl-6 mb-4 space-y-2;
+  }
+  .prose-dark strong {
+    @apply text-white;
+  }
 }

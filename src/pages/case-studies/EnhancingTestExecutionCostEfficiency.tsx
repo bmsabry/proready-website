@@ -3,7 +3,10 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, User, Tag, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { usePageMeta } from '../../lib/meta';
 const EnhancingTestExecutionCostEfficiency = () => {
+  usePageMeta('Enhancing Test Execution Cost & Efficiency', 'Automating manual test operations delivered 40% more daily data points, 50% lower staffing per test, and $2M in savings over 10 years.');
+
   return (
     <div className="pt-32 pb-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -17,7 +20,7 @@ const EnhancingTestExecutionCostEfficiency = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <h1 className="text-4xl md:text-6xl font-bold mb-8 leading-tight">
+          <h1 className="text-3xl md:text-5xl font-bold mb-8 leading-tight">
             Enhancing Test Execution Cost & Efficiency
           </h1>
 
@@ -25,14 +28,14 @@ const EnhancingTestExecutionCostEfficiency = () => {
             <a
               href="/case-study-enhancing-test-execution-cost-efficiency.pdf"
               download="CASE STUDY Enhancing Test Execution Cost & Efficiency.pdf"
-              className="inline-flex items-center justify-center rounded-full bg-cyan-500 px-8 py-4 text-sm font-bold text-slate-950 transition hover:bg-cyan-400 shadow-lg shadow-cyan-500/20"
+              className="btn-primary rounded-full"
             >
               Download Full PDF
             </a>
           </div>
 
           <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img 
+            <img loading="lazy" decoding="async" 
               src="/case2-study-enhancing-test-execution-cost-efficiency.jpg" 
               alt="Enhancing Test Execution Cost & Efficiency" 
               className="w-full h-full object-cover"

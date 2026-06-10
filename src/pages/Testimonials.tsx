@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Quote, Star, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Quote, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { Reveal, SectionHeading, PageHero, CTABand } from '../components/ui';
+import { usePageMeta } from '../lib/meta';
 
 const Testimonials = () => {
+  usePageMeta(
+    'Testimonials — What Leaders, Engineers & Clients Say',
+    'Thirty first-hand testimonials from chief engineers, principal engineers, technicians, and industry partners on the dedication, technical excellence, and impact of working with ProReadyEngineer.'
+  );
+
   const [activeFeatured, setActiveFeatured] = useState(0);
 
   // All testimonials from the combined document
@@ -272,89 +279,61 @@ const Testimonials = () => {
   };
 
   return (
-    <div className="pt-20 min-h-screen">
-      {/* Hero Section */}
-      <section className="relative py-16 overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-amber-500/10 blur-[150px] rounded-full"></div>
-          <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-cyan-500/10 blur-[150px] rounded-full"></div>
-        </div>
+    <div className="pb-0">
+      <PageHero
+        eyebrow="Client Voices"
+        title={<>What People <span className="text-gradient">Say</span></>}
+        subtitle="Genuine feedback from chief engineers, principal engineers, technicians, and industry partners who've experienced the passion, dedication, and impact of working together."
+      />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <span className="inline-flex items-center gap-2 py-1 px-4 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-medium mb-6">
-              <Sparkles className="w-4 h-4" />
-              Voices of Impact
-            </span>
-            <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
-              What People <span className="text-gradient">Say</span>
-            </h1>
-            <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-              Genuine feedback from colleagues, leaders, and collaborators who've experienced 
-              the passion, dedication, and impact of working together.
-            </p>
-          </motion.div>
-        </div>
-      </section>
+      {/* Featured carousel + sentiment chart */}
+      <section className="pb-16">
+        <div className="container-site">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+            {/* Featured carousel */}
+            <Reveal className="flex flex-col">
+              <div className="relative flex-grow">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeFeatured}
+                    initial={{ opacity: 0, x: 40 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -40 }}
+                    transition={{ duration: 0.4 }}
+                    className="h-full"
+                  >
+                    <figure className="card relative h-full min-h-[320px] p-8 overflow-hidden">
+                      <div className="absolute -top-10 -right-6 w-40 h-40 bg-cyan-500/10 blur-[60px] rounded-full pointer-events-none" />
+                      <Quote className="w-8 h-8 text-cyan-500/40 mb-5" aria-hidden="true" />
 
-      {/* Featured Testimonials + Sentiment Chart Section */}
-      <section className="py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-            {/* Carousel - Left Side */}
-            <div className="relative">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeFeatured}
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -50 }}
-                  transition={{ duration: 0.5 }}
-                  className="relative"
-                >
-                  <div className="relative p-8 rounded-3xl bg-gradient-to-br from-amber-500/5 via-slate-900 to-cyan-500/5 border border-amber-500/20 min-h-[320px]">
-                    <div className="absolute top-4 left-6 text-6xl text-amber-500/20 font-serif">"</div>
-                    <div className="absolute bottom-4 right-6 text-6xl text-cyan-500/20 font-serif rotate-180">"</div>
-                    
-                    <div className="relative z-10">
-                      <div className="flex gap-1 mb-4">
+                      <div className="flex gap-1 mb-4" aria-label="5 out of 5 stars">
                         {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                          <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" aria-hidden="true" />
                         ))}
                       </div>
-                      
-                      <p className="text-base text-slate-200 leading-relaxed mb-6 italic line-clamp-5">
-                        {featuredTestimonials[activeFeatured].statement}
-                      </p>
-                      
-                      <div>
-                        <p className="text-lg font-bold text-white">
-                          {featuredTestimonials[activeFeatured].name}
-                        </p>
-                        <p className="text-amber-400 text-sm">
-                          {featuredTestimonials[activeFeatured].role}
-                        </p>
-                        <span className="inline-block mt-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
-                          {featuredTestimonials[activeFeatured].highlight}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              </AnimatePresence>
 
-              {/* Carousel Controls */}
-              <div className="flex justify-center gap-4 mt-6">
+                      <blockquote className="text-base text-slate-200 leading-relaxed mb-6">
+                        {featuredTestimonials[activeFeatured].statement}
+                      </blockquote>
+
+                      <figcaption>
+                        <p className="font-bold text-white">{featuredTestimonials[activeFeatured].name}</p>
+                        <p className="text-cyan-400 text-sm">{featuredTestimonials[activeFeatured].role}</p>
+                        <span className="eyebrow mt-3">{featuredTestimonials[activeFeatured].highlight}</span>
+                      </figcaption>
+                    </figure>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
+              {/* Carousel controls */}
+              <div className="flex justify-center items-center gap-4 mt-6">
                 <button
                   onClick={prevFeatured}
                   aria-label="Previous testimonial"
-                  className="p-2 rounded-full bg-slate-800 border border-slate-700 hover:border-amber-500/50 hover:bg-amber-500/10 transition-all group"
+                  className="p-2 rounded-full bg-slate-900 border border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
                 >
-                  <ChevronLeft aria-hidden="true" className="w-4 h-4 text-slate-400 group-hover:text-amber-400" />
+                  <ChevronLeft aria-hidden="true" className="w-4 h-4 text-slate-400 group-hover:text-cyan-400" />
                 </button>
                 <div className="flex items-center gap-2">
                   {featuredTestimonials.map((_, i) => (
@@ -364,8 +343,8 @@ const Testimonials = () => {
                       aria-label={`Show testimonial ${i + 1}`}
                       aria-current={i === activeFeatured}
                       className={`h-2 rounded-full transition-all ${
-                        i === activeFeatured 
-                          ? 'w-6 bg-amber-400' 
+                        i === activeFeatured
+                          ? 'w-6 bg-cyan-400'
                           : 'w-2 bg-slate-600 hover:bg-slate-500'
                       }`}
                     />
@@ -374,139 +353,120 @@ const Testimonials = () => {
                 <button
                   onClick={nextFeatured}
                   aria-label="Next testimonial"
-                  className="p-2 rounded-full bg-slate-800 border border-slate-700 hover:border-amber-500/50 hover:bg-amber-500/10 transition-all group"
+                  className="p-2 rounded-full bg-slate-900 border border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
                 >
-                  <ChevronRight aria-hidden="true" className="w-4 h-4 text-slate-400 group-hover:text-amber-400" />
+                  <ChevronRight aria-hidden="true" className="w-4 h-4 text-slate-400 group-hover:text-cyan-400" />
                 </button>
               </div>
-            </div>
+            </Reveal>
 
-            {/* Sentiment Chart - Right Side */}
-            <div className="relative p-6 rounded-3xl bg-slate-900/80 border border-slate-800">
-              <h3 className="text-lg font-semibold text-white mb-2 text-center">
-                Sentiment Analysis
-              </h3>
-              <p className="text-sm text-slate-400 text-center mb-4">
-                Themes from {allTestimonials.length} testimonials
-              </p>
-              
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={sentimentData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {sentimentData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1e293b', 
-                        border: '1px solid #334155',
-                        borderRadius: '8px',
-                        color: '#f1f5f9'
-                      }}
-                    />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={36}
-                      iconType="circle"
-                      formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+            {/* Sentiment chart */}
+            <Reveal delay={0.1}>
+              <div className="card h-full p-6">
+                <h3 className="text-lg font-semibold text-white mb-1 text-center">Sentiment Analysis</h3>
+                <p className="text-sm text-slate-400 text-center mb-4 font-mono">
+                  Themes from {allTestimonials.length} testimonials
+                </p>
 
-              {/* Stats summary */}
-              <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-800">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-amber-400">{allTestimonials.length}</p>
-                  <p className="text-xs text-slate-400">Total Reviews</p>
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={sentimentData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {sentimentData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                          color: '#f1f5f9'
+                        }}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                        iconType="circle"
+                        formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-cyan-400">15+</p>
-                  <p className="text-xs text-slate-400">Years Impact</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-purple-400 leading-tight">
-                    <p>Exceeds</p>
-                    <p>Expectations</p>
+
+                {/* Stats summary */}
+                <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-800">
+                  <div className="text-center">
+                    <p className="font-display text-2xl font-bold text-gradient">{allTestimonials.length}</p>
+                    <p className="text-xs font-mono uppercase tracking-widest text-slate-400 mt-1">Reviews</p>
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">Positive</p>
+                  <div className="text-center">
+                    <p className="font-display text-2xl font-bold text-gradient">15+</p>
+                    <p className="text-xs font-mono uppercase tracking-widest text-slate-400 mt-1">Years Impact</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="font-display text-2xl font-bold text-gradient">100%</p>
+                    <p className="text-xs font-mono uppercase tracking-widest text-slate-400 mt-1">Positive</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            </Reveal>
           </div>
         </div>
       </section>
 
-      {/* All Testimonials Grid */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              All <span className="text-gradient">Testimonials</span>
-            </h2>
-            <p className="text-slate-400">
-              Testimonials from leadership, peers, and clients.
-            </p>
-          </motion.div>
+      {/* All testimonials — masonry wall */}
+      <section className="pb-20 lg:pb-28">
+        <div className="container-site">
+          <SectionHeading
+            eyebrow="The Full Record"
+            title={<>All <span className="text-gradient">Testimonials</span></>}
+            subtitle="Every word, unedited — from leadership, peers, technicians, and clients."
+          />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="columns-1 md:columns-2 xl:columns-3 gap-6 [column-fill:_balance]">
             {allTestimonials.map((testimonial, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.02 }}
-                className="group relative"
-              >
-                <div className="h-full p-6 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-cyan-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/5 hover:-translate-y-1">
-                  {/* Quote Icon */}
-                  <div className="absolute -top-3 -left-3 w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
-                    <Quote className="w-5 h-5 text-white" />
-                  </div>
-
-                  {/* Category Tag */}
-                  <div className="flex justify-end mb-4">
-                    <span className="text-xs px-3 py-1 rounded-full bg-slate-800 text-slate-400 group-hover:bg-cyan-500/10 group-hover:text-cyan-400 transition-colors">
+              <Reveal key={`${testimonial.name}-${i}`} delay={Math.min((i % 6) * 0.04, 0.2)} className="mb-6 break-inside-avoid">
+                <figure className="group card card-hover p-6">
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <Quote className="w-6 h-6 text-cyan-500/50 shrink-0" aria-hidden="true" />
+                    <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded-full bg-slate-800/80 text-slate-400 group-hover:bg-cyan-500/10 group-hover:text-cyan-400 transition-colors text-right">
                       {testimonial.category}
                     </span>
                   </div>
 
-                  {/* Statement */}
-                  <p className="text-slate-300 text-sm leading-relaxed mb-6 line-clamp-6">
+                  <blockquote className="text-slate-300 text-sm leading-relaxed mb-5">
                     "{testimonial.statement}"
-                  </p>
+                  </blockquote>
 
-                  {/* Author */}
-                  <div className="pt-4 border-t border-slate-800">
+                  <figcaption className="pt-4 border-t border-slate-800/80">
                     <p className="font-semibold text-white group-hover:text-cyan-400 transition-colors">
                       {testimonial.name}
                     </p>
-                    <p className="text-sm text-slate-400">
-                      {testimonial.role}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
+                    <p className="text-xs text-slate-500 mt-0.5">{testimonial.role}</p>
+                  </figcaption>
+                </figure>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
+
+      <CTABand
+        title="Want to experience it firsthand?"
+        subtitle="The same dedication behind every one of these testimonials goes into every client engagement."
+        primaryLabel="Start a Conversation"
+        secondaryLabel="See Proven Results"
+        secondaryTo="/case-studies"
+      />
     </div>
   );
 };

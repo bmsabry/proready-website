@@ -1,143 +1,291 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { Flame, Brain, GraduationCap, CheckCircle2, Zap, BarChart3, Microscope } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Flame, Brain, GraduationCap, CheckCircle2, ArrowRight, Briefcase, UserCheck, Presentation } from 'lucide-react';
+import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
+import { usePageMeta } from '../lib/meta';
 
-const ServiceCard = ({ title, icon, description, features, color }: any) => (
-  <motion.div 
-    initial={{ opacity: 0, y: 20 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true }}
-    className="p-8 rounded-3xl bg-slate-900/50 border border-slate-800 hover:border-slate-700 transition-all"
-  >
-    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-slate-950 border border-slate-800`}>
-      {React.cloneElement(icon, { className: `w-7 h-7 ${color}` })}
-    </div>
-    <h3 className="text-2xl font-bold mb-4">{title}</h3>
-    <p className="text-slate-400 mb-8 leading-relaxed">
-      {description}
-    </p>
-    <ul className="space-y-4">
-      {features.map((feature: string, i: number) => (
-        <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
-          <CheckCircle2 className={`w-5 h-5 shrink-0 ${color}`} />
-          {feature}
-        </li>
-      ))}
-    </ul>
-  </motion.div>
-);
+type Practice = {
+  id: string;
+  index: string;
+  eyebrow: string;
+  title: string;
+  icon: React.ReactElement;
+  accent: string;        // text color for icon + checks
+  glow: string;          // bg tint for the visual panel
+  description: string;
+  capabilities: string[];
+  footnote?: React.ReactNode;
+  visualLabel: string;
+  visualTags: string[];
+};
 
-const Services = () => {
-  const services = [
-    {
-      title: "Thermal Fluid Sciences",
-      icon: <Flame />,
-      color: "text-orange-500",
-      description: "Expert consulting in high-temperature fluid dynamics and combustion systems, with a focus on gas turbine efficiency and emissions.",
-      features: [
-        "Gas Turbine Combustion emissions optimization",
-        "Experimental Design & Data Interpretation",
-        "Emissions Reduction Technologies",
-        "Test Facility design, specification and sizing",
-        "Computational Fluid Dynamics (CFD) Analysis",
-        "Test Execution Automation including Auto-mapping"
-      ]
-    },
-    {
-      title: "AI & Data Analytics",
-      icon: <Brain />,
-      color: "text-cyan-500",
-      description: "Bridging the gap between physics-based engineering and modern machine learning to unlock hidden insights in your data.",
-      features: [
-        "Predictive Maintenance Models",
-        "Neural Networks",
-        "Digital Twin Development",
-        "Automated Data Processing Pipelines",
-        "Anomaly Detection in Sensor Data"
-      ]
-    },
-    {
-      title: "Training & Workshops",
-      icon: <GraduationCap />,
-      color: "text-blue-500",
-      description: "Empowering engineering teams with the latest tools and methodologies through hands-on technical training.",
-      features: [
-        "Advanced Combustion Fundamentals",
-        "Gas Turbine Combustion",
-        "Fundamentals of Turbomachinery",
-        "Data Visualization & Advanced Analytics",
-        "Applied Machine Learning & AI for Engineers",
-        "CFD Best Practices & Simulation",
-        "Custom Corporate Training Programs"
-      ]
-    }
-  ];
+const practices: Practice[] = [
+  {
+    id: 'thermal-fluid',
+    index: '01',
+    eyebrow: 'Thermal Fluid Sciences',
+    title: 'Thermal Fluid Sciences',
+    icon: <Flame aria-hidden="true" />,
+    accent: 'text-orange-400',
+    glow: 'from-orange-500/10',
+    description:
+      'Expert consulting in high-temperature fluid dynamics and combustion systems, with a focus on gas turbine efficiency and emissions. From first-principles design to test-cell commissioning, we cover the full lifecycle of high-energy thermal hardware.',
+    capabilities: [
+      'Gas turbine combustion design & troubleshooting — DLN/DLE systems, lean blowout, combustion dynamics, and emissions compliance',
+      'Hydrogen & alternative fuels — combustor adaptation for H2 blends, syngas, and liquid fuels including crude oil',
+      'Emissions mapping & optimization — experimental design, data interpretation, and digital twin–driven tuning',
+      'High-pressure test cell & facility engineering — design, specification, sizing, and commissioning',
+      'Test execution automation, including auto-mapping for faster, more repeatable campaigns',
+      'Computational Fluid Dynamics (CFD) & conjugate heat transfer analysis',
+      'Finite Element Analysis (FEA) & structural integrity assessment',
+      'ASME pressure vessel & static equipment design',
+    ],
+    visualLabel: 'Combustion Systems',
+    visualTags: ['DLN / DLE', 'H2 & Flex-Fuel', 'CFD · CHT', 'ASME BPVC'],
+  },
+  {
+    id: 'industrial-ai',
+    index: '02',
+    eyebrow: 'Industrial AI',
+    title: 'Industrial AI & Data Analytics',
+    icon: <Brain aria-hidden="true" />,
+    accent: 'text-cyan-400',
+    glow: 'from-cyan-500/10',
+    description:
+      'Bridging the gap between physics-based engineering and modern machine learning to unlock hidden insights in your data. Unlike generic data science firms, we understand the underlying physics of your systems — so models are not just accurate, but physically consistent and explainable.',
+    capabilities: [
+      'Physics-informed machine learning & neural networks grounded in governing equations',
+      'Computer vision for automated inspection and defect detection',
+      'Bayesian methods for uncertainty quantification and decisions under sparse data',
+      'Predictive maintenance & reliability models that anticipate failures before they happen',
+      'Anomaly detection in high-frequency sensor data',
+      'Digital twin development for performance monitoring and optimization',
+      'Production-grade data pipelines & decision systems — not throwaway notebooks',
+      'Test automation that closes the loop between experiment and model',
+    ],
+    visualLabel: 'Physics-First AI',
+    visualTags: ['Physics-Informed ML', 'Computer Vision', 'Bayesian UQ', 'Digital Twins'],
+  },
+  {
+    id: 'training',
+    index: '03',
+    eyebrow: 'Training',
+    title: 'Training & Workshops',
+    icon: <GraduationCap aria-hidden="true" />,
+    accent: 'text-blue-400',
+    glow: 'from-blue-500/10',
+    description:
+      'Instructor-led courses taught by industry veterans who have designed, tested, and fielded the systems they teach. We empower engineering teams with the latest tools and methodologies through hands-on technical training — on-site, online, or hybrid.',
+    capabilities: [
+      'Gas Turbine Emissions Mapping — our flagship 5-day course, from first principles to expert level',
+      'Advanced Combustion Fundamentals',
+      'Gas Turbine Combustion',
+      'Fundamentals of Turbomachinery',
+      'Data Visualization & Advanced Analytics',
+      'Applied Machine Learning & AI for Engineers',
+      'CFD Best Practices & Simulation',
+      'Custom corporate training programs aligned to your systems, data, and business goals',
+    ],
+    footnote: (
+      <Link to="/training" className="btn-ghost mt-6">
+        Explore the course catalog <ArrowRight className="w-4 h-4" aria-hidden="true" />
+      </Link>
+    ),
+    visualLabel: 'Expert-Led Courses',
+    visualTags: ['Instructor-Led', 'Hands-On Labs', 'Flagship: Emissions Mapping', 'Custom Corporate'],
+  },
+];
 
-  return (
-    <div className="pt-32 pb-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-20">
-          <motion.h1 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-4xl md:text-5xl font-bold mb-6"
-          >
-            Specialized <span className="text-gradient">Engineering Services</span>
-          </motion.h1>
-          <p className="text-slate-400 text-lg">
-            We combine deep domain expertise in thermal sciences with advanced computational 
-            capabilities to solve the most complex engineering challenges.
-          </p>
-        </div>
+const processSteps = [
+  {
+    n: '01',
+    title: 'Discover',
+    desc: 'A focused technical conversation to understand your system, constraints, and what success looks like.',
+  },
+  {
+    n: '02',
+    title: 'Diagnose',
+    desc: 'We dig into the data, drawings, and test results to isolate root causes — not symptoms.',
+  },
+  {
+    n: '03',
+    title: 'Solve',
+    desc: 'Analysis, simulation, redesign, or model development — executed by senior experts, validated against physics.',
+  },
+  {
+    n: '04',
+    title: 'Deploy',
+    desc: 'Solutions delivered into your workflow: hardware changes, commissioned facilities, or production-grade software.',
+  },
+];
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-32">
-          {services.map((s, i) => (
-            <ServiceCard key={i} {...s} />
-          ))}
-        </div>
+const engagementModels = [
+  {
+    icon: <Briefcase aria-hidden="true" />,
+    title: 'Project-Based Consulting',
+    desc: 'Scoped engagements with clear deliverables — a troubleshooting campaign, a test cell specification, a deployed model.',
+  },
+  {
+    icon: <UserCheck aria-hidden="true" />,
+    title: 'Embedded Expert Support',
+    desc: 'A senior specialist integrated with your team for the duration of a program, on-site or remote.',
+  },
+  {
+    icon: <Presentation aria-hidden="true" />,
+    title: 'Workshops & Training',
+    desc: 'Instructor-led courses and tailored workshops that raise your whole team’s capability.',
+  },
+];
 
-        {/* Methodology Section */}
-        <div className="rounded-[3rem] bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 p-8 md:p-16">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <h2 className="text-3xl font-bold mb-8">Our Approach: <br /><span className="text-cyan-400">Physics-First AI</span></h2>
-              <p className="text-slate-400 mb-8 leading-relaxed">
-                Unlike generic data science firms, we understand the underlying physics of your systems. 
-                Our "Physics-First" approach ensures that AI models are not just accurate, but physically 
-                consistent and explainable.
+const PracticeSection = ({ practice, flip }: { practice: Practice; flip: boolean }) => (
+  <section id={practice.id} className="section-pad scroll-mt-24">
+    <div className="container-site">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+        {/* Copy + capabilities */}
+        <Reveal className={flip ? 'lg:order-2' : ''}>
+          <div className="flex items-center gap-3 mb-5">
+            <span className="font-mono text-xs text-slate-500 tracking-widest">{practice.index}</span>
+            <span className="h-px w-10 bg-slate-700" aria-hidden="true" />
+            <span className="eyebrow">{practice.eyebrow}</span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-5">{practice.title}</h2>
+          <p className="text-slate-400 leading-relaxed mb-8">{practice.description}</p>
+          <ul className="grid grid-cols-1 gap-3.5">
+            {practice.capabilities.map((cap) => (
+              <li key={cap} className="flex items-start gap-3 text-sm text-slate-300 leading-relaxed">
+                <CheckCircle2 className={`w-5 h-5 shrink-0 mt-0.5 ${practice.accent}`} aria-hidden="true" />
+                {cap}
+              </li>
+            ))}
+          </ul>
+          {practice.footnote}
+        </Reveal>
+
+        {/* Visual panel */}
+        <Reveal delay={0.12} className={flip ? 'lg:order-1' : ''}>
+          <div className="card relative overflow-hidden aspect-square max-w-md mx-auto w-full flex items-center justify-center">
+            <div
+              className={`absolute inset-0 bg-gradient-to-b ${practice.glow} via-transparent to-transparent pointer-events-none`}
+              aria-hidden="true"
+            />
+            <div className="hero-backdrop opacity-40" aria-hidden="true" />
+            <div className="relative z-10 text-center px-8">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-slate-950/80 border border-slate-700/60 flex items-center justify-center">
+                {React.cloneElement(practice.icon, {
+                  className: `w-10 h-10 ${practice.accent}`,
+                })}
+              </div>
+              <p className="font-mono text-xs uppercase tracking-widest text-slate-400 mb-6">
+                {practice.visualLabel}
               </p>
-              <div className="space-y-6">
-                {[
-                  { icon: <Microscope />, title: "Deep Domain Knowledge", desc: "Decades of experience in gas turbine and thermal systems." },
-                  { icon: <Zap />, title: "Rapid Prototyping", desc: "Quickly validate ideas with high-fidelity simulations." },
-                  { icon: <BarChart3 />, title: "Actionable Insights", desc: "We don't just provide data; we provide engineering solutions." }
-                ].map((item, i) => (
-                  <div key={i} className="flex gap-4">
-                    <div className="p-2 bg-slate-800 rounded-lg h-fit text-cyan-400">
-                      {item.icon}
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-white">{item.title}</h4>
-                      <p className="text-sm text-slate-400">{item.desc}</p>
-                    </div>
-                  </div>
+              <div className="flex flex-wrap justify-center gap-2">
+                {practice.visualTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="font-mono text-[11px] uppercase tracking-wider text-slate-300 bg-slate-900/80 border border-slate-700/60 rounded-full px-3 py-1.5"
+                  >
+                    {tag}
+                  </span>
                 ))}
               </div>
             </div>
-            <div className="relative">
-              <div className="aspect-square rounded-2xl bg-slate-800/50 border border-slate-700 flex items-center justify-center overflow-hidden">
-                {/* Placeholder for a technical illustration/animation */}
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent"></div>
-                <div className="text-center p-8">
-                  <div className="w-24 h-24 bg-cyan-500/20 rounded-full blur-2xl absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
-                  <Brain className="w-20 h-20 text-cyan-500 relative z-10 mx-auto mb-4 animate-pulse" />
-                  <p className="text-xs font-mono text-cyan-400/60 uppercase tracking-widest">Neural Network Analysis</p>
+          </div>
+        </Reveal>
+      </div>
+    </div>
+  </section>
+);
+
+const Services = () => {
+  usePageMeta(
+    'Consulting Services',
+    'Gas turbine combustion design & troubleshooting, DLN/DLE and hydrogen fuels, high-pressure test cell engineering, CFD/FEA, physics-informed industrial AI, and expert-led training from ProReadyEngineer.'
+  );
+
+  return (
+    <div>
+      <PageHero
+        eyebrow="What We Do"
+        title={
+          <>
+            Specialized <span className="text-gradient">Engineering Services</span>
+          </>
+        }
+        subtitle="Three deeply integrated practices — Thermal Fluid Sciences, Industrial AI, and expert-led Training — combining decades of gas turbine and thermal systems experience with advanced computational capability to solve the most complex engineering challenges."
+      >
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          {practices.map((p) => (
+            <a
+              key={p.id}
+              href={`#${p.id}`}
+              className="font-mono text-xs uppercase tracking-widest text-slate-300 hover:text-cyan-400 bg-slate-900/70 border border-slate-700/70 hover:border-cyan-500/40 rounded-full px-4 py-2 transition-colors"
+            >
+              {p.index} / {p.title}
+            </a>
+          ))}
+        </div>
+      </PageHero>
+
+      {practices.map((p, i) => (
+        <PracticeSection key={p.id} practice={p} flip={i % 2 === 1} />
+      ))}
+
+      {/* How we engage */}
+      <section className="section-pad relative overflow-hidden">
+        <div className="absolute inset-0 -z-10 bg-hero-radial" aria-hidden="true" />
+        <div className="container-site">
+          <SectionHeading
+            eyebrow="How We Engage"
+            title="From first call to fielded solution"
+            subtitle="A disciplined process honed across OEM programs, test campaigns, and field troubleshooting."
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {processSteps.map((step, i) => (
+              <Reveal key={step.n} delay={i * 0.08}>
+                <div className="card card-hover h-full p-6 relative">
+                  <span className="font-mono text-xs text-cyan-400 tracking-widest">{step.n}</span>
+                  <h3 className="text-lg font-bold mt-3 mb-2">{step.title}</h3>
+                  <p className="text-sm text-slate-400 leading-relaxed">{step.desc}</p>
+                  {i < processSteps.length - 1 && (
+                    <ArrowRight
+                      className="hidden lg:block absolute top-1/2 -right-4 -translate-y-1/2 w-4 h-4 text-slate-600"
+                      aria-hidden="true"
+                    />
+                  )}
                 </div>
-              </div>
-            </div>
+              </Reveal>
+            ))}
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Engagement models */}
+      <section className="section-pad pt-0">
+        <div className="container-site">
+          <SectionHeading
+            eyebrow="Engagement Models"
+            title="Work with us the way that fits"
+          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {engagementModels.map((m, i) => (
+              <Reveal key={m.title} delay={i * 0.08}>
+                <div className="card card-hover h-full p-8">
+                  <div className="w-12 h-12 rounded-xl bg-slate-950/80 border border-slate-700/60 flex items-center justify-center text-cyan-400 mb-5">
+                    {m.icon}
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">{m.title}</h3>
+                  <p className="text-sm text-slate-400 leading-relaxed">{m.desc}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <CTABand
+        secondaryLabel="Browse Training Courses"
+        secondaryTo="/training"
+      />
     </div>
   );
 };

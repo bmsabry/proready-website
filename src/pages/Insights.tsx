@@ -1,7 +1,8 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { Calendar, User, ArrowRight, Tag } from 'lucide-react';
+import { ArrowRight, Calendar, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Reveal, PageHero, CTABand } from '../components/ui';
+import { usePageMeta } from '../lib/meta';
 
 const posts = [
   {
@@ -87,93 +88,102 @@ const posts = [
 ];
 
 const Insights = () => {
+  usePageMeta(
+    'Research Insights — Combustion, Thermal-Fluid & Hydrogen Deep Dives',
+    'From the lab to your desk: technical deep dives into gas turbine combustion, DLE emissions, hydrogen transition, vortex dynamics, and combustor design from ProReadyEngineer.'
+  );
+
   return (
-    <div className="pt-32 pb-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6">Research <span className="text-gradient">Insights</span></h1>
-          <p className="text-slate-400 text-lg">
-            Deep dives into thermal fluid sciences, combustion research, and the application of AI in modern engineering.
-          </p>
-        </div>
+    <div className="pb-0">
+      <PageHero
+        eyebrow="Research Insights"
+        title={<>From the <span className="text-gradient">Lab</span></>}
+        subtitle="Deep dives into thermal-fluid sciences, combustion research, and the application of AI in modern engineering — written by the engineers doing the work."
+      />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {posts.map((post, i) => (
-            <motion.article
-              key={post.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="group flex flex-col bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden hover:border-slate-700 transition-all"
-            >
-              <Link to={post.link} className="aspect-video overflow-hidden">
-                <img 
-                  src={post.image} 
-                  alt={post.title} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-              </Link>
-              <div className="p-8 flex flex-col flex-grow">
-                <div className="flex items-center gap-4 mb-4">
-                  <span className="flex items-center gap-1.5 text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                    <Tag className="w-3 h-3" />
-                    {post.category}
-                  </span>
-                  <span className="text-slate-600">•</span>
-                  <span className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <Calendar className="w-3 h-3" />
-                    {post.date}
-                  </span>
-                </div>
-                
-                <Link to={post.link}>
-                  <h3 className="text-xl font-bold mb-4 group-hover:text-cyan-400 transition-colors leading-tight">
-                    {post.title}
-                  </h3>
-                </Link>
-                <p className="text-slate-400 text-sm mb-8 flex-grow leading-relaxed">
-                  {post.excerpt}
-                </p>
-
-                <div className="flex items-center justify-between pt-6 border-t border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center">
-                      <User className="w-3 h-3 text-slate-400" />
-                    </div>
-                    <span className="text-xs text-slate-400">{post.author}</span>
-                  </div>
-                  <Link to={post.link} className="text-cyan-400 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all">
-                    Read More <ArrowRight className="w-4 h-4" />
+      <section className="pb-20 lg:pb-28">
+        <div className="container-site">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {posts.map((post, i) => (
+              <Reveal key={post.id} delay={Math.min(i * 0.06, 0.3)} className="h-full">
+                <article className="group card card-hover h-full flex flex-col overflow-hidden">
+                  <Link to={post.link} className="block aspect-video overflow-hidden" tabIndex={-1} aria-hidden="true">
+                    <img
+                      src={post.image}
+                      alt={post.title}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
                   </Link>
-                </div>
-              </div>
-            </motion.article>
-          ))}
-        </div>
+                  <div className="p-7 flex flex-col flex-grow">
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="text-[11px] font-mono uppercase tracking-widest text-cyan-400">
+                        {post.category}
+                      </span>
+                      <span className="text-slate-700" aria-hidden="true">/</span>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                        <Calendar className="w-3 h-3" aria-hidden="true" />
+                        {post.date}
+                      </span>
+                    </div>
 
-        {/* Newsletter CTA */}
-        <div className="mt-24 p-12 rounded-[3rem] bg-slate-900 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="max-w-md">
-            <h2 className="text-2xl font-bold mb-2">Stay Updated</h2>
-            <p className="text-slate-400 text-sm">
-              Get our latest technical papers and case studies delivered directly to your inbox.
-            </p>
+                    <h3 className="text-lg font-bold leading-snug mb-3">
+                      <Link to={post.link} className="group-hover:text-cyan-400 transition-colors">
+                        {post.title}
+                      </Link>
+                    </h3>
+                    <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">
+                      {post.excerpt}
+                    </p>
+
+                    <div className="flex items-center justify-between pt-5 border-t border-slate-800/80">
+                      <span className="inline-flex items-center gap-2 text-xs text-slate-500">
+                        <User className="w-3.5 h-3.5" aria-hidden="true" />
+                        {post.author}
+                      </span>
+                      <Link to={post.link} className="btn-ghost group-hover:gap-3">
+                        Read More <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+              </Reveal>
+            ))}
           </div>
-          <div className="flex w-full md:w-auto gap-3">
-            <label htmlFor="newsletter-email" className="sr-only">Email address for newsletter</label>
-            <input 
-              id="newsletter-email"
-              name="email"
-              type="email" 
-              autoComplete="email"
-              placeholder="engineering@company.com" 
-              className="flex-grow md:w-64 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
-            />
-            <button className="btn-primary whitespace-nowrap">Subscribe</button>
-          </div>
+
+          {/* Newsletter */}
+          <Reveal className="mt-16">
+            <div className="card p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8">
+              <div className="max-w-md">
+                <h2 className="text-2xl font-bold mb-2">Stay Updated</h2>
+                <p className="text-slate-400 text-sm">
+                  Get our latest technical papers and case studies delivered directly to your inbox.
+                </p>
+              </div>
+              <div className="flex w-full md:w-auto gap-3">
+                <label htmlFor="newsletter-email" className="sr-only">Email address for newsletter</label>
+                <input
+                  id="newsletter-email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="engineering@company.com"
+                  className="flex-grow md:w-64 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+                />
+                <button className="btn-primary whitespace-nowrap">Subscribe</button>
+              </div>
+            </div>
+          </Reveal>
         </div>
-      </div>
+      </section>
+
+      <CTABand
+        title="Want this expertise on your problem?"
+        subtitle="The same rigor behind these analyses goes into every client engagement — from combustion test campaigns to hydrogen readiness studies."
+        primaryLabel="Consult with Experts"
+        secondaryLabel="See Proven Results"
+        secondaryTo="/case-studies"
+      />
     </div>
   );
 };

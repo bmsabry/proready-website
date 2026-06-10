@@ -3,7 +3,10 @@ import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { usePageMeta } from '../../lib/meta';
 const NewHighperformanceDataAcquisitionSystem = () => {
+  usePageMeta('New High-Performance Data Acquisition System', 'A modern data acquisition platform with auto-saving, Excel integration, and on-the-fly configuration, delivered as an MVP in 3 weeks and fully functional in 12.');
+
   return (
     <div className="pt-32 pb-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -17,7 +20,7 @@ const NewHighperformanceDataAcquisitionSystem = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <h1 className="text-4xl md:text-6xl font-bold mb-8 leading-tight">
+          <h1 className="text-3xl md:text-5xl font-bold mb-8 leading-tight">
             New High‑Performance Data Acquisition System
           </h1>
 
@@ -25,14 +28,14 @@ const NewHighperformanceDataAcquisitionSystem = () => {
             <a
               href="/New_HighPerformance_Data_Acquisition_System.pdf"
               download="New_HighPerformance_Data_Acquisition_System.pdf"
-              className="inline-flex items-center justify-center rounded-full bg-cyan-500 px-8 py-4 text-sm font-bold text-slate-950 transition hover:bg-cyan-400 shadow-lg shadow-cyan-500/20"
+              className="btn-primary rounded-full"
             >
               Download Full PDF
             </a>
           </div>
 
           <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img
+            <img loading="lazy" decoding="async"
               src="/New_HighPerformance_Data_Acquisition_System.jpg"
               alt="New High‑Performance Data Acquisition System"
               className="w-full h-full object-cover"

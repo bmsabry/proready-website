@@ -3,7 +3,10 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { usePageMeta } from '../../lib/meta';
 const SACDynamics = () => {
+  usePageMeta('Combustion Dynamics in SAC Sectors', 'Technical analysis of thermo-acoustic instabilities in Single Annular Combustor sectors, where unsteady heat release couples with acoustic pressure oscillations.');
+
   return (
     <div className="pt-32 pb-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -29,14 +32,14 @@ const SACDynamics = () => {
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-bold mb-8 leading-tight">
+          <h1 className="text-3xl md:text-5xl font-bold mb-8 leading-tight">
             Technical Analysis of Combustion Dynamics in Single Annular Combustor (SAC) Sectors
           </h1>
 
           <div className="flex items-center justify-between gap-4 mb-12 pb-12 border-b border-slate-800">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
-                <img src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" className="w-full h-full object-cover" />
+                <img loading="lazy" decoding="async" src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" className="w-full h-full object-cover" />
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-200">Dr. Bassam Abdelnabi</p>
@@ -47,7 +50,7 @@ const SACDynamics = () => {
               <a
                 href="/SAC Dynamics.pdf"
                 download="SAC Dynamics.pdf"
-                className="inline-flex items-center justify-center rounded-full bg-cyan-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
+                className="btn-primary rounded-full"
               >
                 Download Full PDF
               </a>
@@ -55,7 +58,7 @@ const SACDynamics = () => {
           </div>
 
           <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img 
+            <img loading="lazy" decoding="async" 
               src="/SAC_Dynamics.jpg" 
               alt="Combustion Dynamics in SAC Sectors" 
               className="w-full h-full object-cover"

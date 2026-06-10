@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, ArrowRight } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -15,9 +15,11 @@ const Navbar = () => {
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => { setIsOpen(false); }, [location.pathname]);
 
   const navLinks = [
     { name: 'Home', path: '/' },
@@ -28,48 +30,56 @@ const Navbar = () => {
     { name: 'Testimonials', path: '/testimonials' },
   ];
 
+  const isActive = (path: string) =>
+    path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
+
   return (
     <nav className={cn(
-      "fixed w-full z-50 transition-all duration-300",
-      scrolled ? "glass py-3" : "bg-transparent py-5"
+      'fixed w-full z-50 transition-all duration-300',
+      scrolled || isOpen ? 'glass py-3' : 'bg-transparent py-5'
     )}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="container-site">
         <div className="flex justify-between items-center">
           <Link to="/" className="flex items-center space-x-3">
             <img
               src="/Logo.jpg"
-              alt="ProReadyEngineer Logo"
+              alt=""
+              width="40"
+              height="40"
               className="h-10 w-auto rounded-md"
             />
-            <span className="text-xl font-bold tracking-tight">
-              ProReady<span className="text-cyan-500">Engineer</span>
+            <span className="font-display text-xl font-bold tracking-tight">
+              ProReady<span className="text-cyan-400">Engineer</span>
             </span>
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden lg:flex items-center gap-7">
             {navLinks.map((link) => (
               <Link
                 key={link.name}
                 to={link.path}
                 className={cn(
-                  "text-sm font-medium transition-colors hover:text-cyan-400",
-                  location.pathname === link.path ? "text-cyan-400" : "text-slate-300"
+                  'relative text-sm font-medium transition-colors hover:text-cyan-400 py-1',
+                  isActive(link.path) ? 'text-cyan-400' : 'text-slate-300'
                 )}
               >
                 {link.name}
+                {isActive(link.path) && (
+                  <span className="absolute -bottom-0.5 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent" aria-hidden="true" />
+                )}
               </Link>
             ))}
-            <Link to="/contact" className="btn-primary py-2 px-5 text-sm">
-              Get in Touch
+            <Link to="/contact" className="btn-primary py-2.5 px-5 text-sm">
+              Get in Touch <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </Link>
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="md:hidden">
+          <div className="lg:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="text-slate-300"
+              className="p-2 text-slate-300 hover:text-white transition-colors"
               aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
               aria-expanded={isOpen}
               aria-controls="mobile-menu"
@@ -82,13 +92,16 @@ const Navbar = () => {
 
       {/* Mobile Nav */}
       {isOpen && (
-        <div id="mobile-menu" className="md:hidden glass absolute top-full left-0 w-full py-4 px-4 space-y-4 border-t border-slate-800">
+        <div id="mobile-menu" className="lg:hidden glass absolute top-full left-0 w-full py-4 px-4 space-y-1 border-t border-slate-800">
           {navLinks.map((link) => (
             <Link
               key={link.name}
               to={link.path}
               onClick={() => setIsOpen(false)}
-              className="block text-base font-medium text-slate-300 hover:text-cyan-400"
+              className={cn(
+                'block rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
+                isActive(link.path) ? 'text-cyan-400 bg-cyan-500/5' : 'text-slate-300 hover:text-cyan-400 hover:bg-slate-800/50'
+              )}
             >
               {link.name}
             </Link>
@@ -96,7 +109,7 @@ const Navbar = () => {
           <Link
             to="/contact"
             onClick={() => setIsOpen(false)}
-            className="block btn-primary text-center"
+            className="btn-primary w-full text-center mt-3"
           >
             Get in Touch
           </Link>
