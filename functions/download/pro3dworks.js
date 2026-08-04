@@ -38,6 +38,11 @@ export async function onRequestGet(context) {
     if (!asset.ok) throw new Error('asset ' + asset.status);
     const headers = new Headers(asset.headers);
     headers.set('Content-Disposition', 'attachment; filename="Pro3DWorks.html"');
+    // Serve as a binary attachment: Cloudflare HTML transforms (email
+    // obfuscation, Rocket Loader) rewrite text/html bodies and would break
+    // the app's mailto links in the downloaded copy. Octet-stream bodies
+    // pass through byte-exact; the filename keeps the .html extension.
+    headers.set('Content-Type', 'application/octet-stream');
     // Every download must reach this function so it gets counted.
     headers.set('Cache-Control', 'no-store');
     return new Response(asset.body, { status: 200, headers });
