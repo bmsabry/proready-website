@@ -641,3 +641,34 @@ originSessionId: 1bde30f9-7812-452b-837b-7c93d5c35efa
 - SignWell webhook endpoint is named `/webhooks/signrequest` for historical reasons — do not rename.
 - No Celery worker on Render; RFQ dispatch uses asyncio in FastAPI + a Render Cron Job.
 ```
+
+
+---
+
+## Products page + Pro3DWorks download tracking (added 2026-08-04)
+
+**What:** `/products` page (in navbar) offers Pro3DWorks (free single-file browser CAD viewer,
+source repo `bmsabry/Pro3DWorks`) for download with full statistics.
+
+**Flow:** button → `GET /download/pro3dworks` → Cloudflare Pages Function
+(`functions/download/pro3dworks.js`) which (1) logs `{time, country, region, city, timezone,
+colo, referrer, user_agent}` from `request.cf` via `POST {API}/api/track/download`
+(fire-and-forget in `waitUntil`; download NEVER breaks on logging failure) and (2) streams the
+static asset `public/downloads/Pro3DWorks.html` with `Content-Disposition: attachment` +
+`Cache-Control: no-store` (every download must hit the function to be counted). Direct hits to
+`/downloads/Pro3DWorks.html` bypass counting — that's accepted.
+
+**Backend** (`backend/app/routes/downloads.py`, model `ProductDownload` in `models.py`,
+table auto-created by `create_all` on Render deploy):
+- `POST /api/track/download` — insert; product whitelist `KNOWN_PRODUCTS = {"pro3dworks"}`.
+- `GET /api/downloads/stats` — public aggregates (total/7d/30d/top countries) for the live
+  counter on `/products`. No PII. Unauthenticated by design; repo is public so there is no
+  secret between the Pages Function and this endpoint — counts are best-effort marketing
+  stats, not billing data.
+- `GET /api/admin/downloads` — `require_admin`; daily series, countries, referrers, recent
+  100 rows. Surfaced in `/admin` → **Downloads** tab (`DownloadsTab` in AdminDashboard.tsx).
+
+**Updating the shipped app:** rebuild Pro3DWorks, replace `public/downloads/Pro3DWorks.html`,
+bump the version string on `src/pages/Products.tsx`, push `main`.
+
+**IP addresses are never stored** — geo stops at city (Cloudflare edge data).
