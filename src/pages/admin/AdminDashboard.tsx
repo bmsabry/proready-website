@@ -28,6 +28,8 @@ import {
   Bot,
   Maximize2,
   Minimize2,
+  Download,
+  Globe2,
 } from 'lucide-react';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
@@ -94,7 +96,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [view, setView] = useState<'registrations' | 'courses' | 'ai'>('registrations');
+  const [view, setView] = useState<'registrations' | 'courses' | 'ai' | 'downloads'>('registrations');
   const [regs, setRegs] = useState<Registration[] | null>(null);
   const [seats, setSeats] = useState<SeatsInfo | null>(null);
   const [adminEmail, setAdminEmail] = useState<string | null>(null);
@@ -268,9 +270,24 @@ export default function AdminDashboard() {
             <Sparkles className="w-4 h-4" />
             AI Settings
           </button>
+          <button
+            onClick={() => setView('downloads')}
+            className={`flex items-center gap-2 text-sm px-4 py-2 border-b-2 -mb-px transition-colors ${
+              view === 'downloads'
+                ? 'border-cyan-400 text-cyan-300'
+                : 'border-transparent text-slate-300 hover:text-slate-200'
+            }`}
+          >
+            <Download className="w-4 h-4" />
+            Downloads
+          </button>
         </div>
 
-        {view === 'ai' ? (
+        {view === 'downloads' ? (
+          <DownloadsTab
+            onAuthError={() => navigate('/admin/login', { replace: true })}
+          />
+        ) : view === 'ai' ? (
           <AISettingsTab
             onAuthError={() => navigate('/admin/login', { replace: true })}
           />
@@ -1839,5 +1856,175 @@ function AdminChatWidget({ onAuthError }: { onAuthError: () => void }) {
         </div>
       )}
     </>
+  );
+}
+
+/* ---------------- Downloads tab: product download statistics ---------------- */
+
+type DownloadStats = {
+  product: string;
+  total: number;
+  last7: number;
+  last30: number;
+  by_day: { date: string; count: number }[];
+  by_country: { country: string; count: number }[];
+  by_referrer: { referrer: string; count: number }[];
+  recent: {
+    ts: string;
+    country: string;
+    region: string;
+    city: string;
+    timezone: string;
+    referrer: string;
+    user_agent: string;
+  }[];
+};
+
+function DownloadsTab({ onAuthError }: { onAuthError: () => void }) {
+  const [stats, setStats] = useState<DownloadStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/downloads?product=pro3dworks`, fetchOpts);
+      if (res.status === 401) { onAuthError(); return; }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setStats((await res.json()) as DownloadStats);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load download stats.');
+    } finally {
+      setLoading(false);
+    }
+  }, [onAuthError]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const maxDay = stats?.by_day.reduce((m, d) => Math.max(m, d.count), 0) || 1;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <Download className="w-5 h-5 text-cyan-400" /> Pro3DWorks downloads
+        </h2>
+        <button onClick={() => void load()} disabled={loading}
+          className="btn-secondary flex items-center gap-2 text-sm py-2 px-3">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+        </button>
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 text-red-200 text-sm px-4 py-3 mb-6">
+          {error}
+        </div>
+      )}
+
+      {stats && (
+        <>
+          {/* Counters */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            {[
+              { label: 'All time', value: stats.total },
+              { label: 'Last 30 days', value: stats.last30 },
+              { label: 'Last 7 days', value: stats.last7 },
+            ].map((c) => (
+              <div key={c.label} className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+                <p className="text-sm text-slate-400">{c.label}</p>
+                <p className="text-3xl font-bold text-white mt-1">{c.value.toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Daily bars (last 30 days) */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 mb-8">
+            <p className="text-sm font-semibold text-slate-200 mb-4">Daily downloads — last 30 days</p>
+            {stats.by_day.length === 0 ? (
+              <p className="text-sm text-slate-400">No downloads recorded yet.</p>
+            ) : (
+              <div className="flex items-end gap-1 h-28">
+                {stats.by_day.map((d) => (
+                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1"
+                    title={`${d.date}: ${d.count}`}>
+                    <div className="w-full rounded-t bg-cyan-500/70"
+                      style={{ height: `${Math.max(4, (d.count / maxDay) * 100)}%` }} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-6 mb-8">
+            {/* Countries */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <p className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+                <Globe2 className="w-4 h-4 text-cyan-400" /> By country
+              </p>
+              {stats.by_country.length === 0 ? (
+                <p className="text-sm text-slate-400">Nothing yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {stats.by_country.map((c) => (
+                    <li key={c.country} className="flex items-center justify-between text-sm">
+                      <span className="text-slate-300">{c.country}</span>
+                      <span className="text-slate-400">{c.count.toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {/* Referrers */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <p className="text-sm font-semibold text-slate-200 mb-3">Top referrers</p>
+              {stats.by_referrer.length === 0 ? (
+                <p className="text-sm text-slate-400">Direct downloads only so far.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {stats.by_referrer.map((r) => (
+                    <li key={r.referrer} className="flex items-center justify-between text-sm gap-4">
+                      <span className="text-slate-300 truncate">{r.referrer}</span>
+                      <span className="text-slate-400 shrink-0">{r.count.toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {/* Recent rows */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 overflow-x-auto">
+            <p className="text-sm font-semibold text-slate-200 mb-3">Most recent downloads</p>
+            {stats.recent.length === 0 ? (
+              <p className="text-sm text-slate-400">No downloads recorded yet — share the link!</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-400 border-b border-slate-800">
+                    <th className="py-2 pr-4 font-medium">When</th>
+                    <th className="py-2 pr-4 font-medium">Where</th>
+                    <th className="py-2 pr-4 font-medium">Referrer</th>
+                    <th className="py-2 font-medium">Browser</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.recent.map((r, i) => (
+                    <tr key={`${r.ts}-${i}`} className="border-b border-slate-800/60 text-slate-300">
+                      <td className="py-2 pr-4 whitespace-nowrap">{formatDate(r.ts)}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">
+                        {[r.city, r.region, r.country].filter(Boolean).join(', ') || '(unknown)'}
+                      </td>
+                      <td className="py-2 pr-4 max-w-[240px] truncate">{r.referrer || '—'}</td>
+                      <td className="py-2 max-w-[260px] truncate text-slate-400">{r.user_agent}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
