@@ -174,3 +174,31 @@ class AIUsageDaily(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class ProductDownload(Base):
+    """One row per download of a free product (e.g. Pro3DWorks).
+
+    Logged by the Cloudflare Pages Function that serves the file: it sees the
+    visitor's edge geo (country/region/city/timezone) and forwards it here.
+    The API never stores IP addresses — geo granularity stops at city, which
+    keeps the table safe to expose in aggregate on the public site.
+    """
+
+    __tablename__ = "product_downloads"
+    __table_args__ = (
+        Index("ix_product_downloads_product_ts", "product", "ts"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    product: Mapped[str] = mapped_column(String(64), index=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    country: Mapped[str] = mapped_column(String(8), default="")
+    region: Mapped[str] = mapped_column(String(128), default="")
+    city: Mapped[str] = mapped_column(String(128), default="")
+    timezone: Mapped[str] = mapped_column(String(64), default="")
+    colo: Mapped[str] = mapped_column(String(8), default="")
+    referrer: Mapped[str] = mapped_column(Text, default="")
+    user_agent: Mapped[str] = mapped_column(Text, default="")

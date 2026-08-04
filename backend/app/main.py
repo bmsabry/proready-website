@@ -15,6 +15,7 @@ from .routes import admin as admin_routes
 from .routes import ai as ai_routes
 from .routes import auth as auth_routes
 from .routes import courses as courses_routes
+from .routes import downloads as downloads_routes
 from .routes import register as register_routes
 from .routes import seats as seats_routes
 
@@ -133,6 +134,7 @@ app.include_router(admin_routes.router)
 app.include_router(courses_routes.public_router)
 app.include_router(courses_routes.admin_router)
 app.include_router(ai_routes.router)
+app.include_router(downloads_routes.router)
 
 
 @app.get("/", tags=["meta"])
