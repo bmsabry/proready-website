@@ -6,6 +6,7 @@ import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
 
 const Services = lazy(() => import('./pages/Services'));
+const Products = lazy(() => import('./pages/Products'));
 const Training = lazy(() => import('./pages/Training'));
 const Insights = lazy(() => import('./pages/Insights'));
 const CaseStudies = lazy(() => import('./pages/CaseStudies'));
@@ -60,6 +61,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/services" element={<Services />} />
+              <Route path="/products" element={<Products />} />
               <Route path="/services/gas-turbine-combustion" element={<GasTurbineCombustionConsulting />} />
               <Route path="/services/industrial-ai" element={<IndustrialAIConsulting />} />
               <Route path="/services/test-cell-design" element={<TestCellDesign />} />
