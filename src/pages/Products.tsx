@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Download, CheckCircle2, ShieldCheck, Sparkles, Boxes, Camera, Ruler, Heart,
+  Download, CheckCircle2, ShieldCheck, Sparkles, Boxes, Camera, Ruler, Heart, CircleDollarSign,
 } from 'lucide-react';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
@@ -28,7 +28,12 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
   {
     icon: <Sparkles aria-hidden="true" className="w-5 h-5" />,
     title: 'AI Engineer built in',
-    text: 'Identify components, color by function, generate a BOM with order-of-magnitude cost estimates, review the design, or chat with your model. Every run shows its real API cost, and a session log tallies AI spend vs the cost of the same work by hand. Works with any OpenAI-compatible endpoint — or fully local and private with LM Studio.',
+    text: 'Identify components, color by function, generate a BOM with order-of-magnitude cost estimates, review the design, or chat with your model. Works with any OpenAI-compatible endpoint — or fully local and private with LM Studio.',
+  },
+  {
+    icon: <CircleDollarSign aria-hidden="true" className="w-5 h-5" />,
+    title: 'Estimates your cost savings — AI vs. manual labor',
+    text: 'Every AI run is metered in real dollars, and the built-in cost & savings log estimates what the same work would cost an engineer doing it by hand, at your own labor rate. Each model session becomes a line item — AI cost, manual estimate, and money saved — with a running total.',
   },
   {
     icon: <ShieldCheck aria-hidden="true" className="w-5 h-5" />,
@@ -40,7 +45,7 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
 export default function Products() {
   usePageMeta(
     'Products — Free Engineering Software',
-    'Free engineering software by ProReadyEngineer LLC. Pro3DWorks: open any CAD model in your browser — measure, section, explode, photoreal render, and AI-assisted BOM.',
+    'Free engineering software by ProReadyEngineer LLC. Pro3DWorks: browser CAD viewer — measure, section, photoreal render, AI-assisted BOM, and estimated cost savings of AI vs manual work.',
   );
 
   const [downloads, setDownloads] = useState<number | null>(null);
