@@ -21,10 +21,26 @@ const Navbar = () => {
 
   useEffect(() => { setIsOpen(false); }, [location.pathname]);
 
+  // "New" badge on Products: pulls attention until the date below, then
+  // removes itself — no redeploy needed. Rendered client-side only (after
+  // hydration) so build-time HTML never disagrees with the visitor's clock.
+  const PRODUCTS_NEW_UNTIL = Date.parse('2026-09-15T00:00:00Z');
+  const [showNewBadge, setShowNewBadge] = useState(false);
+  useEffect(() => { setShowNewBadge(Date.now() < PRODUCTS_NEW_UNTIL); }, [PRODUCTS_NEW_UNTIL]);
+  const newBadge = (
+    <span
+      className="ml-1.5 align-middle text-[10px] font-bold uppercase tracking-wider
+        bg-amber-400/15 text-amber-300 border border-amber-400/40 rounded-full px-1.5 py-0.5"
+      aria-label="New section"
+    >
+      New
+    </span>
+  );
+
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'Services', path: '/services' },
-    { name: 'Products', path: '/products' },
+    { name: 'Products', path: '/products', isNew: true },
     { name: 'Training', path: '/training' },
     { name: 'Research Insights', path: '/insights' },
     { name: 'Case Studies', path: '/case-studies' },
@@ -66,6 +82,7 @@ const Navbar = () => {
                 )}
               >
                 {link.name}
+                {'isNew' in link && link.isNew && showNewBadge && newBadge}
                 {isActive(link.path) && (
                   <span className="absolute -bottom-0.5 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent" aria-hidden="true" />
                 )}
@@ -105,6 +122,7 @@ const Navbar = () => {
               )}
             >
               {link.name}
+              {'isNew' in link && link.isNew && showNewBadge && newBadge}
             </Link>
           ))}
           <Link
