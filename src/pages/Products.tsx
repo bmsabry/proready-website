@@ -28,7 +28,7 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
   {
     icon: <Sparkles aria-hidden="true" className="w-5 h-5" />,
     title: 'AI Engineer built in',
-    text: 'Identify components, color by function, generate a BOM with order-of-magnitude cost estimates, review the design, or chat with your model. Works with any OpenAI-compatible endpoint — or fully local and private with LM Studio.',
+    text: 'Identify components, color by function, generate a BOM with order-of-magnitude cost estimates (exported as a formatted Excel workbook), review the design, or chat with your model. Works with any OpenAI-compatible endpoint — or fully local and private with LM Studio.',
   },
   {
     icon: <CircleDollarSign aria-hidden="true" className="w-5 h-5" />,
@@ -107,7 +107,7 @@ export default function Products() {
                   </a>
                 </div>
                 <p className="text-sm text-slate-400">
-                  v2.52.0 · single HTML file · ~9&nbsp;MB · Windows / Mac / Linux · works offline
+                  v2.53.0 · single HTML file · ~9&nbsp;MB · Windows / Mac / Linux · works offline
                   {downloads !== null && downloads > 0 && (
                     <> · <span className="text-cyan-300">{downloads.toLocaleString()} download{downloads === 1 ? '' : 's'}</span></>
                   )}
