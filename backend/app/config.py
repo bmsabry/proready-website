@@ -54,8 +54,58 @@ class Settings(BaseSettings):
     SESSION_SECRET: str = ""
     SESSION_MAX_AGE_SECONDS: int = 60 * 60 * 24 * 7  # 7 days
 
+    # --- Academy (self-serve on-demand courses) ---------------------------
+    # Public site root — used to build magic-link URLs and Stripe redirect
+    # targets. No trailing slash.
+    SITE_URL: str = "https://proreadyengineer.com"
+
+    # Learner sessions are separate from the admin session in every way:
+    # different cookie, different signing salt, different lifetime. A leaked
+    # learner cookie must never grant admin access.
+    LEARNER_SESSION_SECRET: str = ""
+    LEARNER_SESSION_MAX_AGE_SECONDS: int = 60 * 60 * 24 * 30  # 30 days
+    # How long a sign-in link stays valid before it must be re-requested.
+    LOGIN_LINK_TTL_SECONDS: int = 60 * 30  # 30 minutes
+    # Sign-in links are rate limited per email to blunt inbox flooding.
+    LOGIN_LINK_MAX_PER_HOUR: int = 5
+
+    # Mastery gate: percentage required on a module's formative set before
+    # the next module unlocks. Per the GT-05 curriculum sign-off.
+    MASTERY_THRESHOLD_PCT: float = 80.0
+
+    # --- Legacy quiz-app compatibility ------------------------------------
+    # The five standalone smallgasturbine.gt-XX apps speak an email+password
+    # JWT contract that used to be served by the combustion-toolkit API. We
+    # reimplement that contract here so those apps point at this service and
+    # the toolkit can stay switched off for good.
+    COMPAT_JWT_SECRET: str = ""
+    COMPAT_ACCESS_TOKEN_MINUTES: int = 60 * 24
+    COMPAT_REFRESH_TOKEN_DAYS: int = 30
+    # Which academy product an enrolment in it unlocks the legacy modules for.
+    # One purchase of the course opens all five quiz apps.
+    COMPAT_PRODUCT_CODE: str = "micro-gas-turbine-design"
+
+    # --- Payments (Stripe Checkout) ---------------------------------------
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+
+    # --- Video (Cloudflare Stream) ----------------------------------------
+    # Customer subdomain code, e.g. "abcd1234" in
+    # https://customer-abcd1234.cloudflarestream.com
+    CF_STREAM_CUSTOMER_CODE: str = ""
+    CF_ACCOUNT_ID: str = ""
+    CF_API_TOKEN: str = ""
+    # Signing key pair from POST /stream/keys — the JWK is base64-encoded.
+    CF_STREAM_SIGNING_KEY_ID: str = ""
+    CF_STREAM_SIGNING_KEY_JWK: str = ""
+    # Playback tokens are deliberately short-lived; the player refreshes.
+    STREAM_TOKEN_TTL_SECONDS: int = 60 * 60 * 2  # 2 hours
+
     # --- CORS -------------------------------------------------------------
     # Comma-separated origins. In prod: https://proreadyengineer.com
+    # The five smallgasturbine.* quiz-app origins must be listed here too;
+    # they call /auth and /learning cross-origin with a Bearer token.
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @property
