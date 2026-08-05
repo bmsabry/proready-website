@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.db import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
+from app.config import get_settings  # noqa: E402
 from app.models import Learner, LoginToken, Module, QuizItem  # noqa: E402
 
 PRODUCT = "micro-gas-turbine-design"
@@ -495,3 +496,155 @@ def test_short_answers_are_held_for_review_not_marked_wrong(client):
     flagged = [f for f in result["feedback"] if f["needs_review"]]
     assert len(flagged) == shorts
     assert all(f["rubric"] for f in flagged), "rubric must reach the reviewer"
+
+
+# -----------------------------------------------------------------------------
+# Owner override
+# -----------------------------------------------------------------------------
+
+def test_owner_email_bypasses_purchase_and_every_gate(client):
+    """The site owner can inspect the whole product without buying it.
+
+    Safe because the email is only ever proven — magic link received, or a
+    password set on that address. A stranger typing it gets nothing, which the
+    next test asserts.
+    """
+    from app.academy import is_owner
+    from app.config import get_settings
+
+    owner_email = get_settings().owner_emails_list[0]
+
+    db = SessionLocal()
+    owner = Learner(email=owner_email, full_name="Owner")
+    db.add(owner)
+    db.commit()
+    from app.learner_auth import issue_login_token
+
+    raw = issue_login_token(db, owner)
+    db.close()
+
+    owner_client = TestClient(app, base_url="https://testserver")
+    assert owner_client.post("/api/academy/auth/verify", json={"token": raw}).status_code == 200
+
+    # No enrollment row exists for this learner at all.
+    me = owner_client.get("/api/academy/me").json()
+    assert me["signed_in"] is True and me["enrollments"] == []
+
+    course = owner_client.get(f"/api/academy/course/{PRODUCT}")
+    assert course.status_code == 200, "owner should reach the course without buying"
+    modules = course.json()["modules"]
+    assert all(m["unlocked"] for m in modules), "every module open, no sequential gate"
+
+    # And a locked-for-everyone-else lesson opens.
+    deep = modules[-1]["lessons"][0]
+    assert owner_client.get(f"/api/academy/lesson/{deep['id']}").status_code == 200
+
+    db = SessionLocal()
+    promoted = db.query(Learner).filter(Learner.email == owner_email).one()
+    db.close()
+    assert promoted.is_staff is True, "owner should be flagged staff on first sight"
+    assert is_owner(promoted) is True
+
+
+def test_claiming_the_owner_email_without_proving_it_grants_nothing(anon):
+    """Typing the owner's address must not be a way in."""
+    # No session at all — the course stays closed.
+    assert anon.get(f"/api/academy/course/{PRODUCT}").status_code == 401
+    # And asking for a link to that address reveals nothing and grants nothing.
+    from app.config import get_settings
+
+    r = anon.post(
+        "/api/academy/auth/request-link",
+        json={"email": get_settings().owner_emails_list[0]},
+    )
+    assert r.json() == {"ok": True}
+    assert anon.get("/api/academy/me").json()["signed_in"] is False
+
+
+# -----------------------------------------------------------------------------
+# Admin tooling for access
+# -----------------------------------------------------------------------------
+
+def test_admin_sees_who_holds_owner_bypass(client):
+    r = client.get("/api/admin/academy/owners", headers=ADMIN)
+    assert r.status_code == 200
+    body = r.json()
+    assert get_settings().owner_emails_list[0] in body["owner_emails"]
+    assert body["env_var"] == "OWNER_EMAILS"
+    # Unauthenticated callers learn nothing about who can bypass.
+    assert client.get("/api/admin/academy/owners").status_code == 401
+
+
+def test_admin_can_mint_a_sign_in_link_and_it_works_once(client):
+    email = "link-me@example.com"
+    client.post(
+        "/api/admin/academy/grant",
+        headers=ADMIN,
+        json={"email": email, "product_code": PRODUCT, "send_email_invite": False},
+    )
+
+    r = client.post(
+        "/api/admin/academy/login-link", headers=ADMIN, json={"email": email}
+    )
+    assert r.status_code == 200
+    link = r.json()["link"]
+    assert r.json()["emailed"] is False, "must not email unless asked"
+
+    token = link.split("token=")[1]
+    fresh = TestClient(app, base_url="https://testserver")
+    assert fresh.post("/api/academy/auth/verify", json={"token": token}).status_code == 200
+    assert fresh.get("/api/academy/me").json()["email"] == email
+
+    # Single use: the same token is dead the second time.
+    again = TestClient(app, base_url="https://testserver")
+    assert again.post("/api/academy/auth/verify", json={"token": token}).status_code == 400
+
+    assert client.post(
+        "/api/admin/academy/login-link", headers=ADMIN, json={"email": "nobody@example.com"}
+    ).status_code == 404
+    assert client.post(
+        "/api/admin/academy/login-link", json={"email": email}
+    ).status_code == 401
+
+
+def test_admin_learner_rows_flag_owners_and_missing_passwords(client):
+    rows = client.get("/api/admin/academy/learners", headers=ADMIN).json()["learners"]
+    assert rows, "expected at least one learner by now"
+    for row in rows:
+        assert "is_owner" in row and "has_password" in row
+
+
+def test_a_learner_can_set_a_quiz_app_password_from_a_proven_session(client):
+    """Closes the loop opened by refusing password signup on accounts that
+    already carry access: the session proves the mailbox, so setting a
+    password from inside it is safe."""
+    from app.routes.compat import verify_password
+
+    email = "sets-a-password@example.com"
+    client.post(
+        "/api/admin/academy/grant",
+        headers=ADMIN,
+        json={"email": email, "product_code": PRODUCT, "send_email_invite": False},
+    )
+    link = client.post(
+        "/api/admin/academy/login-link", headers=ADMIN, json={"email": email}
+    ).json()["link"]
+
+    session = TestClient(app, base_url="https://testserver")
+    session.post("/api/academy/auth/verify", json={"token": link.split("token=")[1]})
+    assert session.get("/api/academy/me").json()["has_password"] is False
+
+    assert session.post(
+        "/api/academy/auth/set-password", json={"password": "a-good-long-password"}
+    ).status_code == 200
+    assert session.get("/api/academy/me").json()["has_password"] is True
+
+    db = SessionLocal()
+    row = db.query(Learner).filter(Learner.email == email).one()
+    assert verify_password("a-good-long-password", row.password_hash)
+    db.close()
+
+    # And it is genuinely session-gated, not just email-gated.
+    assert TestClient(app, base_url="https://testserver").post(
+        "/api/academy/auth/set-password", json={"password": "another-password"}
+    ).status_code == 401

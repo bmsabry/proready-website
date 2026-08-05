@@ -35,6 +35,27 @@ def auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
+def set_password_then_login(c, email: str, password: str) -> str:
+    """Walk the real onboarding path for someone who already has access.
+
+    Admin mints a sign-in link -> the learner opens it, which proves the
+    mailbox -> they set a password from that session -> the quiz apps take it.
+    """
+    link = c.post(
+        "/api/admin/academy/login-link", headers=ADMIN, json={"email": email}
+    ).json()["link"]
+    session = TestClient(app, base_url="https://testserver")
+    assert session.post(
+        "/api/academy/auth/verify", json={"token": link.split("token=")[1]}
+    ).status_code == 200
+    assert session.post(
+        "/api/academy/auth/set-password", json={"password": password}
+    ).status_code == 200
+    r = c.post("/auth/login", json={"email": email, "password": password})
+    assert r.status_code == 200, r.text
+    return r.json()["access_token"]
+
+
 # -----------------------------------------------------------------------------
 # Signup / login
 # -----------------------------------------------------------------------------
@@ -147,10 +168,10 @@ def test_one_purchase_unlocks_all_five_apps(c):
     }, headers=ADMIN)
     assert r.status_code == 200
 
-    # The buyer was provisioned without a password; they set one by signing up.
-    tokens = c.post("/auth/signup", json={"email": BUYER, "password": PASSWORD})
-    assert tokens.status_code == 201, "a paid learner must be able to claim their account"
-    token = tokens.json()["access_token"]
+    # The buyer was provisioned without a password. They set one from the
+    # magic-link session — not by "signing up" on an email that already carries
+    # access, which would let anyone who knows the address take the course.
+    token = set_password_then_login(c, BUYER, PASSWORD)
 
     # One Learner row, not two.
     db = SessionLocal()
@@ -301,3 +322,97 @@ def test_compat_tokens_do_not_open_the_academy_or_admin_apis(c):
     assert c.get("/api/admin/academy/products", headers=auth(token)).status_code == 401
     # The academy learner API keys off a cookie, not this Bearer token.
     assert c.get("/api/academy/me", headers=auth(token)).json()["signed_in"] is False
+
+
+# -----------------------------------------------------------------------------
+# Owner bypass — the path a password login takes
+# -----------------------------------------------------------------------------
+
+def test_owner_password_login_unlocks_every_module_without_a_purchase(c):
+    """The bug this pins: the compat layer used to read `is_staff` straight off
+    the row, so an owner who only ever signed in here with a password — never
+    through an academy magic link — was treated as a stranger and locked out of
+    their own material. Entitlement now goes through the config-backed owner
+    list, so the DB flag is a cache rather than the source of truth."""
+    from app.config import get_settings
+
+    owner_email = get_settings().owner_emails_list[0]
+
+    # Deliberately built the way a pre-existing account looks: a password, and
+    # is_staff still False because nothing has promoted it yet. (The row may
+    # already exist from the academy suite — same shared DB — so this reshapes
+    # it rather than insisting on inserting.)
+    db = SessionLocal()
+    row = db.query(Learner).filter(Learner.email == owner_email).one_or_none()
+    if row is None:
+        row = Learner(email=owner_email, full_name="Owner")
+        db.add(row)
+    row.password_hash = hash_password("owners-own-password")
+    row.is_staff = False
+    db.commit()
+    db.close()
+
+    r = c.post(
+        "/auth/login", json={"email": owner_email, "password": "owners-own-password"}
+    )
+    assert r.status_code == 200
+    token = r.json()["access_token"]
+
+    assert c.get("/auth/me", headers=auth(token)).json()["is_admin"] is True
+
+    mods = c.get("/learning/my-modules", headers=auth(token)).json()
+    assert len(mods) == len(MODULES), "owner should see every module"
+    assert all(m["enrolled"] for m in mods)
+    assert all(m["via_admin"] for m in mods), "and be marked as reaching them as admin"
+
+    for module_id in MODULES:
+        access = c.get(f"/learning/{module_id}/access", headers=auth(token)).json()
+        assert access["enrolled"] is True
+        assert access["is_admin"] is True
+
+
+def test_owner_email_cannot_be_claimed_by_password_signup(c):
+    """An address that grants everything must not be claimable by whoever
+    types it first — it takes the email-link route, which proves the mailbox."""
+    from app.config import get_settings
+
+    r = c.post(
+        "/auth/signup",
+        json={
+            "email": get_settings().owner_emails_list[0].upper(),
+            "password": "not-your-account",
+            "full_name": "Impostor",
+        },
+    )
+    assert r.status_code == 403
+    assert "link" in r.json()["detail"].lower()
+
+
+def test_a_paid_account_without_a_password_cannot_be_claimed_by_a_stranger(c):
+    """A Stripe buyer's row sits password-less until they set one. Signing up
+    on that email used to adopt the row — and the course with it."""
+    db = SessionLocal()
+    db.add(Learner(email="paid-no-password@example.com", full_name="Buyer"))
+    db.commit()
+    db.close()
+
+    r = c.post(
+        "/api/admin/academy/grant",
+        headers=ADMIN,
+        json={
+            "email": "paid-no-password@example.com",
+            "product_code": PRODUCT,
+            "send_email_invite": False,
+        },
+    )
+    assert r.status_code == 200
+
+    r = c.post(
+        "/auth/signup",
+        json={"email": "paid-no-password@example.com", "password": "stolen-account"},
+    )
+    assert r.status_code == 403
+    assert c.post(
+        "/auth/login",
+        json={"email": "paid-no-password@example.com", "password": "stolen-account"},
+    ).status_code == 401
