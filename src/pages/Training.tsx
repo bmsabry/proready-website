@@ -9,6 +9,9 @@ import {
   Award,
   FlaskConical,
   MessagesSquare,
+  Infinity as InfinityIcon,
+  PlayCircle,
+  Layers,
 } from 'lucide-react';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
@@ -295,6 +298,82 @@ const Training = () => {
               </Reveal>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ON-DEMAND — self-paced, buy once, keep forever */}
+      <section className="pb-20">
+        <div className="container-site">
+          <SectionHeading
+            eyebrow="On-Demand"
+            title="Learn at Your Own Pace"
+            subtitle="Recorded programmes you buy once and keep. Same material as the live cohorts, without waiting for a start date."
+          />
+          <Reveal>
+            <div className="card card-hover p-7 md:p-10">
+              <div className="grid lg:grid-cols-[1.6fr_1fr] gap-8 items-center">
+                <div>
+                  <div className="flex flex-wrap items-center gap-3 mb-5">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20">
+                      Turbomachinery
+                    </span>
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-slate-300 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
+                      Available Now
+                    </span>
+                  </div>
+                  <h3 className="text-2xl md:text-3xl font-bold mb-4 leading-snug">
+                    Micro Gas Turbine Design
+                  </h3>
+                  <p className="text-slate-300 leading-relaxed mb-6">
+                    Design a 700 N single-shaft turbojet end to end — architecture, centrifugal
+                    compressor, evaporative combustor, axial turbine, compressor maps, CFD and
+                    combustor analysis. Seven modules, 28.5 hours, with the design spreadsheets and
+                    interactive tools used in the sessions.
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono text-slate-300 mb-7">
+                    <span className="flex items-center gap-2">
+                      <Layers className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+                      7 modules
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+                      28.5 hrs
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <PlayCircle className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+                      16 h video
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <InfinityIcon className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+                      Lifetime
+                    </span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Link to="/training/micro-gas-turbine-design" className="btn-primary">
+                      View Course <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                    </Link>
+                    <Link to="/contact" className="btn-secondary">
+                      Team Licences
+                    </Link>
+                  </div>
+                </div>
+
+                <ul className="space-y-3 text-sm lg:border-l lg:border-slate-800 lg:pl-8">
+                  {[
+                    'Recorded sessions, streamed on any device',
+                    'Slide decks, four design calculators, two interactive tools',
+                    'Module quizzes that gate the next module',
+                    'Certificate with public verification',
+                  ].map((t) => (
+                    <li key={t} className="flex gap-2.5 text-slate-300">
+                      <Award className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" aria-hidden="true" />
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </Reveal>
         </div>
       </section>
 
