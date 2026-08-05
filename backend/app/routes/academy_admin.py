@@ -251,6 +251,10 @@ def list_learners(
 
     out = []
     for learner in learners:
+        # Self-healing: opening the admin table reconciles every stored owner
+        # flag with the current OWNER_EMAILS, so a removed owner stops reading
+        # as staff here without waiting for them to sign in again.
+        svc.sync_owner_flag(db, learner)
         rows = by_learner.get(learner.id, [])
         if product_code and not any(
             r.product_code == product_code and r.status == "active" for r in rows
