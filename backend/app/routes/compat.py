@@ -315,6 +315,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)) -> TokenResponse:
     learner.password_hash = hash_password(body.password)
     db.commit()
     db.refresh(learner)
+    svc.promote_if_owner(db, learner)
     return _token_response(learner)
 
 
@@ -333,6 +334,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
         )
     learner.last_login_at = datetime.now(timezone.utc)
     db.commit()
+    svc.promote_if_owner(db, learner)
     return _token_response(learner)
 
 

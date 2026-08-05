@@ -236,6 +236,10 @@ def verify(body: VerifyIn, response: Response, db: Session = Depends(get_db)) ->
             detail="This sign-in link has expired or was already used. Request a new one.",
         )
     learner, next_path = result
+    # Magic-link sign-in is the other way an owner email gets proven, so
+    # promote here too — otherwise is_staff only ever gets set on the
+    # password path and the quiz apps never see is_admin.
+    svc.promote_if_owner(db, learner)
     set_learner_cookie(response, learner)
     return {
         "ok": True,
