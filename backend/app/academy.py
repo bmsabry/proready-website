@@ -93,25 +93,39 @@ def any_active_enrollment(db: Session, learner: Learner | None) -> bool:
 def is_owner(learner: Learner | None) -> bool:
     """Owner accounts bypass every paywall and gate.
 
-    Keyed on the email that is already proven — a magic link had to be opened,
-    or a password set on that address. Typing the owner's email at checkout
-    grants nothing, because purchases are provisioned from Stripe's verified
-    email in the webhook, never from client input.
+    The OWNER_EMAILS setting is the only source of truth, deliberately. An
+    earlier version also honoured the is_staff column, which made the grant
+    impossible to take back: once a row had been flagged, dropping the address
+    from the config left the bypass in place forever. is_staff is now a cache
+    of this answer (see sync_owner_flag), never an independent grant.
+
+    Keyed on an email that is already proven — a magic link had to be opened,
+    or a password set on that address from a session. Typing the owner's email
+    at checkout grants nothing, because purchases are provisioned from Stripe's
+    verified email in the webhook, never from client input.
     """
     if learner is None:
         return False
-    if learner.is_staff:
-        return True
     return learner.email.lower() in get_settings().owner_emails_list
 
 
-def promote_if_owner(db: Session, learner: Learner) -> Learner:
-    """Flip is_staff on the first time an owner email is seen."""
-    if not learner.is_staff and learner.email.lower() in get_settings().owner_emails_list:
-        learner.is_staff = True
+def sync_owner_flag(db: Session, learner: Learner) -> Learner:
+    """Make the stored is_staff column agree with the config list.
+
+    Called on every path that authenticates someone, so the admin table and
+    any query against the column tell the truth in both directions — promoting
+    a newly-added owner and demoting one who has been removed.
+    """
+    should_be = is_owner(learner)
+    if learner.is_staff != should_be:
+        learner.is_staff = should_be
         db.commit()
         db.refresh(learner)
     return learner
+
+
+# Kept so older call sites keep working; the behaviour is now two-way.
+promote_if_owner = sync_owner_flag
 
 
 def has_access(db: Session, learner: Learner | None, product_code: str) -> bool:
