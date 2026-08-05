@@ -68,7 +68,33 @@ def active_enrollment(
     return row
 
 
+def is_owner(learner: Learner | None) -> bool:
+    """Owner accounts bypass every paywall and gate.
+
+    Keyed on the email that is already proven — a magic link had to be opened,
+    or a password set on that address. Typing the owner's email at checkout
+    grants nothing, because purchases are provisioned from Stripe's verified
+    email in the webhook, never from client input.
+    """
+    if learner is None:
+        return False
+    if learner.is_staff:
+        return True
+    return learner.email.lower() in get_settings().owner_emails_list
+
+
+def promote_if_owner(db: Session, learner: Learner) -> Learner:
+    """Flip is_staff on the first time an owner email is seen."""
+    if not learner.is_staff and learner.email.lower() in get_settings().owner_emails_list:
+        learner.is_staff = True
+        db.commit()
+        db.refresh(learner)
+    return learner
+
+
 def has_access(db: Session, learner: Learner | None, product_code: str) -> bool:
+    if is_owner(learner):
+        return True
     return active_enrollment(db, learner, product_code) is not None
 
 
@@ -132,7 +158,7 @@ def upsert_learner(db: Session, email: str, full_name: str = "") -> Learner:
     elif full_name and not learner.full_name:
         learner.full_name = full_name.strip()
         db.commit()
-    return learner
+    return promote_if_owner(db, learner)
 
 
 # -----------------------------------------------------------------------------
@@ -262,6 +288,8 @@ def module_unlocked(db: Session, learner: Learner | None, module: Module) -> boo
     """
     if not has_access(db, learner, module.product_code):
         return False
+    if is_owner(learner):
+        return True
     earlier = db.execute(
         select(Module).where(
             Module.product_code == module.product_code,
@@ -280,6 +308,7 @@ def course_state(db: Session, learner: Learner | None, product_code: str) -> lis
     """
     settings = get_settings()
     entitled = has_access(db, learner, product_code)
+    owner = is_owner(learner)
 
     modules = db.execute(
         select(Module)
@@ -302,7 +331,7 @@ def course_state(db: Session, learner: Learner | None, product_code: str) -> lis
     previous_passed = True  # module 1 is always open
     for module in modules:
         lessons = by_module.get(module.id, [])
-        unlocked = entitled and previous_passed
+        unlocked = entitled and (previous_passed or owner)
 
         done = sum(1 for l in lessons if lesson_is_complete(l, prog.get(l.id)))
         watched = sum(

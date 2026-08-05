@@ -69,6 +69,16 @@ class Settings(BaseSettings):
     # Sign-in links are rate limited per email to blunt inbox flooding.
     LOGIN_LINK_MAX_PER_HOUR: int = 5
 
+    # Owner override. Any learner whose (verified) email is listed here is
+    # treated as enrolled in everything and flagged is_staff. Safe because an
+    # email only becomes a session after a magic link is received, or after a
+    # password is set on that address — a stranger typing it gets nothing.
+    OWNER_EMAILS: str = "bmsabry@gmail.com"
+
+    @property
+    def owner_emails_list(self) -> List[str]:
+        return [e.strip().lower() for e in self.OWNER_EMAILS.split(",") if e.strip()]
+
     # Mastery gate: percentage required on a module's formative set before
     # the next module unlocks. Per the GT-05 curriculum sign-off.
     MASTERY_THRESHOLD_PCT: float = 80.0
