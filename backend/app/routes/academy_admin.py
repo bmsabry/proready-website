@@ -362,11 +362,18 @@ def login_link(
     expires like any other, so a copied link is not a standing key.
     """
     settings = get_settings()
+    email = str(body.email).lower().strip()
     learner = db.execute(
-        select(Learner).where(Learner.email == str(body.email).lower().strip())
+        select(Learner).where(Learner.email == email)
     ).scalar_one_or_none()
     if learner is None:
-        raise HTTPException(status_code=404, detail="Learner not found.")
+        # Owner addresses are created on demand — they are operator config, so
+        # there is nothing to look up until the first sign-in. Anyone else has
+        # to exist already, which keeps this from doubling as a create-user API.
+        if email not in settings.owner_emails_list:
+            raise HTTPException(status_code=404, detail="Learner not found.")
+        learner = svc.upsert_learner(db, email, "")
+    svc.promote_if_owner(db, learner)
 
     raw = issue_login_token(db, learner, next_path=body.next_path or "/learn")
     link = f"{settings.SITE_URL}/learn/signin?token={raw}"

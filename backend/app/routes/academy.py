@@ -205,9 +205,21 @@ def request_link(body: RequestLinkIn, db: Session = Depends(get_db)) -> OkOut:
     learner = db.execute(
         select(Learner).where(Learner.email == email)
     ).scalar_one_or_none()
+
+    # An owner address is configured by the operator, not claimed by a caller,
+    # so the row is created on first request rather than requiring a purchase
+    # first. Without this a newly-added owner has no way in at all: this
+    # endpoint would no-op, and password signup on an owner address is refused
+    # by design. The link still only reaches the mailbox itself.
+    if learner is None and email in settings.owner_emails_list:
+        learner = svc.upsert_learner(db, email, "")
+        log.info("Created owner account on first sign-in request")
+
     if learner is None or learner.status != "active":
         log.info("Sign-in link requested for unknown/blocked address")
         return OkOut()
+
+    svc.promote_if_owner(db, learner)
 
     if recent_link_count(db, learner.id) >= settings.LOGIN_LINK_MAX_PER_HOUR:
         log.warning("Sign-in link rate limit hit for learner id=%s", learner.id)
