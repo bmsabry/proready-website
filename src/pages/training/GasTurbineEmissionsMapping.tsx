@@ -174,7 +174,7 @@ const GasTurbineEmissionsMapping = () => {
     'Gas Turbine Emissions Mapping Course',
     'Five-day live expert course on DLE gas turbine emissions mapping: combustion fundamentals, dynamics, fuel splits, ambient effects, and flex-fuel troubleshooting. Taught by a practitioner with 19+ years of field experience.',
     {
-      image: 'https://proreadyengineer.com/Gas_Turbine_Emissions_Mapping_Infographic.png',
+      image: 'https://proreadyengineer.com/Mapping_Training_Infographic_6.png',
       jsonLd: {
         '@context': 'https://schema.org',
         '@type': 'Course',
@@ -577,7 +577,7 @@ const GasTurbineEmissionsMapping = () => {
         {/* COURSE MAP INFOGRAPHIC */}
         <Reveal className="mb-16 card overflow-hidden">
           <img
-            src="/Gas_Turbine_Emissions_Mapping_Infographic.png"
+            src="/Mapping_Training_Infographic_6.png"
             alt="Course overview infographic — DLE emissions mapping workflow from combustion fundamentals through fuel-split optimisation to flex-fuel troubleshooting"
             className="w-full h-auto block"
             loading="lazy"
