@@ -262,7 +262,7 @@ const Training = () => {
                   className="block rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/50 hover:border-cyan-500/40 transition-colors"
                 >
                   <img
-                    src="/Gas_Turbine_Emissions_Mapping_Infographic.png"
+                    src="/Mapping_Training_Infographic_6.png"
                     alt="Gas Turbine Emissions Mapping course infographic: DLE combustion circuits, dynamics corridor, and mapping workflow"
                     className="w-full h-auto block"
                     loading="lazy"
