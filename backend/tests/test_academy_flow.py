@@ -695,3 +695,40 @@ def test_a_newly_added_owner_can_get_in_from_a_standing_start(client):
         ).status_code == 404
     finally:
         settings.OWNER_EMAILS = original
+
+
+def test_owner_access_can_be_taken_back(client):
+    """The failure this pins: is_staff used to be an independent grant, so once
+    a row had been flagged, removing the address from OWNER_EMAILS left the
+    bypass in place permanently — a temporary co-instructor would have kept
+    god-mode forever. The config list is now the only source of truth."""
+    settings = get_settings()
+    original = settings.OWNER_EMAILS
+    temp = "temporary-owner@example.com"
+
+    settings.OWNER_EMAILS = f"{original},{temp}"
+    try:
+        link = client.post(
+            "/api/admin/academy/login-link", headers=ADMIN, json={"email": temp}
+        ).json()["link"]
+        session = TestClient(app, base_url="https://testserver")
+        session.post("/api/academy/auth/verify", json={"token": link.split("token=")[1]})
+
+        assert session.get("/api/academy/me").json()["is_owner"] is True
+        assert session.get(f"/api/academy/course/{PRODUCT}").status_code == 200
+
+        db = SessionLocal()
+        assert db.query(Learner).filter(Learner.email == temp).one().is_staff is True
+        db.close()
+    finally:
+        settings.OWNER_EMAILS = original
+
+    # Same live session, same cookie — the bypass is simply gone.
+    assert session.get("/api/academy/me").json()["is_owner"] is False
+    assert session.get(f"/api/academy/course/{PRODUCT}").status_code == 403
+
+    # And the stored flag reconciles rather than lingering as a false badge.
+    client.get("/api/admin/academy/learners", headers=ADMIN)
+    db = SessionLocal()
+    assert db.query(Learner).filter(Learner.email == temp).one().is_staff is False
+    db.close()
