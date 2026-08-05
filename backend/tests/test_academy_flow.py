@@ -648,3 +648,50 @@ def test_a_learner_can_set_a_quiz_app_password_from_a_proven_session(client):
     assert TestClient(app, base_url="https://testserver").post(
         "/api/academy/auth/set-password", json={"password": "another-password"}
     ).status_code == 401
+
+
+def test_a_newly_added_owner_can_get_in_from_a_standing_start(client):
+    """The gap this pins: password signup on an owner address is refused, so if
+    request-link also no-opped for an address with no row yet, adding an email
+    to OWNER_EMAILS would lock that person out completely rather than let them
+    in. Owner rows are therefore created on first request."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    original = settings.OWNER_EMAILS
+    fresh = "brand-new-owner@example.com"
+    settings.OWNER_EMAILS = f"{original},{fresh}"
+    try:
+        db = SessionLocal()
+        assert db.query(Learner).filter(Learner.email == fresh).count() == 0
+        db.close()
+
+        assert client.post(
+            "/api/academy/auth/request-link",
+            json={"email": fresh, "next_path": "/learn", "website": ""},
+        ).status_code == 200
+
+        db = SessionLocal()
+        row = db.query(Learner).filter(Learner.email == fresh).one()
+        assert row.is_staff is True, "and is promoted at the same moment"
+        db.close()
+
+        # A stranger with no row still gets nothing created for them.
+        client.post(
+            "/api/academy/auth/request-link",
+            json={"email": "not-an-owner@example.com", "next_path": "/learn", "website": ""},
+        )
+        db = SessionLocal()
+        assert db.query(Learner).filter(Learner.email == "not-an-owner@example.com").count() == 0
+        db.close()
+
+        # Admin can mint a link for an owner who has never signed in; not for
+        # an arbitrary unknown address.
+        assert client.post(
+            "/api/admin/academy/login-link", headers=ADMIN, json={"email": fresh}
+        ).status_code == 200
+        assert client.post(
+            "/api/admin/academy/login-link", headers=ADMIN, json={"email": "ghost@example.com"}
+        ).status_code == 404
+    finally:
+        settings.OWNER_EMAILS = original
