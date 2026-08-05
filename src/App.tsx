@@ -15,6 +15,14 @@ const Contact = lazy(() => import('./pages/Contact'));
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const GasTurbineEmissionsMapping = lazy(() => import('./pages/training/GasTurbineEmissionsMapping'));
+const MicroGasTurbineDesign = lazy(() => import('./pages/training/MicroGasTurbineDesign'));
+// Learner portal — auth-gated, deliberately NOT in routes.ts so the
+// prerenderer never tries to build these.
+const LearnSignIn = lazy(() => import('./pages/learn/SignIn'));
+const LearnDashboard = lazy(() => import('./pages/learn/Dashboard'));
+const LearnLesson = lazy(() => import('./pages/learn/Lesson'));
+const LearnQuiz = lazy(() => import('./pages/learn/Quiz'));
+const LearnWelcome = lazy(() => import('./pages/learn/Welcome'));
 
 const GasTurbineCombustionConsulting = lazy(() => import('./pages/services/GasTurbineCombustionConsulting'));
 const IndustrialAIConsulting = lazy(() => import('./pages/services/IndustrialAIConsulting'));
@@ -67,6 +75,13 @@ function App() {
               <Route path="/services/test-cell-design" element={<TestCellDesign />} />
               <Route path="/training" element={<Training />} />
               <Route path="/training/gas-turbine-emissions-mapping" element={<GasTurbineEmissionsMapping />} />
+              <Route path="/training/micro-gas-turbine-design" element={<MicroGasTurbineDesign />} />
+              <Route path="/learn" element={<LearnDashboard />} />
+              <Route path="/learn/signin" element={<LearnSignIn />} />
+              <Route path="/learn/welcome" element={<LearnWelcome />} />
+              <Route path="/learn/lesson/:lessonId" element={<LearnLesson />} />
+              <Route path="/learn/quiz/:moduleId/:itemSet" element={<LearnQuiz />} />
+              <Route path="/learn/:productCode" element={<LearnDashboard />} />
               <Route path="/insights" element={<Insights />} />
               <Route path="/case-studies" element={<CaseStudies />} />
               <Route path="/testimonials" element={<Testimonials />} />

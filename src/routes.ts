@@ -21,6 +21,7 @@ export const PRERENDER_ROUTES: RouteEntry[] = [
   { path: '/services/test-cell-design', lastmod: M, priority: 0.9 },
   { path: '/training', lastmod: M, priority: 0.8, changefreq: 'weekly' },
   { path: '/training/gas-turbine-emissions-mapping', lastmod: M, priority: 0.8, changefreq: 'weekly' },
+  { path: '/training/micro-gas-turbine-design', lastmod: '2026-08-05', priority: 0.9, changefreq: 'weekly' },
   { path: '/insights', lastmod: M, priority: 0.8 },
   { path: '/case-studies', lastmod: M, priority: 0.8 },
   { path: '/testimonials', lastmod: M, priority: 0.7 },
