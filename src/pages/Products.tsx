@@ -51,12 +51,23 @@ export default function Products() {
   const [downloads, setDownloads] = useState<number | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/api/downloads/stats?product=pro3dworks`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!cancelled && d && typeof d.total === 'number') setDownloads(d.total);
-      })
-      .catch(() => {});
+    // The stats API sleeps on Render's free tier and takes 30-60 s to wake.
+    // A single fetch dies against that cold start (mobile visitors saw no
+    // counter); retrying with backoff lets attempt 1 wake the server and a
+    // later attempt fill the counter a few seconds after.
+    const attempt = (retriesLeft: number, delayMs: number) => {
+      fetch(`${API_BASE}/api/downloads/stats?product=pro3dworks`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (cancelled) return;
+          if (d && typeof d.total === 'number') setDownloads(d.total);
+          else if (retriesLeft > 0) setTimeout(() => attempt(retriesLeft - 1, delayMs * 2.5), delayMs);
+        })
+        .catch(() => {
+          if (!cancelled && retriesLeft > 0) setTimeout(() => attempt(retriesLeft - 1, delayMs * 2.5), delayMs);
+        });
+    };
+    attempt(3, 8000);
     return () => { cancelled = true; };
   }, []);
 
