@@ -18,7 +18,7 @@ from .. import academy as svc
 from ..config import get_settings
 from ..db import get_db
 from ..deps import require_admin
-from ..emailer import enrollment_granted_html, send_email
+from ..emailer import enrollment_granted_html, login_link_html, send_email
 from ..learner_auth import issue_login_token
 from ..models import (
     Enrollment,
@@ -48,6 +48,12 @@ class GrantIn(BaseModel):
 class RevokeIn(BaseModel):
     email: EmailStr
     product_code: str
+
+
+class LoginLinkIn(BaseModel):
+    email: EmailStr
+    next_path: str = "/learn"
+    send_email: bool = False
 
 
 class ProductPatch(BaseModel):
@@ -269,6 +275,8 @@ def list_learners(
                 "email": learner.email,
                 "full_name": learner.full_name,
                 "status": learner.status,
+                "is_owner": svc.is_owner(learner),
+                "has_password": bool(learner.password_hash),
                 "created_at": learner.created_at,
                 "last_login_at": learner.last_login_at,
                 "lessons_completed": progress_rows,
@@ -341,6 +349,59 @@ def revoke(
     db.commit()
     log.info("Admin %s revoked %s from %s", admin, learner.email, body.product_code)
     return {"ok": True}
+
+
+@router.post("/login-link")
+def login_link(
+    body: LoginLinkIn, db: Session = Depends(get_db), admin: str = Depends(require_admin)
+) -> dict:
+    """Mint a sign-in link for any learner — support, debugging, lost email.
+
+    Returns the raw link so it can be copied straight out of the admin panel
+    when the person never received the original. The token is single-use and
+    expires like any other, so a copied link is not a standing key.
+    """
+    settings = get_settings()
+    learner = db.execute(
+        select(Learner).where(Learner.email == str(body.email).lower().strip())
+    ).scalar_one_or_none()
+    if learner is None:
+        raise HTTPException(status_code=404, detail="Learner not found.")
+
+    raw = issue_login_token(db, learner, next_path=body.next_path or "/learn")
+    link = f"{settings.SITE_URL}/learn/signin?token={raw}"
+    if body.send_email:
+        send_email(
+            to=learner.email,
+            subject="Your ProReadyEngineer sign-in link",
+            html=login_link_html(
+                learner.full_name or "", link, settings.LOGIN_LINK_TTL_SECONDS // 60
+            ),
+        )
+    log.info("Admin %s minted a sign-in link for %s", admin, learner.email)
+    return {
+        "ok": True,
+        "email": learner.email,
+        "link": link,
+        "expires_in_seconds": settings.LOGIN_LINK_TTL_SECONDS,
+        "emailed": bool(body.send_email),
+    }
+
+
+@router.get("/owners")
+def owners(_: str = Depends(require_admin)) -> dict:
+    """Which addresses hold the everything-bypass, and how it is configured."""
+    settings = get_settings()
+    return {
+        "owner_emails": settings.owner_emails_list,
+        "admin_email": settings.ADMIN_EMAIL,
+        "env_var": "OWNER_EMAILS",
+        "note": (
+            "Owner addresses skip every paywall, module lock and mastery gate, "
+            "on the course platform and the quiz apps alike. Edit the "
+            "OWNER_EMAILS environment variable to change the list."
+        ),
+    }
 
 
 # -----------------------------------------------------------------------------

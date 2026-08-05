@@ -278,7 +278,7 @@ def _user_out(learner: Learner) -> UserOut:
         # Owning an account here means the email was reachable, either via a
         # magic link or an invitation, so there is no separate verify step.
         is_verified=True,
-        is_admin=bool(learner.is_staff),
+        is_admin=svc.is_owner(learner),
         created_at=learner.created_at,
     )
 
@@ -302,6 +302,29 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)) -> TokenResponse:
         select(Learner).where(Learner.email == email)
     ).scalar_one_or_none()
 
+    # Order matters below. Anything that already carries value — owner status
+    # or a live enrolment — is refused *before* the ordinary "already
+    # registered" branch, so those addresses always get pointed at the email
+    # link rather than at a password prompt they cannot satisfy.
+
+    # An owner email grants everything, so it must never be claimable by
+    # whoever types it first. The owner takes the magic-link route, which
+    # proves the mailbox, and sets a password from there.
+    if email in get_settings().owner_emails_list:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This address signs in by email link. Use 'Email me a link' instead.",
+        )
+    # A row that already carries access belongs to someone who paid. Letting a
+    # stranger "sign up" on that email would hand them the course.
+    if learner is not None and svc.any_active_enrollment(db, learner):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "This address already has access. Open the sign-in link we "
+                "emailed you, then set a password from your dashboard."
+            ),
+        )
     if learner is not None and learner.password_hash:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
@@ -373,8 +396,13 @@ def _known_module(module_id: str) -> dict:
 
 
 def _entitled(db: Session, learner: Learner) -> bool:
-    """One academy enrolment covers every legacy module."""
-    if learner.is_staff:
+    """One academy enrolment covers every legacy module.
+
+    Goes through `svc.is_owner` rather than reading `is_staff` directly: the
+    owner list lives in config, so an owner who has only ever signed in here
+    with a password — never through an academy magic link — still gets in.
+    """
+    if svc.is_owner(learner):
         return True
     return svc.has_access(db, learner, get_settings().COMPAT_PRODUCT_CODE)
 
@@ -458,7 +486,7 @@ def my_modules(
                 granted_at=enrollment.granted_at if enrollment else None,
                 last_active_at=state.last_active_at if state else None,
                 progress_summary=_progress_summary(state.payload if state else {}),
-                via_admin=enrollment is None and learner.is_staff,
+                via_admin=enrollment is None and svc.is_owner(learner),
             )
         )
     return out
@@ -478,7 +506,7 @@ def get_access(
         # so the apps' response parsing does not break.
         has_pending_invitation=False,
         has_pending_request=False,
-        is_admin=bool(learner.is_staff),
+        is_admin=svc.is_owner(learner),
     )
 
 

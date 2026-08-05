@@ -255,6 +255,31 @@ def logout(response: Response) -> OkOut:
     return OkOut()
 
 
+class SetPasswordIn(BaseModel):
+    password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/auth/set-password", response_model=OkOut)
+def set_password(
+    body: SetPasswordIn,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> OkOut:
+    """Set the password the legacy quiz apps sign in with.
+
+    Only reachable from a session, which means the mailbox was already proven
+    by opening a magic link. That is what makes it safe for this to overwrite
+    an existing password: it is the account-recovery path as well as the
+    first-time setup path, and it never accepts an email from the caller.
+    """
+    from .compat import hash_password
+
+    learner.password_hash = hash_password(body.password)
+    db.commit()
+    log.info("Learner %s set a quiz-app password", learner.email)
+    return OkOut()
+
+
 @router.get("/me")
 def me(
     db: Session = Depends(get_db),
@@ -272,6 +297,10 @@ def me(
         "signed_in": True,
         "email": learner.email,
         "full_name": learner.full_name,
+        "is_owner": svc.is_owner(learner),
+        # Lets the dashboard prompt for one before sending someone to a quiz
+        # app they would otherwise be unable to sign in to.
+        "has_password": bool(learner.password_hash),
         "enrollments": [
             {
                 "product_code": r.product_code,
