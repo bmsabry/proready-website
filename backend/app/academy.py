@@ -68,6 +68,28 @@ def active_enrollment(
     return row
 
 
+def any_active_enrollment(db: Session, learner: Learner | None) -> bool:
+    """True when this learner holds live access to anything at all.
+
+    Used where the question is "does this account already carry something
+    worth stealing?" rather than "can they open this particular course."
+    """
+    if learner is None:
+        return False
+    rows = db.execute(
+        select(Enrollment).where(
+            Enrollment.learner_id == learner.id,
+            Enrollment.status == "active",
+        )
+    ).scalars().all()
+    now = datetime.now(timezone.utc)
+    for row in rows:
+        expires = _aware(row.expires_at)
+        if expires is None or expires > now:
+            return True
+    return False
+
+
 def is_owner(learner: Learner | None) -> bool:
     """Owner accounts bypass every paywall and gate.
 
