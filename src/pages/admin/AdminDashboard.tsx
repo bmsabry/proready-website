@@ -2,35 +2,37 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  CheckCircle2,
-  XCircle,
-  RefreshCw,
-  LogOut,
-  Users,
-  Clock,
-  Ban,
-  Mail,
-  Briefcase,
-  MapPin,
-  Calendar,
-  BookOpen,
-  Send,
-  Plus,
-  Save,
-  Lock,
-  Unlock,
-  X,
-  Sparkles,
-  MessageSquare,
-  Trash2,
   AlertTriangle,
-  KeyRound,
+  Ban,
+  BookOpen,
   Bot,
-  Maximize2,
-  Minimize2,
+  Briefcase,
+  Calendar,
+  Clock,
   Download,
   Globe2,
+  GraduationCap,
+  KeyRound,
+  Lock,
+  LogOut,
+  Mail,
+  MapPin,
+  Maximize2,
+  MessageSquare,
+  Minimize2,
+  Plus,
+  RefreshCw,
+  Save,
+  Send,
+  Sparkles,
+  Trash2,
+  Unlock,
+  Users,
+  X,
+  XCircle,
+  CheckCircle2,
 } from 'lucide-react';
+import AcademyTab from './AcademyTab';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
 
@@ -96,7 +98,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [view, setView] = useState<'registrations' | 'courses' | 'ai' | 'downloads'>('registrations');
+  const [view, setView] = useState<'registrations' | 'courses' | 'academy' | 'ai' | 'downloads'>('registrations');
   const [regs, setRegs] = useState<Registration[] | null>(null);
   const [seats, setSeats] = useState<SeatsInfo | null>(null);
   const [adminEmail, setAdminEmail] = useState<string | null>(null);
@@ -260,6 +262,17 @@ export default function AdminDashboard() {
             Courses
           </button>
           <button
+            onClick={() => setView('academy')}
+            className={`flex items-center gap-2 text-sm px-4 py-2 border-b-2 -mb-px transition-colors ${
+              view === 'academy'
+                ? 'border-cyan-400 text-cyan-300'
+                : 'border-transparent text-slate-300 hover:text-slate-200'
+            }`}
+          >
+            <GraduationCap className="w-4 h-4" />
+            Academy
+          </button>
+          <button
             onClick={() => setView('ai')}
             className={`flex items-center gap-2 text-sm px-4 py-2 border-b-2 -mb-px transition-colors ${
               view === 'ai'
@@ -289,6 +302,10 @@ export default function AdminDashboard() {
           />
         ) : view === 'ai' ? (
           <AISettingsTab
+            onAuthError={() => navigate('/admin/login', { replace: true })}
+          />
+        ) : view === 'academy' ? (
+          <AcademyTab
             onAuthError={() => navigate('/admin/login', { replace: true })}
           />
         ) : view === 'courses' ? (
