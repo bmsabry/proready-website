@@ -45,6 +45,10 @@ export type Me = {
   signed_in: boolean;
   email?: string;
   full_name?: string;
+  /* Owner accounts see every module regardless of purchase or publish state. */
+  is_owner?: boolean;
+  /* False until they set the password the interactive modules sign in with. */
+  has_password?: boolean;
   enrollments?: { product_code: string; title: string; granted_at: string }[];
 };
 
@@ -173,6 +177,12 @@ export const academy = {
 
   logout: () =>
     request<{ ok: boolean }>('/api/academy/auth/logout', { method: 'POST' }),
+
+  setPassword: (password: string) =>
+    request<{ ok: boolean }>('/api/academy/auth/set-password', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
 
   course: (code: string) => request<CourseState>(`/api/academy/course/${code}`),
 
