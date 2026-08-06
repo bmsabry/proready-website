@@ -852,7 +852,7 @@ function CommsTab({
   onAuthError: () => void;
 }) {
   const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState(lesson.body ?? '');
   const [rawHtml, setRawHtml] = useState(false);
   const [audience, setAudience] = useState<NotifyAudience>('all');
   const [busy, setBusy] = useState(false);
@@ -1381,7 +1381,7 @@ function LessonEditor({
   const [title, setTitle] = useState(lesson.title);
   const [isPreview, setIsPreview] = useState(lesson.is_preview);
   const [position, setPosition] = useState(String(lesson.position));
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState(lesson.body ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1391,7 +1391,7 @@ function LessonEditor({
     if (isPreview !== lesson.is_preview) patch.is_preview = isPreview;
     const pos = parseInt(position, 10);
     if (!Number.isNaN(pos) && pos !== lesson.position) patch.position = pos;
-    if (body.trim()) patch.body = body;
+    if (body !== (lesson.body ?? '')) patch.body = body;
     if (Object.keys(patch).length === 0) {
       onClose();
       return;
@@ -1405,6 +1405,7 @@ function LessonEditor({
       });
       const uiPatch: Partial<ContentLesson> = {};
       if (patch.title) uiPatch.title = title.trim();
+      if (patch.body !== undefined) uiPatch.body = body;
       if (patch.is_preview !== undefined) uiPatch.is_preview = isPreview;
       if (patch.position !== undefined) uiPatch.position = pos;
       onSaved(uiPatch);
@@ -1463,7 +1464,7 @@ function LessonEditor({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={8}
-              placeholder="Leave blank to keep the current body unchanged."
+              placeholder="Lesson body (markdown/plain text)."
               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500"
             />
             <span className="text-[11px] text-slate-500 mt-1 block">

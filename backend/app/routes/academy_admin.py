@@ -202,6 +202,7 @@ def product_content(
                         "code": l.code,
                         "title": l.title,
                         "kind": l.kind,
+                        "body": l.body or "",
                         "position": l.position,
                         "duration_s": l.duration_s,
                         "video_uid": l.video_uid,

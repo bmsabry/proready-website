@@ -215,6 +215,7 @@ export type ContentLesson = {
   code: string;
   title: string;
   kind: string;
+  body: string;
   position: number;
   duration_s: number;
   video_uid: string;
