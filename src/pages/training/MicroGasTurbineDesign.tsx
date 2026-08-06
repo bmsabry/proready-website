@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { usePageMeta } from '../../lib/meta';
 import { CTABand, Reveal, SectionHeading } from '../../components/ui';
+import PayPalButtons, { fetchPaymentsConfig } from '../../components/PayPalButtons';
 import {
   COURSE_SUBTITLE,
   MODULES,
@@ -252,12 +253,200 @@ const ModuleCard = ({ module, index }: { module: (typeof MODULES)[number]; index
   );
 };
 
+/* ---------- Buy flow: PayPal-first, card as the fallback ----------
+   Module-level on purpose: defined inside the page it would remount (and
+   lose the buyer's typed email) on every parent re-render. The button
+   expands in place into a small panel that collects email + name for the
+   PayPal order; "Pay by card instead" keeps the existing Stripe path. When
+   PayPal is not configured, the button goes straight to Stripe as before. */
+const BuyFlow = ({
+  full = false,
+  owned,
+  purchasable,
+  price,
+  paypalEnabled,
+  checkoutState,
+  onCardCheckout,
+}: {
+  full?: boolean;
+  owned: boolean;
+  purchasable: boolean;
+  price: string;
+  paypalEnabled: boolean;
+  checkoutState: 'idle' | 'loading' | 'error';
+  onCardCheckout: () => void;
+}) => {
+  const uid = useId();
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [payError, setPayError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  if (owned) {
+    return (
+      <Link to="/learn" className={`btn-primary ${full ? 'w-full' : ''}`}>
+        Go to your course <ArrowRight className="w-4 h-4" aria-hidden="true" />
+      </Link>
+    );
+  }
+  if (!purchasable) {
+    return (
+      <Link to="/contact" className={`btn-primary ${full ? 'w-full' : ''}`}>
+        Ask about early access <ArrowRight className="w-4 h-4" aria-hidden="true" />
+      </Link>
+    );
+  }
+
+  const emailOk = /^\S+@\S+\.\S+$/.test(email.trim());
+
+  const createOrder = async (): Promise<string> => {
+    setPayError(null);
+    const res = await fetch(`${API_BASE}/api/payments/recorded/paypal/create-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        product_code: PRODUCT_CODE,
+        email: email.trim(),
+        full_name: fullName.trim(),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.order_id) {
+      setPayError(
+        typeof data.detail === 'string'
+          ? data.detail
+          : 'Could not start PayPal checkout. Please try again.',
+      );
+      throw new Error('paypal create-order failed');
+    }
+    return data.order_id as string;
+  };
+
+  const captureOrder = async (orderId: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/api/payments/recorded/paypal/capture`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: orderId,
+        product_code: PRODUCT_CODE,
+        email: email.trim(),
+        full_name: fullName.trim(),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      setPayError(
+        typeof data.detail === 'string'
+          ? data.detail
+          : 'PayPal could not complete this payment. Please try again.',
+      );
+      throw new Error('paypal capture failed');
+    }
+    setDone(true);
+    const next = typeof data.next === 'string' && data.next ? data.next : '/learn';
+    window.setTimeout(() => {
+      window.location.href = next;
+    }, 1500);
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => (paypalEnabled ? setOpen(true) : onCardCheckout())}
+        disabled={checkoutState === 'loading'}
+        className={`btn-primary disabled:opacity-70 disabled:cursor-wait ${full ? 'w-full' : ''}`}
+      >
+        {checkoutState === 'loading' ? 'Opening checkout…' : `Get lifetime access — ${price}`}
+        {checkoutState !== 'loading' && <ArrowRight className="w-4 h-4" aria-hidden="true" />}
+      </button>
+    );
+  }
+
+  if (done) {
+    return (
+      <div className={`rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-5 text-left ${full ? '' : 'max-w-md mx-auto'}`}>
+        <p className="font-semibold text-white flex items-center gap-2">
+          <Check className="w-4 h-4 text-cyan-400" aria-hidden="true" />
+          Payment received
+        </p>
+        <p className="text-sm text-slate-300 mt-1.5">
+          Taking you to your course — a sign-in link is also on its way to {email.trim()}.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`rounded-xl border border-slate-700 bg-slate-950/60 p-5 text-left ${full ? '' : 'max-w-md mx-auto'}`}>
+      <div className="flex items-baseline justify-between gap-3 mb-4">
+        <p className="font-semibold text-white">Complete your purchase</p>
+        <span className="font-mono text-sm text-cyan-300">{price}</span>
+      </div>
+      <div className="space-y-3 mb-4">
+        <div className="space-y-1.5">
+          <label htmlFor={`${uid}-email`} className="text-xs font-medium text-slate-300 uppercase tracking-wider">
+            Email <span className="text-cyan-400" aria-hidden="true">*</span>
+          </label>
+          <input
+            id={`${uid}-email`}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+            className="w-full bg-slate-900/60 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
+          />
+          <p className="text-xs text-slate-500">Your course access and receipt go here.</p>
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor={`${uid}-name`} className="text-xs font-medium text-slate-300 uppercase tracking-wider">
+            Full name <span className="normal-case font-normal text-slate-500">(for your certificate)</span>
+          </label>
+          <input
+            id={`${uid}-name`}
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Jane Doe"
+            autoComplete="name"
+            className="w-full bg-slate-900/60 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
+          />
+        </div>
+      </div>
+      {payError && (
+        <p className="text-sm text-amber-300 mb-3" role="alert">
+          {payError}
+        </p>
+      )}
+      <p className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-2">Pay with PayPal</p>
+      <PayPalButtons createOrder={createOrder} onApprove={captureOrder} disabled={!emailOk} />
+      {!emailOk && (
+        <p className="text-xs text-slate-500 mt-1.5">Enter your email above to enable payment.</p>
+      )}
+      <button
+        type="button"
+        onClick={onCardCheckout}
+        disabled={checkoutState === 'loading'}
+        className="btn-secondary w-full mt-3 disabled:opacity-70 disabled:cursor-wait"
+      >
+        {checkoutState === 'loading' ? 'Opening checkout…' : 'Pay by card instead'}
+      </button>
+      <button type="button" onClick={() => setOpen(false)} className="btn-ghost mt-3 text-xs">
+        Cancel
+      </button>
+    </div>
+  );
+};
+
 const MicroGasTurbineDesign: React.FC = () => {
   const [priceCents, setPriceCents] = useState<number>(FALLBACK_PRICE_CENTS);
   const [currency, setCurrency] = useState<string>('usd');
   const [status, setStatus] = useState<'live' | 'draft'>('live');
   const [owned, setOwned] = useState(false);
   const [checkoutState, setCheckoutState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [paypalEnabled, setPaypalEnabled] = useState(false);
 
   const price = formatPrice(priceCents, currency);
 
@@ -331,6 +520,19 @@ const MicroGasTurbineDesign: React.FC = () => {
     };
   }, []);
 
+  // Which providers the buy panel may offer. All-disabled until the API
+  // answers, so the button falls back to the plain Stripe path meanwhile.
+  useEffect(() => {
+    if (!API_BASE) return;
+    let cancelled = false;
+    fetchPaymentsConfig().then((cfg) => {
+      if (!cancelled) setPaypalEnabled(cfg.paypal_enabled);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const startCheckout = async () => {
     if (!CHECKOUT_ENDPOINT) return;
     setCheckoutState('loading');
@@ -353,32 +555,13 @@ const MicroGasTurbineDesign: React.FC = () => {
 
   const purchasable = status === 'live' && !!CHECKOUT_ENDPOINT;
 
-  const BuyButton = ({ full = false }: { full?: boolean }) => {
-    if (owned) {
-      return (
-        <Link to="/learn" className={`btn-primary ${full ? 'w-full' : ''}`}>
-          Go to your course <ArrowRight className="w-4 h-4" aria-hidden="true" />
-        </Link>
-      );
-    }
-    if (!purchasable) {
-      return (
-        <Link to="/contact" className={`btn-primary ${full ? 'w-full' : ''}`}>
-          Ask about early access <ArrowRight className="w-4 h-4" aria-hidden="true" />
-        </Link>
-      );
-    }
-    return (
-      <button
-        type="button"
-        onClick={startCheckout}
-        disabled={checkoutState === 'loading'}
-        className={`btn-primary disabled:opacity-70 disabled:cursor-wait ${full ? 'w-full' : ''}`}
-      >
-        {checkoutState === 'loading' ? 'Opening checkout…' : `Get lifetime access — ${price}`}
-        {checkoutState !== 'loading' && <ArrowRight className="w-4 h-4" aria-hidden="true" />}
-      </button>
-    );
+  const buyProps = {
+    owned,
+    purchasable,
+    price,
+    paypalEnabled,
+    checkoutState,
+    onCardCheckout: startCheckout,
   };
 
   return (
@@ -442,7 +625,7 @@ const MicroGasTurbineDesign: React.FC = () => {
                 </p>
 
                 <div className="mt-6">
-                  <BuyButton full />
+                  <BuyFlow full {...buyProps} />
                 </div>
                 {checkoutState === 'error' && (
                   <p className="mt-3 text-sm text-amber-300" role="alert">
@@ -603,7 +786,7 @@ const MicroGasTurbineDesign: React.FC = () => {
           <SectionHeading eyebrow="How it works" title="From purchase to first lesson in a minute" />
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
             {[
-              { n: '01', t: 'Buy', d: 'Card payment through Stripe. No account to create first.' },
+              { n: '01', t: 'Buy', d: 'Pay with PayPal or card. No account to create first.' },
               { n: '02', t: 'Check your email', d: 'A sign-in link lands within seconds. No password to invent or forget.' },
               { n: '03', t: 'Work through it', d: 'Watch, read, calculate. Progress saves as you go, on any device.' },
               { n: '04', t: 'Clear the gates', d: 'Pass each module assessment to unlock the next, and earn the certificate.' },
@@ -653,7 +836,7 @@ const MicroGasTurbineDesign: React.FC = () => {
               end. {price} once, and it stays yours.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <BuyButton />
+              <BuyFlow {...buyProps} />
               <Link to="/contact" className="btn-secondary">
                 Ask a question first
               </Link>

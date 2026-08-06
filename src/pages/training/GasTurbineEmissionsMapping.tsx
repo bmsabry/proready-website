@@ -19,6 +19,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Reveal } from '../../components/ui';
+import PayPalButtons, { fetchPaymentsConfig, PaymentsConfig } from '../../components/PayPalButtons';
 import { usePageMeta } from '../../lib/meta';
 
 // -----------------------------------------------------------------------------
@@ -38,6 +39,14 @@ const DEFAULT_COHORT_DATE = 'May 15, 2026';
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
 const COURSE_ENDPOINT = API_BASE ? `${API_BASE}/api/courses/${COURSE_CODE}` : '';
 const REGISTER_ENDPOINT = API_BASE ? `${API_BASE}/api/register` : '';
+
+// 149500 + 'usd' -> "$1,495"; keeps cents only when they exist.
+const formatAmount = (cents: number, currency: string): string =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: (currency || 'usd').toUpperCase(),
+    minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+  }).format(cents / 100);
 
 // Parse an ISO yyyy-mm-dd date into "May 15, 2026" without timezone drift.
 const formatStartDate = (iso: string): string => {
@@ -207,6 +216,18 @@ const GasTurbineEmissionsMapping = () => {
     'idle',
   );
   const [formError, setFormError] = useState<string | null>(null);
+  // Online payment for the held seat. registrationId only exists after a real
+  // (non-simulated) /api/register success; priceCents comes from the course
+  // record — 0 keeps the cohort invoice-only and hides every payment control.
+  const [priceCents, setPriceCents] = useState<number>(0);
+  const [currency, setCurrency] = useState<string>('usd');
+  const [registrationId, setRegistrationId] = useState<number | null>(null);
+  const [payCfg, setPayCfg] = useState<PaymentsConfig | null>(null);
+  const [paidNow, setPaidNow] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+  const [cardLoading, setCardLoading] = useState(false);
+  // Stripe Checkout returns to this page with ?paid=1 / ?cancelled=1.
+  const [returnBanner, setReturnBanner] = useState<'paid' | 'cancelled' | null>(null);
 
   // Fetch live course data (start_date + seats). Falls back to hardcoded
   // constants when API_BASE is empty (local preview) or the request fails.
@@ -229,11 +250,17 @@ const GasTurbineEmissionsMapping = () => {
           seats_taken: number;
           status: 'open' | 'closed';
           day_dates?: string[];
+          price_cents?: number;
+          currency?: string;
         };
         if (!cancelled) {
           setSeatsTaken(data.seats_taken);
           setCapacity(data.total_seats);
           setCourseStatus(data.status);
+          if (typeof data.price_cents === 'number' && data.price_cents > 0) {
+            setPriceCents(data.price_cents);
+            setCurrency(data.currency || 'usd');
+          }
           // day_dates is the source of truth for cohort start/length when present.
           // Fall back to start_date only if day_dates is missing or empty.
           if (Array.isArray(data.day_dates) && data.day_dates.length > 0) {
@@ -256,6 +283,32 @@ const GasTurbineEmissionsMapping = () => {
       cancelled = true;
     };
   }, []);
+
+  // Stripe Checkout sends the buyer back with ?paid=1 or ?cancelled=1. Show
+  // the matching banner at the register section and bring it into view.
+  // (Runs only in the browser — the prerendered HTML carries no banner.)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const banner = params.get('paid') === '1' ? 'paid' : params.get('cancelled') === '1' ? 'cancelled' : null;
+    if (!banner) return;
+    setReturnBanner(banner);
+    const t = window.setTimeout(() => {
+      document.getElementById('register')?.scrollIntoView({ block: 'start' });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Which providers may be offered, fetched once a seat is actually payable.
+  useEffect(() => {
+    if (formState !== 'success' || registrationId === null || priceCents <= 0) return;
+    let cancelled = false;
+    fetchPaymentsConfig().then((cfg) => {
+      if (!cancelled) setPayCfg(cfg);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [formState, registrationId, priceCents]);
 
   const seatsRemaining =
     seatsTaken === null ? capacity : Math.max(0, capacity - seatsTaken);
@@ -297,12 +350,84 @@ const GasTurbineEmissionsMapping = () => {
         return;
       }
       if (typeof data.taken === 'number') setSeatsTaken(data.taken);
+      if (typeof data.registration_id === 'number') setRegistrationId(data.registration_id);
       setFormState(data.status === 'duplicate' ? 'duplicate' : 'success');
     } catch {
       setFormError('Network error. Please try again or email info@proreadyengineer.com.');
       setFormState('error');
     }
   };
+
+  // ----- Online payment for the held seat (PayPal capture / Stripe redirect)
+
+  const createLiveOrder = async (): Promise<string> => {
+    setPayError(null);
+    const res = await fetch(`${API_BASE}/api/payments/live/paypal/create-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ registration_id: registrationId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.order_id) {
+      setPayError(
+        typeof data.detail === 'string'
+          ? data.detail
+          : 'Could not start PayPal checkout. Please try again.',
+      );
+      throw new Error('paypal create-order failed');
+    }
+    return data.order_id as string;
+  };
+
+  const captureLiveOrder = async (orderId: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/api/payments/live/paypal/capture`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ registration_id: registrationId, order_id: orderId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      setPayError(
+        typeof data.detail === 'string'
+          ? data.detail
+          : 'PayPal could not complete this payment. Please try again.',
+      );
+      throw new Error('paypal capture failed');
+    }
+    setPaidNow(true);
+  };
+
+  const startCardCheckout = async () => {
+    if (registrationId === null) return;
+    setCardLoading(true);
+    setPayError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/payments/live/stripe/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registration_id: registrationId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setPayError(
+        typeof data.detail === 'string'
+          ? data.detail
+          : 'Could not start card checkout. Please try again.',
+      );
+    } catch {
+      setPayError('Network error. Please try again.');
+    }
+    setCardLoading(false);
+  };
+
+  const showPayPanel =
+    registrationId !== null &&
+    priceCents > 0 &&
+    payCfg !== null &&
+    (payCfg.paypal_enabled || payCfg.stripe_enabled);
 
   return (
     <div className="pb-20">
@@ -762,6 +887,28 @@ const GasTurbineEmissionsMapping = () => {
 
         {/* REGISTRATION FORM */}
         <Reveal id="register" className="p-8 md:p-12 card scroll-mt-28">
+          {returnBanner === 'paid' && (
+            <div className="mb-8 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-200 text-sm flex items-start gap-3">
+              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+              <span>
+                Payment received — your seat is confirmed. A receipt is on its way to your
+                email.
+              </span>
+            </div>
+          )}
+          {returnBanner === 'cancelled' && (
+            <div className="mb-8 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm flex items-start gap-3">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+              <span>
+                Checkout was cancelled — nothing was charged. Your seat is still held; we'll
+                email payment instructions, or write to{' '}
+                <a className="underline" href="mailto:info@proreadyengineer.com">
+                  info@proreadyengineer.com
+                </a>
+                .
+              </span>
+            </div>
+          )}
           <span className="eyebrow mb-4">Register</span>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-2">
             Reserve your seat — {cohortDate} cohort
@@ -779,18 +926,79 @@ const GasTurbineEmissionsMapping = () => {
               <div className="w-20 h-20 bg-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle2 className="w-10 h-10 text-cyan-400" aria-hidden="true" />
               </div>
-              <h3 className="text-2xl font-bold mb-4">Registration received</h3>
-              <p className="text-slate-300 mb-8 max-w-md mx-auto">
-                Thanks — we'll send a confirmation email with payment details and pre-read
-                material within 24 hours. If you don't see it, check spam or email{' '}
-                <a
-                  className="text-cyan-400 underline"
-                  href="mailto:info@proreadyengineer.com"
-                >
-                  info@proreadyengineer.com
-                </a>
-                .
-              </p>
+              {paidNow ? (
+                <>
+                  <h3 className="text-2xl font-bold mb-4">
+                    Payment received — your seat is confirmed
+                  </h3>
+                  <p className="text-slate-300 mb-8 max-w-md mx-auto">
+                    A receipt is on its way to your inbox, and the pre-read material follows
+                    closer to the start date. Questions in the meantime? Email{' '}
+                    <a
+                      className="text-cyan-400 underline"
+                      href="mailto:info@proreadyengineer.com"
+                    >
+                      info@proreadyengineer.com
+                    </a>
+                    .
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-2xl font-bold mb-4">Registration received</h3>
+                  <p className="text-slate-300 mb-8 max-w-md mx-auto">
+                    Thanks — we'll send a confirmation email with payment details and pre-read
+                    material within 24 hours. If you don't see it, check spam or email{' '}
+                    <a
+                      className="text-cyan-400 underline"
+                      href="mailto:info@proreadyengineer.com"
+                    >
+                      info@proreadyengineer.com
+                    </a>
+                    .
+                  </p>
+                  {showPayPanel && payCfg && (
+                    <div className="max-w-md mx-auto text-left rounded-2xl border border-cyan-500/30 bg-slate-900/60 p-6">
+                      <h4 className="text-lg font-bold text-white mb-1">Secure your seat now</h4>
+                      <p className="text-sm text-slate-300 mb-5">
+                        Founding Cohort seat —{' '}
+                        <span className="text-white font-semibold">
+                          {formatAmount(priceCents, currency)}
+                        </span>
+                      </p>
+                      {payError && (
+                        <p className="text-sm text-amber-300 mb-3" role="alert">
+                          {payError}
+                        </p>
+                      )}
+                      {payCfg.paypal_enabled && (
+                        <div className="mb-3">
+                          <p className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-2">
+                            Pay with PayPal
+                          </p>
+                          <PayPalButtons
+                            createOrder={createLiveOrder}
+                            onApprove={captureLiveOrder}
+                          />
+                        </div>
+                      )}
+                      {payCfg.stripe_enabled && (
+                        <button
+                          type="button"
+                          onClick={startCardCheckout}
+                          disabled={cardLoading}
+                          className="btn-secondary w-full disabled:opacity-70 disabled:cursor-wait"
+                        >
+                          {cardLoading ? 'Opening checkout…' : 'Pay by card'}
+                        </button>
+                      )}
+                      <p className="text-xs text-slate-400 mt-4">
+                        Prefer an invoice? Your seat is held — we'll email payment instructions.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           ) : formState === 'duplicate' ? (
             <div className="text-center py-12">

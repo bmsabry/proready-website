@@ -113,6 +113,10 @@ def list_software_public(db: Session = Depends(get_db)) -> List[dict]:
             "blurb": p.blurb,
             "latest_version": p.latest_version,
             "download_count": downloads.get(p.slug, 0),
+            # The Pages download function (/download/{slug}) resolves slugs to
+            # assets from this list. Asset paths are public by design — the
+            # function's fail-open path redirects straight to them.
+            "asset_path": p.asset_path,
         }
         for p in products
     ]

@@ -12,6 +12,7 @@ import {
   Infinity as InfinityIcon,
   PlayCircle,
   Layers,
+  Tag,
 } from 'lucide-react';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
@@ -113,6 +114,9 @@ type LiveCourseInfo = {
   startDate: string; // already formatted "May 16, 2026"
   status: 'open' | 'closed';
   numDays: number; // length of day_dates; 0 if not scheduled
+  priceCents: number; // 0 = invoice-only, no public price shown
+  currency: string;
+  recordedProductCode: string | null; // set when an on-demand edition exists
 };
 
 const WHY_TRAIN = [
@@ -159,6 +163,9 @@ const Training = () => {
               seats_taken: number;
               status: 'open' | 'closed';
               day_dates?: string[];
+              price_cents?: number;
+              currency?: string;
+              recorded_product_code?: string | null;
             };
             // Prefer day_dates[0] over start_date so the listing matches
             // the detail page when admin updates the daily schedule.
@@ -172,6 +179,9 @@ const Training = () => {
               startDate: formatStartDate(startIso),
               status: data.status,
               numDays: Array.isArray(data.day_dates) ? data.day_dates.length : 0,
+              priceCents: typeof data.price_cents === 'number' ? data.price_cents : 0,
+              currency: data.currency || 'usd',
+              recordedProductCode: data.recorded_product_code || null,
             };
             return [code, info] as const;
           } catch {
@@ -201,6 +211,15 @@ const Training = () => {
         : `${flagshipLive.seatsRemaining} of ${flagshipLive.totalSeats} seats left`
     : flagship.attendees;
   const flagshipDateLabel = flagshipLive ? flagshipLive.startDate : flagship.nextDate;
+  // Price shows only when the API reports one; the SSR fallback stays priceless.
+  const flagshipPriceLabel =
+    flagshipLive && flagshipLive.priceCents > 0
+      ? new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: flagshipLive.currency.toUpperCase(),
+          minimumFractionDigits: flagshipLive.priceCents % 100 === 0 ? 0 : 2,
+        }).format(flagshipLive.priceCents / 100)
+      : null;
   const flagshipDurationLabel =
     flagshipLive && flagshipLive.numDays > 0 ? `${flagshipLive.numDays} Days` : flagship.duration;
 
@@ -227,7 +246,12 @@ const Training = () => {
             />
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-center relative">
               <div className="lg:col-span-3">
-                <span className="eyebrow mb-5">Flagship Course · Live Cohort</span>
+                <div className="flex flex-wrap items-center gap-3 mb-5">
+                  <span className="eyebrow">Flagship Course</span>
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20">
+                    Live online cohort
+                  </span>
+                </div>
                 <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-4">
                   {flagship.title}
                 </h2>
@@ -246,6 +270,11 @@ const Training = () => {
                   <MonoBadge icon={<BookOpen className="w-3.5 h-3.5" aria-hidden="true" />}>
                     {flagship.level}
                   </MonoBadge>
+                  {flagshipPriceLabel && (
+                    <MonoBadge icon={<Tag className="w-3.5 h-3.5" aria-hidden="true" />}>
+                      {flagshipPriceLabel} per seat
+                    </MonoBadge>
+                  )}
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4">
@@ -257,6 +286,15 @@ const Training = () => {
                     Ask a Question
                   </Link>
                 </div>
+                {flagshipLive?.recordedProductCode && (
+                  <Link
+                    to={`/training/${flagshipLive.recordedProductCode}`}
+                    className="btn-ghost mt-4"
+                  >
+                    <PlayCircle className="w-4 h-4" aria-hidden="true" />
+                    Also available on-demand
+                  </Link>
+                )}
               </div>
 
               <div className="lg:col-span-2">

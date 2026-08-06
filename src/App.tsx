@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
@@ -57,6 +57,15 @@ const PageLoader = () => (
   </div>
 );
 
+/** Stripe Checkout returns buyers to /training/{course.code}?paid=1, and the
+    course code carries the cohort suffix (e.g. -2026-05) while the page lives
+    at the plain slug. Forward the visit, query string intact, so the payment
+    banner lands on the course page instead of a 404. */
+const EmissionsCohortRedirect = () => {
+  const { search } = useLocation();
+  return <Navigate to={`/training/gas-turbine-emissions-mapping${search}`} replace />;
+};
+
 function App() {
   return (
     <>
@@ -75,6 +84,7 @@ function App() {
               <Route path="/services/test-cell-design" element={<TestCellDesign />} />
               <Route path="/training" element={<Training />} />
               <Route path="/training/gas-turbine-emissions-mapping" element={<GasTurbineEmissionsMapping />} />
+              <Route path="/training/gas-turbine-emissions-mapping-2026-05" element={<EmissionsCohortRedirect />} />
               <Route path="/training/micro-gas-turbine-design" element={<MicroGasTurbineDesign />} />
               <Route path="/learn" element={<LearnDashboard />} />
               <Route path="/learn/signin" element={<LearnSignIn />} />
