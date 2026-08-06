@@ -19,12 +19,27 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import require_admin
-from ..models import ProductDownload
+from ..models import ProductDownload, SoftwareProduct
 
 router = APIRouter(prefix="/api", tags=["downloads"])
 
-# Whitelist keeps junk products out of the table; extend as products ship.
-KNOWN_PRODUCTS = {"pro3dworks"}
+
+def valid_product(db: Session, slug: str) -> bool:
+    """True when `slug` is a registered software product (any status).
+
+    Replaces the old hardcoded KNOWN_PRODUCTS whitelist: the registry
+    (software_products, managed via /api/admin/software) is the source of
+    truth now, so shipping a new product is an admin action instead of a
+    deploy. Hidden products stay trackable — installed apps keep phoning
+    home after a product is unlisted — while junk slugs still 400 so the
+    telemetry tables stay clean.
+    """
+    return (
+        db.execute(
+            select(SoftwareProduct.id).where(SoftwareProduct.slug == slug)
+        ).first()
+        is not None
+    )
 
 
 class DownloadEvent(BaseModel):
@@ -41,7 +56,7 @@ class DownloadEvent(BaseModel):
 @router.post("/track/download")
 def track_download(event: DownloadEvent, db: Session = Depends(get_db)) -> dict:
     product = event.product.strip().lower()
-    if product not in KNOWN_PRODUCTS:
+    if not valid_product(db, product):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown product."
         )
@@ -68,7 +83,7 @@ def _since(days: int) -> datetime:
 def public_stats(product: str = "pro3dworks", db: Session = Depends(get_db)) -> dict:
     """Aggregate counts only — safe for the public Products page."""
     product = product.strip().lower()
-    if product not in KNOWN_PRODUCTS:
+    if not valid_product(db, product):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown product."
         )
@@ -101,7 +116,7 @@ def admin_stats(
     _admin: str = Depends(require_admin),
 ) -> dict:
     product = product.strip().lower()
-    if product not in KNOWN_PRODUCTS:
+    if not valid_product(db, product):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown product."
         )
@@ -180,7 +195,7 @@ def track_launch(evt: LaunchEvent, db: Session = Depends(get_db)) -> dict:
     """Record one anonymous app launch (product + version + city-level geo)."""
     from ..models import AppLaunch
 
-    if evt.product not in KNOWN_PRODUCTS:
+    if not valid_product(db, evt.product):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown product.")
     db.add(
         AppLaunch(
@@ -200,7 +215,7 @@ def launches_stats(product: str = "pro3dworks", db: Session = Depends(get_db)) -
     """Aggregate anonymous launch events for the public/admin stats views."""
     from ..models import AppLaunch
 
-    if product not in KNOWN_PRODUCTS:
+    if not valid_product(db, product):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown product.")
     total = db.scalar(select(func.count(AppLaunch.id)).where(AppLaunch.product == product)) or 0
     week_ago = datetime.now(tz.utc) - timedelta(days=7)
@@ -260,7 +275,7 @@ def track_usage(evt: UsageEvent, db: Session = Depends(get_db)) -> dict:
 
     from ..models import AppUsage
 
-    if evt.product not in KNOWN_PRODUCTS:
+    if not valid_product(db, evt.product):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown product.")
     feats: dict[str, int] = {}
     if evt.features:
@@ -289,7 +304,7 @@ def usage_stats(product: str = "pro3dworks", db: Session = Depends(get_db)) -> d
 
     from ..models import AppUsage
 
-    if product not in KNOWN_PRODUCTS:
+    if not valid_product(db, product):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown product.")
     total = db.scalar(select(func.count(AppUsage.id)).where(AppUsage.product == product)) or 0
     week_ago = datetime.now(tz.utc) - timedelta(days=7)

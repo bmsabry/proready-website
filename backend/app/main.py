@@ -11,7 +11,7 @@ from sqlalchemy import inspect, select, text
 from .academy_seed import seed_academy
 from .config import get_settings
 from .db import Base, SessionLocal, engine
-from .models import Course
+from .models import Course, SoftwareProduct
 from .routes import academy as academy_routes
 from .routes import academy_admin as academy_admin_routes
 from .routes import admin as admin_routes
@@ -23,6 +23,7 @@ from .routes import courses as courses_routes
 from .routes import downloads as downloads_routes
 from .routes import register as register_routes
 from .routes import seats as seats_routes
+from .routes import software as software_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -125,6 +126,37 @@ def _seed_default_course() -> None:
 
 _seed_default_course()
 
+
+def _seed_software_products() -> None:
+    """Ensure the software registry knows about Pro3DWorks.
+
+    The registry replaces the old hardcoded KNOWN_PRODUCTS whitelist in
+    routes/downloads.py; without this seed, telemetry from Pro3DWorks
+    builds already in the wild would start 400ing after deploy. Idempotent
+    — never overwrites admin edits to an existing row.
+    """
+    db = SessionLocal()
+    try:
+        existing = db.execute(
+            select(SoftwareProduct).where(SoftwareProduct.slug == "pro3dworks")
+        ).scalar_one_or_none()
+        if existing is None:
+            db.add(
+                SoftwareProduct(
+                    slug="pro3dworks",
+                    name="Pro3DWorks",
+                    asset_path="/downloads/Pro3DWorks.html",
+                    latest_version="2.53.2",
+                )
+            )
+            db.commit()
+            log.info("Seeded software product pro3dworks")
+    finally:
+        db.close()
+
+
+_seed_software_products()
+
 # Academy content (products/modules/lessons/quiz items) is seeded from the
 # JSON manifests bundled in app/data/. Idempotent — safe on every boot.
 seed_academy()
@@ -151,6 +183,8 @@ app.include_router(courses_routes.public_router)
 app.include_router(courses_routes.admin_router)
 app.include_router(ai_routes.router)
 app.include_router(downloads_routes.router)
+app.include_router(software_routes.public_router)
+app.include_router(software_routes.admin_router)
 app.include_router(academy_routes.router)
 app.include_router(checkout_routes.router)
 app.include_router(academy_admin_routes.router)
