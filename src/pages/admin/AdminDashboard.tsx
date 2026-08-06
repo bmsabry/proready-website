@@ -2,37 +2,35 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  AlertTriangle,
-  Ban,
-  BookOpen,
-  Bot,
-  Briefcase,
-  Calendar,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  LogOut,
+  Users,
   Clock,
+  Ban,
+  Mail,
+  Briefcase,
+  MapPin,
+  Calendar,
+  BookOpen,
+  Send,
+  Plus,
+  Save,
+  Lock,
+  Unlock,
+  X,
+  Sparkles,
+  MessageSquare,
+  Trash2,
+  AlertTriangle,
+  KeyRound,
+  Bot,
+  Maximize2,
+  Minimize2,
   Download,
   Globe2,
-  GraduationCap,
-  KeyRound,
-  Lock,
-  LogOut,
-  Mail,
-  MapPin,
-  Maximize2,
-  MessageSquare,
-  Minimize2,
-  Plus,
-  RefreshCw,
-  Save,
-  Send,
-  Sparkles,
-  Trash2,
-  Unlock,
-  Users,
-  X,
-  XCircle,
-  CheckCircle2,
 } from 'lucide-react';
-import AcademyTab from './AcademyTab';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
 
@@ -98,7 +96,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [view, setView] = useState<'registrations' | 'courses' | 'academy' | 'ai' | 'downloads'>('registrations');
+  const [view, setView] = useState<'registrations' | 'courses' | 'ai' | 'downloads'>('registrations');
   const [regs, setRegs] = useState<Registration[] | null>(null);
   const [seats, setSeats] = useState<SeatsInfo | null>(null);
   const [adminEmail, setAdminEmail] = useState<string | null>(null);
@@ -262,17 +260,6 @@ export default function AdminDashboard() {
             Courses
           </button>
           <button
-            onClick={() => setView('academy')}
-            className={`flex items-center gap-2 text-sm px-4 py-2 border-b-2 -mb-px transition-colors ${
-              view === 'academy'
-                ? 'border-cyan-400 text-cyan-300'
-                : 'border-transparent text-slate-300 hover:text-slate-200'
-            }`}
-          >
-            <GraduationCap className="w-4 h-4" />
-            Academy
-          </button>
-          <button
             onClick={() => setView('ai')}
             className={`flex items-center gap-2 text-sm px-4 py-2 border-b-2 -mb-px transition-colors ${
               view === 'ai'
@@ -302,10 +289,6 @@ export default function AdminDashboard() {
           />
         ) : view === 'ai' ? (
           <AISettingsTab
-            onAuthError={() => navigate('/admin/login', { replace: true })}
-          />
-        ) : view === 'academy' ? (
-          <AcademyTab
             onAuthError={() => navigate('/admin/login', { replace: true })}
           />
         ) : view === 'courses' ? (
@@ -2042,6 +2025,167 @@ function DownloadsTab({ onAuthError }: { onAuthError: () => void }) {
           </div>
         </>
       )}
+
+      <AppTelemetrySection />
+    </div>
+  );
+}
+
+/* ---------- Pro3DWorks app telemetry (launches + opt-in usage pings) ---------- */
+
+type LaunchStats = {
+  product: string;
+  total: number;
+  last7: number;
+  by_version: { version: string; count: number }[];
+  top_countries: { country: string; count: number }[];
+};
+
+type UsageStats = {
+  product: string;
+  total_sessions: number;
+  last7: number;
+  total_minutes: number;
+  feature_totals: Record<string, number>;
+  by_version: { version: string; count: number }[];
+  top_countries: { country: string; count: number }[];
+};
+
+const FEATURE_LABELS: Record<string, string> = {
+  models_loaded: 'Models loaded',
+  identify: 'AI identify & color',
+  orient: 'AI auto-orient',
+  review: 'AI design review',
+  bom: 'AI BOM + cost estimate',
+  rename: 'AI rename parts',
+  chat: 'AI chat',
+  photoreal: 'Photoreal renders',
+  other: 'Other',
+};
+
+function AppTelemetrySection() {
+  const [launches, setLaunches] = useState<LaunchStats | null>(null);
+  const [usage, setUsage] = useState<UsageStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [l, u] = await Promise.all([
+        fetch(`${API_BASE}/api/launches/stats?product=pro3dworks`, { cache: 'no-store' }),
+        fetch(`${API_BASE}/api/usage/stats?product=pro3dworks`, { cache: 'no-store' }),
+      ]);
+      setLaunches(l.ok ? ((await l.json()) as LaunchStats) : null);
+      setUsage(u.ok ? ((await u.json()) as UsageStats) : null);
+      if (!l.ok && !u.ok) setError('Telemetry endpoints not reachable yet (backend may still be deploying).');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load app telemetry.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const features = usage
+    ? Object.entries(usage.feature_totals).sort((a, b) => b[1] - a[1])
+    : [];
+  const maxFeature = features.reduce((m, f) => Math.max(m, f[1]), 0) || 1;
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-cyan-400" /> App telemetry
+          </h2>
+          <p className="text-sm text-slate-400 mt-1">
+            Launches come from the in-app update check (on by default, off switch in the app). Usage
+            pings are strictly opt-in feature counts. Both are anonymous — city-level location only,
+            no IP addresses stored.
+          </p>
+        </div>
+        <button onClick={() => void load()} disabled={loading}
+          className="btn-secondary flex items-center gap-2 text-sm py-2 px-3 shrink-0">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+        </button>
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 text-sm px-4 py-3 mb-6">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        {[
+          { label: 'Launches — all time', value: launches?.total },
+          { label: 'Launches — last 7 days', value: launches?.last7 },
+          { label: 'Top version in the field', value: launches?.by_version[0]?.version },
+          { label: 'Usage pings (opt-in)', value: usage?.total_sessions },
+          { label: 'Pings — last 7 days', value: usage?.last7 },
+          { label: 'Hours in app (opted-in)', value: usage ? Math.round(usage.total_minutes / 60) : undefined },
+        ].map((c) => (
+          <div key={c.label} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <p className="text-xs text-slate-400">{c.label}</p>
+            <p className="text-2xl font-bold text-white mt-1">
+              {c.value === undefined || c.value === null ? '—' : typeof c.value === 'number' ? c.value.toLocaleString() : c.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+          <p className="text-sm font-semibold text-slate-200 mb-3">What people actually use (opt-in pings)</p>
+          {features.length === 0 ? (
+            <p className="text-sm text-slate-400">No usage pings yet — they only arrive from users who turn the ping on in the app's Privacy &amp; data dialog.</p>
+          ) : (
+            <ul className="space-y-2">
+              {features.map(([k, v]) => (
+                <li key={k} className="text-sm">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-slate-300">{FEATURE_LABELS[k] ?? k}</span>
+                    <span className="text-slate-400">{v.toLocaleString()}</span>
+                  </div>
+                  <div className="h-1.5 rounded bg-slate-800">
+                    <div className="h-1.5 rounded bg-cyan-500/70" style={{ width: `${Math.max(4, (v / maxFeature) * 100)}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+          <p className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+            <Globe2 className="w-4 h-4 text-cyan-400" /> Launches by country &amp; version
+          </p>
+          {!launches || launches.top_countries.length === 0 ? (
+            <p className="text-sm text-slate-400">No launches recorded yet.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <ul className="space-y-2">
+                {launches.top_countries.map((c) => (
+                  <li key={c.country} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300">{c.country}</span>
+                    <span className="text-slate-400">{c.count.toLocaleString()}</span>
+                  </li>
+                ))}
+              </ul>
+              <ul className="space-y-2">
+                {launches.by_version.map((v) => (
+                  <li key={v.version} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300">v{v.version}</span>
+                    <span className="text-slate-400">{v.count.toLocaleString()}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
