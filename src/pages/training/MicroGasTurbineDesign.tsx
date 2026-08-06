@@ -626,6 +626,14 @@ const MicroGasTurbineDesign: React.FC = () => {
 
                 <div className="mt-6">
                   <BuyFlow full {...buyProps} />
+                  <p className="text-xs text-slate-400 mt-3">
+                    Card or US bank account, securely through Stripe. Prefer Zelle or an
+                    invoice?{' '}
+                    <Link to="/contact" className="text-cyan-400 hover:text-cyan-300">
+                      Contact us
+                    </Link>
+                    .
+                  </p>
                 </div>
                 {checkoutState === 'error' && (
                   <p className="mt-3 text-sm text-amber-300" role="alert">
@@ -786,7 +794,7 @@ const MicroGasTurbineDesign: React.FC = () => {
           <SectionHeading eyebrow="How it works" title="From purchase to first lesson in a minute" />
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
             {[
-              { n: '01', t: 'Buy', d: 'Card payment through Stripe. No account to create first.' },
+              { n: '01', t: 'Buy', d: 'Pay by card or US bank account through Stripe. Prefer Zelle? Contact us for an invoice.' },
               { n: '02', t: 'Check your email', d: 'A sign-in link lands within seconds. No password to invent or forget.' },
               { n: '03', t: 'Work through it', d: 'Watch, read, calculate. Progress saves as you go, on any device.' },
               { n: '04', t: 'Clear the gates', d: 'Pass each module assessment to unlock the next, and earn the certificate.' },

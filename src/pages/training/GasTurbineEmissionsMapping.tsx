@@ -993,7 +993,15 @@ const GasTurbineEmissionsMapping = () => {
                         </button>
                       )}
                       <p className="text-xs text-slate-400 mt-4">
-                        Prefer an invoice? Your seat is held — we'll email payment instructions.
+                        Tip: choosing "US bank account" at checkout costs far less in processing
+                        fees than a card, and helps us keep course prices down.
+                      </p>
+                      <p className="text-xs text-slate-400 mt-2">
+                        Prefer Zelle or an invoice? Your seat is held.{' '}
+                        <Link to="/contact" className="text-cyan-400 hover:text-cyan-300">
+                          Contact us
+                        </Link>{' '}
+                        and we'll send an invoice with Zelle and bank-transfer details.
                       </p>
                     </div>
                   )}
