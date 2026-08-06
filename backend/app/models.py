@@ -202,3 +202,28 @@ class ProductDownload(Base):
     colo: Mapped[str] = mapped_column(String(8), default="")
     referrer: Mapped[str] = mapped_column(Text, default="")
     user_agent: Mapped[str] = mapped_column(Text, default="")
+
+
+class AppLaunch(Base):
+    """One row per in-app update check — a launch signal from Pro3DWorks.
+
+    The app's optional startup update check hits the site's /app/version
+    function, which forwards the edge geo here. Same privacy policy as
+    download tracking: no IP addresses ever stored, geo stops at city; the
+    only app-supplied field is its version string.
+    """
+
+    __tablename__ = "app_launches"
+    __table_args__ = (
+        Index("ix_app_launches_product_ts", "product", "ts"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    product: Mapped[str] = mapped_column(String(64), index=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    version: Mapped[str] = mapped_column(String(24), default="")
+    country: Mapped[str] = mapped_column(String(8), default="")
+    region: Mapped[str] = mapped_column(String(128), default="")
+    city: Mapped[str] = mapped_column(String(128), default="")
