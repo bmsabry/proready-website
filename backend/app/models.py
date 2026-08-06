@@ -47,6 +47,16 @@ class Course(Base):
     # Stored as JSON for portability (Postgres uses native json, SQLite text).
     day_dates: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
 
+    # Optional link to the academy Product (academy_products.code) that
+    # carries this course's recorded, on-demand counterpart. Powers the
+    # 'recorded' notify audience and the live-vs-recorded stats split.
+    # Plain string, not a real FK, for the same reason as
+    # Registration.course_code — courses and products can be renamed or
+    # replaced without cascading migrations.
+    recorded_product_code: Mapped[str | None] = mapped_column(
+        String(64), default=None
+    )
+
     # 'open' | 'closed' — 'closed' rejects new registrations.
     status: Mapped[str] = mapped_column(String(16), default="open", index=True)
 
@@ -699,3 +709,61 @@ class AppUsage(Base):
 
 
 Index("ix_app_usage_product_ts", AppUsage.product, AppUsage.ts)
+
+
+class SoftwareProduct(Base):
+    """A downloadable software product (Pro3DWorks and successors).
+
+    This registry replaces the hardcoded KNOWN_PRODUCTS whitelist that used
+    to live in routes/downloads.py: rows here are the single source of truth
+    for which slugs the download/launch/usage telemetry endpoints accept,
+    and they power the public products list plus the admin CRUD. 'hidden'
+    products stay valid for tracking — installed apps keep phoning home
+    after a product is unlisted — they just drop off the public list.
+    """
+
+    __tablename__ = "software_products"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    slug: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    blurb: Mapped[str] = mapped_column(Text, default="")
+    # Site-relative path the download button serves, e.g.
+    # '/downloads/Pro3DWorks.html'.
+    asset_path: Mapped[str] = mapped_column(String(300), default="")
+    latest_version: Mapped[str] = mapped_column(String(24), default="")
+    # 'live' — shown on the public products list; 'hidden' — admin-only.
+    status: Mapped[str] = mapped_column(String(16), default="live", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class EmailLog(Base):
+    """One row per outbound email attempt, success or failure.
+
+    Written by emailer.send_email / send_broadcast whenever a db session is
+    supplied. scope_kind/scope_code tie the row back to what triggered it
+    (a course broadcast, a product announcement, a transactional system
+    mail), so the admin comms log can answer "who did we email about X,
+    and did it actually go out?" without grepping Resend's dashboard.
+    """
+
+    __tablename__ = "email_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    # 'course' | 'product' | 'system'
+    scope_kind: Mapped[str] = mapped_column(String(16), default="system")
+    scope_code: Mapped[str] = mapped_column(String(128), default="", index=True)
+    # Which segment was targeted ('all', 'paid', 'recorded', 'buyers', ...).
+    # Free-form so transactional sends can label themselves too.
+    audience: Mapped[str] = mapped_column(String(32), default="")
+    template: Mapped[str] = mapped_column(String(64), default="")
+    subject: Mapped[str] = mapped_column(String(500), default="")
+    recipient: Mapped[str] = mapped_column(String(320), index=True)
+    ok: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Resend message id when the API accepted the send — empty otherwise.
+    provider_id: Mapped[str] = mapped_column(String(64), default="")

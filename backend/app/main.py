@@ -37,32 +37,39 @@ settings = get_settings()
 Base.metadata.create_all(bind=engine)
 
 
-def _ensure_day_dates_column() -> None:
-    """Add the courses.day_dates JSON column if it isn't there yet.
+def _ensure_column(table: str, column: str, ddl: str) -> None:
+    """Add `column` to an existing `table` if it isn't there yet.
 
-    create_all() does NOT alter existing tables, so when we ship the new
-    column to a DB that already has the courses table (Render Postgres),
-    we have to migrate manually. This helper is idempotent — it inspects
-    the current schema and only ALTERs when the column is missing.
+    create_all() does NOT alter existing tables, so when we ship a new
+    column to a DB that already has the table (Render Postgres), we have
+    to migrate manually. This helper is idempotent — it inspects the
+    current schema and only ALTERs when the column is missing. Brand-new
+    tables need nothing: create_all makes them with every column.
     """
     inspector = inspect(engine)
-    if "courses" not in inspector.get_table_names():
+    if table not in inspector.get_table_names():
         return  # create_all just made it with the column already
-    cols = {c["name"] for c in inspector.get_columns("courses")}
-    if "day_dates" in cols:
+    cols = {c["name"] for c in inspector.get_columns(table)}
+    if column in cols:
         return
-    dialect = engine.dialect.name
-    if dialect == "postgresql":
-        sql = "ALTER TABLE courses ADD COLUMN day_dates JSON NOT NULL DEFAULT '[]'::json"
-    else:
-        # SQLite + others: TEXT-backed JSON, no ::cast.
-        sql = "ALTER TABLE courses ADD COLUMN day_dates JSON NOT NULL DEFAULT '[]'"
     with engine.begin() as conn:
-        conn.execute(text(sql))
-    log.info("Migrated: added courses.day_dates column")
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+    log.info("Migrated: added %s.%s column", table, column)
 
 
-_ensure_day_dates_column()
+def _run_column_migrations() -> None:
+    # courses.day_dates — the JSON default needs a ::json cast on Postgres
+    # but not on SQLite's TEXT-backed JSON.
+    if engine.dialect.name == "postgresql":
+        _ensure_column("courses", "day_dates", "JSON NOT NULL DEFAULT '[]'::json")
+    else:
+        _ensure_column("courses", "day_dates", "JSON NOT NULL DEFAULT '[]'")
+    # courses.recorded_product_code — nullable link to the academy Product
+    # that carries this course's recorded counterpart.
+    _ensure_column("courses", "recorded_product_code", "VARCHAR(64)")
+
+
+_run_column_migrations()
 
 
 # Default day-by-day schedule for the legacy Gas Turbine course. Admins
