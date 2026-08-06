@@ -100,7 +100,7 @@ def test_public_software_list_has_seeded_pro3dworks(client):
     assert r.status_code == 200
     products = r.json()
     row = next(p for p in products if p["slug"] == "pro3dworks")
-    assert set(row) == {"slug", "name", "blurb", "latest_version", "download_count"}
+    assert set(row) == {"slug", "name", "blurb", "latest_version", "download_count", "asset_path"}
     assert row["name"] == "Pro3DWorks"
     assert row["latest_version"] == "2.53.2"
     assert row["download_count"] == 0
