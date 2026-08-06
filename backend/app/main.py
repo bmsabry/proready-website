@@ -25,6 +25,7 @@ from .routes import downloads as downloads_routes
 from .routes import register as register_routes
 from .routes import seats as seats_routes
 from .routes import software as software_routes
+from .routes import stats as stats_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -186,6 +187,7 @@ app.include_router(ai_routes.router)
 app.include_router(downloads_routes.router)
 app.include_router(software_routes.public_router)
 app.include_router(software_routes.admin_router)
+app.include_router(stats_routes.router)
 app.include_router(academy_routes.router)
 app.include_router(checkout_routes.router)
 app.include_router(academy_admin_routes.router)

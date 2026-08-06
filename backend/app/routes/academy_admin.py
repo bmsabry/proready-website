@@ -7,8 +7,6 @@ none of it is reachable with a learner session.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import delete, func, select
@@ -27,12 +25,12 @@ from ..models import (
     Lesson,
     LessonProgress,
     Module,
-    Order,
     Product,
     QuizAttempt,
     QuizItem,
     Slide,
 )
+from ..stats_queries import product_headline_stats
 
 log = logging.getLogger(__name__)
 
@@ -560,33 +558,18 @@ def stats(
     db: Session = Depends(get_db),
     _: str = Depends(require_admin),
 ) -> dict:
-    """Headline numbers plus per-module funnel — what the dashboard renders."""
-    orders_q = select(Order).where(Order.status == "paid")
-    if product_code:
-        orders_q = orders_q.where(Order.product_code == product_code)
-    paid_orders = db.execute(orders_q).scalars().all()
+    """Headline numbers plus per-module funnel — what the dashboard renders.
 
-    revenue_cents = sum(o.amount_cents for o in paid_orders)
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-    recent_revenue = sum(
-        o.amount_cents
-        for o in paid_orders
-        if o.paid_at
-        and (o.paid_at if o.paid_at.tzinfo else o.paid_at.replace(tzinfo=timezone.utc))
-        >= cutoff
-    )
-
-    enroll_q = select(Enrollment).where(Enrollment.status == "active")
-    if product_code:
-        enroll_q = enroll_q.where(Enrollment.product_code == product_code)
-    active = db.execute(enroll_q).scalars().all()
+    The headline block lives in stats_queries.product_headline_stats so the
+    per-course stats endpoint (routes/stats.py) reports identical numbers.
+    """
+    headline = product_headline_stats(db, product_code)
 
     modules_q = select(Module).order_by(Module.position)
     if product_code:
         modules_q = modules_q.where(Module.product_code == product_code)
     modules = db.execute(modules_q).scalars().all()
 
-    learner_ids = [e.learner_id for e in active]
     funnel = []
     for module in modules:
         lessons = db.execute(
@@ -620,17 +603,4 @@ def stats(
             }
         )
 
-    completed = 0
-    for learner_id in set(learner_ids):
-        learner = db.get(Learner, learner_id)
-        if learner and product_code and svc.course_complete(db, learner, product_code):
-            completed += 1
-
-    return {
-        "revenue_cents_total": revenue_cents,
-        "revenue_cents_30d": recent_revenue,
-        "orders_paid": len(paid_orders),
-        "active_enrollments": len(active),
-        "learners_completed": completed,
-        "modules": funnel,
-    }
+    return {**headline, "modules": funnel}
