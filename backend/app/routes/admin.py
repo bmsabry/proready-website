@@ -47,20 +47,36 @@ def list_registrations(
     return list(db.execute(stmt).scalars().all())
 
 
-@router.post("/mark-paid", response_model=MarkPaidOut)
-def mark_paid(body: MarkPaidIn, db: Session = Depends(get_db)) -> MarkPaidOut:
+def mark_registration_paid(
+    db: Session,
+    reg: Registration,
+    *,
+    provider: str = "",
+    payment_ref: str = "",
+    amount_cents: Optional[int] = None,
+    notes: Optional[str] = None,
+) -> bool:
+    """Core of mark-paid — shared by the admin endpoint and the online
+    payment paths (PayPal capture, Stripe live-cohort webhook) so all of
+    them have identical side effects.
+
+    Returns True when the row actually transitioned to paid, False on an
+    idempotent replay of an already-paid row (callers use this to avoid
+    re-sending receipt emails). Raises HTTPException(409) when the cohort
+    is already at paid capacity.
+    """
     settings = get_settings()
-    reg = db.get(Registration, body.registration_id)
-    if reg is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found.")
 
     if reg.status == "paid":
-        # Idempotent — don't double-write paid_at.
-        return MarkPaidOut(
-            ok=True,
-            taken=count_active(db, reg.course_code),
-            registration=AdminRegistrationOut.model_validate(reg),
-        )
+        # Idempotent — don't double-write paid_at. Backfill the payment
+        # attribution if this is the first time a provider claims the row
+        # (e.g. admin marked it paid manually while a capture was in flight).
+        if provider and not reg.payment_provider:
+            reg.payment_provider = provider
+            reg.payment_ref = payment_ref
+            reg.amount_cents = amount_cents
+            db.commit()
+        return False
 
     # Capacity guard — read live seat cap from the row's own Course so admin
     # edits to total_seats are respected. Use count_paid (true paid count)
@@ -79,10 +95,24 @@ def mark_paid(body: MarkPaidIn, db: Session = Depends(get_db)) -> MarkPaidOut:
 
     reg.status = "paid"
     reg.paid_at = datetime.now(timezone.utc)
-    if body.notes is not None:
-        reg.admin_notes = body.notes
+    if provider:
+        reg.payment_provider = provider
+        reg.payment_ref = payment_ref
+        reg.amount_cents = amount_cents
+    if notes is not None:
+        reg.admin_notes = notes
     db.commit()
     db.refresh(reg)
+    return True
+
+
+@router.post("/mark-paid", response_model=MarkPaidOut)
+def mark_paid(body: MarkPaidIn, db: Session = Depends(get_db)) -> MarkPaidOut:
+    reg = db.get(Registration, body.registration_id)
+    if reg is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found.")
+
+    mark_registration_paid(db, reg, notes=body.notes)
 
     return MarkPaidOut(
         ok=True,

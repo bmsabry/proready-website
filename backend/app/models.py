@@ -43,6 +43,12 @@ class Course(Base):
     start_date: Mapped[date] = mapped_column(Date)
     total_seats: Mapped[int] = mapped_column(Integer, default=15)
 
+    # Online seat price in minor units (cents). 0 means "no online payment"
+    # — the cohort stays on the manual invoice flow (register → admin
+    # invoices by hand → admin marks paid).
+    price_cents: Mapped[int] = mapped_column(Integer, default=0)
+    currency: Mapped[str] = mapped_column(String(8), default="usd")
+
     # ISO date strings, ordered Day 1 -> Day N. Number of days = len(day_dates).
     # Stored as JSON for portability (Postgres uses native json, SQLite text).
     day_dates: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
@@ -87,6 +93,14 @@ class Registration(Base):
 
     # 'pending' | 'paid' | 'cancelled'
     status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+
+    # Online-payment audit trail. Empty provider means the row was paid by
+    # manual invoice (or is not paid yet) — the pre-payments behavior.
+    # 'paypal' | 'stripe' | ''
+    payment_provider: Mapped[str] = mapped_column(String(16), default="")
+    # PayPal order id / Stripe Checkout Session id.
+    payment_ref: Mapped[str] = mapped_column(String(128), default="")
+    amount_cents: Mapped[int | None] = mapped_column(Integer, default=None)
 
     # Free-text admin notes (optional, nullable).
     admin_notes: Mapped[str | None] = mapped_column(String(2000), default=None)

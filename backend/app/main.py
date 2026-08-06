@@ -22,6 +22,7 @@ from .routes import comms as comms_routes
 from .routes import compat as compat_routes
 from .routes import courses as courses_routes
 from .routes import downloads as downloads_routes
+from .routes import payments as payments_routes
 from .routes import register as register_routes
 from .routes import seats as seats_routes
 from .routes import software as software_routes
@@ -70,6 +71,15 @@ def _run_column_migrations() -> None:
     # courses.recorded_product_code — nullable link to the academy Product
     # that carries this course's recorded counterpart.
     _ensure_column("courses", "recorded_product_code", "VARCHAR(64)")
+    # courses price — online seat price for live cohorts (0 = invoice-only).
+    _ensure_column("courses", "price_cents", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column("courses", "currency", "VARCHAR(8) NOT NULL DEFAULT 'usd'")
+    # registrations payment audit trail (PayPal/Stripe live-cohort payments).
+    _ensure_column(
+        "registrations", "payment_provider", "VARCHAR(16) NOT NULL DEFAULT ''"
+    )
+    _ensure_column("registrations", "payment_ref", "VARCHAR(128) NOT NULL DEFAULT ''")
+    _ensure_column("registrations", "amount_cents", "INTEGER")
 
 
 _run_column_migrations()
@@ -190,6 +200,7 @@ app.include_router(software_routes.admin_router)
 app.include_router(stats_routes.router)
 app.include_router(academy_routes.router)
 app.include_router(checkout_routes.router)
+app.include_router(payments_routes.router)
 app.include_router(academy_admin_routes.router)
 app.include_router(comms_routes.router)
 # Legacy contract for the standalone quiz apps. Mounted at /auth and

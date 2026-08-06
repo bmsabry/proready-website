@@ -53,6 +53,8 @@ class AdminRegistrationOut(BaseModel):
     years_experience: str
     location: str
     status: str
+    # 'paypal' | 'stripe' | '' (empty = manual invoice / not paid online)
+    payment_provider: str = ""
     admin_notes: Optional[str] = None
     created_at: datetime
     paid_at: Optional[datetime] = None
@@ -105,6 +107,9 @@ class CourseOut(BaseModel):
     seats_taken: int = 0
     seats_paid: int = 0
     seats_remaining: int = 0
+    # Online seat price in cents. 0 = no online payment (invoice-only flow).
+    price_cents: int = 0
+    currency: str = "usd"
     # Academy product carrying this course's recorded counterpart, or None.
     recorded_product_code: Optional[str] = None
 
@@ -117,6 +122,9 @@ class CourseCreateIn(BaseModel):
     status: Literal["open", "closed"] = "open"
     # Optional on create — admin can fill in the schedule later.
     day_dates: List[date] = Field(default_factory=list, max_length=60)
+    # Online seat price. 0 (default) keeps the cohort invoice-only.
+    price_cents: int = Field(default=0, ge=0)
+    currency: str = Field(default="usd", min_length=3, max_length=8)
 
 
 class CoursePatchIn(BaseModel):
@@ -133,6 +141,9 @@ class CoursePatchIn(BaseModel):
     # the link; omit the field to leave it unchanged (the handler checks
     # model_fields_set to tell those apart).
     recorded_product_code: Optional[str] = Field(default=None, max_length=64)
+    # Online seat price. Set to 0 to switch the cohort back to invoice-only.
+    price_cents: Optional[int] = Field(default=None, ge=0)
+    currency: Optional[str] = Field(default=None, min_length=3, max_length=8)
 
 
 class NotifyIn(BaseModel):

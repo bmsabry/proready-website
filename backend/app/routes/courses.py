@@ -92,6 +92,8 @@ def _to_out(course: Course, db: Session) -> CourseOut:
         seats_taken=active,
         seats_paid=paid,
         seats_remaining=max(course.total_seats - active, 0),
+        price_cents=course.price_cents,
+        currency=course.currency,
         recorded_product_code=course.recorded_product_code,
     )
 
@@ -184,6 +186,8 @@ def create_course(body: CourseCreateIn, db: Session = Depends(get_db)) -> Course
         total_seats=body.total_seats,
         status=body.status,
         day_dates=[d.isoformat() for d in body.day_dates],
+        price_cents=body.price_cents,
+        currency=body.currency.lower(),
     )
     db.add(course)
     db.commit()
@@ -218,6 +222,10 @@ def patch_course(
     if body.day_dates is not None:
         # Replace the full list. Store as ISO strings so JSON is portable.
         course.day_dates = [d.isoformat() for d in body.day_dates]
+    if body.price_cents is not None:
+        course.price_cents = body.price_cents
+    if body.currency is not None:
+        course.currency = body.currency.lower()
     if "recorded_product_code" in body.model_fields_set:
         # Explicit null clears the link; omitting the field leaves it alone.
         if body.recorded_product_code:

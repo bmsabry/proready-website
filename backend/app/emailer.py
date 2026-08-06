@@ -508,3 +508,45 @@ def enrollment_granted_html(full_name: str, course_title: str, link: str) -> str
         the sign-in page using this same email address.
       </p>"""
     return _academy_shell("Access granted", "Your course is ready", body)
+
+
+def payment_receipt_html(
+    full_name: str, course_title: str, amount_display: str, reference: str
+) -> str:
+    """Receipt for a live-cohort seat paid online (PayPal or Stripe)."""
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    amount_row = (
+        f"""<tr>
+          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Amount</td>
+          <td style="padding:4px 0;color:#f1f5f9;"><strong>{amount_display}</strong></td>
+        </tr>"""
+        if amount_display
+        else ""
+    )
+    reference_row = (
+        f"""<tr>
+          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Reference</td>
+          <td style="padding:4px 0;color:#f1f5f9;">{reference}</td>
+        </tr>"""
+        if reference
+        else ""
+    )
+    body = f"""\
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
+        Your payment for <strong>{course_title}</strong> went through and your
+        seat is now <strong>confirmed</strong>.
+      </p>
+      <table style="margin:0 0 16px;font-size:15px;">
+        <tr>
+          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Course</td>
+          <td style="padding:4px 0;color:#f1f5f9;">{course_title}</td>
+        </tr>
+{amount_row}
+{reference_row}
+      </table>
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
+        Keep this email as your receipt. We'll follow up with the joining
+        details and schedule before the course begins.
+      </p>"""
+    return _academy_shell("Payment received", "Your seat is confirmed", body)

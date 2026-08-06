@@ -100,6 +100,26 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
 
+    # --- Payments (PayPal Orders v2) --------------------------------------
+    # Credentials land later; until both are set every PayPal endpoint
+    # degrades to 503 and /api/payments/config reports paypal_enabled=False.
+    PAYPAL_CLIENT_ID: str = ""
+    PAYPAL_CLIENT_SECRET: str = ""
+    PAYPAL_MODE: str = "live"  # 'live' | 'sandbox'
+    PAYPAL_CURRENCY: str = "USD"
+
+    @property
+    def paypal_enabled(self) -> bool:
+        return bool(self.PAYPAL_CLIENT_ID and self.PAYPAL_CLIENT_SECRET)
+
+    @property
+    def paypal_base_url(self) -> str:
+        return (
+            "https://api-m.sandbox.paypal.com"
+            if self.PAYPAL_MODE == "sandbox"
+            else "https://api-m.paypal.com"
+        )
+
     # --- Video (Cloudflare Stream) ----------------------------------------
     # Customer subdomain code, e.g. "abcd1234" in
     # https://customer-abcd1234.cloudflarestream.com

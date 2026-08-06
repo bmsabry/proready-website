@@ -148,7 +148,6 @@ def _fulfil(db: Session, session_obj: dict) -> None:
 
     Called only from the webhook, only after signature verification.
     """
-    settings = get_settings()
     session_id = session_obj.get("id") or ""
     email = (
         (session_obj.get("customer_details") or {}).get("email")
@@ -201,11 +200,25 @@ def _fulfil(db: Session, session_obj: dict) -> None:
     db.commit()
     db.refresh(order)
 
+    grant_and_welcome(db, order, product, learner)
+    log.info("Fulfilled order %s for %s (%s)", order.id, email, product_code)
+
+
+def grant_and_welcome(
+    db: Session, order: Order, product: Product, learner: Learner
+) -> None:
+    """Grant access + send the purchase-welcome email for a paid order.
+
+    Shared by the Stripe webhook (`_fulfil`) and the PayPal recorded-course
+    capture path so both providers provision access identically. The
+    enrollment source is the order's provider ('stripe' | 'paypal').
+    """
+    settings = get_settings()
     svc.grant_enrollment(
-        db, learner, product_code, source="stripe", order_id=order.id
+        db, learner, order.product_code, source=order.provider, order_id=order.id
     )
 
-    raw = issue_login_token(db, learner, next_path=f"/learn/{product_code}")
+    raw = issue_login_token(db, learner, next_path=f"/learn/{order.product_code}")
     link = f"{settings.SITE_URL}/learn/signin?token={raw}"
     send_email(
         to=learner.email,
@@ -216,7 +229,6 @@ def _fulfil(db: Session, session_obj: dict) -> None:
         ),
         bcc=settings.ADMIN_NOTIFY_EMAIL or None,
     )
-    log.info("Fulfilled order %s for %s (%s)", order.id, email, product_code)
 
 
 def _revoke_for_payment(db: Session, payment_intent: str, reason: str) -> None:
@@ -277,13 +289,30 @@ async def stripe_webhook(
     kind = event["type"]
     obj = event["data"]["object"]
 
+    # Live-cohort seats ride the same webhook: their sessions are tagged
+    # metadata.kind == 'live_course' by /api/payments/live/stripe/checkout.
+    # Lazy import — payments.py imports _stripe from this module at import
+    # time, so importing it back at module level would be circular.
+    def _is_live_course(session_obj: dict) -> bool:
+        return (session_obj.get("metadata") or {}).get("kind") == "live_course"
+
     if kind == "checkout.session.completed":
         if obj.get("payment_status") == "paid":
-            _fulfil(db, dict(obj))
+            if _is_live_course(obj):
+                from .payments import fulfil_live_session  # noqa: PLC0415
+
+                fulfil_live_session(db, dict(obj))
+            else:
+                _fulfil(db, dict(obj))
         else:
             log.info("Checkout completed but unpaid (%s) — waiting", obj.get("id"))
     elif kind == "checkout.session.async_payment_succeeded":
-        _fulfil(db, dict(obj))
+        if _is_live_course(obj):
+            from .payments import fulfil_live_session  # noqa: PLC0415
+
+            fulfil_live_session(db, dict(obj))
+        else:
+            _fulfil(db, dict(obj))
     elif kind == "charge.refunded":
         _revoke_for_payment(db, str(obj.get("payment_intent") or ""), "refunded")
     elif kind == "charge.dispute.created":
