@@ -227,3 +227,29 @@ class AppLaunch(Base):
     country: Mapped[str] = mapped_column(String(8), default="")
     region: Mapped[str] = mapped_column(String(128), default="")
     city: Mapped[str] = mapped_column(String(128), default="")
+
+
+class AppUsage(Base):
+    """One anonymous, opt-in usage ping from a closing Pro3DWorks session.
+
+    Counts only: which features ran, and for how many minutes the app was
+    open. No identifiers, no file names, no model data; location stops at
+    city level and no IP addresses are ever stored.
+    """
+
+    __tablename__ = "app_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product: Mapped[str] = mapped_column(String(64), index=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    version: Mapped[str | None] = mapped_column(String(24))
+    minutes: Mapped[int | None] = mapped_column(Integer)
+    features: Mapped[str | None] = mapped_column(String(1024))  # JSON counts: {"bom": 2, ...}
+    country: Mapped[str | None] = mapped_column(String(8))
+    region: Mapped[str | None] = mapped_column(String(128))
+    city: Mapped[str | None] = mapped_column(String(128))
+
+
+Index("ix_app_usage_product_ts", AppUsage.product, AppUsage.ts)
