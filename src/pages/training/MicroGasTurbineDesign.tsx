@@ -786,7 +786,7 @@ const MicroGasTurbineDesign: React.FC = () => {
           <SectionHeading eyebrow="How it works" title="From purchase to first lesson in a minute" />
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
             {[
-              { n: '01', t: 'Buy', d: 'Pay with PayPal or card. No account to create first.' },
+              { n: '01', t: 'Buy', d: 'Card payment through Stripe. No account to create first.' },
               { n: '02', t: 'Check your email', d: 'A sign-in link lands within seconds. No password to invent or forget.' },
               { n: '03', t: 'Work through it', d: 'Watch, read, calculate. Progress saves as you go, on any device.' },
               { n: '04', t: 'Clear the gates', d: 'Pass each module assessment to unlock the next, and earn the certificate.' },
