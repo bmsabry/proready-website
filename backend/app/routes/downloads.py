@@ -163,3 +163,191 @@ def admin_stats(
             for r in recent
         ],
     }
+
+
+class LaunchEvent(BaseModel):
+    """Anonymous launch signal forwarded by the site's /app/version function."""
+
+    product: str = Field(min_length=1, max_length=64)
+    version: str | None = Field(default=None, max_length=24)
+    country: str | None = Field(default=None, max_length=8)
+    region: str | None = Field(default=None, max_length=128)
+    city: str | None = Field(default=None, max_length=128)
+
+
+@router.post("/track/launch", status_code=status.HTTP_204_NO_CONTENT)
+def track_launch(evt: LaunchEvent, db: Session = Depends(get_db)) -> None:
+    """Record one anonymous app launch (product + version + city-level geo)."""
+    from ..models import AppLaunch
+
+    if evt.product not in KNOWN_PRODUCTS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown product.")
+    db.add(
+        AppLaunch(
+            product=evt.product,
+            version=evt.version,
+            country=evt.country,
+            region=evt.region,
+            city=evt.city,
+        )
+    )
+    db.commit()
+
+
+@router.get("/launches/stats")
+def launches_stats(product: str = "pro3dworks", db: Session = Depends(get_db)) -> dict:
+    """Aggregate anonymous launch events for the public/admin stats views."""
+    from ..models import AppLaunch
+
+    if product not in KNOWN_PRODUCTS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown product.")
+    total = db.scalar(select(func.count(AppLaunch.id)).where(AppLaunch.product == product)) or 0
+    week_ago = datetime.now(tz.utc) - timedelta(days=7)
+    last7 = (
+        db.scalar(
+            select(func.count(AppLaunch.id)).where(
+                AppLaunch.product == product, AppLaunch.ts >= week_ago
+            )
+        )
+        or 0
+    )
+    by_version = [
+        {"version": v or "(unknown)", "count": c}
+        for v, c in db.execute(
+            select(AppLaunch.version, func.count(AppLaunch.id))
+            .where(AppLaunch.product == product)
+            .group_by(AppLaunch.version)
+            .order_by(func.count(AppLaunch.id).desc())
+            .limit(8)
+        )
+    ]
+    top_countries = [
+        {"country": c or "??", "count": n}
+        for c, n in db.execute(
+            select(AppLaunch.country, func.count(AppLaunch.id))
+            .where(AppLaunch.product == product)
+            .group_by(AppLaunch.country)
+            .order_by(func.count(AppLaunch.id).desc())
+            .limit(8)
+        )
+    ]
+    return {
+        "product": product,
+        "total": total,
+        "last7": last7,
+        "by_version": by_version,
+        "top_countries": top_countries,
+    }
+
+
+class UsageEvent(BaseModel):
+    """Anonymous opt-in usage ping forwarded by the site's /app/ping function."""
+
+    product: str = Field(min_length=1, max_length=64)
+    version: str | None = Field(default=None, max_length=24)
+    minutes: int | None = Field(default=None, ge=0, le=100000)
+    features: dict[str, int] | None = None
+    country: str | None = Field(default=None, max_length=8)
+    region: str | None = Field(default=None, max_length=128)
+    city: str | None = Field(default=None, max_length=128)
+
+
+@router.post("/track/usage", status_code=status.HTTP_204_NO_CONTENT)
+def track_usage(evt: UsageEvent, db: Session = Depends(get_db)) -> None:
+    """Record one anonymous usage ping: feature counts only, never identifiers."""
+    import json as _json
+
+    from ..models import AppUsage
+
+    if evt.product not in KNOWN_PRODUCTS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown product.")
+    feats: dict[str, int] = {}
+    if evt.features:
+        for k, v in list(evt.features.items())[:24]:
+            if isinstance(v, int) and 0 <= v <= 1_000_000:
+                feats[str(k)[:32]] = v
+    db.add(
+        AppUsage(
+            product=evt.product,
+            version=evt.version,
+            minutes=evt.minutes,
+            features=_json.dumps(feats) if feats else None,
+            country=evt.country,
+            region=evt.region,
+            city=evt.city,
+        )
+    )
+    db.commit()
+
+
+@router.get("/usage/stats")
+def usage_stats(product: str = "pro3dworks", db: Session = Depends(get_db)) -> dict:
+    """Aggregate the anonymous usage pings: sessions, minutes, feature totals."""
+    import json as _json
+
+    from ..models import AppUsage
+
+    if product not in KNOWN_PRODUCTS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown product.")
+    total = db.scalar(select(func.count(AppUsage.id)).where(AppUsage.product == product)) or 0
+    week_ago = datetime.now(tz.utc) - timedelta(days=7)
+    last7 = (
+        db.scalar(
+            select(func.count(AppUsage.id)).where(
+                AppUsage.product == product, AppUsage.ts >= week_ago
+            )
+        )
+        or 0
+    )
+    total_minutes = (
+        db.scalar(
+            select(func.coalesce(func.sum(AppUsage.minutes), 0)).where(
+                AppUsage.product == product
+            )
+        )
+        or 0
+    )
+    feature_totals: dict[str, int] = {}
+    for (feats_json,) in db.execute(
+        select(AppUsage.features)
+        .where(AppUsage.product == product)
+        .order_by(AppUsage.ts.desc())
+        .limit(5000)
+    ):
+        if not feats_json:
+            continue
+        try:
+            for k, v in _json.loads(feats_json).items():
+                if isinstance(v, int):
+                    feature_totals[k] = feature_totals.get(k, 0) + v
+        except Exception:
+            continue
+    by_version = [
+        {"version": v or "(unknown)", "count": c}
+        for v, c in db.execute(
+            select(AppUsage.version, func.count(AppUsage.id))
+            .where(AppUsage.product == product)
+            .group_by(AppUsage.version)
+            .order_by(func.count(AppUsage.id).desc())
+            .limit(8)
+        )
+    ]
+    top_countries = [
+        {"country": c or "??", "count": n}
+        for c, n in db.execute(
+            select(AppUsage.country, func.count(AppUsage.id))
+            .where(AppUsage.product == product)
+            .group_by(AppUsage.country)
+            .order_by(func.count(AppUsage.id).desc())
+            .limit(8)
+        )
+    ]
+    return {
+        "product": product,
+        "total_sessions": total,
+        "last7": last7,
+        "total_minutes": int(total_minutes),
+        "feature_totals": dict(sorted(feature_totals.items(), key=lambda kv: -kv[1])),
+        "by_version": by_version,
+        "top_countries": top_countries,
+    }
