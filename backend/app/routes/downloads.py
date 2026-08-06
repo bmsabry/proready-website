@@ -163,3 +163,61 @@ def admin_stats(
             for r in recent
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# App launches — the in-app update check doubles as an anonymous launch
+# signal (app version + city-level geo only; same policy as downloads).
+# ---------------------------------------------------------------------------
+
+class LaunchEvent(BaseModel):
+    product: str = Field(min_length=1, max_length=64)
+    version: str | None = Field(default=None, max_length=24)
+    country: str | None = Field(default=None, max_length=8)
+    region: str | None = Field(default=None, max_length=128)
+    city: str | None = Field(default=None, max_length=128)
+
+
+@router.post("/track/launch")
+def track_launch(event: LaunchEvent, db: Session = Depends(get_db)) -> dict:
+    from ..models import AppLaunch
+
+    product = event.product.strip().lower()
+    if product not in KNOWN_PRODUCTS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="unknown product")
+    db.add(AppLaunch(
+        product=product,
+        version=(event.version or "").strip()[:24],
+        country=(event.country or "").strip()[:8],
+        region=(event.region or "").strip()[:128],
+        city=(event.city or "").strip()[:128],
+    ))
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/launches/stats")
+def launch_stats(product: str = "pro3dworks", db: Session = Depends(get_db)) -> dict:
+    """Public aggregate launch statistics — no personal data, mirrors /downloads/stats."""
+    from ..models import AppLaunch
+
+    product = product.strip().lower()
+    total = db.scalar(select(func.count()).select_from(AppLaunch).where(AppLaunch.product == product)) or 0
+    week_ago = datetime.now(tz.utc) - timedelta(days=7)
+    last7 = db.scalar(
+        select(func.count()).select_from(AppLaunch)
+        .where(AppLaunch.product == product, AppLaunch.ts >= week_ago)) or 0
+    by_version = [
+        {"version": v or "unknown", "count": c}
+        for v, c in db.execute(
+            select(AppLaunch.version, func.count()).where(AppLaunch.product == product)
+            .group_by(AppLaunch.version).order_by(func.count().desc()).limit(8)).all()
+    ]
+    top_countries = [
+        {"country": co or "unknown", "count": c}
+        for co, c in db.execute(
+            select(AppLaunch.country, func.count()).where(AppLaunch.product == product)
+            .group_by(AppLaunch.country).order_by(func.count().desc()).limit(8)).all()
+    ]
+    return {"product": product, "total": total, "last7": last7,
+            "by_version": by_version, "top_countries": top_countries}
