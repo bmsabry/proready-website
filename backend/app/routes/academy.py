@@ -42,7 +42,17 @@ from ..learner_auth import (
     require_learner,
     set_learner_cookie,
 )
-from ..models import Certificate, Enrollment, Learner, Lesson, Module, Product, QuizItem
+from ..models import (
+    Certificate,
+    Chapter,
+    Enrollment,
+    Learner,
+    Lesson,
+    Module,
+    Product,
+    QuizItem,
+    Slide,
+)
 from ..stream_tokens import is_configured as stream_configured
 from ..stream_tokens import playback_urls
 
@@ -392,6 +402,17 @@ def lesson_detail(
     ).scalars().all()
     index = next((i for i, l in enumerate(siblings) if l.id == lesson.id), 0)
 
+    # Chapters are how a three-hour recording becomes navigable. Their titles
+    # come from the deck's own section names, and the timestamps from matching
+    # what was on screen to the slides, so they mark where a topic is actually
+    # taught rather than where an upload limit happened to cut the file.
+    chapters = db.execute(
+        select(Chapter).where(Chapter.lesson_id == lesson.id).order_by(Chapter.position)
+    ).scalars().all()
+    slides = db.execute(
+        select(Slide).where(Slide.module_id == lesson.module_id).order_by(Slide.number)
+    ).scalars().all()
+
     return {
         "id": lesson.id,
         "code": lesson.code,
@@ -415,6 +436,26 @@ def lesson_detail(
             "watched_s": prog.watched_s if prog else 0,
             "completed": svc.lesson_is_complete(lesson, prog),
         },
+        "chapters": [
+            {
+                "title": c.title,
+                "start_s": c.start_s,
+                "end_s": c.end_s,
+                "slides": c.slides or [],
+            }
+            for c in chapters
+        ],
+        "slides": [
+            {
+                "number": s_.number,
+                "title": s_.title,
+                "section": s_.section,
+                "appears_at_s": s_.appears_at_s,
+                "image_sm": s_.image_sm,
+                "image_lg": s_.image_lg,
+            }
+            for s_ in slides
+        ],
         "prev_lesson_id": siblings[index - 1].id if index > 0 else None,
         "next_lesson_id": siblings[index + 1].id if index + 1 < len(siblings) else None,
         # Watermark shown over the player and slide viewer. Rendering the

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from .. import academy as svc
@@ -21,6 +21,7 @@ from ..deps import require_admin
 from ..emailer import enrollment_granted_html, login_link_html, send_email
 from ..learner_auth import issue_login_token
 from ..models import (
+    Chapter,
     Enrollment,
     Learner,
     Lesson,
@@ -30,6 +31,7 @@ from ..models import (
     Product,
     QuizAttempt,
     QuizItem,
+    Slide,
 )
 
 log = logging.getLogger(__name__)
@@ -229,6 +231,139 @@ def patch_lesson(
         setattr(lesson, field, value)
     db.commit()
     return {"ok": True, "id": lesson.id, "video_uid": lesson.video_uid}
+
+
+class ChapterIn(BaseModel):
+    title: str
+    start_s: int
+    end_s: int
+    slides: list[int] = Field(default_factory=list)
+
+
+class SlideIn(BaseModel):
+    number: int
+    title: str = ""
+    section: str = ""
+    text: str = ""
+    appears_at_s: int = -1
+    image_lg: str = ""
+    image_sm: str = ""
+
+
+class ModuleIngestIn(BaseModel):
+    video_uid: str = ""
+    duration_s: int = 0
+    chapters: list[ChapterIn] = Field(default_factory=list)
+    slides: list[SlideIn] = Field(default_factory=list)
+    replace: bool = True
+
+
+@router.post("/modules/{code}/ingest")
+def ingest_module(
+    code: str,
+    body: ModuleIngestIn,
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin),
+) -> dict:
+    """Apply the ingest pipeline's output to a module.
+
+    This is the seam between the two halves of the platform: the pipeline turns
+    a recording and a deck into a master video plus chapters and slides, and
+    this endpoint reshapes the module to match. It is idempotent — running the
+    pipeline again and re-posting simply replaces what was there.
+
+    The important thing it does is collapse the per-file video lessons into a
+    single one. The source recordings arrive split across a dozen or more files
+    purely because of upload limits, and a boundary can land mid-sentence; those
+    were never units of teaching and should never have been units of delivery.
+    What replaces them is one continuous lesson navigated by named chapters.
+    """
+    module = db.execute(
+        select(Module).where(Module.code == code)
+    ).scalar_one_or_none()
+    if module is None:
+        raise HTTPException(status_code=404, detail=f"No module {code}.")
+
+    lessons = db.execute(
+        select(Lesson).where(Lesson.module_id == module.id).order_by(Lesson.position)
+    ).scalars().all()
+    videos = [l for l in lessons if l.kind == "video"]
+
+    keep: Lesson | None = None
+    if videos:
+        keep, *extra = videos
+        keep.title = f"{module.code} — full lecture"
+        keep.code = f"{module.code}-LECTURE"
+        keep.video_uid = body.video_uid
+        keep.duration_s = body.duration_s
+        keep.source_file = "master.mp4"
+        # The surplus part-lessons carry progress rows, so they are removed
+        # together with them rather than orphaned.
+        for row in extra:
+            db.execute(
+                delete(LessonProgress).where(LessonProgress.lesson_id == row.id)
+            )
+            db.delete(row)
+    elif body.video_uid:
+        keep = Lesson(
+            module_id=module.id,
+            code=f"{module.code}-LECTURE",
+            title=f"{module.code} — full lecture",
+            position=0,
+            kind="video",
+            video_uid=body.video_uid,
+            duration_s=body.duration_s,
+            source_file="master.mp4",
+        )
+        db.add(keep)
+        db.flush()
+
+    if body.replace and keep is not None:
+        db.execute(delete(Chapter).where(Chapter.lesson_id == keep.id))
+    if keep is not None:
+        for i, ch in enumerate(body.chapters):
+            db.add(
+                Chapter(
+                    lesson_id=keep.id,
+                    position=i,
+                    title=ch.title,
+                    start_s=ch.start_s,
+                    end_s=ch.end_s,
+                    slides=ch.slides,
+                )
+            )
+
+    if body.replace:
+        db.execute(delete(Slide).where(Slide.module_id == module.id))
+    for sl in body.slides:
+        db.add(
+            Slide(
+                module_id=module.id,
+                number=sl.number,
+                title=sl.title,
+                section=sl.section,
+                text=sl.text,
+                appears_at_s=sl.appears_at_s,
+                image_lg=sl.image_lg,
+                image_sm=sl.image_sm,
+            )
+        )
+
+    db.commit()
+    log.info(
+        "Admin %s ingested %s: uid=%s chapters=%d slides=%d",
+        admin, code, body.video_uid, len(body.chapters), len(body.slides),
+    )
+    return {
+        "ok": True,
+        "module": code,
+        "lesson_id": keep.id if keep else None,
+        "video_uid": body.video_uid,
+        "duration_s": body.duration_s,
+        "chapters": len(body.chapters),
+        "slides": len(body.slides),
+        "part_lessons_removed": max(0, len(videos) - 1),
+    }
 
 
 # -----------------------------------------------------------------------------
