@@ -73,6 +73,7 @@ class LessonPatch(BaseModel):
     asset_path: str | None = None
     body: str | None = None
     is_preview: bool | None = None
+    position: int | None = Field(default=None, ge=0)
 
 
 # -----------------------------------------------------------------------------

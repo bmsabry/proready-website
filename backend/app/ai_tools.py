@@ -6,32 +6,55 @@ Python errors back to the agent — instead they catch and return
 {"ok": false, "error": "..."} so the agent can reason about failures
 and the audit log records the error string.
 
-High-stakes operations (any notify_course, or bulk mark_paid/cancel
-≥ 3 rows) are intercepted in routes/ai.py BEFORE handlers run, so the
-admin can approve in chat first.
+Wherever an admin HTTP endpoint already implements the behaviour, the
+handler calls that route function (or its shared helper) directly —
+mark_paid goes through routes/admin.mark_registration_paid, broadcasts
+through routes/courses + routes/comms, grants through routes/academy_admin
+— so the assistant and the dashboard can never disagree on side effects.
+
+High-stakes operations (broadcasts, enrollment grant/revoke, lesson
+edits, software hide/show, bulk mark_paid/cancel ≥ 3 rows) are
+intercepted in routes/ai.py BEFORE handlers run, so the admin can
+approve in chat first.
 """
 from __future__ import annotations
 
 import logging
 import re
-from datetime import date, datetime, timezone
+from datetime import date
 from html import escape as _html_escape
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select
+from fastapi import HTTPException
+from pydantic import ValidationError
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from .config import get_settings
-from .emailer import broadcast_html, send_email
-from .models import Course, Registration
+from .models import (
+    Course,
+    Enrollment,
+    Learner,
+    Lesson,
+    Order,
+    Product,
+    Registration,
+    SoftwareProduct,
+)
+from .routes import academy_admin as academy_admin_routes
+from .routes import admin as admin_routes
+from .routes import comms as comms_routes
+from .routes import courses as courses_routes
+from .routes import software as software_routes
+from .schemas import NotifyIn
 from .seats import count_active, count_paid
+from .stats_queries import course_funnel_stats, software_telemetry_stats
 
 log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
 # Plain-text → email-safe HTML (mirrors the frontend helper so the agent
-# can pass natural prose into notify_course and have it format right).
+# can pass natural prose into the notify tools and have it format right).
 # ---------------------------------------------------------------------------
 
 _LINK_RE = re.compile(r"(https?://[^\s<]+|mailto:[^\s<]+)")
@@ -58,6 +81,20 @@ def _plain_text_to_email_html(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _iso(dt: Any) -> Optional[str]:
+    return dt.isoformat() if dt else None
+
+
+def _http_err(e: HTTPException) -> Dict[str, Any]:
+    return {"ok": False, "error": str(e.detail)}
+
+
+def _validation_err(e: ValidationError) -> Dict[str, Any]:
+    first = e.errors()[0]
+    field = ".".join(str(p) for p in first.get("loc", ()))
+    return {"ok": False, "error": f"invalid {field or 'input'}: {first.get('msg', 'validation error')}"}
+
+
 def _course_summary(c: Course, db: Session) -> Dict[str, Any]:
     return {
         "code": c.code,
@@ -66,6 +103,9 @@ def _course_summary(c: Course, db: Session) -> Dict[str, Any]:
         "total_seats": c.total_seats,
         "status": c.status,
         "day_dates": list(c.day_dates or []),
+        "price_cents": c.price_cents,
+        "currency": c.currency,
+        "recorded_product_code": c.recorded_product_code,
         "seats_paid": count_paid(db, c.code),
         "seats_active": count_active(db, c.code),
         "seats_remaining": max(c.total_seats - count_active(db, c.code), 0),
@@ -81,7 +121,7 @@ def _registration_summary(r: Registration) -> Dict[str, Any]:
         "company": r.company,
         "job_title": r.job_title,
         "status": r.status,
-        "created_at": r.created_at.isoformat() if r.created_at else None,
+        "created_at": _iso(r.created_at),
     }
 
 
@@ -93,7 +133,7 @@ def _course_or_error(db: Session, code: str) -> tuple[Optional[Course], Optional
 
 
 # ---------------------------------------------------------------------------
-# Tool handlers
+# Tool handlers — courses & registrations
 # ---------------------------------------------------------------------------
 
 
@@ -164,9 +204,21 @@ def list_registrations(
     status: Optional[str] = None,
     limit: int = 100,
 ) -> Dict[str, Any]:
-    settings = get_settings()
-    code = (course_code or settings.COURSE_CODE).strip()
-    stmt = select(Registration).where(Registration.course_code == code)
+    code = (course_code or "").strip()
+    if not code:
+        return {
+            "ok": False,
+            "error": (
+                "course_code is required — pass a real course code "
+                "(use list_courses to find it) or 'all' for every course"
+            ),
+        }
+    stmt = select(Registration)
+    if code != "all":
+        _, err = _course_or_error(db, code)
+        if err:
+            return err
+        stmt = stmt.where(Registration.course_code == code)
     if status:
         if status not in ("paid", "pending", "cancelled"):
             return {"ok": False, "error": "status must be paid|pending|cancelled"}
@@ -181,48 +233,61 @@ def list_registrations(
     }
 
 
-def _set_status(db: Session, registration_id: int, new_status: str, notes: Optional[str]) -> Dict[str, Any]:
+def mark_paid(db: Session, registration_id: int, notes: Optional[str] = None) -> Dict[str, Any]:
     reg = db.get(Registration, registration_id)
     if reg is None:
         return {"ok": False, "error": f"registration {registration_id} not found"}
-    if new_status == "paid":
-        # Capacity guard, mirrors the admin endpoint.
-        course = db.execute(
-            select(Course).where(Course.code == reg.course_code)
-        ).scalar_one_or_none()
-        capacity = course.total_seats if course else get_settings().COURSE_CAPACITY
-        if reg.status != "paid" and count_paid(db, reg.course_code) >= capacity:
-            return {"ok": False, "error": "cohort already at paid capacity"}
-        if reg.status != "paid":
-            reg.paid_at = datetime.now(timezone.utc)
-    else:
-        reg.paid_at = None
-    reg.status = new_status
+    try:
+        # Shared with the admin endpoint and the online payment paths
+        # (PayPal capture, Stripe webhook) — identical side effects.
+        transitioned = admin_routes.mark_registration_paid(db, reg, notes=notes)
+    except HTTPException as e:
+        return {"ok": False, "error": str(e.detail), "course_code": reg.course_code}
+    return {
+        "ok": True,
+        "course_code": reg.course_code,
+        "already_paid": not transitioned,
+        "registration": _registration_summary(reg),
+    }
+
+
+def cancel(db: Session, registration_id: int, notes: Optional[str] = None) -> Dict[str, Any]:
+    reg = db.get(Registration, registration_id)
+    if reg is None:
+        return {"ok": False, "error": f"registration {registration_id} not found"}
+    # Mirrors POST /api/admin/cancel: frees the seat, clears paid_at.
+    reg.status = "cancelled"
+    reg.paid_at = None
     if notes is not None:
         reg.admin_notes = notes
     db.commit()
     db.refresh(reg)
-    return {"ok": True, "registration": _registration_summary(reg)}
+    return {
+        "ok": True,
+        "course_code": reg.course_code,
+        "registration": _registration_summary(reg),
+    }
 
 
-def mark_paid(db: Session, registration_id: int, notes: Optional[str] = None) -> Dict[str, Any]:
-    return _set_status(db, registration_id, "paid", notes)
-
-
-def cancel(db: Session, registration_id: int, notes: Optional[str] = None) -> Dict[str, Any]:
-    return _set_status(db, registration_id, "cancelled", notes)
+def _bulk(db: Session, registration_ids: List[int], notes: Optional[str], one) -> Dict[str, Any]:
+    results = [one(db, int(rid), notes) for rid in registration_ids]
+    ok = sum(1 for r in results if r.get("ok"))
+    course_codes = sorted({r["course_code"] for r in results if r.get("course_code")})
+    return {
+        "ok": True,
+        "succeeded": ok,
+        "failed": len(results) - ok,
+        "course_codes": course_codes,
+        "results": results,
+    }
 
 
 def bulk_mark_paid(db: Session, registration_ids: List[int], notes: Optional[str] = None) -> Dict[str, Any]:
-    results = [_set_status(db, int(rid), "paid", notes) for rid in registration_ids]
-    ok = sum(1 for r in results if r.get("ok"))
-    return {"ok": True, "succeeded": ok, "failed": len(results) - ok, "results": results}
+    return _bulk(db, registration_ids, notes, mark_paid)
 
 
 def bulk_cancel(db: Session, registration_ids: List[int], notes: Optional[str] = None) -> Dict[str, Any]:
-    results = [_set_status(db, int(rid), "cancelled", notes) for rid in registration_ids]
-    ok = sum(1 for r in results if r.get("ok"))
-    return {"ok": True, "succeeded": ok, "failed": len(results) - ok, "results": results}
+    return _bulk(db, registration_ids, notes, cancel)
 
 
 def notify_course(
@@ -232,49 +297,340 @@ def notify_course(
     body: str,
     audience: str = "all",
 ) -> Dict[str, Any]:
-    """Send a broadcast email. Body is plain text — converted to HTML here."""
-    if audience not in ("all", "paid", "pending"):
-        return {"ok": False, "error": "audience must be all|paid|pending"}
-    course, err = _course_or_error(db, code)
-    if err:
-        return err
+    """Broadcast to a cohort via the same path as the admin notify endpoint
+    (audience resolution, batch send and EmailLog rows all included).
+    Body is plain text — converted to HTML here."""
+    try:
+        payload = NotifyIn(
+            subject=subject,
+            body_html=_plain_text_to_email_html(body),
+            audience=audience,
+        )
+    except ValidationError as e:
+        return _validation_err(e)
+    try:
+        out = courses_routes.notify_course(code, payload, db)
+    except HTTPException as e:
+        return _http_err(e)
+    return {
+        "ok": True,
+        "sent": out.recipients,
+        "failed_count": out.failures,
+        "failed_addresses": out.failed_addresses,
+        "audience": audience,
+        "recipients_total": out.recipients + out.failures,
+    }
 
-    stmt = select(Registration).where(Registration.course_code == code)
-    if audience == "paid":
-        stmt = stmt.where(Registration.status == "paid")
-    elif audience == "pending":
-        stmt = stmt.where(Registration.status == "pending")
-    else:  # 'all' excludes cancelled
-        stmt = stmt.where(Registration.status.in_(("paid", "pending")))
-    recipients = list(db.execute(stmt).scalars())
 
-    body_html = _plain_text_to_email_html(body)
-    html = broadcast_html(course_title=course.title, body_html=body_html)
+# ---------------------------------------------------------------------------
+# Tool handlers — platform-wide reads
+# ---------------------------------------------------------------------------
 
-    sent = 0
-    failed: List[str] = []
-    for r in recipients:
-        if send_email(to=r.email, subject=subject, html=html):
-            sent += 1
-        else:
-            failed.append(r.email)
+
+def get_course_stats(db: Session, course_code: Optional[str] = None) -> Dict[str, Any]:
+    stmt = select(Course).order_by(Course.start_date.asc())
+    if course_code:
+        stmt = stmt.where(Course.code == course_code)
+    courses = list(db.execute(stmt).scalars())
+    if course_code and not courses:
+        return {"ok": False, "error": f"course '{course_code}' not found"}
+    return {"ok": True, "courses": [course_funnel_stats(db, c) for c in courses]}
+
+
+def get_software_stats(db: Session, slug: Optional[str] = None) -> Dict[str, Any]:
+    stmt = select(SoftwareProduct).order_by(
+        SoftwareProduct.created_at.asc(), SoftwareProduct.id.asc()
+    )
+    if slug:
+        stmt = stmt.where(SoftwareProduct.slug == slug)
+    products = list(db.execute(stmt).scalars())
+    if slug and not products:
+        return {"ok": False, "error": f"software '{slug}' not found"}
+    return {"ok": True, "software": [software_telemetry_stats(db, p) for p in products]}
+
+
+def list_software(db: Session, **_: Any) -> Dict[str, Any]:
+    # Same rows as GET /api/admin/software — hidden products included.
+    return {"ok": True, "software": software_routes.list_software_admin(db)}
+
+
+def list_learners(
+    db: Session,
+    query: Optional[str] = None,
+    product_code: Optional[str] = None,
+    limit: int = 50,
+) -> Dict[str, Any]:
+    if product_code and db.get(Product, product_code) is None:
+        return {"ok": False, "error": f"product '{product_code}' not found"}
+    data = academy_admin_routes.list_learners(product_code=product_code or "", db=db)
+    q = (query or "").strip().lower()
+    cap = max(1, min(int(limit), 200))
+    rows: List[Dict[str, Any]] = []
+    for row in data["learners"]:
+        if q and q not in row["email"].lower() and q not in (row["full_name"] or "").lower():
+            continue
+        rows.append(
+            {
+                "id": row["id"],
+                "email": row["email"],
+                "full_name": row["full_name"],
+                "status": row["status"],
+                "is_owner": row["is_owner"],
+                "created_at": _iso(row["created_at"]),
+                "last_login_at": _iso(row["last_login_at"]),
+                "lessons_completed": row["lessons_completed"],
+                "quiz_attempts": row["quiz_attempts"],
+                "enrollments": [
+                    {
+                        "product_code": e["product_code"],
+                        "status": e["status"],
+                        "source": e["source"],
+                        "granted_at": _iso(e["granted_at"]),
+                    }
+                    for e in row["enrollments"]
+                ],
+            }
+        )
+        if len(rows) >= cap:
+            break
+    return {"ok": True, "count": len(rows), "learners": rows}
+
+
+def get_email_log(db: Session, scope_code: Optional[str] = None, limit: int = 50) -> Dict[str, Any]:
+    data = comms_routes.comms_log(
+        scope_code=(scope_code or "").strip(),
+        limit=max(1, min(int(limit), 200)),
+        db=db,
+    )
+    return {"ok": True, "count": data["count"], "emails": data["rows"]}
+
+
+def list_course_content(db: Session, product_code: str) -> Dict[str, Any]:
+    try:
+        data = academy_admin_routes.product_content(product_code, db)
+    except HTTPException as e:
+        return _http_err(e)
+    modules = []
+    for m in data["modules"]:
+        modules.append(
+            {
+                "id": m["id"],
+                "code": m["code"],
+                "title": m["title"],
+                "position": m["position"],
+                "quiz_item_count": m["quiz_item_count"],
+                "lessons": [
+                    {
+                        "id": l["id"],
+                        "title": l["title"],
+                        "kind": l["kind"],
+                        "position": l["position"],
+                        "duration_s": l["duration_s"],
+                        "video_ready": bool(l["video_uid"]) if l["kind"] == "video" else None,
+                        "is_preview": l["is_preview"],
+                    }
+                    for l in m["lessons"]
+                ],
+            }
+        )
+    return {"ok": True, "product": data["product"], "modules": modules}
+
+
+def find_person(db: Session, email: str) -> Dict[str, Any]:
+    email_norm = (email or "").strip().lower()
+    if not email_norm:
+        return {"ok": False, "error": "email is required"}
+
+    regs = list(
+        db.execute(
+            select(Registration)
+            .where(func.lower(Registration.email) == email_norm)
+            .order_by(Registration.created_at.desc())
+        ).scalars()
+    )
+    learner = db.execute(
+        select(Learner).where(Learner.email == email_norm)
+    ).scalar_one_or_none()
+    enrollments: List[Enrollment] = []
+    if learner is not None:
+        enrollments = list(
+            db.execute(
+                select(Enrollment).where(Enrollment.learner_id == learner.id)
+            ).scalars()
+        )
+    order_filter = func.lower(Order.email) == email_norm
+    if learner is not None:
+        order_filter = or_(order_filter, Order.learner_id == learner.id)
+    orders = list(
+        db.execute(
+            select(Order).where(order_filter).order_by(Order.created_at.desc())
+        ).scalars()
+    )
 
     return {
         "ok": True,
-        "sent": sent,
-        "failed_count": len(failed),
-        "failed_addresses": failed,
-        "audience": audience,
-        "recipients_total": len(recipients),
+        "email": email_norm,
+        "found": bool(regs or learner or orders),
+        "registrations": [_registration_summary(r) for r in regs],
+        "learner": (
+            {
+                "id": learner.id,
+                "email": learner.email,
+                "full_name": learner.full_name,
+                "status": learner.status,
+                "created_at": _iso(learner.created_at),
+                "last_login_at": _iso(learner.last_login_at),
+            }
+            if learner is not None
+            else None
+        ),
+        "enrollments": [
+            {
+                "product_code": e.product_code,
+                "status": e.status,
+                "source": e.source,
+                "granted_at": _iso(e.granted_at),
+                "expires_at": _iso(e.expires_at),
+                "note": e.note,
+            }
+            for e in enrollments
+        ],
+        "orders": [
+            {
+                "id": o.id,
+                "product_code": o.product_code,
+                "provider": o.provider,
+                "status": o.status,
+                "amount_cents": o.amount_cents,
+                "currency": o.currency,
+                "created_at": _iso(o.created_at),
+                "paid_at": _iso(o.paid_at),
+            }
+            for o in orders
+        ],
     }
+
+
+# ---------------------------------------------------------------------------
+# Tool handlers — platform-wide writes
+# ---------------------------------------------------------------------------
+
+
+def notify_product_buyers(db: Session, product_code: str, subject: str, body: str) -> Dict[str, Any]:
+    """Broadcast to a product's active enrollees via the same path as
+    POST /api/admin/products/{code}/notify (batch send + EmailLog rows)."""
+    try:
+        payload = comms_routes.ProductNotifyIn(
+            subject=subject, body_html=_plain_text_to_email_html(body)
+        )
+    except ValidationError as e:
+        return _validation_err(e)
+    try:
+        out = comms_routes.notify_product(product_code, payload, db)
+    except HTTPException as e:
+        return _http_err(e)
+    return {
+        "ok": True,
+        "product_code": product_code,
+        "sent": out.recipients,
+        "failed_count": out.failures,
+        "failed_addresses": out.failed_addresses,
+    }
+
+
+def grant_enrollment(
+    db: Session, email: str, product_code: str, full_name: Optional[str] = None
+) -> Dict[str, Any]:
+    try:
+        payload = academy_admin_routes.GrantIn(
+            email=email,
+            product_code=product_code,
+            full_name=full_name or "",
+            note="granted via AI assistant",
+        )
+    except ValidationError as e:
+        return _validation_err(e)
+    try:
+        # Same path as POST /api/admin/academy/grant — upserts the learner,
+        # activates the enrollment and emails a sign-in link.
+        out = academy_admin_routes.grant(payload, db, admin="ai-assistant")
+    except HTTPException as e:
+        return _http_err(e)
+    return {**out, "product_code": product_code}
+
+
+def revoke_enrollment(db: Session, email: str, product_code: str) -> Dict[str, Any]:
+    try:
+        payload = academy_admin_routes.RevokeIn(email=email, product_code=product_code)
+    except ValidationError as e:
+        return _validation_err(e)
+    try:
+        academy_admin_routes.revoke(payload, db, admin="ai-assistant")
+    except HTTPException as e:
+        return _http_err(e)
+    return {"ok": True, "email": str(payload.email), "product_code": product_code}
+
+
+_LESSON_FIELDS = ("title", "body", "is_preview", "position")
+
+
+def update_lesson(db: Session, lesson_id: int, fields: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    fields = dict(fields or {})
+    unknown = sorted(set(fields) - set(_LESSON_FIELDS))
+    if unknown:
+        return {"ok": False, "error": f"unsupported fields {unknown}; allowed: {list(_LESSON_FIELDS)}"}
+    if not fields:
+        return {"ok": False, "error": "no fields supplied to update"}
+    try:
+        payload = academy_admin_routes.LessonPatch(**fields)
+    except ValidationError as e:
+        return _validation_err(e)
+    try:
+        academy_admin_routes.patch_lesson(int(lesson_id), payload, db)
+    except HTTPException as e:
+        return _http_err(e)
+    lesson = db.get(Lesson, int(lesson_id))
+    return {
+        "ok": True,
+        "changed_fields": sorted(fields),
+        "lesson": {
+            "id": lesson.id,
+            "title": lesson.title,
+            "kind": lesson.kind,
+            "position": lesson.position,
+            "is_preview": lesson.is_preview,
+        },
+    }
+
+
+_SOFTWARE_FIELDS = ("name", "blurb", "latest_version", "status")
+
+
+def update_software(db: Session, slug: str, fields: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    fields = dict(fields or {})
+    unknown = sorted(set(fields) - set(_SOFTWARE_FIELDS))
+    if unknown:
+        return {"ok": False, "error": f"unsupported fields {unknown}; allowed: {list(_SOFTWARE_FIELDS)}"}
+    if not fields:
+        return {"ok": False, "error": "no fields supplied to update"}
+    try:
+        payload = software_routes.SoftwarePatchIn(**fields)
+    except ValidationError as e:
+        return _validation_err(e)
+    try:
+        row = software_routes.patch_software(slug, payload, db)
+    except HTTPException as e:
+        return _http_err(e)
+    return {"ok": True, "changed_fields": sorted(fields), "software": row}
 
 
 # ---------------------------------------------------------------------------
 # Tool registry
 # ---------------------------------------------------------------------------
 
-# Maps tool name -> (handler, JSON-Schema spec for OpenAI tools field).
-# Handlers receive db as first positional arg, then kwargs from the model.
+# Maps tool name -> handler. Handlers receive db as first positional arg,
+# then kwargs from the model. Every name here must have a TOOL_SPECS entry
+# and vice versa (enforced by tests).
 TOOL_HANDLERS = {
     "list_courses": list_courses,
     "get_course": get_course,
@@ -285,6 +641,18 @@ TOOL_HANDLERS = {
     "bulk_mark_paid": bulk_mark_paid,
     "bulk_cancel": bulk_cancel,
     "notify_course": notify_course,
+    "get_course_stats": get_course_stats,
+    "get_software_stats": get_software_stats,
+    "list_software": list_software,
+    "list_learners": list_learners,
+    "get_email_log": get_email_log,
+    "list_course_content": list_course_content,
+    "find_person": find_person,
+    "notify_product_buyers": notify_product_buyers,
+    "grant_enrollment": grant_enrollment,
+    "revoke_enrollment": revoke_enrollment,
+    "update_lesson": update_lesson,
+    "update_software": update_software,
 }
 
 
@@ -303,7 +671,7 @@ def _fn(name: str, description: str, parameters: Dict[str, Any]) -> Dict[str, An
 TOOL_SPECS = [
     _fn(
         "list_courses",
-        "List every course with its seats and schedule. Read-only; use freely.",
+        "List every live-cohort course with seats, pricing, schedule and its linked recorded_product_code. Read-only; use freely.",
         {"type": "object", "properties": {}, "required": []},
     ),
     _fn(
@@ -311,7 +679,7 @@ TOOL_SPECS = [
         "Fetch full detail for a single course by its code.",
         {
             "type": "object",
-            "properties": {"code": {"type": "string", "description": "Course code, e.g. gas-turbine-emissions-mapping-2026-05"}},
+            "properties": {"code": {"type": "string", "description": "Course code from list_courses."}},
             "required": ["code"],
         },
     ),
@@ -337,20 +705,23 @@ TOOL_SPECS = [
     ),
     _fn(
         "list_registrations",
-        "List registrations for a course. Filterable by status. Returns up to `limit` rows (default 100).",
+        "List live-cohort registrations. course_code is REQUIRED: a real course code, or 'all' for every course. Each row carries its own course_code. Filterable by status.",
         {
             "type": "object",
             "properties": {
-                "course_code": {"type": "string"},
+                "course_code": {
+                    "type": "string",
+                    "description": "A course code from list_courses, or 'all' for every course.",
+                },
                 "status": {"type": "string", "enum": ["paid", "pending", "cancelled"]},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 500, "default": 100},
             },
-            "required": [],
+            "required": ["course_code"],
         },
     ),
     _fn(
         "mark_paid",
-        "Mark a single registration as paid. Use bulk_mark_paid for >1 row.",
+        "Mark a single registration as paid (same side effects as the admin dashboard button). Use bulk_mark_paid for >1 row.",
         {
             "type": "object",
             "properties": {
@@ -398,7 +769,7 @@ TOOL_SPECS = [
     ),
     _fn(
         "notify_course",
-        "Send an email broadcast to a course's registrants. Body is PLAIN TEXT — newlines become paragraphs/<br>, links auto-link. Always requires admin confirmation in chat.",
+        "Send an email broadcast to a course's audience. Body is PLAIN TEXT — newlines become paragraphs/<br>, links auto-link. Every send is written to the email log. Always requires admin confirmation in chat.",
         {
             "type": "object",
             "properties": {
@@ -407,19 +778,171 @@ TOOL_SPECS = [
                 "body": {"type": "string", "description": "Plain text. Backend converts to email HTML."},
                 "audience": {
                     "type": "string",
-                    "enum": ["all", "paid", "pending"],
+                    "enum": ["all", "paid", "pending", "recorded", "everyone"],
                     "default": "all",
-                    "description": "all = paid+pending; paid only; pending only.",
+                    "description": "all = live paid+pending; recorded = active buyers of the linked recorded product; everyone = all + recorded.",
                 },
             },
             "required": ["code", "subject", "body"],
+        },
+    ),
+    _fn(
+        "get_course_stats",
+        "Per-course stats: live funnel (pending/paid/cancelled, seats, registrations by day, top companies) plus the linked recorded product's revenue/enrollments (null when no recorded twin). Omit course_code for all courses.",
+        {
+            "type": "object",
+            "properties": {"course_code": {"type": "string"}},
+            "required": [],
+        },
+    ),
+    _fn(
+        "get_software_stats",
+        "Download / launch / usage telemetry per software product (totals, last-7/30-day windows, versions, top features). Omit slug for all products.",
+        {
+            "type": "object",
+            "properties": {"slug": {"type": "string"}},
+            "required": [],
+        },
+    ),
+    _fn(
+        "list_software",
+        "List every software product in the registry — hidden ones included — with telemetry counts and status.",
+        {"type": "object", "properties": {}, "required": []},
+    ),
+    _fn(
+        "list_learners",
+        "List academy learners with enrollment summaries and progress counts. query = substring match on email or name; product_code = only that product's active enrollees.",
+        {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Substring match on email or full name."},
+                "product_code": {"type": "string"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50},
+            },
+            "required": [],
+        },
+    ),
+    _fn(
+        "get_email_log",
+        "Recent outbound emails (broadcasts and transactional), newest first, with per-recipient success flags. scope_code filters to one course or product code.",
+        {
+            "type": "object",
+            "properties": {
+                "scope_code": {"type": "string", "description": "Course code or product code."},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50},
+            },
+            "required": [],
+        },
+    ),
+    _fn(
+        "list_course_content",
+        "Module → lesson tree for a recorded academy product: ids, titles, kind, duration, video readiness, preview flags.",
+        {
+            "type": "object",
+            "properties": {"product_code": {"type": "string", "description": "Academy product code, e.g. from a course's recorded_product_code."}},
+            "required": ["product_code"],
+        },
+    ),
+    _fn(
+        "find_person",
+        "Everything about one person by email, across the whole platform: cohort registrations (any course), learner record, enrollments and orders. Prefer this for 'who is X?' questions.",
+        {
+            "type": "object",
+            "properties": {"email": {"type": "string"}},
+            "required": ["email"],
+        },
+    ),
+    _fn(
+        "notify_product_buyers",
+        "Email everyone holding active access to a recorded product. Body is PLAIN TEXT. Every send is written to the email log. Always requires admin confirmation in chat.",
+        {
+            "type": "object",
+            "properties": {
+                "product_code": {"type": "string"},
+                "subject": {"type": "string"},
+                "body": {"type": "string", "description": "Plain text. Backend converts to email HTML."},
+            },
+            "required": ["product_code", "subject", "body"],
+        },
+    ),
+    _fn(
+        "grant_enrollment",
+        "Give a person access to a recorded product — creates the learner if needed and emails them a sign-in link. Always requires admin confirmation in chat.",
+        {
+            "type": "object",
+            "properties": {
+                "email": {"type": "string"},
+                "product_code": {"type": "string"},
+                "full_name": {"type": "string"},
+            },
+            "required": ["email", "product_code"],
+        },
+    ),
+    _fn(
+        "revoke_enrollment",
+        "Revoke a person's access to a recorded product. Always requires admin confirmation in chat.",
+        {
+            "type": "object",
+            "properties": {
+                "email": {"type": "string"},
+                "product_code": {"type": "string"},
+            },
+            "required": ["email", "product_code"],
+        },
+    ),
+    _fn(
+        "update_lesson",
+        "Edit one lesson. fields may contain: title, body, is_preview, position. Always requires admin confirmation in chat.",
+        {
+            "type": "object",
+            "properties": {
+                "lesson_id": {"type": "integer", "description": "Lesson id from list_course_content."},
+                "fields": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "body": {"type": "string"},
+                        "is_preview": {"type": "boolean"},
+                        "position": {"type": "integer", "minimum": 0},
+                    },
+                    "additionalProperties": False,
+                },
+            },
+            "required": ["lesson_id", "fields"],
+        },
+    ),
+    _fn(
+        "update_software",
+        "Edit a software product. fields may contain: name, blurb, latest_version, status ('live'|'hidden'). Status changes (hide/show) require admin confirmation in chat.",
+        {
+            "type": "object",
+            "properties": {
+                "slug": {"type": "string"},
+                "fields": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "blurb": {"type": "string"},
+                        "latest_version": {"type": "string"},
+                        "status": {"type": "string", "enum": ["live", "hidden"]},
+                    },
+                    "additionalProperties": False,
+                },
+            },
+            "required": ["slug", "fields"],
         },
     ),
 ]
 
 
 # Tools that always require admin confirmation in chat.
-HIGH_STAKES_ALWAYS = {"notify_course"}
+HIGH_STAKES_ALWAYS = {
+    "notify_course",
+    "notify_product_buyers",
+    "grant_enrollment",
+    "revoke_enrollment",
+    "update_lesson",
+}
 
 # Tools that are high-stakes only at large size.
 HIGH_STAKES_BULK_THRESHOLD = 3
@@ -432,6 +955,9 @@ def is_high_stakes(tool_name: str, args: Dict[str, Any]) -> bool:
     if tool_name in HIGH_STAKES_BULK_TOOLS:
         ids = args.get("registration_ids") or []
         return len(ids) >= HIGH_STAKES_BULK_THRESHOLD
+    if tool_name == "update_software":
+        # Hiding/showing a product changes the public site; metadata edits don't.
+        return "status" in (args.get("fields") or {})
     return False
 
 
@@ -443,6 +969,27 @@ def summarize_call(tool_name: str, args: Dict[str, Any]) -> str:
             f"Send broadcast email to '{args.get('code', '?')}' "
             f"(audience: {aud}) — subject: \"{args.get('subject', '')[:80]}\""
         )
+    if tool_name == "notify_product_buyers":
+        return (
+            f"Email all active buyers of product '{args.get('product_code', '?')}' "
+            f"— subject: \"{args.get('subject', '')[:80]}\""
+        )
+    if tool_name == "grant_enrollment":
+        return (
+            f"Grant {args.get('email', '?')} access to "
+            f"'{args.get('product_code', '?')}' (sends a sign-in link email)"
+        )
+    if tool_name == "revoke_enrollment":
+        return (
+            f"Revoke {args.get('email', '?')}'s access to "
+            f"'{args.get('product_code', '?')}'"
+        )
+    if tool_name == "update_lesson":
+        fields = sorted((args.get("fields") or {}).keys())
+        return f"Update lesson {args.get('lesson_id', '?')} — fields: {fields}"
+    if tool_name == "update_software":
+        fields = sorted((args.get("fields") or {}).keys())
+        return f"Update software '{args.get('slug', '?')}' — fields: {fields}"
     if tool_name in {"bulk_mark_paid", "bulk_cancel"}:
         ids = args.get("registration_ids") or []
         action = "Mark paid" if tool_name == "bulk_mark_paid" else "Cancel"
