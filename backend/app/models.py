@@ -448,6 +448,75 @@ class Lesson(Base):
     )
 
 
+class Chapter(Base):
+    """A named, seekable span inside one continuous lecture recording.
+
+    The source recordings arrive split into a dozen or more files, but those
+    splits are an artefact of upload size limits — a boundary can land
+    mid-sentence — so they are rejoined into one master per module and
+    navigated by chapter instead. Chapter names come from the deck's own
+    section structure ('Slip Factor', 'Disc Stress'), and the timestamps come
+    from matching what is on screen to the slides, so they mark where a topic
+    is genuinely taught rather than where a file happened to be cut.
+    """
+
+    __tablename__ = "academy_chapters"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lesson_id: Mapped[int] = mapped_column(Integer, index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, index=True)
+
+    title: Mapped[str] = mapped_column(String(300))
+    start_s: Mapped[int] = mapped_column(Integer, default=0)
+    end_s: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Slide numbers covered, so the player can show the deck alongside.
+    slides: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Slide(Base):
+    """One rendered slide, and the moment it appears in the recording.
+
+    Slides ship as images, never as the .pptx: the deck is the intellectual
+    property the whole platform exists to protect, so it is served through a
+    signed, watermarked endpoint and there is no file to hand around.
+
+    `text` is kept for two jobs that pay for themselves later — grounding the
+    course assistant in what was actually taught, and letting a learner search
+    the deck rather than scrub the video.
+    """
+
+    __tablename__ = "academy_slides"
+    __table_args__ = (
+        Index("ix_academy_slide_unique", "module_id", "number", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    module_id: Mapped[int] = mapped_column(Integer, index=True)
+    number: Mapped[int] = mapped_column(Integer, default=0)
+
+    title: Mapped[str] = mapped_column(String(300), default="")
+    section: Mapped[str] = mapped_column(String(200), default="")
+    text: Mapped[str] = mapped_column(Text, default="")
+
+    # Where this slide first appears in the master recording. -1 when the
+    # module has no recording (GT-03 and GT-12 today) or the alignment could
+    # not place it — the slide is still shown, just not seekable.
+    appears_at_s: Mapped[int] = mapped_column(Integer, default=-1)
+
+    # Stored asset keys, resolved to signed URLs at request time.
+    image_lg: Mapped[str] = mapped_column(String(300), default="")
+    image_sm: Mapped[str] = mapped_column(String(300), default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class LessonProgress(Base):
     """Per-learner, per-lesson watch state. Upserted by the player heartbeat."""
 
