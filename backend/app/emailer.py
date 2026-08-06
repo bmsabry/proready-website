@@ -218,3 +218,104 @@ def admin_notification_html(reg: dict, taken_after: int, capacity: int) -> str:
   </table>
 </body></html>
 """
+
+
+# -----------------------------------------------------------------------------
+# Academy templates
+# -----------------------------------------------------------------------------
+# Same dark-navy + cyan shell as the cohort emails above, so a buyer who has
+# also registered for a live course sees one consistent sender identity.
+
+def _academy_shell(eyebrow: str, heading: str, body_html: str) -> str:
+    return f"""\
+<!doctype html>
+<html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0b1220;padding:32px;color:#e2e8f0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#0f172a;border:1px solid #1e293b;border-radius:16px;overflow:hidden;">
+    <tr><td style="padding:32px;">
+      <div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#22d3ee;margin-bottom:8px;">
+        {eyebrow}
+      </div>
+      <h1 style="margin:0 0 16px;font-size:22px;color:#f1f5f9;">{heading}</h1>
+      {body_html}
+      <p style="margin:24px 0 0;font-size:13px;color:#64748b;">
+        Questions? Reply to this email or write to
+        <a href="mailto:info@proreadyengineer.com" style="color:#22d3ee;">info@proreadyengineer.com</a>.
+      </p>
+    </td></tr>
+    <tr><td style="padding:16px 32px;background:#0b1220;border-top:1px solid #1e293b;font-size:12px;color:#475569;">
+      ProReadyEngineer &middot; Thermal Fluid Sciences &amp; AI
+    </td></tr>
+  </table>
+</body></html>"""
+
+
+def _cta_button(label: str, url: str) -> str:
+    return f"""\
+      <p style="margin:0 0 24px;">
+        <a href="{url}" style="display:inline-block;background:linear-gradient(90deg,#22d3ee,#3b82f6);color:#04121f;
+           font-weight:700;font-size:15px;text-decoration:none;padding:13px 26px;border-radius:10px;">{label}</a>
+      </p>"""
+
+
+def login_link_html(full_name: str, link: str, minutes: int) -> str:
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    body = f"""\
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">
+        Here's your sign-in link. It works once and expires in
+        <strong>{minutes} minutes</strong>.
+      </p>
+{_cta_button("Sign in to your courses", link)}
+      <p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:#94a3b8;">
+        If the button doesn't work, paste this into your browser:<br>
+        <span style="color:#22d3ee;word-break:break-all;">{link}</span>
+      </p>
+      <p style="margin:0;font-size:13px;line-height:1.55;color:#94a3b8;">
+        Didn't ask for this? You can ignore this email — nobody can sign in
+        without the link above.
+      </p>"""
+    return _academy_shell("Sign in", "Your sign-in link", body)
+
+
+def purchase_welcome_html(
+    full_name: str, course_title: str, link: str, minutes: int
+) -> str:
+    greeting = f"Welcome aboard, {full_name}." if full_name else "Welcome aboard."
+    body = f"""\
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">
+        Your payment for <strong>{course_title}</strong> went through and your
+        access is live. It's yours for good — there's no subscription and no
+        expiry date.
+      </p>
+{_cta_button("Start the course", link)}
+      <p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:#94a3b8;">
+        That link signs you in and expires in {minutes} minutes. After that,
+        request a fresh one any time from the sign-in page — same email address,
+        no password to remember.
+      </p>
+      <p style="margin:0 0 8px;font-size:15px;line-height:1.55;">What's inside:</p>
+      <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#cbd5e1;">
+        Recorded sessions you can work through at your own pace, the slide decks
+        and design spreadsheets, the interactive labs, and the module quizzes.
+        Each module unlocks the next once you clear its check, and your progress
+        is saved as you go.
+      </p>"""
+    return _academy_shell("Payment confirmed", "You're in", body)
+
+
+def enrollment_granted_html(full_name: str, course_title: str, link: str) -> str:
+    """Manual/comp grant — an admin added this learner by hand."""
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    body = f"""\
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">
+        You've been given access to <strong>{course_title}</strong> on the
+        ProReadyEngineer training platform.
+      </p>
+{_cta_button("Open the course", link)}
+      <p style="margin:0;font-size:13px;line-height:1.55;color:#94a3b8;">
+        This link signs you in once. After that, request a new one any time from
+        the sign-in page using this same email address.
+      </p>"""
+    return _academy_shell("Access granted", "Your course is ready", body)

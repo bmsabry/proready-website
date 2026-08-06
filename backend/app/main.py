@@ -8,12 +8,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, select, text
 
+from .academy_seed import seed_academy
 from .config import get_settings
 from .db import Base, SessionLocal, engine
 from .models import Course
+from .routes import academy as academy_routes
+from .routes import academy_admin as academy_admin_routes
 from .routes import admin as admin_routes
 from .routes import ai as ai_routes
 from .routes import auth as auth_routes
+from .routes import checkout as checkout_routes
+from .routes import compat as compat_routes
 from .routes import courses as courses_routes
 from .routes import downloads as downloads_routes
 from .routes import register as register_routes
@@ -113,6 +118,10 @@ def _seed_default_course() -> None:
 
 _seed_default_course()
 
+# Academy content (products/modules/lessons/quiz items) is seeded from the
+# JSON manifests bundled in app/data/. Idempotent — safe on every boot.
+seed_academy()
+
 app = FastAPI(
     title="ProReadyEngineer Training API",
     version="1.0.0",
@@ -123,7 +132,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,  # required so /api/admin/* cookies survive
-    allow_methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -135,6 +144,13 @@ app.include_router(courses_routes.public_router)
 app.include_router(courses_routes.admin_router)
 app.include_router(ai_routes.router)
 app.include_router(downloads_routes.router)
+app.include_router(academy_routes.router)
+app.include_router(checkout_routes.router)
+app.include_router(academy_admin_routes.router)
+# Legacy contract for the standalone quiz apps. Mounted at /auth and
+# /learning (no /api prefix) because that is what those apps already call.
+app.include_router(compat_routes.auth_router)
+app.include_router(compat_routes.learning_router)
 
 
 @app.get("/", tags=["meta"])
