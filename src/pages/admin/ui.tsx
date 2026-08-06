@@ -110,6 +110,43 @@ export function ProviderBadge({ provider }: { provider?: string }) {
   );
 }
 
+/** ACH settlement state of an enrollment: amber while the bank debit is
+ *  pending (title carries the drop-dead date), red once it failed. Settled
+ *  card payments render nothing. */
+export function SettlementBadge({
+  status,
+  deadline,
+}: {
+  status?: string;
+  deadline?: string | null;
+}) {
+  if (status === 'pending') {
+    return (
+      <span
+        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono border bg-amber-500/15 text-amber-300 border-amber-500/40"
+        title={
+          deadline
+            ? `Bank payment pending — funds expected by ${new Date(deadline).toLocaleDateString()}; access auto-revokes if unconfirmed`
+            : 'Bank payment pending'
+        }
+      >
+        bank pending
+      </span>
+    );
+  }
+  if (status === 'failed') {
+    return (
+      <span
+        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono border bg-red-500/15 text-red-300 border-red-500/40"
+        title="Bank payment failed or timed out — access revoked; buyer emailed with card/contact options"
+      >
+        bank failed
+      </span>
+    );
+  }
+  return null;
+}
+
 // ----- Form fields -----------------------------------------------------------
 
 export function LabeledInput({

@@ -73,6 +73,7 @@ import {
   ProviderBadge,
   RefreshButton,
   SeatsBar,
+  SettlementBadge,
   StatusBadge,
 } from './ui';
 
@@ -724,9 +725,16 @@ function BuyersTab({
               </thead>
               <tbody>
                 {filtered.map((l) => {
-                  const enr = l.enrollments.find(
-                    (e) => e.product_code === productCode && e.status === 'active',
-                  );
+                  // Failed bank payments arrive revoked — resolve them too so
+                  // the row badges red instead of reading as never-enrolled.
+                  const enr =
+                    l.enrollments.find(
+                      (e) => e.product_code === productCode && e.status === 'active',
+                    ) ??
+                    l.enrollments.find(
+                      (e) =>
+                        e.product_code === productCode && e.settlement_status === 'failed',
+                    );
                   return (
                     <tr key={l.id} className="border-b border-slate-800/60 last:border-0">
                       <td className="px-4 py-3">
@@ -743,8 +751,14 @@ function BuyersTab({
                       <td className="px-4 py-3">
                         {enr ? (
                           <div>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
-                              {enr.source}
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
+                                {enr.source}
+                              </span>
+                              <SettlementBadge
+                                status={enr.settlement_status}
+                                deadline={enr.settlement_deadline}
+                              />
                             </span>
                             <div className="text-[11px] text-slate-500 mt-1">
                               since {formatDate(enr.granted_at)}
@@ -775,7 +789,7 @@ function BuyersTab({
                             )}
                             Sign-in link
                           </button>
-                          {enr && (
+                          {enr && enr.status === 'active' && (
                             <ConfirmButton
                               message={`Revoke ${l.email}'s access to ${productCode}?`}
                               onConfirm={() => void revoke(l.email)}

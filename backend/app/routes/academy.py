@@ -314,6 +314,9 @@ def me(
             Enrollment.learner_id == learner.id, Enrollment.status == "active"
         )
     ).scalars().all()
+    # Write-on-read settlement enforcement: a bank payment past its
+    # 7-business-day deadline drops out of /me the moment it's looked at.
+    rows = [r for r in rows if svc.settlement_ok(db, r)]
     products = {p.code: p for p in db.execute(select(Product)).scalars().all()}
     return {
         "signed_in": True,

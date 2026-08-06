@@ -16,6 +16,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .config import get_settings
+from .emailer import (
+    send_email,
+    settlement_failed_admin_html,
+    settlement_failed_html,
+)
 from .models import (
     Certificate,
     Enrollment,
@@ -23,6 +28,7 @@ from .models import (
     Lesson,
     LessonProgress,
     Module,
+    Product,
     QuizAttempt,
     QuizItem,
 )
@@ -62,6 +68,8 @@ def active_enrollment(
     ).scalar_one_or_none()
     if row is None:
         return None
+    if not settlement_ok(db, row):
+        return None
     expires = _aware(row.expires_at)
     if expires is not None and expires <= datetime.now(timezone.utc):
         return None
@@ -84,10 +92,97 @@ def any_active_enrollment(db: Session, learner: Learner | None) -> bool:
     ).scalars().all()
     now = datetime.now(timezone.utc)
     for row in rows:
+        if not settlement_ok(db, row):
+            continue
         expires = _aware(row.expires_at)
         if expires is None or expires > now:
             return True
     return False
+
+
+def settlement_ok(db: Session, row: Enrollment) -> bool:
+    """Is this enrollment's payment (still) good? The 7-business-day revoke.
+
+    ACH purchases grant provisional access with settlement_status='pending'
+    and a settlement_deadline (see settlement.py). There is no cron: the rule
+    is enforced lazily, on read, by every access path that goes through
+    active_enrollment / any_active_enrollment and by the admin serializers.
+    A pending row past its deadline is revoked on the spot (write-on-read)
+    and the buyer + admin are emailed exactly once — the status flip inside
+    revoke_for_failed_settlement is the double-send guard.
+    """
+    if row.settlement_status != "pending":
+        return True
+    deadline = _aware(row.settlement_deadline)
+    if deadline is None or deadline > datetime.now(timezone.utc):
+        return True
+    revoke_for_failed_settlement(
+        db,
+        row,
+        note=f"bank payment not confirmed by {deadline.date().isoformat()}",
+        detail=(
+            "The bank payment was never confirmed by the "
+            f"{deadline.date().isoformat()} deadline — access revoked."
+        ),
+    )
+    return False
+
+
+def revoke_for_failed_settlement(
+    db: Session, enrollment: Enrollment, *, note: str, detail: str = ""
+) -> bool:
+    """Pull provisional access after a bank payment fails (or times out) and
+    email the buyer + admin. Shared by the async_payment_failed webhook and
+    the lazy deadline enforcement so both speak with one voice.
+
+    Returns True when the row transitioned. The settlement_status flip is the
+    idempotency/double-send guard: webhook replays and repeated access checks
+    find 'failed' and do nothing.
+    """
+    if enrollment.settlement_status == "failed":
+        return False
+    enrollment.status = "revoked"
+    enrollment.settlement_status = "failed"
+    enrollment.settlement_deadline = None
+    enrollment.note = note[:500]
+    db.commit()
+
+    settings = get_settings()
+    learner = db.get(Learner, enrollment.learner_id)
+    product = db.get(Product, enrollment.product_code)
+    title = product.title if product is not None else enrollment.product_code
+    course_url = f"{settings.SITE_URL}/training/{enrollment.product_code}"
+
+    if learner is not None:
+        send_email(
+            to=learner.email,
+            subject=f"Action needed — your bank payment for {title} didn't clear",
+            html=settlement_failed_html(learner.full_name or "", title, course_url),
+            db=db,
+            scope_kind="product",
+            scope_code=enrollment.product_code,
+            audience="payer",
+            template="settlement_failed",
+        )
+    if settings.ADMIN_NOTIFY_EMAIL:
+        send_email(
+            to=settings.ADMIN_NOTIFY_EMAIL,
+            subject=(
+                "Bank payment failed — access revoked: "
+                f"{learner.email if learner else 'unknown'} / {enrollment.product_code}"
+            ),
+            html=settlement_failed_admin_html(
+                learner.email if learner else "unknown",
+                title,
+                detail or note,
+            ),
+            db=db,
+            scope_kind="product",
+            scope_code=enrollment.product_code,
+            audience="admin",
+            template="settlement_failed_admin",
+        )
+    return True
 
 
 def is_owner(learner: Learner | None) -> bool:
@@ -142,11 +237,18 @@ def grant_enrollment(
     source: str = "stripe",
     order_id: int | None = None,
     note: str = "",
+    settlement_status: str = "settled",
+    settlement_deadline: datetime | None = None,
 ) -> Enrollment:
     """Create or reactivate an access grant. Idempotent by (learner, product).
 
     Re-granting a revoked enrollment flips it back to active rather than
     inserting a duplicate, so a refund-then-repurchase leaves one clean row.
+
+    Card payments (and manual/comp grants) settle instantly — the defaults.
+    An ACH purchase passes settlement_status='pending' plus a deadline, and
+    the settled call after async_payment_succeeded clears both (this same
+    reactivation path also restores access if funds clear after a revoke).
     """
     existing = db.execute(
         select(Enrollment).where(
@@ -155,9 +257,18 @@ def grant_enrollment(
         )
     ).scalar_one_or_none()
     if existing is not None:
+        already_settled = (
+            existing.status == "active" and existing.settlement_status == "settled"
+        )
         existing.status = "active"
         existing.expires_at = None
         existing.source = source
+        # A new provisional (ACH) purchase must never downgrade access that is
+        # already active and settled — if the fresh debit later bounces, the
+        # previously-paid grant survives.
+        if not (already_settled and settlement_status == "pending"):
+            existing.settlement_status = settlement_status
+            existing.settlement_deadline = settlement_deadline
         if order_id is not None:
             existing.order_id = order_id
         if note:
@@ -173,6 +284,8 @@ def grant_enrollment(
         status="active",
         expires_at=None,
         note=note,
+        settlement_status=settlement_status,
+        settlement_deadline=settlement_deadline,
     )
     db.add(row)
     db.commit()

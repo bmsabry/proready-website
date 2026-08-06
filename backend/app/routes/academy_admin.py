@@ -391,8 +391,16 @@ def list_learners(
         # as staff here without waiting for them to sign in again.
         svc.sync_owner_flag(db, learner)
         rows = by_learner.get(learner.id, [])
+        # Same write-on-read settlement enforcement as the access rule, so the
+        # dashboard never shows a lapsed bank payment as live access.
+        for r in rows:
+            svc.settlement_ok(db, r)
+        # The product filter keeps failed-settlement buyers visible: the
+        # Buyers tab needs them to badge 'bank payment failed' for follow-up.
         if product_code and not any(
-            r.product_code == product_code and r.status == "active" for r in rows
+            r.product_code == product_code
+            and (r.status == "active" or r.settlement_status == "failed")
+            for r in rows
         ):
             continue
 
@@ -426,6 +434,8 @@ def list_learners(
                         "status": r.status,
                         "source": r.source,
                         "granted_at": r.granted_at,
+                        "settlement_status": r.settlement_status,
+                        "settlement_deadline": r.settlement_deadline,
                     }
                     for r in rows
                 ],

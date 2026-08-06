@@ -467,7 +467,8 @@ def login_link_html(full_name: str, link: str, minutes: int) -> str:
 
 
 def purchase_welcome_html(
-    full_name: str, course_title: str, link: str, minutes: int
+    full_name: str, course_title: str, link: str, minutes: int,
+    bank_pending: bool = False,
 ) -> str:
     greeting = f"Welcome aboard, {full_name}." if full_name else "Welcome aboard."
     body = f"""\
@@ -490,7 +491,22 @@ def purchase_welcome_html(
         Each module unlocks the next once you clear its check, and your progress
         is saved as you go.
       </p>"""
-    return _academy_shell("Payment confirmed", "You're in", body)
+    if bank_pending:
+        # ACH: the debit is initiated but unconfirmed for a few business days.
+        # Access is provisional; academy.settlement_ok pulls it if the payment
+        # never clears, and _payment_failed emails them if the bank says no.
+        body += """
+      <p style="margin:0 0 16px;padding:12px 14px;border:1px solid rgba(245,158,11,0.4);border-radius:10px;background:rgba(245,158,11,0.08);font-size:13px;line-height:1.6;color:#fcd34d;">
+        One note: you paid by bank transfer, which takes a few business days to
+        clear. Your access is active now and will be fully confirmed once the
+        payment clears — nothing more for you to do. If it doesn't go through,
+        we'll email you right away.
+      </p>"""
+    return _academy_shell(
+        "Bank payment processing" if bank_pending else "Payment confirmed",
+        "You're in",
+        body,
+    )
 
 
 def enrollment_granted_html(full_name: str, course_title: str, link: str) -> str:
@@ -550,3 +566,79 @@ def payment_receipt_html(
         details and schedule before the course begins.
       </p>"""
     return _academy_shell("Payment received", "Your seat is confirmed", body)
+
+
+def settlement_failed_html(
+    full_name: str, course_title: str, course_url: str
+) -> str:
+    """Recorded product: the bank debit never cleared — access is paused."""
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    body = f"""\
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
+        Your bank payment for <strong>{course_title}</strong> didn't clear, so
+        your course access is paused for now. Your progress is saved — nothing
+        is lost.
+      </p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">
+        To get back in, pay by card from the course page (it takes a minute and
+        access is restored instantly), or simply reply to this email and we'll
+        sort it out and reinstate you.
+      </p>
+{_cta_button("Pay by card", course_url)}
+      <p style="margin:0;font-size:13px;line-height:1.55;color:#94a3b8;">
+        Course page:
+        <a href="{course_url}" style="color:#22d3ee;word-break:break-all;">{course_url}</a>
+      </p>"""
+    return _academy_shell("Payment issue", "Your bank payment didn't clear", body)
+
+
+def live_bank_failed_html(
+    full_name: str, course_title: str, course_url: str
+) -> str:
+    """Live cohort seat: the bank debit never cleared — the seat is still held."""
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    body = f"""\
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
+        Your bank payment for <strong>{course_title}</strong> didn't clear.
+        Don't worry — <strong>your seat is still held</strong> for you.
+      </p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">
+        To confirm it, pay by card from the course page, or reply to this email
+        and we'll arrange another way to settle it.
+      </p>
+{_cta_button("Pay by card", course_url)}
+      <p style="margin:0;font-size:13px;line-height:1.55;color:#94a3b8;">
+        Course page:
+        <a href="{course_url}" style="color:#22d3ee;word-break:break-all;">{course_url}</a>
+      </p>"""
+    return _academy_shell("Payment issue", "Your bank payment didn't clear", body)
+
+
+def settlement_failed_admin_html(
+    buyer_email: str, course_title: str, detail: str
+) -> str:
+    """Owner heads-up when a bank payment fails or times out unconfirmed."""
+    body = f"""\
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
+        A bank (ACH) payment did not clear.
+      </p>
+      <table style="margin:0 0 16px;font-size:14px;">
+        <tr>
+          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Buyer</td>
+          <td style="padding:4px 0;color:#f1f5f9;">{buyer_email}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Course</td>
+          <td style="padding:4px 0;color:#f1f5f9;">{course_title}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Outcome</td>
+          <td style="padding:4px 0;color:#f1f5f9;">{detail}</td>
+        </tr>
+      </table>
+      <p style="margin:0;font-size:13px;line-height:1.55;color:#94a3b8;">
+        The buyer has been emailed with card-payment and contact options.
+      </p>"""
+    return _academy_shell("Payments", "Bank payment failed", body)

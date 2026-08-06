@@ -80,6 +80,15 @@ def _run_column_migrations() -> None:
     )
     _ensure_column("registrations", "payment_ref", "VARCHAR(128) NOT NULL DEFAULT ''")
     _ensure_column("registrations", "amount_cents", "INTEGER")
+    # academy_enrollments settlement tracking (ACH delayed-notification).
+    _ensure_column(
+        "academy_enrollments",
+        "settlement_status",
+        "VARCHAR(16) NOT NULL DEFAULT 'settled'",
+    )
+    _ensure_column(
+        "academy_enrollments", "settlement_deadline", "TIMESTAMP WITH TIME ZONE"
+    )
 
 
 _run_column_migrations()

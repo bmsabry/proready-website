@@ -39,8 +39,10 @@ from .. import academy as svc
 from .. import paypal
 from ..config import get_settings
 from ..db import get_db
-from ..emailer import payment_receipt_html, send_email
+from ..emailer import live_bank_failed_html, payment_receipt_html, send_email
+from ..emailer import settlement_failed_admin_html
 from ..models import Course, Order, Product, Registration
+from ..settlement import SETTLEMENT_MARGIN_BUSINESS_DAYS, add_business_days
 from .admin import mark_registration_paid
 from .checkout import _stripe, grant_and_welcome
 
@@ -316,10 +318,11 @@ def live_stripe_checkout(body: LiveOrderIn, db: Session = Depends(get_db)) -> di
     return {"url": session.url}
 
 
-def fulfil_live_session(db: Session, session_obj: dict) -> None:
-    """Mark a live-cohort registration paid from a completed Stripe Checkout
-    Session. Called by the webhook after signature verification; must never
-    raise — Stripe would retry a permanent condition forever."""
+def _live_session_registration(
+    db: Session, session_obj: dict
+) -> tuple[Registration, Course] | None:
+    """Resolve a live_course-tagged Checkout Session to its registration and
+    course, or None (with logging) when the metadata is broken."""
     session_id = str(session_obj.get("id") or "")
     raw_reg_id = (session_obj.get("metadata") or {}).get("registration_id")
     try:
@@ -329,7 +332,7 @@ def fulfil_live_session(db: Session, session_obj: dict) -> None:
             "live_course session %s has bad registration_id %r",
             session_id, raw_reg_id,
         )
-        return
+        return None
 
     reg = db.get(Registration, reg_id)
     if reg is None:
@@ -337,7 +340,7 @@ def fulfil_live_session(db: Session, session_obj: dict) -> None:
             "live_course session %s references unknown registration %s",
             session_id, reg_id,
         )
-        return
+        return None
     course = db.execute(
         select(Course).where(Course.code == reg.course_code)
     ).scalar_one_or_none()
@@ -345,6 +348,66 @@ def fulfil_live_session(db: Session, session_obj: dict) -> None:
         log.error(
             "live_course session %s: course %r missing", session_id, reg.course_code
         )
+        return None
+    return reg, course
+
+
+# Lines a bank-payment event may write into Registration.admin_notes. Each
+# event replaces the other kind's line, so the note always reflects the
+# latest state of the debit — and an already-present line of the same kind
+# is the webhook-replay guard.
+_BANK_NOTE_PREFIXES = ("bank payment processing", "bank payment failed")
+
+
+def _swap_bank_note(reg: Registration, note: str) -> bool:
+    """Replace any prior bank-payment note line with `note`, preserving the
+    admin's own notes. Returns False (no change) when a line of the same
+    kind is already present — i.e. a webhook replay."""
+    prefix = next(pfx for pfx in _BANK_NOTE_PREFIXES if note.startswith(pfx))
+    lines = [l for l in (reg.admin_notes or "").splitlines() if l.strip()]
+    if any(l.startswith(prefix) for l in lines):
+        return False
+    lines = [l for l in lines if not l.startswith(_BANK_NOTE_PREFIXES)]
+    lines.append(note)
+    reg.admin_notes = "\n".join(lines)[:2000]
+    return True
+
+
+def fulfil_live_session(db: Session, session_obj: dict) -> None:
+    """Handle checkout.session.completed / async_payment_succeeded for a
+    live-cohort seat. Called by the webhook after signature verification;
+    must never raise — Stripe would retry a permanent condition forever.
+
+    The registration flips to paid ONLY when the session's payment_status is
+    'paid': a card at completed, or an ACH debit at async_payment_succeeded.
+    A completed-but-unpaid session (ACH pending) leaves the row pending —
+    the seat is already held by the pending registration — notes the
+    expected settlement date for the admin, and sends no receipt yet."""
+    session_id = str(session_obj.get("id") or "")
+    loaded = _live_session_registration(db, session_obj)
+    if loaded is None:
+        return
+    reg, course = loaded
+
+    if str(session_obj.get("payment_status") or "") != "paid":
+        # ACH delayed notification: funds unconfirmed for 4-5 business days.
+        if reg.status != "pending":
+            log.info(
+                "live_course session %s unpaid but registration %s is %s — ignoring",
+                session_id, reg.id, reg.status,
+            )
+            return
+        deadline = add_business_days(
+            datetime.now(timezone.utc), SETTLEMENT_MARGIN_BUSINESS_DAYS
+        )
+        if _swap_bank_note(
+            reg, f"bank payment processing, expected by {deadline.date().isoformat()}"
+        ):
+            db.commit()
+            log.info(
+                "live_course session %s: bank payment pending for registration %s",
+                session_id, reg.id,
+            )
         return
 
     amount = int(session_obj.get("amount_total") or course.price_cents)
@@ -359,6 +422,70 @@ def fulfil_live_session(db: Session, session_obj: dict) -> None:
             "live_course session %s could not be marked paid: %s",
             session_id, exc.detail,
         )
+
+
+def live_payment_failed(db: Session, session_obj: dict) -> None:
+    """checkout.session.async_payment_failed for a live-cohort seat.
+
+    No auto-cancel: a pending registration IS the held-seat pre-payment
+    state, so the row stays pending and the owner releases it by hand if
+    needed. The admin note flips from 'processing' to 'failed', and the
+    buyer (seat still held — pay by card or contact us) plus the admin are
+    emailed once; the note swap doubles as the replay guard."""
+    session_id = str(session_obj.get("id") or "")
+    loaded = _live_session_registration(db, session_obj)
+    if loaded is None:
+        return
+    reg, course = loaded
+
+    if reg.status == "paid":
+        # Funds were already confirmed; a late failure event must not touch it.
+        log.warning(
+            "async_payment_failed for paid registration %s (%s) — ignoring",
+            reg.id, session_id,
+        )
+        return
+
+    today = datetime.now(timezone.utc).date().isoformat()
+    if not _swap_bank_note(reg, f"bank payment failed {today}"):
+        return  # replay — already recorded and already emailed
+    db.commit()
+
+    settings = get_settings()
+    course_url = f"{settings.SITE_URL}/training/{course.code}"
+    send_email(
+        to=reg.email,
+        subject=f"Your bank payment didn't clear — {course.title}",
+        html=live_bank_failed_html(reg.full_name, course.title, course_url),
+        db=db,
+        scope_kind="course",
+        scope_code=course.code,
+        audience="payer",
+        template="live_bank_failed",
+    )
+    if settings.ADMIN_NOTIFY_EMAIL:
+        send_email(
+            to=settings.ADMIN_NOTIFY_EMAIL,
+            subject=(
+                f"Bank payment failed — live seat still pending: "
+                f"{reg.email} / {course.code}"
+            ),
+            html=settlement_failed_admin_html(
+                reg.email,
+                course.title,
+                f"Live-cohort seat: the ACH debit failed on {today}. The "
+                "registration stays pending (seat held) — no auto-cancel.",
+            ),
+            db=db,
+            scope_kind="course",
+            scope_code=course.code,
+            audience="admin",
+            template="live_bank_failed_admin",
+        )
+    log.info(
+        "live_course session %s: bank payment failed for registration %s",
+        session_id, reg.id,
+    )
 
 
 # ----- RECORDED products: PayPal --------------------------------------------

@@ -15,6 +15,9 @@ const Welcome: React.FC = () => {
   const sessionId = params.get('session_id') || '';
   const [status, setStatus] = useState<'checking' | 'paid' | 'slow'>('checking');
   const [email, setEmail] = useState('');
+  // ACH: the order sits at 'processing' while the bank debit clears, but
+  // access is already provisioned — treat it as success with a caveat.
+  const [bankPending, setBankPending] = useState(false);
 
   usePageMeta('Thank you', 'Your ProReadyEngineer course purchase.', { noindex: true });
 
@@ -30,8 +33,9 @@ const Welcome: React.FC = () => {
       try {
         const res = await academy.checkoutStatus(sessionId);
         if (cancelled) return;
-        if (res.status === 'paid') {
+        if (res.status === 'paid' || res.status === 'processing') {
           setEmail(res.email || '');
+          setBankPending(res.status === 'processing');
           setStatus('paid');
           return;
         }
@@ -71,6 +75,13 @@ const Welcome: React.FC = () => {
                 link to <strong className="text-white">{email}</strong> — no password
                 to invent.
               </p>
+              {bankPending && (
+                <p className="text-amber-300/90 text-xs leading-relaxed -mt-3 mb-6">
+                  You paid by bank transfer, which takes a few business days to
+                  clear. Your access is active in the meantime — we'll email you
+                  if anything needs attention.
+                </p>
+              )}
               <Link to="/learn/signin" className="btn-primary w-full">
                 Go to your course
               </Link>

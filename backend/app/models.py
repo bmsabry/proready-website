@@ -412,6 +412,15 @@ class Enrollment(Base):
     status: Mapped[str] = mapped_column(String(16), default="active", index=True)
     note: Mapped[str] = mapped_column(String(500), default="")
 
+    # Delayed-notification (ACH) tracking. 'settled' — funds confirmed (cards
+    # settle instantly); 'pending' — provisional access while the bank debit
+    # clears; 'failed' — the debit bounced or the deadline lapsed unconfirmed.
+    settlement_status: Mapped[str] = mapped_column(String(16), default="settled")
+    # Drop-dead date for a 'pending' row; NULL once settled/failed.
+    settlement_deadline: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
 
 class Module(Base):
     """A top-level unit of a product — one GT session (GT-05, GT-06, ...)."""

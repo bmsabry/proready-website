@@ -174,6 +174,9 @@ export type Enrollment = {
   status: string;
   source: string;
   granted_at: string;
+  // ACH delayed-notification tracking: 'settled' | 'pending' | 'failed'.
+  settlement_status?: string;
+  settlement_deadline?: string | null;
 };
 
 export type Learner = {

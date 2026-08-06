@@ -24,7 +24,7 @@ import {
   type Learner,
   type Owners,
 } from './lib';
-import { ConfirmButton, Notice, RefreshButton, Section, StatusBadge } from './ui';
+import { ConfirmButton, Notice, RefreshButton, Section, SettlementBadge, StatusBadge } from './ui';
 
 export default function AcademyPage({ onAuthError }: { onAuthError: () => void }) {
   const [products, setProducts] = useState<AcademyProduct[] | null>(null);
@@ -461,20 +461,28 @@ export default function AcademyPage({ onAuthError }: { onAuthError: () => void }
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
                           everything
                         </span>
-                      ) : l.enrollments.filter((e) => e.status === 'active').length === 0 ? (
+                      ) : l.enrollments.filter(
+                          (e) => e.status === 'active' || e.settlement_status === 'failed',
+                        ).length === 0 ? (
                         <span className="text-slate-500 text-xs">none</span>
                       ) : (
                         <div className="flex flex-wrap gap-1">
                           {l.enrollments
-                            .filter((e) => e.status === 'active')
+                            .filter(
+                              (e) => e.status === 'active' || e.settlement_status === 'failed',
+                            )
                             .map((e) => (
                               <span
                                 key={e.product_code}
-                                className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300"
+                                className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300"
                                 title={`granted ${e.granted_at}`}
                               >
                                 {e.product_code}
                                 <span className="text-slate-500"> · {e.source}</span>
+                                <SettlementBadge
+                                  status={e.settlement_status}
+                                  deadline={e.settlement_deadline}
+                                />
                               </span>
                             ))}
                         </div>

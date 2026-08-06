@@ -17,6 +17,14 @@ Flow:
 Idempotency: `academy_orders.provider_ref` is unique on the Checkout Session
 id, so Stripe's at-least-once webhook delivery can replay the same event
 without double-granting or double-emailing.
+
+ACH (US bank debit) is delayed-notification: `completed` arrives with
+payment_status='unpaid' and the money confirms 4-5 business days later via
+`async_payment_succeeded` / fails via `async_payment_failed`. Recorded
+products grant provisional access at completed (Order 'processing',
+enrollment settlement-pending with a 7-business-day deadline enforced
+lazily by academy.settlement_ok); live-cohort seats only flip to paid when
+payment_status is actually 'paid'.
 """
 from __future__ import annotations
 
@@ -33,6 +41,7 @@ from ..db import get_db
 from ..emailer import purchase_welcome_html, send_email
 from ..learner_auth import issue_login_token
 from ..models import Learner, Order, Product
+from ..settlement import SETTLEMENT_MARGIN_BUSINESS_DAYS, add_business_days
 
 log = logging.getLogger(__name__)
 
@@ -143,11 +152,8 @@ def create_checkout(
     return {"url": session.url, "session_id": session.id}
 
 
-def _fulfil(db: Session, session_obj: dict) -> None:
-    """Turn a completed Checkout Session into access. Idempotent.
-
-    Called only from the webhook, only after signature verification.
-    """
+def _session_identity(session_obj: dict) -> tuple[str, str, str]:
+    """(session_id, buyer_email, product_code) from a Checkout Session."""
     session_id = session_obj.get("id") or ""
     email = (
         (session_obj.get("customer_details") or {}).get("email")
@@ -157,6 +163,23 @@ def _fulfil(db: Session, session_obj: dict) -> None:
     product_code = (session_obj.get("metadata") or {}).get(
         "product_code"
     ) or session_obj.get("client_reference_id")
+    return session_id, email, str(product_code or "")
+
+
+def _fulfil(db: Session, session_obj: dict, *, provisional: bool = False) -> None:
+    """Turn a completed Checkout Session into access. Idempotent.
+
+    Called only from the webhook, only after signature verification.
+
+    provisional=True is the ACH path: `checkout.session.completed` arrived
+    with payment_status != 'paid', so the money is 4-5 business days out.
+    Access is granted immediately anyway (owner's call: digital goods, low
+    fraud surface) but marked settlement-pending with a 7-business-day
+    drop-dead date, and the Order sits at 'processing' until the bank
+    answers via async_payment_succeeded/_failed — or the deadline lapses
+    and academy.settlement_ok revokes on read.
+    """
+    session_id, email, product_code = _session_identity(session_obj)
 
     if not email or not product_code:
         log.error("Webhook missing email or product_code for session %s", session_id)
@@ -168,6 +191,12 @@ def _fulfil(db: Session, session_obj: dict) -> None:
     if order is not None and order.status == "paid":
         log.info("Webhook replay for already-fulfilled session %s — ignoring", session_id)
         return
+    if provisional and order is not None and order.status == "processing":
+        log.info("Replay of unpaid completed event %s — ignoring", session_id)
+        return
+    # async_payment_succeeded after a processed completed event: the welcome
+    # email already went out with the provisional grant — settle silently.
+    was_provisional = order is not None and order.status == "processing"
 
     product = db.get(Product, product_code)
     if product is None:
@@ -193,31 +222,121 @@ def _fulfil(db: Session, session_obj: dict) -> None:
     order.amount_cents = int(session_obj.get("amount_total") or product.price_cents)
     order.currency = (session_obj.get("currency") or product.currency).lower()
     order.payment_ref = str(session_obj.get("payment_intent") or "")
-    order.status = "paid"
     from datetime import datetime, timezone as _tz
 
-    order.paid_at = datetime.now(_tz.utc)
+    if provisional:
+        order.status = "processing"
+    else:
+        order.status = "paid"
+        order.paid_at = datetime.now(_tz.utc)
     db.commit()
     db.refresh(order)
 
-    grant_and_welcome(db, order, product, learner)
-    log.info("Fulfilled order %s for %s (%s)", order.id, email, product_code)
+    grant_and_welcome(
+        db, order, product, learner,
+        bank_pending=provisional,
+        send_welcome=provisional or not was_provisional,
+    )
+    log.info(
+        "%s order %s for %s (%s)",
+        "Provisionally granted" if provisional else "Fulfilled",
+        order.id, email, product_code,
+    )
+
+
+def _payment_failed(db: Session, session_obj: dict) -> None:
+    """checkout.session.async_payment_failed for a recorded product: the ACH
+    debit bounced after provisional access was granted. Idempotent — the
+    Order status flip guards the whole path, and the enrollment flip inside
+    revoke_for_failed_settlement guards the emails.
+    """
+    session_id, email, product_code = _session_identity(session_obj)
+
+    order = db.execute(
+        select(Order).where(Order.provider_ref == session_id)
+    ).scalar_one_or_none()
+    if order is None:
+        # completed never reached us either — nothing was granted.
+        log.info("async_payment_failed for unknown session %s — ignoring", session_id)
+        return
+    if order.status == "failed":
+        return  # replay
+    if order.status == "paid":
+        # Funds were already confirmed; a late failure event must not un-pay.
+        log.warning(
+            "async_payment_failed for already-paid session %s — ignoring", session_id
+        )
+        return
+    order.status = "failed"
+    db.commit()
+
+    learner = (
+        db.get(Learner, order.learner_id) if order.learner_id is not None else None
+    )
+    if learner is None and email:
+        learner = db.execute(
+            select(Learner).where(Learner.email == email)
+        ).scalar_one_or_none()
+    enrollment = None
+    if learner is not None:
+        from ..models import Enrollment
+
+        enrollment = db.execute(
+            select(Enrollment).where(
+                Enrollment.learner_id == learner.id,
+                Enrollment.product_code == (order.product_code or product_code),
+            )
+        ).scalar_one_or_none()
+    if enrollment is None:
+        log.info("async_payment_failed %s: no enrollment to revoke", session_id)
+        return
+
+    from datetime import datetime, timezone as _tz
+
+    today = datetime.now(_tz.utc).date().isoformat()
+    svc.revoke_for_failed_settlement(
+        db,
+        enrollment,
+        note=f"bank payment failed {today}",
+        detail=f"Stripe reported the ACH debit failed on {today} — access revoked.",
+    )
+    log.info("Revoked provisional access for failed session %s", session_id)
 
 
 def grant_and_welcome(
-    db: Session, order: Order, product: Product, learner: Learner
+    db: Session, order: Order, product: Product, learner: Learner,
+    *, bank_pending: bool = False, send_welcome: bool = True,
 ) -> None:
     """Grant access + send the purchase-welcome email for a paid order.
 
     Shared by the Stripe webhook (`_fulfil`) and the PayPal recorded-course
     capture path so both providers provision access identically. The
     enrollment source is the order's provider ('stripe' | 'paypal').
+
+    bank_pending=True (ACH awaiting settlement) grants provisionally with a
+    7-business-day deadline and appends the processing note to the welcome
+    email. send_welcome=False settles an existing provisional grant without
+    re-mailing a buyer who was already welcomed at checkout time.
     """
     settings = get_settings()
-    svc.grant_enrollment(
-        db, learner, order.product_code, source=order.provider, order_id=order.id
-    )
+    if bank_pending:
+        from datetime import datetime, timezone as _tz
 
+        svc.grant_enrollment(
+            db, learner, order.product_code,
+            source=order.provider, order_id=order.id,
+            settlement_status="pending",
+            settlement_deadline=add_business_days(
+                datetime.now(_tz.utc), SETTLEMENT_MARGIN_BUSINESS_DAYS
+            ),
+        )
+    else:
+        svc.grant_enrollment(
+            db, learner, order.product_code, source=order.provider, order_id=order.id
+        )
+
+    if not send_welcome:
+        return
     raw = issue_login_token(db, learner, next_path=f"/learn/{order.product_code}")
     link = f"{settings.SITE_URL}/learn/signin?token={raw}"
     send_email(
@@ -226,6 +345,7 @@ def grant_and_welcome(
         html=purchase_welcome_html(
             learner.full_name or "", product.title, link,
             settings.LOGIN_LINK_TTL_SECONDS // 60,
+            bank_pending=bank_pending,
         ),
         bcc=settings.ADMIN_NOTIFY_EMAIL or None,
     )
@@ -297,15 +417,22 @@ async def stripe_webhook(
         return (session_obj.get("metadata") or {}).get("kind") == "live_course"
 
     if kind == "checkout.session.completed":
-        if obj.get("payment_status") == "paid":
-            if _is_live_course(obj):
-                from .payments import fulfil_live_session  # noqa: PLC0415
+        if _is_live_course(obj):
+            # fulfil_live_session inspects payment_status itself: paid (card)
+            # settles the seat now; unpaid (ACH pending) holds it with a note.
+            from .payments import fulfil_live_session  # noqa: PLC0415
 
-                fulfil_live_session(db, dict(obj))
-            else:
-                _fulfil(db, dict(obj))
+            fulfil_live_session(db, dict(obj))
+        elif obj.get("payment_status") == "paid":
+            _fulfil(db, dict(obj))
         else:
-            log.info("Checkout completed but unpaid (%s) — waiting", obj.get("id"))
+            # ACH delayed notification: grant provisional access now; the bank
+            # confirms via async_payment_succeeded/_failed in ~4-5 business
+            # days, and settlement_ok revokes at 7 if it never answers.
+            log.info(
+                "Checkout completed unpaid (%s) — provisional grant", obj.get("id")
+            )
+            _fulfil(db, dict(obj), provisional=True)
     elif kind == "checkout.session.async_payment_succeeded":
         if _is_live_course(obj):
             from .payments import fulfil_live_session  # noqa: PLC0415
@@ -313,6 +440,13 @@ async def stripe_webhook(
             fulfil_live_session(db, dict(obj))
         else:
             _fulfil(db, dict(obj))
+    elif kind == "checkout.session.async_payment_failed":
+        if _is_live_course(obj):
+            from .payments import live_payment_failed  # noqa: PLC0415
+
+            live_payment_failed(db, dict(obj))
+        else:
+            _payment_failed(db, dict(obj))
     elif kind == "charge.refunded":
         _revoke_for_payment(db, str(obj.get("payment_intent") or ""), "refunded")
     elif kind == "charge.dispute.created":
