@@ -175,8 +175,8 @@ class LaunchEvent(BaseModel):
     city: str | None = Field(default=None, max_length=128)
 
 
-@router.post("/track/launch", status_code=status.HTTP_204_NO_CONTENT)
-def track_launch(evt: LaunchEvent, db: Session = Depends(get_db)) -> None:
+@router.post("/track/launch")
+def track_launch(evt: LaunchEvent, db: Session = Depends(get_db)) -> dict:
     """Record one anonymous app launch (product + version + city-level geo)."""
     from ..models import AppLaunch
 
@@ -192,6 +192,7 @@ def track_launch(evt: LaunchEvent, db: Session = Depends(get_db)) -> None:
         )
     )
     db.commit()
+    return {"ok": True}
 
 
 @router.get("/launches/stats")
@@ -252,8 +253,8 @@ class UsageEvent(BaseModel):
     city: str | None = Field(default=None, max_length=128)
 
 
-@router.post("/track/usage", status_code=status.HTTP_204_NO_CONTENT)
-def track_usage(evt: UsageEvent, db: Session = Depends(get_db)) -> None:
+@router.post("/track/usage")
+def track_usage(evt: UsageEvent, db: Session = Depends(get_db)) -> dict:
     """Record one anonymous usage ping: feature counts only, never identifiers."""
     import json as _json
 
@@ -278,6 +279,7 @@ def track_usage(evt: UsageEvent, db: Session = Depends(get_db)) -> None:
         )
     )
     db.commit()
+    return {"ok": True}
 
 
 @router.get("/usage/stats")
