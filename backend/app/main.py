@@ -18,6 +18,7 @@ from .routes import admin as admin_routes
 from .routes import ai as ai_routes
 from .routes import auth as auth_routes
 from .routes import checkout as checkout_routes
+from .routes import comms as comms_routes
 from .routes import compat as compat_routes
 from .routes import courses as courses_routes
 from .routes import downloads as downloads_routes
@@ -188,6 +189,7 @@ app.include_router(software_routes.admin_router)
 app.include_router(academy_routes.router)
 app.include_router(checkout_routes.router)
 app.include_router(academy_admin_routes.router)
+app.include_router(comms_routes.router)
 # Legacy contract for the standalone quiz apps. Mounted at /auth and
 # /learning (no /api prefix) because that is what those apps already call.
 app.include_router(compat_routes.auth_router)

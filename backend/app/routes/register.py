@@ -135,10 +135,16 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
         subject=f"Registration received — {course.title} ({cohort_label})",
         html=applicant_confirmation_html(
             full_name=reg.full_name,
+            course_title=course.title,
             cohort=cohort_label,
             price_display=settings.COURSE_PRICE_DISPLAY,
             payment_instructions=settings.PAYMENT_INSTRUCTIONS,
         ),
+        db=db,
+        scope_kind="course",
+        scope_code=course_code,
+        audience="applicant",
+        template="applicant_confirmation",
     )
 
     # Recount after commit so both the admin email and the response
@@ -165,6 +171,11 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
                 taken_after=taken_after,
                 capacity=course.total_seats,
             ),
+            db=db,
+            scope_kind="system",
+            scope_code=course_code,
+            audience="admin",
+            template="admin_new_registration",
         )
 
     return RegisterOut(

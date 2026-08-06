@@ -105,6 +105,8 @@ class CourseOut(BaseModel):
     seats_taken: int = 0
     seats_paid: int = 0
     seats_remaining: int = 0
+    # Academy product carrying this course's recorded counterpart, or None.
+    recorded_product_code: Optional[str] = None
 
 
 class CourseCreateIn(BaseModel):
@@ -127,6 +129,10 @@ class CoursePatchIn(BaseModel):
     # Pass the full ordered list; we replace the column in one shot.
     # Send [] to clear; omit the field to leave unchanged.
     day_dates: Optional[List[date]] = Field(default=None, max_length=60)
+    # Link to the recorded academy Product. Send an explicit null to clear
+    # the link; omit the field to leave it unchanged (the handler checks
+    # model_fields_set to tell those apart).
+    recorded_product_code: Optional[str] = Field(default=None, max_length=64)
 
 
 class NotifyIn(BaseModel):
@@ -134,8 +140,11 @@ class NotifyIn(BaseModel):
 
     subject: str = Field(min_length=1, max_length=200)
     body_html: str = Field(min_length=1, max_length=100_000)
-    # Which registrants to target. 'all' includes paid + pending (not cancelled).
-    audience: Literal["all", "paid", "pending"] = "all"
+    # Which segment to target. Live audiences ('all' = paid + pending,
+    # never cancelled) come from the registrations table; 'recorded' is
+    # the active enrollees of the course's linked academy product; and
+    # 'everyone' unions live 'all' with 'recorded', deduped.
+    audience: Literal["all", "paid", "pending", "recorded", "everyone"] = "all"
 
 
 class NotifyOut(BaseModel):

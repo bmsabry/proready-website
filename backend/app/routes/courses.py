@@ -26,10 +26,11 @@ from ..db import get_db
 from ..deps import require_admin
 from ..emailer import (
     broadcast_html,
-    send_email,
+    send_broadcast,
     start_date_updated_html,
 )
-from ..models import Course, Registration
+from ..models import Course, Product, Registration
+from ..stats_queries import active_enrollee_emails
 from ..schemas import (
     AdminRegistrationOut,
     CourseCreateIn,
@@ -91,6 +92,7 @@ def _to_out(course: Course, db: Session) -> CourseOut:
         seats_taken=active,
         seats_paid=paid,
         seats_remaining=max(course.total_seats - active, 0),
+        recorded_product_code=course.recorded_product_code,
     )
 
 
@@ -103,15 +105,38 @@ def _get_or_404(db: Session, code: str) -> Course:
     return course
 
 
-def _recipients_for(db: Session, code: str, audience: str) -> list[Registration]:
-    stmt = select(Registration).where(Registration.course_code == code)
+def _recipients_for(db: Session, course: Course, audience: str) -> list[str]:
+    """Resolve a notify audience to a deduped list of email addresses.
+
+    Live audiences ('all' | 'paid' | 'pending') read the registrations
+    table; 'recorded' reads the active enrollees of the linked academy
+    product (course.recorded_product_code — empty link means an empty
+    audience, not an error); 'everyone' unions live 'all' with 'recorded'.
+    Dedup keeps first-seen order so batch chunks stay deterministic, and
+    matters because one person can be both a live registrant and a
+    recorded buyer.
+    """
+
+    def live(statuses: tuple[str, ...]) -> list[str]:
+        stmt = select(Registration.email).where(
+            Registration.course_code == course.code,
+            Registration.status.in_(statuses),
+        )
+        return [email for (email,) in db.execute(stmt).all()]
+
     if audience == "paid":
-        stmt = stmt.where(Registration.status == "paid")
+        emails = live(("paid",))
     elif audience == "pending":
-        stmt = stmt.where(Registration.status == "pending")
-    else:  # 'all' — exclude cancelled by default
-        stmt = stmt.where(Registration.status.in_(("paid", "pending")))
-    return list(db.execute(stmt).scalars().all())
+        emails = live(("pending",))
+    elif audience == "recorded":
+        emails = active_enrollee_emails(db, course.recorded_product_code)
+    elif audience == "everyone":
+        emails = live(("paid", "pending")) + active_enrollee_emails(
+            db, course.recorded_product_code
+        )
+    else:  # 'all' — live registrants, excluding cancelled
+        emails = live(("paid", "pending"))
+    return list(dict.fromkeys(emails))
 
 
 # ----- Public router ---------------------------------------------------------
@@ -193,27 +218,42 @@ def patch_course(
     if body.day_dates is not None:
         # Replace the full list. Store as ISO strings so JSON is portable.
         course.day_dates = [d.isoformat() for d in body.day_dates]
+    if "recorded_product_code" in body.model_fields_set:
+        # Explicit null clears the link; omitting the field leaves it alone.
+        if body.recorded_product_code:
+            product = db.get(Product, body.recorded_product_code)
+            if product is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Academy product '{body.recorded_product_code}' not found."
+                    ),
+                )
+        course.recorded_product_code = body.recorded_product_code or None
 
     db.commit()
     db.refresh(course)
 
     # Auto-notify on start-date change (user chose "yes" in scoping).
     if changed_start:
-        recipients = _recipients_for(db, course.code, "all")
+        recipients = _recipients_for(db, course, "all")
         html = start_date_updated_html(
             course_title=course.title,
             old_start_date=old_start,
             new_start_date=course.start_date,
         )
-        subject = f"Updated start date — {course.title}"
-        sent = 0
-        failed: list[str] = []
-        for r in recipients:
-            ok = send_email(to=r.email, subject=subject, html=html)
-            if ok:
-                sent += 1
-            else:
-                failed.append(r.email)
+        sent, failed = send_broadcast(
+            db,
+            recipients,
+            subject=f"Updated start date — {course.title}",
+            html_builder=lambda _to: html,
+            scope={
+                "scope_kind": "course",
+                "scope_code": course.code,
+                "audience": "all",
+                "template": "start_date_updated",
+            },
+        )
         log.info(
             "start_date change for course=%s notified=%d failed=%d",
             course.code, sent, len(failed),
@@ -227,17 +267,21 @@ def notify_course(
     code: str, body: NotifyIn, db: Session = Depends(get_db)
 ) -> NotifyOut:
     course = _get_or_404(db, code)
-    recipients = _recipients_for(db, course.code, body.audience)
+    recipients = _recipients_for(db, course, body.audience)
     html = broadcast_html(course_title=course.title, body_html=body.body_html)
 
-    sent = 0
-    failed: list[str] = []
-    for r in recipients:
-        ok = send_email(to=r.email, subject=body.subject, html=html)
-        if ok:
-            sent += 1
-        else:
-            failed.append(r.email)
+    sent, failed = send_broadcast(
+        db,
+        recipients,
+        subject=body.subject,
+        html_builder=lambda _to: html,
+        scope={
+            "scope_kind": "course",
+            "scope_code": course.code,
+            "audience": body.audience,
+            "template": "broadcast",
+        },
+    )
 
     return NotifyOut(
         ok=True,

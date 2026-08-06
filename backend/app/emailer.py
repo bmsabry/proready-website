@@ -1,23 +1,91 @@
-"""Resend transactional email wrapper.
+"""Resend transactional email wrapper + outbound email log.
 
-Kept intentionally thin — one POST to Resend's /emails endpoint. If the
-API key is unset (e.g. local dev), logs the would-have-been email and
-returns success. This lets the registration flow work without Resend
-credentials while developing.
+Kept intentionally thin — POSTs to Resend's /emails and /emails/batch
+endpoints through one seam (_resend_post) so tests can fake the wire.
+If the API key is unset (e.g. local dev), the would-have-been email is
+logged and the send reports failure: a message that never left must not
+read as delivered in broadcast counts or the admin comms log.
+
+Every send can optionally record an EmailLog row (pass db=...); that log
+is what GET /api/admin/comms/log serves.
 """
 from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Optional
+from typing import Callable, Optional, Sequence
 
 import httpx
+from sqlalchemy.orm import Session
 
 from .config import get_settings
+from .models import EmailLog
 
 log = logging.getLogger(__name__)
 
 RESEND_URL = "https://api.resend.com/emails"
+RESEND_BATCH_URL = "https://api.resend.com/emails/batch"
+
+# Resend's documented cap on items per /emails/batch call.
+BATCH_CHUNK_SIZE = 100
+
+
+def _resend_post(
+    url: str, payload: dict | list, api_key: str
+) -> Optional[httpx.Response]:
+    """Single HTTP seam for every Resend call — tests monkeypatch this.
+
+    Returns the response, or None on a network-level failure (callers
+    treat None like a non-2xx status).
+    """
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            return client.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+    except httpx.HTTPError as exc:
+        log.error("Resend network error: %s", exc)
+        return None
+
+
+def _log_email(
+    db: Optional[Session],
+    *,
+    scope_kind: str,
+    scope_code: str,
+    audience: str,
+    template: str,
+    subject: str,
+    recipient: str,
+    ok: bool,
+    provider_id: str = "",
+) -> None:
+    """Best-effort EmailLog write. Never raises — logging must not be the
+    reason a send (or the request around it) fails."""
+    if db is None:
+        return
+    try:
+        db.add(
+            EmailLog(
+                scope_kind=scope_kind,
+                scope_code=scope_code,
+                audience=audience,
+                template=template,
+                subject=subject[:500],
+                recipient=recipient,
+                ok=ok,
+                provider_id=provider_id[:64],
+            )
+        )
+        db.commit()
+    except Exception:
+        log.exception("EmailLog write failed for recipient=%s", recipient)
+        db.rollback()
 
 
 def send_email(
@@ -27,6 +95,11 @@ def send_email(
     *,
     reply_to: Optional[str] = None,
     bcc: Optional[str] = None,
+    db: Optional[Session] = None,
+    scope_kind: str = "system",
+    scope_code: str = "",
+    audience: str = "",
+    template: str = "",
 ) -> bool:
     """Send one email via Resend. Returns True on 2xx, False otherwise.
 
@@ -34,47 +107,159 @@ def send_email(
     depend on the email making it out. Admin notifications include the
     applicant's full payload so Bassam can follow up manually if the
     applicant's email bounces.
+
+    When `db` is supplied, the outcome (including stubbed/failed sends)
+    is recorded as an EmailLog row tagged with scope_kind/scope_code/
+    audience/template — the raw material for the admin comms log.
     """
     settings = get_settings()
 
+    ok = False
+    provider_id = ""
+
     if not settings.RESEND_API_KEY:
+        # Deliberately False (changed 2026-08; used to fake success): a
+        # send that never happened must not inflate broadcast counts or
+        # show as delivered in the comms log.
         log.warning(
             "[email stub] RESEND_API_KEY unset; would have sent to=%s subject=%r",
             to,
             subject,
         )
-        return True
+    else:
+        payload: dict = {
+            "from": settings.EMAIL_FROM,
+            "to": [to],
+            "subject": subject,
+            "html": html,
+        }
+        if reply_to or settings.EMAIL_REPLY_TO:
+            payload["reply_to"] = reply_to or settings.EMAIL_REPLY_TO
+        if bcc:
+            payload["bcc"] = [bcc]
 
-    payload: dict = {
-        "from": settings.EMAIL_FROM,
-        "to": [to],
-        "subject": subject,
-        "html": html,
-    }
-    if reply_to or settings.EMAIL_REPLY_TO:
-        payload["reply_to"] = reply_to or settings.EMAIL_REPLY_TO
-    if bcc:
-        payload["bcc"] = [bcc]
-
-    try:
-        with httpx.Client(timeout=10.0) as client:
-            r = client.post(
-                RESEND_URL,
-                headers={
-                    "Authorization": f"Bearer {settings.RESEND_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
-        if r.status_code >= 300:
+        r = _resend_post(RESEND_URL, payload, settings.RESEND_API_KEY)
+        if r is None:
+            pass  # network failure already logged by the seam
+        elif r.status_code >= 300:
             log.error(
                 "Resend send failed: status=%s body=%s", r.status_code, r.text[:500]
             )
-            return False
-        return True
-    except httpx.HTTPError as exc:
-        log.error("Resend network error: %s", exc)
-        return False
+        else:
+            ok = True
+            try:
+                provider_id = str((r.json() or {}).get("id") or "")
+            except Exception:
+                provider_id = ""
+
+    _log_email(
+        db,
+        scope_kind=scope_kind,
+        scope_code=scope_code,
+        audience=audience,
+        template=template,
+        subject=subject,
+        recipient=to,
+        ok=ok,
+        provider_id=provider_id,
+    )
+    return ok
+
+
+def send_broadcast(
+    db: Session,
+    recipients: Sequence[str],
+    subject: str,
+    html_builder: Callable[[str], str],
+    scope: dict,
+) -> tuple[int, list[str]]:
+    """Send one subject to many recipients via Resend's batch endpoint.
+
+    Why batch: the old notify path POSTed once per registrant, which is
+    slow and rate-limit-prone at cohort size. Batch sends up to 100
+    messages per call; each recipient still gets an individual message
+    (their address alone in `to`) and an individual EmailLog row.
+
+    If a batch POST fails outright, that chunk falls back to per-recipient
+    send_email — a transient batch error degrades to the old behavior
+    instead of dropping the broadcast. `html_builder(email)` produces the
+    body per recipient so future templates can personalize; today's
+    builders ignore the argument.
+
+    scope keys: scope_kind, scope_code, audience, template.
+    Returns (sent_count, failed_addresses).
+    """
+    settings = get_settings()
+    recipients = list(recipients)
+    scope_kwargs = dict(
+        scope_kind=scope.get("scope_kind", "system"),
+        scope_code=scope.get("scope_code", ""),
+        audience=scope.get("audience", ""),
+        template=scope.get("template", ""),
+    )
+
+    sent = 0
+    failed: list[str] = []
+
+    def _fallback(chunk: list[str]) -> None:
+        nonlocal sent
+        for addr in chunk:
+            if send_email(
+                to=addr, subject=subject, html=html_builder(addr), db=db, **scope_kwargs
+            ):
+                sent += 1
+            else:
+                failed.append(addr)
+
+    if not settings.RESEND_API_KEY:
+        _fallback(recipients)  # stub mode: logs every recipient as not sent
+        return sent, failed
+
+    for i in range(0, len(recipients), BATCH_CHUNK_SIZE):
+        chunk = recipients[i : i + BATCH_CHUNK_SIZE]
+        payload = []
+        for addr in chunk:
+            item: dict = {
+                "from": settings.EMAIL_FROM,
+                "to": [addr],
+                "subject": subject,
+                "html": html_builder(addr),
+            }
+            if settings.EMAIL_REPLY_TO:
+                item["reply_to"] = settings.EMAIL_REPLY_TO
+            payload.append(item)
+
+        r = _resend_post(RESEND_BATCH_URL, payload, settings.RESEND_API_KEY)
+        if r is None or r.status_code >= 300:
+            log.error(
+                "Resend batch failed (status=%s); falling back to single sends "
+                "for %d recipients",
+                "network" if r is None else r.status_code,
+                len(chunk),
+            )
+            _fallback(chunk)
+            continue
+
+        ids: list = []
+        try:
+            ids = (r.json() or {}).get("data") or []
+        except Exception:
+            ids = []
+        for idx, addr in enumerate(chunk):
+            provider_id = ""
+            if idx < len(ids) and isinstance(ids[idx], dict):
+                provider_id = str(ids[idx].get("id") or "")
+            _log_email(
+                db,
+                subject=subject,
+                recipient=addr,
+                ok=True,
+                provider_id=provider_id,
+                **scope_kwargs,
+            )
+            sent += 1
+
+    return sent, failed
 
 
 # -----------------------------------------------------------------------------
@@ -82,7 +267,11 @@ def send_email(
 # -----------------------------------------------------------------------------
 
 def applicant_confirmation_html(
-    full_name: str, cohort: str, price_display: str, payment_instructions: str
+    full_name: str,
+    course_title: str,
+    cohort: str,
+    price_display: str,
+    payment_instructions: str,
 ) -> str:
     price_block = (
         f"<p style='margin:0 0 16px;font-size:15px;'>"
@@ -103,7 +292,7 @@ def applicant_confirmation_html(
       </h1>
       <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
         We've received your registration for the
-        <strong>Gas Turbine Emissions Mapping</strong> cohort starting
+        <strong>{course_title}</strong> cohort starting
         <strong>{cohort}</strong>.
       </p>
       {price_block}
