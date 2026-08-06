@@ -852,7 +852,7 @@ function CommsTab({
   onAuthError: () => void;
 }) {
   const [subject, setSubject] = useState('');
-  const [body, setBody] = useState(lesson.body ?? '');
+  const [body, setBody] = useState('');
   const [rawHtml, setRawHtml] = useState(false);
   const [audience, setAudience] = useState<NotifyAudience>('all');
   const [busy, setBusy] = useState(false);
