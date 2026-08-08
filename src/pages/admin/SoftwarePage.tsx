@@ -22,6 +22,7 @@ import {
   formatDate,
   fmtInt,
   type SoftwareItem,
+  countryName,
 } from './lib';
 import {
   HBarList,
@@ -549,7 +550,7 @@ function DownloadsSection({ slug, onAuthError }: { slug: string; onAuthError: ()
                 <ul className="space-y-2">
                   {stats.by_country.map((c) => (
                     <li key={c.country} className="flex items-center justify-between text-sm">
-                      <span className="text-slate-300">{c.country}</span>
+                      <span className="text-slate-300">{countryName(c.country)}</span>
                       <span className="text-slate-400">{c.count.toLocaleString()}</span>
                     </li>
                   ))}
@@ -594,7 +595,7 @@ function DownloadsSection({ slug, onAuthError }: { slug: string; onAuthError: ()
                     <tr key={`${r.ts}-${i}`} className="border-b border-slate-800/60 text-slate-300">
                       <td className="py-2 pr-4 whitespace-nowrap">{formatDate(r.ts)}</td>
                       <td className="py-2 pr-4 whitespace-nowrap">
-                        {[r.city, r.region, r.country].filter(Boolean).join(', ') || '(unknown)'}
+                        {[r.city, r.region, countryName(r.country)].filter(Boolean).join(', ') || '(unknown)'}
                       </td>
                       <td className="py-2 pr-4 max-w-[240px] truncate">{r.referrer || '—'}</td>
                       <td className="py-2 max-w-[260px] truncate text-slate-400">{r.user_agent}</td>
@@ -749,7 +750,7 @@ function AppTelemetrySection({ slug }: { slug: string }) {
               <ul className="space-y-2">
                 {launches.top_countries.map((c) => (
                   <li key={c.country} className="flex items-center justify-between text-sm">
-                    <span className="text-slate-300">{c.country}</span>
+                    <span className="text-slate-300">{countryName(c.country)}</span>
                     <span className="text-slate-400">{c.count.toLocaleString()}</span>
                   </li>
                 ))}

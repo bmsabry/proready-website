@@ -436,3 +436,14 @@ export function downloadCsv(
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+/** "US" -> "United States" via the browser's own region names; falls back to the code. */
+const regionNames = typeof Intl !== 'undefined' ? new Intl.DisplayNames(['en'], { type: 'region' }) : null;
+export function countryName(code: string): string {
+  if (!code) return code;
+  try {
+    return regionNames?.of(code.toUpperCase()) ?? code;
+  } catch {
+    return code;
+  }
+}
