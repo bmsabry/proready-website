@@ -8,7 +8,6 @@ import {
   Flame,
   Activity,
   Gauge,
-  Cloud,
   Wrench,
   CheckCircle2,
   Lock,
@@ -122,26 +121,14 @@ const CURRICULUM: Day[] = [
     icon: <Gauge className="w-6 h-6" />,
   },
   {
-    title: 'Mapping & Ambient Effects',
+    title: 'Mapping, Flex Fuel & Troubleshooting',
     summary:
-      'Per-circuit fuel split optimisation, seasonal remapping, humidity and inlet T effects.',
+      'Fuel-split optimisation, ambient corrections, hydrogen blending, and root-cause analysis of real field events.',
     topics: [
-      'Systematic sweep methodology for fuel splits',
-      'Hotter inlet air → effectively richer mixture',
-      'Humidity as an oxygen diluent',
-      'Hardware degradation drivers for remapping',
-    ],
-    icon: <Cloud className="w-6 h-6" />,
-  },
-  {
-    title: 'Flex Fuel & Troubleshooting',
-    summary:
-      'Hydrogen blending, Wobbe / Modified Wobbe Index, RCA for LBO, flashback, stage-down events.',
-    topics: [
-      'Propane → natural gas → hydrogen blends',
-      'Wobbe Index and Modified Wobbe Index drift',
-      'RCA workflow for stage-down events',
-      'Acoustic + CO/NOx signatures before visible damage',
+      'Systematic sweep methodology for per-circuit fuel splits',
+      'Ambient corrections: inlet temperature and humidity effects',
+      'Hydrogen and propane blends: Wobbe / Modified Wobbe Index drift',
+      'RCA workflow for LBO, flashback, and stage-down events',
     ],
     icon: <Wrench className="w-6 h-6" />,
   },
