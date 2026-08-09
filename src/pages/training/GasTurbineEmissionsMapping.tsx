@@ -65,7 +65,7 @@ const COURSE_JSONLD = JSON.stringify({
   '@type': 'Course',
   name: 'Gas Turbine Emissions Mapping',
   description:
-    'Five-day live expert course on DLE gas turbine emissions mapping: combustion fundamentals, combustion dynamics, DLE operations, fuel-split mapping, ambient effects, flex fuel, and troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
+    'Four-day live expert course (two weekends) on DLE gas turbine emissions mapping: combustion fundamentals, combustion dynamics, DLE operations, fuel-split mapping, ambient effects, flex fuel, and troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
   provider: {
     '@type': 'Organization',
     name: 'ProReadyEngineer LLC',
@@ -181,7 +181,7 @@ const DEFAULT_DAY_DATES: string[] = [
 const GasTurbineEmissionsMapping = () => {
   usePageMeta(
     'Gas Turbine Emissions Mapping Course',
-    'Five-day live expert course on DLE gas turbine emissions mapping: combustion fundamentals, dynamics, fuel splits, ambient effects, and flex-fuel troubleshooting. Taught by a practitioner with 19+ years of field experience.',
+    'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion fundamentals, dynamics, fuel splits, ambient effects, and flex-fuel troubleshooting. Taught by a practitioner with 19+ years of field experience.',
     {
       image: 'https://proreadyengineer.com/Mapping_Training_Infographic_6.png',
       jsonLd: {
@@ -189,13 +189,13 @@ const GasTurbineEmissionsMapping = () => {
         '@type': 'Course',
         name: 'Gas Turbine Emissions Mapping',
         description:
-          'Five-day live expert course on DLE gas turbine emissions mapping: combustion fundamentals, dynamics, fuel splits, ambient effects, and flex-fuel troubleshooting.',
+          'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion fundamentals, dynamics, fuel splits, ambient effects, and flex-fuel troubleshooting.',
         provider: { '@id': 'https://proreadyengineer.com/#org' },
         hasCourseInstance: [
           {
             '@type': 'CourseInstance',
             courseMode: 'Online',
-            courseWorkload: 'P5D',
+            courseWorkload: 'P4D',
             instructor: { '@type': 'Person', name: 'Dr. Bassam Abdelnabi', jobTitle: 'Principal Consultant, Gas Turbine Combustion Expert' },
           },
         ],
@@ -493,7 +493,7 @@ const GasTurbineEmissionsMapping = () => {
             <div className="card overflow-hidden mb-10 shadow-2xl shadow-cyan-900/10">
               <img
                 src="/Mapping_Training_Infographic_6.png"
-                alt="Gas Turbine Emissions Mapping — De-mystifying Complexity: 6 gas circuits (OM, OP, OE, IM, IP, IE), the dynamics corridor (Φ ≈ 0.45–0.6), and 5-day course timeline"
+                alt="Gas Turbine Emissions Mapping — De-mystifying Complexity: 6 gas circuits (OM, OP, OE, IM, IP, IE), the dynamics corridor (Φ ≈ 0.45–0.6), and course timeline"
                 className="w-full h-auto block"
                 loading="lazy"
               />
@@ -502,7 +502,7 @@ const GasTurbineEmissionsMapping = () => {
             <p className="text-slate-300 text-lg mb-10 leading-relaxed max-w-4xl">
               Modern DLE combustion systems look daunting: five distinct gas circuits, bounded by
               narrow dynamics corridors and moving ambient targets. This course takes you from
-              zero gas-turbine knowledge to confident field mapper over five days, taught by a
+              zero gas-turbine knowledge to confident field mapper over four days, taught by a
               practitioner with 19+ years of live mapping experience and multiple patents in the
               field.
             </p>

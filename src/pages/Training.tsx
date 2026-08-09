@@ -37,7 +37,7 @@ const courses = [
     id: 1,
     title: "Gas Turbine Emissions Mapping",
     category: "Thermal Fluids",
-    duration: "5 Days",
+    duration: "4 Days",
     level: "Beginner to Expert",
     attendees: "15 Seats",
     description: "De-mystify DLE combustion. Master the dynamics corridor, emissions mapping strategy, and flex-fuel troubleshooting from first principles to expert level. No prior gas turbine knowledge required.",

@@ -92,7 +92,7 @@ const practices: Practice[] = [
     description:
       'Instructor-led courses taught by industry veterans who have designed, tested, and fielded the systems they teach. We empower engineering teams with the latest tools and methodologies through hands-on technical training — on-site, online, or hybrid.',
     capabilities: [
-      'Gas Turbine Emissions Mapping: our flagship 5-day course, from first principles to expert level',
+      'Gas Turbine Emissions Mapping: our flagship 4-day weekend course, from first principles to expert level',
       'Advanced Combustion Fundamentals',
       'Gas Turbine Combustion',
       'Fundamentals of Turbomachinery',

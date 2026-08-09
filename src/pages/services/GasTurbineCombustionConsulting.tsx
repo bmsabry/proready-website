@@ -44,7 +44,7 @@ const faqs = [
   },
   {
     q: 'Do you run emissions mapping in the field?',
-    a: 'Yes. We design the test matrix, run the mapping campaign, and use digital twin models to tune the engine against its compliance limits. We also teach this as a 5-day course, Gas Turbine Emissions Mapping.',
+    a: 'Yes. We design the test matrix, run the mapping campaign, and use digital twin models to tune the engine against its compliance limits. We also teach this as a 4-day course, Gas Turbine Emissions Mapping.',
   },
   {
     q: 'How does an engagement usually start?',
