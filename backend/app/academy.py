@@ -12,7 +12,7 @@ import re
 import secrets
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .config import get_settings
@@ -32,6 +32,7 @@ from .models import (
     Product,
     QuizAttempt,
     QuizItem,
+    Slide,
     TermsAcceptance,
 )
 
@@ -506,23 +507,57 @@ def record_progress(
     row.watched_s = (row.watched_s or 0) + delta
     if lesson.duration_s:
         row.watched_s = min(row.watched_s, lesson.duration_s)
-    row.position_s = max(0, int(position_s))
+    # For decks, position marks the furthest slide reached — keep the high
+    #-water mark so revisiting slide 1 never rolls progress backwards.
+    if lesson.kind == "slides":
+        row.position_s = max(row.position_s or 0, int(position_s))
+    else:
+        row.position_s = max(0, int(position_s))
 
-    if row.completed_at is None and lesson_is_complete(lesson, row):
-        row.completed_at = datetime.now(timezone.utc)
+    if row.completed_at is None:
+        total = None
+        if lesson.kind == "slides":
+            total = db.execute(
+                select(func.count(Slide.id)).where(
+                    Slide.module_id == lesson.module_id
+                )
+            ).scalar_one()
+        if lesson_is_complete(lesson, row, total):
+            row.completed_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(row)
     return row
 
 
-def lesson_is_complete(lesson: Lesson, prog: LessonProgress | None) -> bool:
+def slide_totals(db: Session, module_ids: list[int]) -> dict[int, int]:
+    """Slide count per module, one grouped query — feeds deck completion."""
+    if not module_ids:
+        return {}
+    rows = db.execute(
+        select(Slide.module_id, func.count(Slide.id))
+        .where(Slide.module_id.in_(module_ids))
+        .group_by(Slide.module_id)
+    ).all()
+    return {mid: n for mid, n in rows}
+
+
+def lesson_is_complete(
+    lesson: Lesson, prog: LessonProgress | None, slide_total: int | None = None
+) -> bool:
     if prog is None:
         return False
     if prog.completed_at is not None:
         return True
+    # A deck with an in-browser viewer is done when the learner has REACHED
+    # ITS LAST SLIDE — for 'slides' lessons position_s carries the furthest
+    # slide number viewed, not seconds. "Opened the page" is not "studied
+    # the deck". Decks without slide rows (viewer not populated yet) fall
+    # through to the open-once rule so they can't strand a course.
+    if lesson.kind == "slides" and slide_total:
+        return prog.position_s >= slide_total
     if lesson.duration_s <= 0:
-        # Non-timed lessons (decks, labs, readings) complete on first open.
+        # Other non-timed lessons (labs, readings) complete on first open.
         return prog.watched_s > 0
     return prog.watched_s >= math.floor(lesson.duration_s * COMPLETION_RATIO)
 
@@ -576,7 +611,11 @@ def module_gate_passed(db: Session, learner: Learner | None, module: Module) -> 
     if not lessons:
         return True
     prog = progress_map(db, learner, [l.id for l in lessons])
-    return all(lesson_is_complete(l, prog.get(l.id)) for l in lessons)
+    totals = slide_totals(db, [module.id])
+    return all(
+        lesson_is_complete(l, prog.get(l.id), totals.get(l.module_id))
+        for l in lessons
+    )
 
 
 def module_unlocked(db: Session, learner: Learner | None, module: Module) -> bool:
@@ -637,6 +676,7 @@ def course_state(db: Session, learner: Learner | None, product_code: str) -> lis
         by_module.setdefault(l.module_id, []).append(l)
 
     prog = progress_map(db, learner, [l.id for l in all_lessons])
+    totals = slide_totals(db, [m.id for m in modules])
 
     out: list[dict] = []
     previous_passed = True  # module 1 is always open
@@ -648,7 +688,11 @@ def course_state(db: Session, learner: Learner | None, product_code: str) -> lis
         gate_open = owner or (not sequential) or previous_passed
         unlocked = entitled_here and gate_open
 
-        done = sum(1 for l in lessons if lesson_is_complete(l, prog.get(l.id)))
+        done = sum(
+            1
+            for l in lessons
+            if lesson_is_complete(l, prog.get(l.id), totals.get(module.id))
+        )
         watched = sum(
             (prog[l.id].watched_s if l.id in prog else 0) for l in lessons
         )
@@ -700,7 +744,9 @@ def course_state(db: Session, learner: Learner | None, product_code: str) -> lis
                         "accessible": unlocked or l.is_preview,
                         "position_s": prog[l.id].position_s if l.id in prog else 0,
                         "watched_s": prog[l.id].watched_s if l.id in prog else 0,
-                        "completed": lesson_is_complete(l, prog.get(l.id)),
+                        "completed": lesson_is_complete(
+                            l, prog.get(l.id), totals.get(module.id)
+                        ),
                     }
                     for l in lessons
                 ],
