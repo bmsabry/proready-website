@@ -1,6 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Download, ExternalLink } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Download,
+  ExternalLink,
+  Loader2,
+  Maximize2,
+  Minimize2,
+} from 'lucide-react';
 import { usePageMeta } from '../../lib/meta';
 import {
   academy,
@@ -42,13 +51,32 @@ const Watermark = ({ text }: { text: string }) =>
 /* In-browser deck viewer. The pixels come from the entitlement-checked,
  * per-learner-watermarked endpoint — there is no file to download, which is
  * the whole protection model for course materials. crossOrigin with
- * credentials is what lets the <img> carry the session cookie to the API. */
-const SlideViewer = ({ lesson }: { lesson: LessonDetail }) => {
-  const [index, setIndex] = useState(0);
+ * credentials is what lets the <img> carry the session cookie to the API.
+ *
+ * Present mode uses the browser Fullscreen API (button, or the F key);
+ * neighbours of the current slide are prefetched so paging feels instant;
+ * and every slide change is reported upward so completion can mean
+ * "reached the last slide" rather than "opened the page". */
+const SlideViewer = ({
+  lesson,
+  onSlideViewed,
+}: {
+  lesson: LessonDetail;
+  onSlideViewed?: (slideNumber: number, isLast: boolean) => void;
+}) => {
   const slides = lesson.slides;
   const moduleId = lesson.module.id as number;
-  const current = slides[index];
+  // Resume where they left off — position_s carries the furthest slide
+  // number for deck lessons.
+  const [index, setIndex] = useState(() => {
+    const saved = lesson.progress.position_s;
+    return saved > 0 ? Math.min(saved, slides.length) - 1 : 0;
+  });
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const stripRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const current = slides[index];
 
   const go = useCallback(
     (delta: number) =>
@@ -56,14 +84,61 @@ const SlideViewer = ({ lesson }: { lesson: LessonDetail }) => {
     [slides.length]
   );
 
+  const togglePresent = useCallback(() => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      shellRef.current?.requestFullscreen?.().catch(() => {
+        /* not available — the inline viewer still works */
+      });
+    }
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') go(1);
-      if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(-1);
+      const target = e.target as HTMLElement | null;
+      if (target && /^(input|textarea|select)$/i.test(target.tagName)) return;
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        e.preventDefault();
+        go(1);
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        go(-1);
+      }
+      if (e.key === 'f' || e.key === 'F') togglePresent();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [go]);
+  }, [go, togglePresent]);
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  // Show the spinner until THIS slide's pixels arrive.
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [index]);
+
+  // Report progress upward (furthest slide, and whether it's the last one).
+  useEffect(() => {
+    if (current) onSlideViewed?.(current.number, index === slides.length - 1);
+  }, [index, current, slides.length, onSlideViewed]);
+
+  // Prefetch the neighbours so Next/Prev render from the browser's private
+  // cache instead of waiting a full round-trip per keypress.
+  useEffect(() => {
+    [index + 1, index + 2, index - 1].forEach((i) => {
+      const s = slides[i];
+      if (!s) return;
+      const img = new Image();
+      img.crossOrigin = 'use-credentials';
+      img.src = slideImageUrl(moduleId, s.number, 'lg');
+    });
+  }, [index, slides, moduleId]);
 
   useEffect(() => {
     // Keep the active thumbnail in view as the learner pages through.
@@ -76,18 +151,42 @@ const SlideViewer = ({ lesson }: { lesson: LessonDetail }) => {
 
   return (
     <div
-      className="mb-6 select-none"
+      ref={shellRef}
+      className={`select-none ${
+        isFullscreen
+          ? 'bg-black h-screen w-screen flex flex-col items-center justify-center px-6 py-4'
+          : 'mb-6'
+      }`}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-black">
+      <div
+        className={`relative overflow-hidden bg-black ${
+          isFullscreen
+            ? 'flex-1 min-h-0 w-full flex items-center justify-center'
+            : 'rounded-xl border border-slate-800'
+        }`}
+      >
         <img
           key={current.number}
           src={slideImageUrl(moduleId, current.number, 'lg')}
           crossOrigin="use-credentials"
           draggable={false}
+          onLoad={() => setImgLoaded(true)}
           alt={current.title || `Slide ${current.number}`}
-          className="w-full h-auto block"
+          className={
+            isFullscreen
+              ? 'max-h-full max-w-full w-auto h-auto object-contain'
+              : 'w-full h-auto block'
+          }
         />
+        {!imgLoaded && (
+          <div className="absolute inset-0 grid place-items-center bg-slate-950/70 z-20">
+            <span className="inline-flex items-center gap-2 text-sm font-mono uppercase tracking-widest text-cyan-400">
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+              Loading slide {current.number}…
+            </span>
+          </div>
+        )}
         <Watermark text={lesson.watermark} />
         {/* Click zones: left third back, rest forward. */}
         <button
@@ -104,16 +203,38 @@ const SlideViewer = ({ lesson }: { lesson: LessonDetail }) => {
         />
       </div>
 
-      <div className="flex items-center justify-between gap-3 mt-3">
+      <div
+        className={`flex items-center justify-between gap-3 mt-3 ${
+          isFullscreen ? 'w-full max-w-3xl shrink-0' : ''
+        }`}
+      >
         <button type="button" onClick={() => go(-1)} disabled={index === 0}
           className="btn-secondary disabled:opacity-40">
           <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Prev
         </button>
-        <div className="text-sm text-slate-400 font-mono">
-          {index + 1} / {slides.length}
-          {current.section ? (
-            <span className="ml-3 text-slate-500 hidden sm:inline">{current.section}</span>
+        <div className="text-sm text-slate-400 font-mono flex items-center gap-4">
+          <span>
+            {index + 1} / {slides.length}
+          </span>
+          {current.section && !isFullscreen ? (
+            <span className="text-slate-500 hidden sm:inline">{current.section}</span>
           ) : null}
+          <button
+            type="button"
+            onClick={togglePresent}
+            className="btn-secondary !py-1.5 !px-3 text-xs"
+            title={isFullscreen ? 'Exit presentation (F or Esc)' : 'Present fullscreen (F)'}
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="w-3.5 h-3.5" aria-hidden="true" /> Exit
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" /> Present
+              </>
+            )}
+          </button>
         </div>
         <button type="button" onClick={() => go(1)} disabled={index === slides.length - 1}
           className="btn-secondary disabled:opacity-40">
@@ -121,33 +242,35 @@ const SlideViewer = ({ lesson }: { lesson: LessonDetail }) => {
         </button>
       </div>
 
-      <div
-        ref={stripRef}
-        className="mt-3 flex gap-2 overflow-x-auto pb-2"
-        aria-label="Slide thumbnails"
-      >
-        {slides.map((s, i) => (
-          <button
-            key={s.number}
-            type="button"
-            data-slide={i}
-            onClick={() => setIndex(i)}
-            className={`shrink-0 rounded border ${
-              i === index ? 'border-cyan-400' : 'border-slate-800 opacity-60 hover:opacity-100'
-            }`}
-            title={s.title || `Slide ${s.number}`}
-          >
-            <img
-              src={slideImageUrl(moduleId, s.number, 'sm')}
-              crossOrigin="use-credentials"
-              draggable={false}
-              loading="lazy"
-              alt=""
-              className="h-14 w-auto block rounded"
-            />
-          </button>
-        ))}
-      </div>
+      {!isFullscreen && (
+        <div
+          ref={stripRef}
+          className="mt-3 flex gap-2 overflow-x-auto pb-2"
+          aria-label="Slide thumbnails"
+        >
+          {slides.map((s, i) => (
+            <button
+              key={s.number}
+              type="button"
+              data-slide={i}
+              onClick={() => setIndex(i)}
+              className={`shrink-0 rounded border ${
+                i === index ? 'border-cyan-400' : 'border-slate-800 opacity-60 hover:opacity-100'
+              }`}
+              title={s.title || `Slide ${s.number}`}
+            >
+              <img
+                src={slideImageUrl(moduleId, s.number, 'sm')}
+                crossOrigin="use-credentials"
+                draggable={false}
+                loading="lazy"
+                alt=""
+                className="h-14 w-auto block rounded"
+              />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -163,6 +286,10 @@ const Lesson: React.FC = () => {
   const [completed, setCompleted] = useState(false);
 
   const lastBeat = useRef<number>(Date.now());
+  // For deck lessons: the furthest slide number reached this session.
+  // Reported as position_s so the server can mark the deck complete only
+  // when the LAST slide has actually been reached.
+  const maxSlideRef = useRef<number>(0);
 
   usePageMeta(lesson?.title || 'Lesson', 'ProReadyEngineer course lesson.', {
     noindex: true,
@@ -178,6 +305,8 @@ const Lesson: React.FC = () => {
         if (cancelled) return;
         setLesson(data);
         setCompleted(data.progress.completed);
+        maxSlideRef.current =
+          data.kind === 'slides' ? data.progress.position_s || 0 : 0;
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -199,14 +328,32 @@ const Lesson: React.FC = () => {
     const now = Date.now();
     const delta = Math.round((now - lastBeat.current) / 1000);
     lastBeat.current = now;
-    if (delta <= 0) return;
+    // Decks report the furthest slide as position; a zero-delta beat is
+    // still worth sending there (it can carry the finish). Everything else
+    // keeps the original time-based behavior.
+    if (delta <= 0 && lesson.kind !== 'slides') return;
+    const position =
+      lesson.kind === 'slides'
+        ? maxSlideRef.current
+        : lesson.progress.position_s + delta;
     try {
-      const res = await academy.heartbeat(lesson.id, lesson.progress.position_s + delta, delta);
+      const res = await academy.heartbeat(lesson.id, position, Math.max(delta, 0));
       if (res.completed) setCompleted(true);
     } catch {
       /* a dropped beat is not worth interrupting the lesson for */
     }
   }, [lesson]);
+
+  const onSlideViewed = useCallback(
+    (slideNumber: number, isLast: boolean) => {
+      if (slideNumber > maxSlideRef.current) {
+        maxSlideRef.current = slideNumber;
+        // Reaching the end shouldn't wait for the next 15s heartbeat.
+        if (isLast) void beat();
+      }
+    },
+    [beat]
+  );
 
   useEffect(() => {
     if (!lesson) return;
@@ -246,7 +393,14 @@ const Lesson: React.FC = () => {
   return (
     <div className="relative pt-28 pb-20">
       <div className="absolute inset-0 -z-10 bg-hero-radial" />
-      <div className="container-site max-w-4xl">
+      {/* Decks get more room — the slide is the content. */}
+      <div
+        className={`container-site ${
+          lesson.kind === 'slides' && lesson.slides.length > 0
+            ? 'max-w-6xl'
+            : 'max-w-4xl'
+        }`}
+      >
         <Link
           to={lesson.module.product_code ? `/learn/${lesson.module.product_code}` : '/learn'}
           className="btn-ghost mb-6"
@@ -285,7 +439,7 @@ const Lesson: React.FC = () => {
 
         {lesson.kind === 'slides' &&
           (lesson.slides.length > 0 ? (
-            <SlideViewer lesson={lesson} />
+            <SlideViewer lesson={lesson} onSlideViewed={onSlideViewed} />
           ) : (
             <div className="card p-6 mb-6 relative overflow-hidden">
               <Watermark text={lesson.watermark} />

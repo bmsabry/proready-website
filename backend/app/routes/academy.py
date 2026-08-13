@@ -513,7 +513,7 @@ def lesson_detail(
         "progress": {
             "position_s": prog.position_s if prog else 0,
             "watched_s": prog.watched_s if prog else 0,
-            "completed": svc.lesson_is_complete(lesson, prog),
+            "completed": svc.lesson_is_complete(lesson, prog, len(slides)),
         },
         "chapters": [
             {
@@ -812,8 +812,18 @@ def slide_image(
     payload = row.data if size == "sm" else _watermark_image(
         row.data, learner.email
     )
+    # Private (browser-only) caching, keyed on the session cookie: the
+    # learner's own machine may keep their own watermarked pixels for a
+    # few minutes so paging back/forward and prefetch are instant, while
+    # shared caches and CDNs stay excluded. The watermark, not the cache
+    # policy, is what protects a file the learner could screenshot anyway.
+    headers = {
+        "Cache-Control": "private, max-age=900",
+        "Vary": "Cookie",
+        "X-Robots-Tag": "noindex, nofollow",
+    }
     return Response(content=payload, media_type=row.content_type,
-                    headers=dict(_NO_STORE))
+                    headers=headers)
 
 
 _ASSET_BANNER = """

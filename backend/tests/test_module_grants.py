@@ -207,7 +207,9 @@ def test_day1_grant_opens_day1_only(client, setup):
     # Slide pixels: day 1 serves, day 2 refuses — URL iteration buys nothing.
     ok = s.get(f"/api/academy/slide-image/{module_ids['DAY-1']}/1/lg")
     assert ok.status_code == 200
-    assert ok.headers["cache-control"].startswith("private, no-store")
+    # Browser-private caching only — never a shared cache.
+    assert ok.headers["cache-control"].startswith("private")
+    assert "no-store" not in ok.headers["cache-control"]
     assert s.get(f"/api/academy/slide-image/{module_ids['DAY-2']}/1/lg").status_code == 403
 
     # The simulator module was never granted.
@@ -449,3 +451,56 @@ def test_my_courses_owner_sees_everything(client, setup):
     codes = {c["code"] for c in r.json()["courses"]}
     assert PRODUCT in codes  # drafts included for owners
     assert all(c["access"] == "owner" for c in r.json()["courses"])
+
+
+# -----------------------------------------------------------------------------
+# Deck completion — reached the last slide, not merely opened the page
+# -----------------------------------------------------------------------------
+
+def test_slides_lesson_completes_on_last_slide_not_first_open(client, setup):
+    module_ids, lessons = setup
+    # Give the student DAY-1 (idempotent if already granted).
+    client.post(
+        "/api/admin/academy/grant-module",
+        json={"email": STUDENT, "module_id": module_ids["DAY-1"]},
+        headers=ADMIN,
+    )
+    s = _sign_in(client, STUDENT)
+    lesson_id = lessons["DAY-1"]
+
+    # DAY-1 has exactly 1 slide in the fixture; add a second so "first
+    # slide" and "last slide" are distinct states.
+    import base64 as _b64
+
+    client.post(
+        f"/api/admin/academy/modules/{module_ids['DAY-1']}/slides",
+        json={"slides": [{"number": 2, "title": "Second",
+                          "image_lg_b64": _b64.b64encode(_tiny_png()).decode(),
+                          "image_sm_b64": _b64.b64encode(_tiny_png()).decode()}]},
+        headers=ADMIN,
+    )
+
+    # Heartbeat from slide 1: watched time accrues but the deck is NOT done.
+    r = s.post(
+        f"/api/academy/lesson/{lesson_id}/progress",
+        json={"position_s": 1, "watched_delta_s": 30},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["completed"] is False
+
+    detail = s.get(f"/api/academy/lesson/{lesson_id}").json()
+    assert detail["progress"]["completed"] is False
+
+    # Reaching the last slide completes the deck.
+    r = s.post(
+        f"/api/academy/lesson/{lesson_id}/progress",
+        json={"position_s": 2, "watched_delta_s": 5},
+    )
+    assert r.json()["completed"] is True
+
+    # And the high-water mark never rolls back.
+    r = s.post(
+        f"/api/academy/lesson/{lesson_id}/progress",
+        json={"position_s": 1, "watched_delta_s": 5},
+    )
+    assert r.json()["completed"] is True
