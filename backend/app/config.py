@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     # the next module unlocks. Per the GT-05 curriculum sign-off.
     MASTERY_THRESHOLD_PCT: float = 80.0
 
+    # Click-wrap terms document version. Bump this string when the training
+    # terms/liability notice changes materially — every learner is then asked
+    # to accept the new version before opening protected material again.
+    TERMS_VERSION: str = "2026-08-v1"
+
     # --- Legacy quiz-app compatibility ------------------------------------
     # The five standalone smallgasturbine.gt-XX apps speak an email+password
     # JWT contract that used to be served by the combustion-toolkit API. We

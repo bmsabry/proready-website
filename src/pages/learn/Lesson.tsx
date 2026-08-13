@@ -2,7 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, Download, ExternalLink } from 'lucide-react';
 import { usePageMeta } from '../../lib/meta';
-import { academy, ApiError, LessonDetail } from '../../lib/academyApi';
+import {
+  academy,
+  ApiError,
+  LessonDetail,
+  lessonAssetUrl,
+  slideImageUrl,
+} from '../../lib/academyApi';
 
 /* Lesson player.
  *
@@ -32,6 +38,119 @@ const Watermark = ({ text }: { text: string }) =>
       </span>
     </div>
   ) : null;
+
+/* In-browser deck viewer. The pixels come from the entitlement-checked,
+ * per-learner-watermarked endpoint — there is no file to download, which is
+ * the whole protection model for course materials. crossOrigin with
+ * credentials is what lets the <img> carry the session cookie to the API. */
+const SlideViewer = ({ lesson }: { lesson: LessonDetail }) => {
+  const [index, setIndex] = useState(0);
+  const slides = lesson.slides;
+  const moduleId = lesson.module.id as number;
+  const current = slides[index];
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  const go = useCallback(
+    (delta: number) =>
+      setIndex((i) => Math.min(slides.length - 1, Math.max(0, i + delta))),
+    [slides.length]
+  );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') go(1);
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(-1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [go]);
+
+  useEffect(() => {
+    // Keep the active thumbnail in view as the learner pages through.
+    const strip = stripRef.current;
+    const active = strip?.querySelector<HTMLElement>(`[data-slide="${index}"]`);
+    active?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }, [index]);
+
+  if (!slides.length || moduleId == null) return null;
+
+  return (
+    <div
+      className="mb-6 select-none"
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-black">
+        <img
+          key={current.number}
+          src={slideImageUrl(moduleId, current.number, 'lg')}
+          crossOrigin="use-credentials"
+          draggable={false}
+          alt={current.title || `Slide ${current.number}`}
+          className="w-full h-auto block"
+        />
+        <Watermark text={lesson.watermark} />
+        {/* Click zones: left third back, rest forward. */}
+        <button
+          type="button"
+          aria-label="Previous slide"
+          onClick={() => go(-1)}
+          className="absolute inset-y-0 left-0 w-1/3 cursor-w-resize opacity-0"
+        />
+        <button
+          type="button"
+          aria-label="Next slide"
+          onClick={() => go(1)}
+          className="absolute inset-y-0 right-0 w-2/3 cursor-e-resize opacity-0"
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-3 mt-3">
+        <button type="button" onClick={() => go(-1)} disabled={index === 0}
+          className="btn-secondary disabled:opacity-40">
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Prev
+        </button>
+        <div className="text-sm text-slate-400 font-mono">
+          {index + 1} / {slides.length}
+          {current.section ? (
+            <span className="ml-3 text-slate-500 hidden sm:inline">{current.section}</span>
+          ) : null}
+        </div>
+        <button type="button" onClick={() => go(1)} disabled={index === slides.length - 1}
+          className="btn-secondary disabled:opacity-40">
+          Next <ArrowRight className="w-4 h-4" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div
+        ref={stripRef}
+        className="mt-3 flex gap-2 overflow-x-auto pb-2"
+        aria-label="Slide thumbnails"
+      >
+        {slides.map((s, i) => (
+          <button
+            key={s.number}
+            type="button"
+            data-slide={i}
+            onClick={() => setIndex(i)}
+            className={`shrink-0 rounded border ${
+              i === index ? 'border-cyan-400' : 'border-slate-800 opacity-60 hover:opacity-100'
+            }`}
+            title={s.title || `Slide ${s.number}`}
+          >
+            <img
+              src={slideImageUrl(moduleId, s.number, 'sm')}
+              crossOrigin="use-credentials"
+              draggable={false}
+              loading="lazy"
+              alt=""
+              className="h-14 w-auto block rounded"
+            />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const Lesson: React.FC = () => {
   const { lessonId } = useParams();
@@ -161,17 +280,42 @@ const Lesson: React.FC = () => {
           </div>
         )}
 
-        {(lesson.kind === 'slides' || lesson.kind === 'calculator') && (
+        {lesson.kind === 'slides' &&
+          (lesson.slides.length > 0 ? (
+            <SlideViewer lesson={lesson} />
+          ) : (
+            <div className="card p-6 mb-6 relative overflow-hidden">
+              <Watermark text={lesson.watermark} />
+              <p className="text-slate-300 leading-relaxed">
+                The deck for this session is being prepared and will appear here
+                shortly.
+              </p>
+              {lesson.asset_path && !lesson.asset_path.startsWith('blob:') && (
+                <a
+                  href={lesson.asset_path}
+                  className="btn-secondary mt-4"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open <ExternalLink className="w-4 h-4" aria-hidden="true" />
+                </a>
+              )}
+            </div>
+          ))}
+
+        {lesson.kind === 'calculator' && (
           <div className="card p-6 mb-6 relative overflow-hidden">
             <Watermark text={lesson.watermark} />
             <p className="text-slate-300 leading-relaxed">
-              {lesson.kind === 'slides'
-                ? 'The deck for this session opens in the viewer below.'
-                : 'The design spreadsheet for this session.'}
+              The design spreadsheet for this session.
             </p>
             {lesson.asset_path && (
               <a
-                href={lesson.asset_path}
+                href={
+                  lesson.asset_path.startsWith('blob:')
+                    ? lessonAssetUrl(lesson.id)
+                    : lesson.asset_path
+                }
                 className="btn-secondary mt-4"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -184,11 +328,20 @@ const Lesson: React.FC = () => {
 
         {lesson.kind === 'lab' && lesson.asset_path && (
           <div className="card p-6 mb-6">
-            <p className="text-slate-300 leading-relaxed mb-4">
+            <p className="text-slate-300 leading-relaxed mb-2">
               This interactive tool runs in its own window so it has room to work.
             </p>
+            <p className="text-xs text-slate-500 mb-4">
+              Training simulation only — generic behavior, not any specific
+              engine. Never apply values from it to real equipment. Your access
+              is personal and watermarked with your account email.
+            </p>
             <a
-              href={lesson.asset_path}
+              href={
+                lesson.asset_path.startsWith('blob:')
+                  ? lessonAssetUrl(lesson.id)
+                  : lesson.asset_path
+              }
               target="_blank"
               rel="noopener noreferrer"
               className="btn-primary"
@@ -247,8 +400,9 @@ const Lesson: React.FC = () => {
 
         <p className="mt-8 text-xs text-slate-600 flex items-center gap-2">
           <Download className="w-3.5 h-3.5" aria-hidden="true" />
-          Lecture recordings stream only and are not downloadable. This copy is
-          registered to {lesson.watermark || 'your account'}.
+          Course materials are view-only and are not downloadable. This copy is
+          registered to {lesson.watermark || 'your account'} — for training use
+          only, never for operation of real equipment.
         </p>
       </div>
     </div>

@@ -22,6 +22,7 @@ from sqlalchemy import (
     Float,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     func,
@@ -330,6 +331,14 @@ class Product(Base):
 
     total_hours: Mapped[float] = mapped_column(Float, default=0.0)
 
+    # Sequential mastery gating. True (the on-demand default): module N
+    # unlocks only after module N-1's formative gate is passed. False (live
+    # cohort mode): every module a learner is entitled to is open at once —
+    # access is decided by the admin's grants, not by quiz results. Daily
+    # evaluations still exist and still feed the certificate; they just
+    # don't lock the next day's material.
+    sequential_gate: Mapped[bool] = mapped_column(Boolean, default=True)
+
     # 'draft' — visible to nobody but admin; 'live' — purchasable.
     status: Mapped[str] = mapped_column(String(16), default="draft", index=True)
 
@@ -420,6 +429,132 @@ class Enrollment(Base):
     settlement_deadline: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+
+
+class ModuleGrant(Base):
+    """A per-module access grant — one training day, or one element (the
+    simulator), for one learner.
+
+    This is the fine-grained sibling of Enrollment. The access rule is a
+    strict union: a learner may open a module when they hold EITHER an
+    active product Enrollment (= "access to everything", which is what a
+    purchase or a cohort mark-paid writes) OR an active ModuleGrant for
+    that specific module. Revoking a module grant never touches a product
+    enrollment, and vice versa — the admin UI surfaces both.
+
+    Same soft-revoke convention as Enrollment: status flips between
+    'active' and 'revoked'; re-granting reactivates the same row.
+    """
+
+    __tablename__ = "academy_module_grants"
+    __table_args__ = (
+        Index(
+            "ix_academy_module_grant_unique",
+            "learner_id",
+            "module_id",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    learner_id: Mapped[int] = mapped_column(Integer, index=True)
+    module_id: Mapped[int] = mapped_column(Integer, index=True)
+
+    # 'manual' (admin panel) | 'cohort' (registration flow) | 'comp'
+    source: Mapped[str] = mapped_column(String(16), default="manual")
+    # 'active' | 'revoked'
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    note: Mapped[str] = mapped_column(String(500), default="")
+
+    granted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class SlideImage(Base):
+    """The rendered pixels for one slide, one size. Postgres is the asset
+    store, deliberately: images live next to the entitlement they're gated
+    by, survive redeploys (Render's disk doesn't), and never exist at a
+    public URL. Served exclusively through the watermarking endpoint in
+    routes/academy.py.
+    """
+
+    __tablename__ = "academy_slide_images"
+    __table_args__ = (
+        Index(
+            "ix_academy_slide_image_unique",
+            "module_id",
+            "number",
+            "size",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    module_id: Mapped[int] = mapped_column(Integer, index=True)
+    number: Mapped[int] = mapped_column(Integer, default=0)
+    # 'lg' (viewer) | 'sm' (thumbnail strip)
+    size: Mapped[str] = mapped_column(String(4), default="lg")
+    content_type: Mapped[str] = mapped_column(String(64), default="image/png")
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class AssetBlob(Base):
+    """A protected file served only through the entitlement-checked asset
+    endpoint — the mapping simulator today, any future lab or handout
+    tomorrow. Stored in the DB for the same reasons as SlideImage; the
+    public repo and the public site never carry these bytes.
+
+    Lessons reference a blob as asset_path = 'blob:{key}'.
+    """
+
+    __tablename__ = "academy_asset_blobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    filename: Mapped[str] = mapped_column(String(300), default="")
+    content_type: Mapped[str] = mapped_column(String(64), default="text/html")
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class TermsAcceptance(Base):
+    """One click-wrap acceptance of the training terms by one learner.
+
+    The row is the evidence: who accepted, which document version, and when.
+    Written once per (learner, version) — re-accepting is a no-op. The
+    course UI refuses to open protected material until the current version
+    has a row here, which is what makes the liability notice enforceable
+    rather than decorative.
+    """
+
+    __tablename__ = "academy_terms_acceptances"
+    __table_args__ = (
+        Index(
+            "ix_academy_terms_unique", "learner_id", "doc_version", unique=True
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    learner_id: Mapped[int] = mapped_column(Integer, index=True)
+    doc_version: Mapped[str] = mapped_column(String(32))
+    accepted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    user_agent: Mapped[str] = mapped_column(String(400), default="")
 
 
 class Module(Base):

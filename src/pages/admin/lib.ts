@@ -267,11 +267,19 @@ export type NotifyResult = {
 
 // ----- View state <-> URL hash ----------------------------------------------
 
-export type CourseTab = 'registrations' | 'buyers' | 'comms' | 'stats' | 'materials' | 'settings';
+export type CourseTab =
+  | 'registrations'
+  | 'buyers'
+  | 'access'
+  | 'comms'
+  | 'stats'
+  | 'materials'
+  | 'settings';
 
 export const COURSE_TABS: CourseTab[] = [
   'registrations',
   'buyers',
+  'access',
   'comms',
   'stats',
   'materials',

@@ -50,6 +50,11 @@ export type Me = {
   /* False until they set the password the interactive modules sign in with. */
   has_password?: boolean;
   enrollments?: { product_code: string; title: string; granted_at: string }[];
+  /* Courses where this learner holds day/element grants but no full enrollment. */
+  module_grants?: { product_code: string; title: string; partial: true }[];
+  /* Click-wrap: the current terms version and whether it has been accepted. */
+  terms_version?: string;
+  terms_accepted?: boolean;
 };
 
 export type LessonSummary = {
@@ -78,6 +83,9 @@ export type ModuleState = {
   topics: string[];
   quiz_app_url: string;
   unlocked: boolean;
+  /* True when this learner holds this module (full enrollment or a day grant).
+     unlocked=false + entitled=false means "not included in your access". */
+  entitled: boolean;
   lesson_count: number;
   lessons_completed: number;
   duration_s: number;
@@ -94,7 +102,13 @@ export type ModuleState = {
 };
 
 export type CourseState = {
-  product: { code: string; title: string; subtitle: string; total_hours: number };
+  product: {
+    code: string;
+    title: string;
+    subtitle: string;
+    total_hours: number;
+    sequential_gate: boolean;
+  };
   modules: ModuleState[];
   percent: number;
   lessons_completed: number;
@@ -102,6 +116,15 @@ export type CourseState = {
   complete: boolean;
   certificate_code: string | null;
   video_ready: boolean;
+};
+
+export type SlideMeta = {
+  number: number;
+  title: string;
+  section: string;
+  appears_at_s: number;
+  image_sm: string;
+  image_lg: string;
 };
 
 export type LessonDetail = {
@@ -117,6 +140,8 @@ export type LessonDetail = {
   playback: { hls: string; dash: string; thumbnail: string; iframe: string; expires_in: number } | null;
   video_pending: boolean;
   progress: { position_s: number; watched_s: number; completed: boolean };
+  chapters: { title: string; start_s: number; end_s: number; slides: number[] }[];
+  slides: SlideMeta[];
   prev_lesson_id: number | null;
   next_lesson_id: number | null;
   watermark: string;
@@ -225,7 +250,25 @@ export const academy = {
     request<{ status: string; product_code: string; email: string }>(
       `/api/academy/checkout/${sessionId}`
     ),
+
+  acceptTerms: (version: string) =>
+    request<{ ok: boolean }>('/api/academy/accept-terms', {
+      method: 'POST',
+      body: JSON.stringify({ version }),
+    }),
 };
+
+/* Absolute URL for a protected slide image. The <img> must be rendered with
+ * crossOrigin="use-credentials" so the session cookie rides along. */
+export function slideImageUrl(moduleId: number, number: number, size: 'lg' | 'sm') {
+  return `${API_BASE}/api/academy/slide-image/${moduleId}/${number}/${size}`;
+}
+
+/* Absolute URL for a protected lesson asset (simulator, lab). Opened as a
+ * top-level navigation, so the SameSite=None cookie is sent automatically. */
+export function lessonAssetUrl(lessonId: number) {
+  return `${API_BASE}/api/academy/asset/${lessonId}`;
+}
 
 export function formatDuration(seconds: number): string {
   if (!seconds) return '';

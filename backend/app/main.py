@@ -71,6 +71,11 @@ def _run_column_migrations() -> None:
     # courses.recorded_product_code — nullable link to the academy Product
     # that carries this course's recorded counterpart.
     _ensure_column("courses", "recorded_product_code", "VARCHAR(64)")
+    # academy_products.sequential_gate — False = cohort mode (admin grants
+    # decide access; daily evaluations don't lock the next module).
+    _ensure_column(
+        "academy_products", "sequential_gate", "BOOLEAN NOT NULL DEFAULT TRUE"
+    )
     # courses price — online seat price for live cohorts (0 = invoice-only).
     _ensure_column("courses", "price_cents", "INTEGER NOT NULL DEFAULT 0")
     _ensure_column("courses", "currency", "VARCHAR(8) NOT NULL DEFAULT 'usd'")

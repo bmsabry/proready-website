@@ -16,9 +16,18 @@ Learner (session cookie):
   GET  /api/academy/quiz/{module_id}/{set}     — items WITHOUT answers
   POST /api/academy/quiz/{module_id}/{set}     — submit, grade, gate
   POST /api/academy/certificate/{code}         — issue if complete
+  POST /api/academy/accept-terms               — click-wrap acceptance (logged)
+  GET  /api/academy/slide-image/{module}/{n}/{size} — watermarked slide pixels
+  GET  /api/academy/asset/{lesson_id}          — gated blob (simulator, labs)
 
 The answer key never crosses the wire. `_public_item()` is the only
 serializer used for quiz items, and it has no path to `answer`.
+
+Slide images and asset blobs exist ONLY behind the two endpoints above:
+both check the module-level entitlement, both send no-store cache headers,
+and both stamp the learner's identity into what they serve — the slide
+pixels are watermarked server-side, and HTML assets get a licensed-to
+banner injected. There is no public URL to find.
 """
 from __future__ import annotations
 
@@ -43,15 +52,18 @@ from ..learner_auth import (
     set_learner_cookie,
 )
 from ..models import (
+    AssetBlob,
     Certificate,
     Chapter,
     Enrollment,
     Learner,
     Lesson,
     Module,
+    ModuleGrant,
     Product,
     QuizItem,
     Slide,
+    SlideImage,
 )
 from ..stream_tokens import is_configured as stream_configured
 from ..stream_tokens import playback_urls
@@ -318,6 +330,35 @@ def me(
     # 7-business-day deadline drops out of /me the moment it's looked at.
     rows = [r for r in rows if svc.settlement_ok(db, r)]
     products = {p.code: p for p in db.execute(select(Product)).scalars().all()}
+
+    # Module-level grants surface as course access too — a learner holding
+    # only "Day 1" must still find the course on their dashboard.
+    grant_rows = db.execute(
+        select(ModuleGrant, Module)
+        .join(Module, Module.id == ModuleGrant.module_id)
+        .where(
+            ModuleGrant.learner_id == learner.id,
+            ModuleGrant.status == "active",
+        )
+    ).all()
+    enrolled_codes = {r.product_code for r in rows}
+    granted_products = []
+    seen = set()
+    for _grant, module in grant_rows:
+        if module.product_code in enrolled_codes or module.product_code in seen:
+            continue
+        seen.add(module.product_code)
+        granted_products.append(
+            {
+                "product_code": module.product_code,
+                "title": products[module.product_code].title
+                if module.product_code in products
+                else module.product_code,
+                "partial": True,
+            }
+        )
+
+    settings = get_settings()
     return {
         "signed_in": True,
         "email": learner.email,
@@ -337,7 +378,41 @@ def me(
             }
             for r in rows
         ],
+        "module_grants": granted_products,
+        # Click-wrap state: the UI must collect an acceptance for the current
+        # terms version before opening any protected material.
+        "terms_version": settings.TERMS_VERSION,
+        "terms_accepted": svc.terms_accepted(db, learner, settings.TERMS_VERSION),
     }
+
+
+class AcceptTermsIn(BaseModel):
+    version: str = Field(min_length=1, max_length=32)
+
+
+@router.post("/accept-terms", response_model=OkOut)
+def accept_terms(
+    body: AcceptTermsIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> OkOut:
+    """Record the click-wrap acceptance of the training terms.
+
+    The version echoes back what the UI showed, and only the current version
+    counts — accepting an old document is not accepting the new one.
+    """
+    settings = get_settings()
+    if body.version != settings.TERMS_VERSION:
+        raise HTTPException(
+            status_code=409,
+            detail="The terms were updated — please review the current version.",
+        )
+    svc.record_terms_acceptance(
+        db, learner, body.version, request.headers.get("user-agent", "")
+    )
+    log.info("Learner %s accepted terms %s", learner.email, body.version)
+    return OkOut()
 
 
 # -----------------------------------------------------------------------------
@@ -351,7 +426,7 @@ def course(
     learner: Learner = Depends(require_learner),
 ) -> dict:
     product = _product_or_404(db, code)
-    if not svc.has_access(db, learner, code):
+    if not svc.has_any_access(db, learner, code):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this course yet.",
@@ -370,6 +445,7 @@ def course(
             "title": product.title,
             "subtitle": product.subtitle,
             "total_hours": product.total_hours,
+            "sequential_gate": product.sequential_gate,
         },
         "modules": modules,
         "percent": round(100.0 * done_lessons / total_lessons, 1)
@@ -501,7 +577,7 @@ def _module_for_learner(db: Session, module_id: int, learner: Learner) -> Module
     module = db.get(Module, module_id)
     if module is None:
         raise HTTPException(status_code=404, detail="Module not found.")
-    if not svc.has_access(db, learner, module.product_code):
+    if not svc.module_access(db, learner, module):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this course yet.",
@@ -631,3 +707,172 @@ def verify_certificate(cert_code: str, db: Session = Depends(get_db)) -> dict:
         "course": product.title if product else cert.product_code,
         "issued_at": cert.issued_at,
     }
+
+
+# -----------------------------------------------------------------------------
+# Protected material serving — slide images and asset blobs
+# -----------------------------------------------------------------------------
+# Both endpoints below are the ONLY paths to these bytes. Both check the
+# module-level entitlement (owner / product enrollment / per-module grant),
+# send no-store headers so nothing lands in a shared cache, and stamp the
+# learner's identity into what they serve.
+
+_NO_STORE = {
+    "Cache-Control": "private, no-store, max-age=0",
+    "Pragma": "no-cache",
+    "X-Robots-Tag": "noindex, nofollow",
+}
+
+
+def _watermark_image(data: bytes, text: str) -> bytes:
+    """Burn a per-learner watermark into slide pixels, server-side.
+
+    A corner tag plus a faint diagonal through the middle: unobtrusive to
+    study from, expensive to clean up, and it survives a right-click save —
+    which is the point. On any Pillow hiccup the original bytes are served
+    rather than failing the lesson (the frontend overlay still shows the
+    learner's address in that case).
+    """
+    if not text:
+        return data
+    try:
+        import io
+
+        from PIL import Image, ImageDraw, ImageFont
+
+        im = Image.open(io.BytesIO(data)).convert("RGBA")
+        overlay = Image.new("RGBA", im.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+        w, h = im.size
+
+        try:
+            corner_font = ImageFont.load_default(size=max(12, h // 60))
+            diag_font = ImageFont.load_default(size=max(18, h // 28))
+        except TypeError:  # very old Pillow — unsized bitmap font
+            corner_font = diag_font = ImageFont.load_default()
+
+        tag = f"Licensed to {text} · ProReadyEngineer LLC"
+        # Corner tag, bottom-left, readable but quiet.
+        draw.text((int(w * 0.012), int(h * 0.962)), tag,
+                  fill=(255, 255, 255, 150), font=corner_font,
+                  stroke_width=1, stroke_fill=(0, 0, 0, 130))
+        # Faint diagonal across the middle.
+        diag = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        ddraw = ImageDraw.Draw(diag)
+        ddraw.text((w // 2, h // 2), text, fill=(128, 128, 128, 34),
+                   font=diag_font, anchor="mm")
+        diag = diag.rotate(25, resample=Image.BICUBIC)
+        overlay = Image.alpha_composite(overlay, diag)
+
+        out = Image.alpha_composite(im, overlay).convert("RGB")
+        buf = io.BytesIO()
+        out.save(buf, format="PNG", optimize=False)
+        return buf.getvalue()
+    except Exception:  # pragma: no cover — never fail a lesson over a stamp
+        log.exception("Slide watermarking failed; serving original")
+        return data
+
+
+@router.get("/slide-image/{module_id}/{number}/{size}")
+def slide_image(
+    module_id: int,
+    number: int,
+    size: str,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> Response:
+    """One slide's pixels, watermarked with the requesting learner's email.
+
+    Auth is the session cookie (the <img> tags request with credentials).
+    The entitlement check is module-scoped, so a Day-1-only grant cannot
+    fetch Day 2's deck by iterating URLs.
+    """
+    if size not in ("lg", "sm"):
+        raise HTTPException(status_code=404, detail="Unknown size.")
+    module = db.get(Module, module_id)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found.")
+    if not svc.module_unlocked(db, learner, module):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this material.",
+        )
+    row = db.execute(
+        select(SlideImage).where(
+            SlideImage.module_id == module_id,
+            SlideImage.number == number,
+            SlideImage.size == size,
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Slide not found.")
+
+    # Thumbnails skip the burn — too small to read a watermark, and the
+    # strip requests dozens at once; the viewer image is always stamped.
+    payload = row.data if size == "sm" else _watermark_image(
+        row.data, learner.email
+    )
+    return Response(content=payload, media_type=row.content_type,
+                    headers=dict(_NO_STORE))
+
+
+_ASSET_BANNER = """
+<style>
+#pre-license-banner{position:fixed;left:0;right:0;bottom:0;z-index:2147483647;
+background:rgba(12,18,32,.92);color:#cfe3ff;font:12px/1.5 system-ui,Segoe UI,sans-serif;
+padding:6px 14px;display:flex;gap:14px;justify-content:space-between;align-items:center;
+border-top:1px solid rgba(120,160,255,.35);pointer-events:none}
+#pre-license-banner b{color:#fff;font-weight:600}
+</style>
+<div id="pre-license-banner">
+<span>Licensed to <b>__EMAIL__</b> — personal, non-transferable training use only. Do not copy or redistribute.</span>
+<span>Training simulation — NOT for operation of any real engine. © ProReadyEngineer LLC</span>
+</div>
+"""
+
+
+@router.get("/asset/{lesson_id}")
+def lesson_asset(
+    lesson_id: int,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> Response:
+    """Serve a protected blob (the mapping simulator, labs, handouts).
+
+    Opens as a top-level navigation on the API origin, so the SameSite=None
+    session cookie rides along. HTML gets a licensed-to banner injected and
+    a frame-ancestors lockdown; everything gets no-store headers.
+    """
+    lesson = db.get(Lesson, lesson_id)
+    if lesson is None:
+        raise HTTPException(status_code=404, detail="Lesson not found.")
+    ok, reason = svc.lesson_accessible(db, learner, lesson)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=reason)
+
+    path = lesson.asset_path or ""
+    if not path.startswith("blob:"):
+        raise HTTPException(status_code=404, detail="This lesson has no stored asset.")
+    blob = db.execute(
+        select(AssetBlob).where(AssetBlob.key == path[len("blob:"):])
+    ).scalar_one_or_none()
+    if blob is None:
+        raise HTTPException(status_code=404, detail="Asset not found.")
+
+    headers = dict(_NO_STORE)
+    headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+    data = blob.data
+
+    if blob.content_type.startswith("text/html"):
+        try:
+            html = data.decode("utf-8", errors="replace")
+            banner = _ASSET_BANNER.replace("__EMAIL__", learner.email)
+            lowered = html.lower()
+            idx = lowered.rfind("</body>")
+            html = (html[:idx] + banner + html[idx:]) if idx != -1 else html + banner
+            data = html.encode("utf-8")
+        except Exception:  # pragma: no cover
+            log.exception("Asset banner injection failed; serving original")
+
+    log.info("Asset %s served to %s", path, learner.email)
+    return Response(content=data, media_type=blob.content_type, headers=headers)
