@@ -6,6 +6,7 @@ none of it is reachable with a learner session.
 """
 from __future__ import annotations
 
+import base64
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
@@ -19,16 +20,19 @@ from ..deps import require_admin
 from ..emailer import enrollment_granted_html, login_link_html, send_email
 from ..learner_auth import issue_login_token
 from ..models import (
+    AssetBlob,
     Chapter,
     Enrollment,
     Learner,
     Lesson,
     LessonProgress,
     Module,
+    ModuleGrant,
     Product,
     QuizAttempt,
     QuizItem,
     Slide,
+    SlideImage,
 )
 from ..stats_queries import product_headline_stats
 
@@ -64,6 +68,8 @@ class ProductPatch(BaseModel):
     currency: str | None = None
     stripe_price_id: str | None = None
     status: str | None = None
+    sequential_gate: bool | None = None
+    total_hours: float | None = Field(default=None, ge=0)
 
 
 class LessonPatch(BaseModel):
@@ -616,3 +622,395 @@ def stats(
         )
 
     return {**headline, "modules": funnel}
+
+
+# -----------------------------------------------------------------------------
+# Content management — create products/modules/lessons, load quiz banks,
+# slide images and protected assets, all through the API so new course
+# content never requires a code deploy (and never touches the public repo).
+# -----------------------------------------------------------------------------
+
+class ProductCreate(BaseModel):
+    code: str = Field(min_length=3, max_length=64, pattern=r"^[a-z0-9-]+$")
+    title: str
+    subtitle: str = ""
+    summary: str = ""
+    price_cents: int = Field(default=0, ge=0)
+    currency: str = "usd"
+    total_hours: float = Field(default=0.0, ge=0)
+    status: str = "draft"
+    sequential_gate: bool = True
+
+
+@router.post("/products")
+def create_product(
+    body: ProductCreate, db: Session = Depends(get_db), _: str = Depends(require_admin)
+) -> dict:
+    """Create a product, or update these fields on an existing code —
+    idempotent so a content-load script can be re-run safely."""
+    if body.status not in ("draft", "live"):
+        raise HTTPException(status_code=400, detail="status must be draft or live.")
+    product = db.get(Product, body.code)
+    created = product is None
+    if product is None:
+        product = Product(code=body.code)
+        db.add(product)
+    for field in ("title", "subtitle", "summary", "price_cents", "currency",
+                  "total_hours", "status", "sequential_gate"):
+        setattr(product, field, getattr(body, field))
+    db.commit()
+    log.info("Admin %s product %s", "created" if created else "updated", body.code)
+    return {"ok": True, "created": created, "code": product.code}
+
+
+class ModuleUpsert(BaseModel):
+    code: str = Field(min_length=2, max_length=32)
+    title: str
+    summary: str = ""
+    position: int = Field(default=0, ge=0)
+    hours: float = Field(default=0.0, ge=0)
+    objectives: list = []
+    topics: list = []
+    quiz_app_url: str = ""
+
+
+@router.post("/products/{code}/modules")
+def upsert_module(
+    code: str,
+    body: ModuleUpsert,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin),
+) -> dict:
+    product = db.get(Product, code)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    module = db.execute(
+        select(Module).where(Module.product_code == code, Module.code == body.code)
+    ).scalar_one_or_none()
+    created = module is None
+    if module is None:
+        module = Module(product_code=code, code=body.code)
+        db.add(module)
+    for field in ("title", "summary", "position", "hours", "objectives",
+                  "topics", "quiz_app_url"):
+        setattr(module, field, getattr(body, field))
+    db.commit()
+    db.refresh(module)
+    return {"ok": True, "created": created, "module_id": module.id, "code": module.code}
+
+
+class LessonUpsert(BaseModel):
+    code: str = Field(min_length=2, max_length=64)
+    title: str
+    kind: str = "slides"
+    position: int = Field(default=0, ge=0)
+    duration_s: int = Field(default=0, ge=0)
+    asset_path: str = ""
+    body: str = ""
+    is_preview: bool = False
+
+
+@router.post("/modules/{module_id}/lessons")
+def upsert_lesson(
+    module_id: int,
+    body: LessonUpsert,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin),
+) -> dict:
+    module = db.get(Module, module_id)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found.")
+    if body.kind not in ("video", "slides", "reading", "lab", "calculator", "quiz"):
+        raise HTTPException(status_code=400, detail="Unknown lesson kind.")
+    lesson = db.execute(
+        select(Lesson).where(Lesson.module_id == module_id, Lesson.code == body.code)
+    ).scalar_one_or_none()
+    created = lesson is None
+    if lesson is None:
+        lesson = Lesson(module_id=module_id, code=body.code)
+        db.add(lesson)
+    for field in ("title", "kind", "position", "duration_s", "asset_path",
+                  "body", "is_preview"):
+        setattr(lesson, field, getattr(body, field))
+    db.commit()
+    db.refresh(lesson)
+    return {"ok": True, "created": created, "lesson_id": lesson.id, "code": lesson.code}
+
+
+class QuizItemIn(BaseModel):
+    code: str
+    item_set: str = "formative"
+    kind: str = "mcq"
+    stem: str
+    options: list = []
+    answer: dict = {}
+    rubric: str = ""
+    explanation: str = ""
+    cognitive_level: str = ""
+    outcome_id: str = ""
+    position: int = 0
+
+
+class QuizBankIn(BaseModel):
+    items: list[QuizItemIn]
+    # When true (default) the module's existing items in the same item_set(s)
+    # are replaced wholesale — the safe way to re-run a content load.
+    replace: bool = True
+
+
+@router.post("/modules/{module_id}/quiz-items")
+def load_quiz_items(
+    module_id: int,
+    body: QuizBankIn,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin),
+) -> dict:
+    module = db.get(Module, module_id)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found.")
+    if not body.items:
+        raise HTTPException(status_code=400, detail="No items supplied.")
+    sets = {i.item_set for i in body.items}
+    bad = sets - {"formative", "summative"}
+    if bad:
+        raise HTTPException(status_code=400, detail=f"Unknown item_set: {bad}.")
+    for item in body.items:
+        if item.kind == "mcq":
+            keys = {o.get("key") for o in item.options if isinstance(o, dict)}
+            if item.answer.get("key") not in keys:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Item {item.code}: answer key not among options.",
+                )
+    if body.replace:
+        db.execute(
+            delete(QuizItem).where(
+                QuizItem.module_id == module_id, QuizItem.item_set.in_(sets)
+            )
+        )
+    for item in body.items:
+        db.add(QuizItem(module_id=module_id, **item.model_dump()))
+    db.commit()
+    n = db.execute(
+        select(func.count(QuizItem.id)).where(QuizItem.module_id == module_id)
+    ).scalar_one()
+    log.info("Quiz bank loaded for module %s: %d items", module_id, n)
+    return {"ok": True, "module_id": module_id, "items_total": n}
+
+
+class SlideIn(BaseModel):
+    number: int = Field(ge=1)
+    title: str = ""
+    section: str = ""
+    text: str = ""
+    appears_at_s: int = -1
+    image_lg_b64: str = ""
+    image_sm_b64: str = ""
+
+
+class SlideBatchIn(BaseModel):
+    slides: list[SlideIn]
+
+
+@router.post("/modules/{module_id}/slides")
+def load_slides(
+    module_id: int,
+    body: SlideBatchIn,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin),
+) -> dict:
+    """Upsert slide rows and their pixels. Batched — send ~10 slides per call
+    so a request stays comfortably inside body-size limits."""
+    module = db.get(Module, module_id)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found.")
+    if not body.slides:
+        raise HTTPException(status_code=400, detail="No slides supplied.")
+    if len(body.slides) > 25:
+        raise HTTPException(status_code=400, detail="Batch too large — send ≤25.")
+
+    for s in body.slides:
+        row = db.execute(
+            select(Slide).where(Slide.module_id == module_id, Slide.number == s.number)
+        ).scalar_one_or_none()
+        if row is None:
+            row = Slide(module_id=module_id, number=s.number)
+            db.add(row)
+        row.title = s.title
+        row.section = s.section
+        row.text = s.text
+        row.appears_at_s = s.appears_at_s
+        for size, b64 in (("lg", s.image_lg_b64), ("sm", s.image_sm_b64)):
+            if not b64:
+                continue
+            try:
+                blob = base64.b64decode(b64, validate=True)
+            except Exception:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Slide {s.number} {size}: invalid base64.",
+                )
+            img = db.execute(
+                select(SlideImage).where(
+                    SlideImage.module_id == module_id,
+                    SlideImage.number == s.number,
+                    SlideImage.size == size,
+                )
+            ).scalar_one_or_none()
+            if img is None:
+                img = SlideImage(module_id=module_id, number=s.number, size=size)
+                db.add(img)
+            img.data = blob
+            img.content_type = "image/png"
+            # The learner endpoint is the only reader of these paths.
+            setattr(row, f"image_{size}",
+                    f"/api/academy/slide-image/{module_id}/{s.number}/{size}")
+    db.commit()
+    n = db.execute(
+        select(func.count(Slide.id)).where(Slide.module_id == module_id)
+    ).scalar_one()
+    return {"ok": True, "module_id": module_id, "slides_total": n}
+
+
+class AssetIn(BaseModel):
+    key: str = Field(min_length=3, max_length=128, pattern=r"^[a-z0-9._-]+$")
+    filename: str = ""
+    content_type: str = "text/html"
+    data_b64: str
+
+
+@router.post("/assets")
+def upload_asset(
+    body: AssetIn, db: Session = Depends(get_db), _: str = Depends(require_admin)
+) -> dict:
+    """Store (or replace) a protected blob — the simulator, a lab, a handout.
+    Lessons point at it with asset_path='blob:{key}'."""
+    try:
+        blob = base64.b64decode(body.data_b64, validate=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid base64 payload.")
+    if len(blob) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Asset exceeds the 25MB cap.")
+    row = db.execute(
+        select(AssetBlob).where(AssetBlob.key == body.key)
+    ).scalar_one_or_none()
+    created = row is None
+    if row is None:
+        row = AssetBlob(key=body.key)
+        db.add(row)
+    row.filename = body.filename
+    row.content_type = body.content_type
+    row.data = blob
+    db.commit()
+    log.info("Asset %s %s (%d bytes)", body.key,
+             "created" if created else "replaced", len(blob))
+    return {"ok": True, "created": created, "key": body.key, "bytes": len(blob)}
+
+
+# -----------------------------------------------------------------------------
+# Per-module (per-day / per-element) access control
+# -----------------------------------------------------------------------------
+
+class ModuleGrantIn(BaseModel):
+    email: EmailStr
+    module_id: int
+    full_name: str = ""
+    note: str = ""
+
+
+@router.get("/products/{code}/access")
+def access_matrix(
+    code: str, db: Session = Depends(get_db), _: str = Depends(require_admin)
+) -> dict:
+    """Everything the access panel needs in one call: the product's modules,
+    and every learner who holds either a product enrollment or at least one
+    module grant, with their per-module state."""
+    product = db.get(Product, code)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    modules = db.execute(
+        select(Module).where(Module.product_code == code).order_by(Module.position)
+    ).scalars().all()
+    module_ids = [m.id for m in modules]
+
+    enrollments = db.execute(
+        select(Enrollment).where(
+            Enrollment.product_code == code, Enrollment.status == "active"
+        )
+    ).scalars().all()
+    grants = db.execute(
+        select(ModuleGrant).where(
+            ModuleGrant.module_id.in_(module_ids or [0]),
+            ModuleGrant.status == "active",
+        )
+    ).scalars().all()
+
+    learner_ids = {e.learner_id for e in enrollments} | {g.learner_id for g in grants}
+    learners = {
+        l.id: l
+        for l in db.execute(
+            select(Learner).where(Learner.id.in_(learner_ids or [0]))
+        ).scalars().all()
+    }
+    grants_by_learner: dict[int, set[int]] = {}
+    for g in grants:
+        grants_by_learner.setdefault(g.learner_id, set()).add(g.module_id)
+    enrolled_ids = {e.learner_id for e in enrollments}
+
+    rows = []
+    for lid in sorted(learner_ids):
+        learner = learners.get(lid)
+        if learner is None:
+            continue
+        rows.append(
+            {
+                "learner_id": lid,
+                "email": learner.email,
+                "full_name": learner.full_name,
+                "is_owner": svc.is_owner(learner),
+                "enrolled_all": lid in enrolled_ids,
+                "module_ids": sorted(grants_by_learner.get(lid, set())),
+            }
+        )
+    return {
+        "product": {"code": product.code, "title": product.title,
+                    "sequential_gate": product.sequential_gate},
+        "modules": [
+            {"id": m.id, "code": m.code, "title": m.title, "position": m.position}
+            for m in modules
+        ],
+        "learners": rows,
+    }
+
+
+@router.post("/grant-module")
+def grant_module(
+    body: ModuleGrantIn, db: Session = Depends(get_db), admin: str = Depends(require_admin)
+) -> dict:
+    module = db.get(Module, body.module_id)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found.")
+    learner = svc.upsert_learner(db, str(body.email), body.full_name)
+    svc.grant_module(db, learner, module, source="manual",
+                     note=body.note or f"granted by admin")
+    log.info("Admin %s granted module %s to %s", admin, module.code, learner.email)
+    return {"ok": True, "email": learner.email, "module_id": module.id,
+            "module_code": module.code}
+
+
+@router.post("/revoke-module")
+def revoke_module(
+    body: ModuleGrantIn, db: Session = Depends(get_db), admin: str = Depends(require_admin)
+) -> dict:
+    module = db.get(Module, body.module_id)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found.")
+    learner = db.execute(
+        select(Learner).where(Learner.email == str(body.email).lower().strip())
+    ).scalar_one_or_none()
+    if learner is None:
+        raise HTTPException(status_code=404, detail="Learner not found.")
+    changed = svc.revoke_module(db, learner, module)
+    log.info("Admin %s revoked module %s from %s (changed=%s)",
+             admin, module.code, learner.email, changed)
+    return {"ok": True, "changed": changed}
