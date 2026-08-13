@@ -50,7 +50,15 @@ const ProgressBar = ({ percent }: { percent: number }) => (
   </div>
 );
 
-const ModuleCard = ({ module, index }: { module: ModuleState; index: number }) => {
+const ModuleCard = ({
+  module,
+  index,
+  sequential,
+}: {
+  module: ModuleState;
+  index: number;
+  sequential: boolean;
+}) => {
   const [open, setOpen] = useState(module.unlocked && module.percent < 100);
   const locked = !module.unlocked;
 
@@ -106,7 +114,9 @@ const ModuleCard = ({ module, index }: { module: ModuleState; index: number }) =
           )}
           {locked && (
             <span className="block mt-2 text-xs text-slate-500">
-              Clear the previous module to unlock this one.
+              {module.entitled
+                ? 'Clear the previous module to unlock this one.'
+                : 'Not part of your current access — contact info@proreadyengineer.com to add it.'}
             </span>
           )}
         </span>
@@ -159,10 +169,16 @@ const ModuleCard = ({ module, index }: { module: ModuleState; index: number }) =
             >
               <GraduationCap className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden="true" />
               <span className="flex-1 text-sm font-medium text-white">
-                {module.formative_passed ? 'Module assessment — passed' : 'Take the module assessment'}
+                {module.formative_passed
+                  ? 'Evaluation — passed'
+                  : sequential
+                    ? 'Take the module assessment'
+                    : 'Take the evaluation for this day'}
               </span>
               <span className="text-xs text-slate-400">
-                {module.mastery_threshold}% to unlock the next
+                {sequential
+                  ? `${module.mastery_threshold}% to unlock the next`
+                  : `${module.mastery_threshold}% to pass · retakes allowed`}
               </span>
             </Link>
           )}
@@ -255,17 +271,144 @@ const SetPasswordCard: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   );
 };
 
+/* Click-wrap gate. Protected material stays closed until the current terms
+ * version is accepted; the acceptance is recorded server-side with a
+ * timestamp, which is what makes the notice enforceable evidence rather
+ * than decoration. */
+const TermsGate = ({
+  version,
+  onAccepted,
+}: {
+  version: string;
+  onAccepted: () => void;
+}) => {
+  const [checked, setChecked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const accept = async () => {
+    setBusy(true);
+    setErr('');
+    try {
+      await academy.acceptTerms(version);
+      onAccepted();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Could not record your acceptance.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card p-6 md:p-8 border-amber-500/30">
+      <h2 className="text-xl font-bold text-white mb-1">
+        Training Terms — read and accept before starting
+      </h2>
+      <p className="text-sm text-slate-400 mb-4">
+        Version {version}. Your acceptance is recorded with your account and a
+        timestamp.
+      </p>
+      <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-300 leading-relaxed space-y-3">
+        <p>
+          <strong className="text-white">Training use only.</strong> This course,
+          all materials, and the ProDLEMappingSim simulator are provided for
+          educational and training purposes only. Content is generic and
+          illustrative and is NOT specific to any engine, control system, fuel,
+          site, or operating permit. Nothing in this course constitutes
+          engineering, operational, or maintenance advice for any particular
+          machine or facility.
+        </p>
+        <p>
+          <strong className="text-white">No operational use.</strong> Do not
+          apply values, fuel splits, schedules, limits, tables, or procedures
+          from this training to any real engine or plant — all numbers are
+          illustrative examples. OEM manuals, control-system documentation, site
+          procedures, applicable law and permits, and the direction of
+          qualified, authorized personnel always take precedence.
+        </p>
+        <p>
+          <strong className="text-white">Assumption of risk.</strong> Gas
+          turbine operation, tuning, and combustion mapping are inherently
+          hazardous and can cause equipment damage, production loss,
+          environmental harm, serious injury, or death if performed improperly.
+          Any decision to act on information from this training is made solely
+          at your own risk, under your employer's and site's authorization and
+          procedures.
+        </p>
+        <p>
+          <strong className="text-white">No warranty.</strong> All materials and
+          the simulator are provided “AS IS” and “AS AVAILABLE”, without
+          warranties of any kind, express or implied, including accuracy,
+          completeness, merchantability, or fitness for a particular purpose.
+        </p>
+        <p>
+          <strong className="text-white">Limitation of liability.</strong> To
+          the maximum extent permitted by law, ProReadyEngineer LLC, its owner,
+          employees, and instructors shall not be liable for any direct,
+          indirect, incidental, consequential, special, exemplary, or punitive
+          damages — including equipment damage, loss of production, business
+          interruption, personal injury, or death — arising from or related to
+          the use or misuse of these materials or the simulator, even if advised
+          of the possibility of such damages.
+        </p>
+        <p>
+          <strong className="text-white">Personal, non-transferable access.</strong>{' '}
+          Materials are licensed to you alone, are watermarked with your
+          account, and may not be copied, shared, published, or used to deliver
+          training or consulting to others. Unauthorized reproduction or
+          distribution is copyright infringement under 17 U.S.C. §§ 501–506 and
+          may result in civil and criminal liability, and immediate revocation
+          of access without refund.
+        </p>
+        <p>
+          Questions:{' '}
+          <a href="mailto:info@proreadyengineer.com" className="text-cyan-400">
+            info@proreadyengineer.com
+          </a>
+        </p>
+      </div>
+      <label className="flex items-start gap-3 mt-5 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => setChecked(e.target.checked)}
+          className="mt-1 w-4 h-4 accent-cyan-500"
+        />
+        <span className="text-sm text-slate-300">
+          I have read, understood, and agree to these terms, including the
+          liability disclaimer and the personal-use license.
+        </span>
+      </label>
+      {err && (
+        <p className="text-sm text-amber-300 mt-3" role="alert">
+          {err}
+        </p>
+      )}
+      <button
+        type="button"
+        disabled={!checked || busy}
+        onClick={accept}
+        className="btn-primary mt-5 disabled:opacity-50"
+      >
+        {busy ? 'Recording…' : 'Accept and start the course'}
+      </button>
+    </div>
+  );
+};
+
 const Dashboard: React.FC = () => {
   const { productCode } = useParams();
-  const code = productCode || DEFAULT_PRODUCT;
   const navigate = useNavigate();
 
+  const [code, setCode] = useState(productCode || '');
   const [course, setCourse] = useState<CourseState | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [isOwner, setIsOwner] = useState(false);
   const [needsPassword, setNeedsPassword] = useState(false);
+  const [termsVersion, setTermsVersion] = useState('');
+  const [needsTerms, setNeedsTerms] = useState(false);
 
   usePageMeta('Your course', 'Your ProReadyEngineer course dashboard.', {
     noindex: true,
@@ -284,7 +427,20 @@ const Dashboard: React.FC = () => {
         setEmail(me.email || '');
         setIsOwner(Boolean(me.is_owner));
         setNeedsPassword(me.has_password === false);
-        const data = await academy.course(code);
+        setTermsVersion(me.terms_version || '');
+        setNeedsTerms(
+          Boolean(me.terms_version) && !me.terms_accepted && !me.is_owner
+        );
+        // No product in the URL → open whatever this account actually holds:
+        // a full enrollment first, then a partially-granted course, then the
+        // default catalog product.
+        const resolved =
+          productCode ||
+          me.enrollments?.[0]?.product_code ||
+          me.module_grants?.[0]?.product_code ||
+          DEFAULT_PRODUCT;
+        setCode(resolved);
+        const data = await academy.course(resolved);
         if (!cancelled) setCourse(data);
       } catch (err) {
         if (cancelled) return;
@@ -300,7 +456,7 @@ const Dashboard: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [code, navigate]);
+  }, [productCode, navigate]);
 
   const signOut = async () => {
     try {
@@ -367,6 +523,10 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
 
+        {needsTerms && termsVersion ? (
+          <TermsGate version={termsVersion} onAccepted={() => setNeedsTerms(false)} />
+        ) : (
+          <>
         {needsPassword && <SetPasswordCard onDone={() => setNeedsPassword(false)} />}
 
         <div className="card p-6 mb-8">
@@ -430,9 +590,16 @@ const Dashboard: React.FC = () => {
 
         <div className="space-y-4">
           {course.modules.map((m, i) => (
-            <ModuleCard key={m.id} module={m} index={i} />
+            <ModuleCard
+              key={m.id}
+              module={m}
+              index={i}
+              sequential={course.product.sequential_gate !== false}
+            />
           ))}
         </div>
+          </>
+        )}
       </div>
     </div>
   );
