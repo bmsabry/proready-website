@@ -28,9 +28,11 @@ from .models import (
     Lesson,
     LessonProgress,
     Module,
+    ModuleGrant,
     Product,
     QuizAttempt,
     QuizItem,
+    TermsAcceptance,
 )
 
 # A lesson counts as complete once the learner has watched this share of it.
@@ -227,6 +229,156 @@ def has_access(db: Session, learner: Learner | None, product_code: str) -> bool:
     if is_owner(learner):
         return True
     return active_enrollment(db, learner, product_code) is not None
+
+
+# -----------------------------------------------------------------------------
+# Module-level grants (per-day / per-element access)
+# -----------------------------------------------------------------------------
+
+def module_grant_ids(db: Session, learner: Learner | None, product_code: str) -> set[int]:
+    """The set of module ids in this product the learner holds an active
+    ModuleGrant for. Empty set for anonymous learners."""
+    if learner is None:
+        return set()
+    module_ids = [
+        mid
+        for (mid,) in db.execute(
+            select(Module.id).where(Module.product_code == product_code)
+        ).all()
+    ]
+    if not module_ids:
+        return set()
+    rows = db.execute(
+        select(ModuleGrant.module_id).where(
+            ModuleGrant.learner_id == learner.id,
+            ModuleGrant.module_id.in_(module_ids),
+            ModuleGrant.status == "active",
+        )
+    ).all()
+    return {mid for (mid,) in rows}
+
+
+def module_access(db: Session, learner: Learner | None, module: Module) -> bool:
+    """May this learner open this specific module?
+
+    Union rule: owner bypass, OR an active product enrollment ("everything"),
+    OR an active grant for this one module. This is the primitive every
+    protected read below builds on.
+    """
+    if is_owner(learner):
+        return True
+    if active_enrollment(db, learner, module.product_code) is not None:
+        return True
+    if learner is None:
+        return False
+    row = db.execute(
+        select(ModuleGrant).where(
+            ModuleGrant.learner_id == learner.id,
+            ModuleGrant.module_id == module.id,
+            ModuleGrant.status == "active",
+        )
+    ).scalar_one_or_none()
+    return row is not None
+
+
+def has_any_access(db: Session, learner: Learner | None, product_code: str) -> bool:
+    """Product-level OR at least one module-level grant — the gate for the
+    course overview page, where partially-granted learners still need to see
+    their own map of what is open and what isn't."""
+    if has_access(db, learner, product_code):
+        return True
+    return bool(module_grant_ids(db, learner, product_code))
+
+
+def grant_module(
+    db: Session,
+    learner: Learner,
+    module: Module,
+    *,
+    source: str = "manual",
+    note: str = "",
+) -> ModuleGrant:
+    """Create or reactivate a module grant. Idempotent by (learner, module)."""
+    existing = db.execute(
+        select(ModuleGrant).where(
+            ModuleGrant.learner_id == learner.id,
+            ModuleGrant.module_id == module.id,
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        existing.status = "active"
+        existing.source = source
+        if note:
+            existing.note = note[:500]
+        db.commit()
+        db.refresh(existing)
+        return existing
+    row = ModuleGrant(
+        learner_id=learner.id,
+        module_id=module.id,
+        source=source,
+        status="active",
+        note=note[:500],
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def revoke_module(db: Session, learner: Learner, module: Module) -> bool:
+    """Soft-revoke a module grant. Returns True when a row transitioned."""
+    existing = db.execute(
+        select(ModuleGrant).where(
+            ModuleGrant.learner_id == learner.id,
+            ModuleGrant.module_id == module.id,
+        )
+    ).scalar_one_or_none()
+    if existing is None or existing.status == "revoked":
+        return False
+    existing.status = "revoked"
+    db.commit()
+    return True
+
+
+# -----------------------------------------------------------------------------
+# Terms acceptance (click-wrap)
+# -----------------------------------------------------------------------------
+
+def terms_accepted(db: Session, learner: Learner | None, version: str) -> bool:
+    if learner is None:
+        return False
+    row = db.execute(
+        select(TermsAcceptance).where(
+            TermsAcceptance.learner_id == learner.id,
+            TermsAcceptance.doc_version == version,
+        )
+    ).scalar_one_or_none()
+    return row is not None
+
+
+def record_terms_acceptance(
+    db: Session, learner: Learner, version: str, user_agent: str = ""
+) -> TermsAcceptance:
+    """Write the acceptance row once; later calls return the original —
+    the first timestamp is the legally meaningful one."""
+    existing = db.execute(
+        select(TermsAcceptance).where(
+            TermsAcceptance.learner_id == learner.id,
+            TermsAcceptance.doc_version == version,
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+    row = TermsAcceptance(
+        learner_id=learner.id,
+        doc_version=version,
+        user_agent=(user_agent or "")[:400],
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
 
 
 def grant_enrollment(
@@ -430,14 +582,21 @@ def module_gate_passed(db: Session, learner: Learner | None, module: Module) -> 
 def module_unlocked(db: Session, learner: Learner | None, module: Module) -> bool:
     """Is this one module open to this learner?
 
-    Sequential mastery: every module before it must have its gate passed.
+    Entitlement first (product enrollment OR a grant for this module), then
+    the mastery gate — but only for products that use sequential gating.
+    Cohort-mode products (sequential_gate=False) open every entitled module
+    at once: the admin's grants are the whole access story there.
+
     Kept separate from `course_state` because the progress heartbeat calls
     this on every beat, and building the entire course view (with all
     lessons serialized) just to answer one boolean was the hot path.
     """
-    if not has_access(db, learner, module.product_code):
+    if not module_access(db, learner, module):
         return False
     if is_owner(learner):
+        return True
+    product = db.get(Product, module.product_code)
+    if product is not None and not product.sequential_gate:
         return True
     earlier = db.execute(
         select(Module).where(
@@ -458,6 +617,9 @@ def course_state(db: Session, learner: Learner | None, product_code: str) -> lis
     settings = get_settings()
     entitled = has_access(db, learner, product_code)
     owner = is_owner(learner)
+    granted_ids = module_grant_ids(db, learner, product_code)
+    product = db.get(Product, product_code)
+    sequential = product.sequential_gate if product is not None else True
 
     modules = db.execute(
         select(Module)
@@ -480,7 +642,11 @@ def course_state(db: Session, learner: Learner | None, product_code: str) -> lis
     previous_passed = True  # module 1 is always open
     for module in modules:
         lessons = by_module.get(module.id, [])
-        unlocked = entitled and (previous_passed or owner)
+        # Entitled to this module: product-wide access or a per-module grant.
+        entitled_here = entitled or module.id in granted_ids
+        # The mastery gate only applies on sequentially-gated products.
+        gate_open = owner or (not sequential) or previous_passed
+        unlocked = entitled_here and gate_open
 
         done = sum(1 for l in lessons if lesson_is_complete(l, prog.get(l.id)))
         watched = sum(
@@ -503,6 +669,10 @@ def course_state(db: Session, learner: Learner | None, product_code: str) -> lis
                 "topics": module.topics or [],
                 "quiz_app_url": module.quiz_app_url if unlocked else "",
                 "unlocked": unlocked,
+                # Distinguishes "you don't have this day" (entitled=False)
+                # from "pass the previous gate first" (entitled, not unlocked)
+                # so the UI can say the honest thing in each case.
+                "entitled": entitled_here,
                 "lesson_count": len(lessons),
                 "lessons_completed": done,
                 "duration_s": total_s,
@@ -546,9 +716,9 @@ def lesson_accessible(
 ) -> tuple[bool, str]:
     """Can this learner open this lesson? Returns (ok, reason_if_not).
 
-    Two independent checks, both of which must pass: the entitlement (did
-    you pay) and the sequential gate (did you clear the previous module).
-    Preview lessons bypass both.
+    Two independent checks, both of which must pass: the entitlement (a
+    product enrollment or a grant for this lesson's module) and the mastery
+    gate (on sequentially-gated products only). Preview lessons bypass both.
     """
     if lesson.is_preview:
         return True, ""
@@ -557,7 +727,7 @@ def lesson_accessible(
     if module is None:
         return False, "This lesson is not part of an active course."
 
-    if not has_access(db, learner, module.product_code):
+    if not module_access(db, learner, module):
         return False, "This lesson requires an enrollment."
 
     if not module_unlocked(db, learner, module):
