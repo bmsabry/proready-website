@@ -527,7 +527,9 @@ const Dashboard: React.FC = () => {
           <TermsGate version={termsVersion} onAccepted={() => setNeedsTerms(false)} />
         ) : (
           <>
-        {needsPassword && <SetPasswordCard onDone={() => setNeedsPassword(false)} />}
+        {needsPassword && code === DEFAULT_PRODUCT && (
+          <SetPasswordCard onDone={() => setNeedsPassword(false)} />
+        )}
 
         <div className="card p-6 mb-8">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
