@@ -256,6 +256,20 @@ export const academy = {
       method: 'POST',
       body: JSON.stringify({ version }),
     }),
+
+  myCourses: () => request<{ courses: MyCourse[] }>('/api/academy/my-courses'),
+};
+
+export type MyCourse = {
+  code: string;
+  title: string;
+  subtitle: string;
+  total_hours: number;
+  status: 'draft' | 'live';
+  module_count: number;
+  /* 'owner' — sees everything; 'full' — enrolled in the whole course;
+     'partial' — holds one or more per-day/element grants. */
+  access: 'owner' | 'full' | 'partial';
 };
 
 /* Absolute URL for a protected slide image. The <img> must be rendered with
