@@ -88,6 +88,7 @@ type Props = {
 const TAB_DEFS: { key: CourseTab; label: string; icon: React.ReactNode }[] = [
   { key: 'registrations', label: 'Registrations', icon: <Users className="w-4 h-4" /> },
   { key: 'buyers', label: 'Buyers', icon: <GraduationCap className="w-4 h-4" /> },
+  { key: 'access', label: 'Access', icon: <Lock className="w-4 h-4" /> },
   { key: 'comms', label: 'Comms', icon: <Mail className="w-4 h-4" /> },
   { key: 'stats', label: 'Stats', icon: <BarChart3 className="w-4 h-4" /> },
   { key: 'materials', label: 'Materials', icon: <PlayCircle className="w-4 h-4" /> },
@@ -188,6 +189,13 @@ export default function CourseWorkspace({ code, tab, onTab, onBack, onAuthError 
         <BuyersTab
           course={course}
           stats={stats}
+          onAuthError={onAuthError}
+          gotoSettings={() => onTab('settings')}
+        />
+      )}
+      {course && tab === 'access' && (
+        <AccessTab
+          course={course}
           onAuthError={onAuthError}
           gotoSettings={() => onTab('settings')}
         />
@@ -491,6 +499,390 @@ function RegistrationsTab({
 // =============================================================================
 // Buyers (recorded counterpart)
 // =============================================================================
+
+/* ---------------------------------------------------------------------------
+ * Access tab — per-day / per-element grants for the linked materials product.
+ *
+ * The rule it administers: full enrollment ("All") = everything, written
+ * automatically when a registration is marked paid; module grants open
+ * exactly one day or element each. Toggles act immediately.
+ * ------------------------------------------------------------------------- */
+
+type AccessMatrix = {
+  product: { code: string; title: string; sequential_gate: boolean };
+  modules: { id: number; code: string; title: string; position: number }[];
+  learners: {
+    learner_id: number;
+    email: string;
+    full_name: string;
+    is_owner: boolean;
+    enrolled_all: boolean;
+    module_ids: number[];
+  }[];
+};
+
+function AccessTab({
+  course,
+  onAuthError,
+  gotoSettings,
+}: {
+  course: Course;
+  onAuthError: () => void;
+  gotoSettings: () => void;
+}) {
+  const productCode = course.recorded_product_code;
+  const [matrix, setMatrix] = useState<AccessMatrix | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [addEmail, setAddEmail] = useState('');
+  const [addName, setAddName] = useState('');
+  const [addScope, setAddScope] = useState('all');
+  const [addNotify, setAddNotify] = useState(true);
+
+  const note = (m: string) => {
+    setFlash(m);
+    window.setTimeout(() => setFlash(null), 4000);
+  };
+
+  const load = useCallback(async () => {
+    if (!productCode) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api<AccessMatrix>(
+        `/api/admin/academy/products/${encodeURIComponent(productCode)}/access`,
+      );
+      setMatrix(res);
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setLoading(false);
+    }
+  }, [productCode, onAuthError]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (!productCode) {
+    return (
+      <EmptyState
+        icon={<Lock className="w-5 h-5" />}
+        title="No materials product linked"
+        hint="Link this cohort to its course-materials product in Settings, and this tab becomes the per-day / per-element access panel."
+        action={
+          <button onClick={gotoSettings} className="btn-secondary text-sm py-2 px-4">
+            Open Settings to link one
+          </button>
+        }
+      />
+    );
+  }
+
+  async function toggleAll(row: AccessMatrix['learners'][number]) {
+    setBusy(`all-${row.email}`);
+    setError(null);
+    try {
+      if (row.enrolled_all) {
+        await api('/api/admin/academy/revoke', {
+          method: 'POST',
+          body: JSON.stringify({ email: row.email, product_code: productCode }),
+        });
+        note(`Full access revoked for ${row.email}. Their per-day grants (if any) still apply.`);
+      } else {
+        await api('/api/admin/academy/grant', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: row.email,
+            product_code: productCode,
+            send_email_invite: false,
+          }),
+        });
+        note(`${row.email} now has access to everything.`);
+      }
+      await load();
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function toggleModule(
+    row: AccessMatrix['learners'][number],
+    moduleId: number,
+    has: boolean,
+  ) {
+    setBusy(`${row.email}-${moduleId}`);
+    setError(null);
+    try {
+      await api(has ? '/api/admin/academy/revoke-module' : '/api/admin/academy/grant-module', {
+        method: 'POST',
+        body: JSON.stringify({ email: row.email, module_id: moduleId }),
+      });
+      await load();
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function addPerson(e: React.FormEvent) {
+    e.preventDefault();
+    const email = addEmail.trim();
+    if (!email || !matrix) return;
+    setBusy('add');
+    setError(null);
+    try {
+      if (addScope === 'all') {
+        await api('/api/admin/academy/grant', {
+          method: 'POST',
+          body: JSON.stringify({
+            email,
+            product_code: productCode,
+            full_name: addName.trim(),
+            send_email_invite: addNotify,
+          }),
+        });
+      } else {
+        await api('/api/admin/academy/grant-module', {
+          method: 'POST',
+          body: JSON.stringify({
+            email,
+            module_id: Number(addScope),
+            full_name: addName.trim(),
+          }),
+        });
+        if (addNotify) {
+          await api('/api/admin/academy/login-link', {
+            method: 'POST',
+            body: JSON.stringify({ email, send_email: true }),
+          });
+        }
+      }
+      note(`${email} added${addNotify ? ' and emailed a sign-in link' : ''}.`);
+      setAddEmail('');
+      setAddName('');
+      await load();
+    } catch (err) {
+      reportError(err, onAuthError, setError);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function signInLink(email: string) {
+    setBusy('link' + email);
+    setError(null);
+    try {
+      const res = await api<{ link: string; expires_in_seconds: number }>(
+        '/api/admin/academy/login-link',
+        { method: 'POST', body: JSON.stringify({ email }) },
+      );
+      const mins = Math.round(res.expires_in_seconds / 60);
+      try {
+        await navigator.clipboard.writeText(res.link);
+        note(`Sign-in link for ${email} copied — valid ${mins} min, single use.`);
+      } catch {
+        window.prompt(`Sign-in link for ${email} (valid ${mins} min):`, res.link);
+      }
+    } catch (err) {
+      reportError(err, onAuthError, setError);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const modules = matrix?.modules ?? [];
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-300">
+        <p>
+          <span className="font-semibold text-white">How access works:</span>{' '}
+          marking a registration <span className="text-cyan-300">paid</span> grants{' '}
+          <span className="font-semibold">everything</span> automatically (and emails a sign-in
+          link). Use the toggles here to hand out or pull back individual days or the simulator,
+          or the <span className="font-semibold">All</span> column for everything at once.
+          Cancelling a paid registration pulls its automatic grant back.
+        </p>
+      </div>
+
+      <form
+        onSubmit={addPerson}
+        className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-800 bg-slate-900/40 p-4"
+      >
+        <div className="flex-1 min-w-[14rem]">
+          <label className="block text-xs text-slate-400 mb-1">Email</label>
+          <input
+            value={addEmail}
+            onChange={(e) => setAddEmail(e.target.value)}
+            type="email"
+            required
+            placeholder="student@company.com"
+            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white placeholder-slate-600 focus:border-cyan-500 focus:outline-none text-sm"
+          />
+        </div>
+        <div className="flex-1 min-w-[10rem]">
+          <label className="block text-xs text-slate-400 mb-1">Name (optional)</label>
+          <input
+            value={addName}
+            onChange={(e) => setAddName(e.target.value)}
+            placeholder="Full name"
+            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white placeholder-slate-600 focus:border-cyan-500 focus:outline-none text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Give</label>
+          <select
+            value={addScope}
+            onChange={(e) => setAddScope(e.target.value)}
+            className="px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:outline-none"
+          >
+            <option value="all">Everything</option>
+            {modules.map((m) => (
+              <option key={m.id} value={String(m.id)}>
+                {m.title}
+              </option>
+            ))}
+          </select>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-slate-400 pb-2">
+          <input
+            type="checkbox"
+            checked={addNotify}
+            onChange={(e) => setAddNotify(e.target.checked)}
+            className="accent-cyan-500"
+          />
+          Email sign-in link
+        </label>
+        <button type="submit" disabled={busy === 'add'} className="btn-primary text-sm py-2 px-4 disabled:opacity-50">
+          {busy === 'add' ? 'Adding…' : 'Add person'}
+        </button>
+      </form>
+
+      {flash && (
+        <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-200">
+          {flash}
+        </div>
+      )}
+      {error && (
+        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
+          {error}
+        </div>
+      )}
+
+      {loading && !matrix ? (
+        <div className="py-16 text-center text-slate-400">
+          <Loader2 className="w-5 h-5 animate-spin inline-block" />
+        </div>
+      ) : matrix && matrix.learners.length === 0 ? (
+        <EmptyState
+          icon={<Users className="w-5 h-5" />}
+          title="Nobody has materials access yet"
+          hint="Mark a registration paid (Registrations tab) or add someone above."
+        />
+      ) : matrix ? (
+        <div className="overflow-x-auto rounded-xl border border-slate-800">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-900/60 text-left text-xs uppercase tracking-wider text-slate-400">
+                <th className="px-4 py-3">Learner</th>
+                <th className="px-3 py-3 text-center">All</th>
+                {modules.map((m) => (
+                  <th key={m.id} className="px-3 py-3 text-center whitespace-nowrap" title={m.title}>
+                    {m.code}
+                  </th>
+                ))}
+                <th className="px-3 py-3 text-right">Sign-in</th>
+              </tr>
+            </thead>
+            <tbody>
+              {matrix.learners.map((row) => (
+                <tr key={row.learner_id} className="border-t border-slate-800/70">
+                  <td className="px-4 py-3">
+                    <div className="text-white">{row.email}</div>
+                    <div className="text-xs text-slate-500">
+                      {row.full_name}
+                      {row.is_owner && (
+                        <span className="ml-2 text-[10px] font-mono px-1 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                          OWNER
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    <button
+                      type="button"
+                      disabled={busy === `all-${row.email}` || row.is_owner}
+                      onClick={() => toggleAll(row)}
+                      title={
+                        row.is_owner
+                          ? 'Owner accounts always see everything'
+                          : row.enrolled_all
+                            ? 'Revoke full access'
+                            : 'Grant full access'
+                      }
+                      className={`w-9 h-7 rounded-md border text-xs font-semibold transition-colors disabled:opacity-40 ${
+                        row.enrolled_all || row.is_owner
+                          ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
+                          : 'bg-slate-900 border-slate-700 text-slate-500 hover:border-cyan-500/50'
+                      }`}
+                    >
+                      {row.enrolled_all || row.is_owner ? '✓' : '—'}
+                    </button>
+                  </td>
+                  {modules.map((m) => {
+                    const has = row.module_ids.includes(m.id);
+                    const covered = row.enrolled_all || row.is_owner;
+                    return (
+                      <td key={m.id} className="px-3 py-3 text-center">
+                        <button
+                          type="button"
+                          disabled={covered || busy === `${row.email}-${m.id}`}
+                          onClick={() => toggleModule(row, m.id, has)}
+                          title={
+                            covered
+                              ? 'Covered by full access'
+                              : has
+                                ? `Revoke ${m.title}`
+                                : `Grant ${m.title}`
+                          }
+                          className={`w-9 h-7 rounded-md border text-xs font-semibold transition-colors disabled:opacity-40 ${
+                            covered
+                              ? 'bg-slate-800/60 border-slate-700 text-slate-500'
+                              : has
+                                ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
+                                : 'bg-slate-900 border-slate-700 text-slate-500 hover:border-cyan-500/50'
+                          }`}
+                        >
+                          {covered ? '·' : has ? '✓' : '—'}
+                        </button>
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-3 text-right">
+                    <button
+                      type="button"
+                      disabled={busy === 'link' + row.email}
+                      onClick={() => signInLink(row.email)}
+                      className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50"
+                    >
+                      Copy link
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function BuyersTab({
   course,
