@@ -406,3 +406,46 @@ def test_slide_image_is_watermarked_per_learner(client, setup):
     assert sm.content == _tiny_png()
     assert lg.content != _tiny_png()
     assert lg.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+# -----------------------------------------------------------------------------
+# /my-courses — the /learn chooser feed
+# -----------------------------------------------------------------------------
+
+def test_my_courses_lists_partial_and_full_access(client, setup):
+    module_ids, _ = setup
+    # STUDENT currently holds a DAY-1 grant (re-granted) and no enrollment.
+    s = _sign_in(client, STUDENT)
+    r = s.get("/api/academy/my-courses")
+    assert r.status_code == 200, r.text
+    courses = {c["code"]: c for c in r.json()["courses"]}
+    assert PRODUCT in courses
+    assert courses[PRODUCT]["access"] == "partial"
+
+    # A full enrollment upgrades the same row to 'full'.
+    client.post(
+        "/api/admin/academy/grant",
+        json={"email": STUDENT, "product_code": PRODUCT, "send_email_invite": False},
+        headers=ADMIN,
+    )
+    courses = {c["code"]: c for c in s.get("/api/academy/my-courses").json()["courses"]}
+    assert courses[PRODUCT]["access"] == "full"
+    # Cleanup so later runs start from the partial state again.
+    client.post(
+        "/api/admin/academy/revoke",
+        json={"email": STUDENT, "product_code": PRODUCT},
+        headers=ADMIN,
+    )
+
+
+def test_my_courses_owner_sees_everything(client, setup):
+    # Owner addresses are created on demand by the login-link endpoint.
+    from app.config import get_settings
+
+    owner_email = get_settings().owner_emails_list[0]
+    o = _sign_in(client, owner_email)
+    r = o.get("/api/academy/my-courses")
+    assert r.status_code == 200
+    codes = {c["code"] for c in r.json()["courses"]}
+    assert PRODUCT in codes  # drafts included for owners
+    assert all(c["access"] == "owner" for c in r.json()["courses"])

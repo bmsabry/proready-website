@@ -247,7 +247,10 @@ const Lesson: React.FC = () => {
     <div className="relative pt-28 pb-20">
       <div className="absolute inset-0 -z-10 bg-hero-radial" />
       <div className="container-site max-w-4xl">
-        <Link to="/learn" className="btn-ghost mb-6">
+        <Link
+          to={lesson.module.product_code ? `/learn/${lesson.module.product_code}` : '/learn'}
+          className="btn-ghost mb-6"
+        >
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />
           {lesson.module.code} — {lesson.module.title}
         </Link>

@@ -22,6 +22,7 @@ import {
   formatDuration,
   LessonSummary,
   ModuleState,
+  MyCourse,
 } from '../../lib/academyApi';
 
 const DEFAULT_PRODUCT = 'micro-gas-turbine-design';
@@ -396,12 +397,56 @@ const TermsGate = ({
   );
 };
 
+/* The /learn landing when an account holds more than one course: pick one.
+ * Students with a single course never see this — they land straight in it. */
+const CourseChooser = ({ courses }: { courses: MyCourse[] }) => (
+  <div className="space-y-4">
+    <p className="text-slate-300">
+      Choose the course you want to open. Your progress is saved per course.
+    </p>
+    {courses.map((c) => (
+      <Link
+        key={c.code}
+        to={`/learn/${c.code}`}
+        className="card p-6 flex flex-wrap items-center gap-4 hover:border-cyan-500/40 transition-colors"
+      >
+        <span className="flex-1 min-w-[16rem]">
+          <span className="block text-lg font-semibold text-white leading-snug">
+            {c.title}
+          </span>
+          {c.subtitle && (
+            <span className="block text-sm text-slate-400 mt-1">{c.subtitle}</span>
+          )}
+          <span className="flex flex-wrap items-center gap-3 mt-3 text-xs font-mono uppercase tracking-wider text-slate-500">
+            <span>{c.module_count} modules</span>
+            {c.total_hours > 0 && <span>{c.total_hours} hrs</span>}
+            {c.access === 'partial' && (
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                Partial access
+              </span>
+            )}
+            {c.access === 'owner' && c.status === 'draft' && (
+              <span className="px-1.5 py-0.5 rounded bg-slate-700/40 border border-slate-600 text-slate-400">
+                Draft
+              </span>
+            )}
+          </span>
+        </span>
+        <span className="btn-primary shrink-0">
+          Open <ChevronRight className="w-4 h-4" aria-hidden="true" />
+        </span>
+      </Link>
+    ))}
+  </div>
+);
+
 const Dashboard: React.FC = () => {
   const { productCode } = useParams();
   const navigate = useNavigate();
 
   const [code, setCode] = useState(productCode || '');
   const [course, setCourse] = useState<CourseState | null>(null);
+  const [chooser, setChooser] = useState<MyCourse[] | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
@@ -431,17 +476,32 @@ const Dashboard: React.FC = () => {
         setNeedsTerms(
           Boolean(me.terms_version) && !me.terms_accepted && !me.is_owner
         );
-        // No product in the URL → open whatever this account actually holds:
-        // a full enrollment first, then a partially-granted course, then the
-        // default catalog product.
-        const resolved =
-          productCode ||
-          me.enrollments?.[0]?.product_code ||
-          me.module_grants?.[0]?.product_code ||
-          DEFAULT_PRODUCT;
-        setCode(resolved);
-        const data = await academy.course(resolved);
-        if (!cancelled) setCourse(data);
+
+        if (productCode) {
+          setChooser(null);
+          setCode(productCode);
+          const data = await academy.course(productCode);
+          if (!cancelled) setCourse(data);
+          return;
+        }
+
+        // Bare /learn → decide from what the account actually holds.
+        const mine = (await academy.myCourses()).courses;
+        if (cancelled) return;
+        if (mine.length === 1) {
+          setChooser(null);
+          setCode(mine[0].code);
+          const data = await academy.course(mine[0].code);
+          if (!cancelled) setCourse(data);
+        } else if (mine.length > 1) {
+          setChooser(mine);
+        } else {
+          setError(
+            "This account doesn't have course access yet. If you recently " +
+              'registered or paid, access arrives with your sign-in email — or ' +
+              'contact info@proreadyengineer.com.'
+          );
+        }
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -476,14 +536,47 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  if (chooser) {
+    return (
+      <div className="relative pt-32 pb-20">
+        <div className="hero-backdrop" />
+        <div className="absolute inset-0 -z-10 bg-hero-radial" />
+        <div className="container-site max-w-3xl">
+          <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
+            <div>
+              <span className="eyebrow mb-4">Your courses</span>
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mt-3">
+                Welcome back
+              </h1>
+              {email && (
+                <p className="text-sm text-slate-400 mt-2 flex flex-wrap items-center gap-2">
+                  Signed in as {email}
+                  {isOwner && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                      <ShieldCheck className="w-3 h-3" aria-hidden="true" /> OWNER
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
+            <button type="button" onClick={signOut} className="btn-ghost">
+              Sign out
+            </button>
+          </div>
+          <CourseChooser courses={chooser} />
+        </div>
+      </div>
+    );
+  }
+
   if (error || !course) {
     return (
       <div className="pt-40 pb-32 container-site max-w-lg text-center">
         <div className="card p-8">
           <h1 className="text-xl font-bold mb-3">We couldn't open your course</h1>
           <p className="text-slate-300 mb-6">{error}</p>
-          <Link to="/training/micro-gas-turbine-design" className="btn-secondary">
-            View the course
+          <Link to="/training" className="btn-secondary">
+            Browse the training catalog
           </Link>
         </div>
       </div>

@@ -876,3 +876,84 @@ def lesson_asset(
 
     log.info("Asset %s served to %s", path, learner.email)
     return Response(content=data, media_type=blob.content_type, headers=headers)
+
+
+# -----------------------------------------------------------------------------
+# My courses — everything this account can open, for the /learn chooser
+# -----------------------------------------------------------------------------
+
+@router.get("/my-courses")
+def my_courses(
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> dict:
+    """The courses this account can open, with how it holds each one.
+
+    Owners see every product (drafts included — that is the point of the
+    bypass). Everyone else sees products they hold a full enrollment for,
+    plus products where they hold at least one per-module grant. Draft
+    status does not hide a course here: entitlement implies visibility,
+    which is how a cohort learns from a product that is not yet publicly
+    for sale.
+    """
+    products = {
+        p.code: p for p in db.execute(select(Product)).scalars().all()
+    }
+
+    def pack(p: Product, access: str) -> dict:
+        module_count = db.execute(
+            select(Module).where(Module.product_code == p.code)
+        ).scalars().all()
+        return {
+            "code": p.code,
+            "title": p.title,
+            "subtitle": p.subtitle,
+            "total_hours": p.total_hours,
+            "status": p.status,
+            "module_count": len(module_count),
+            # 'owner' | 'full' | 'partial'
+            "access": access,
+        }
+
+    out: list[dict] = []
+    if svc.is_owner(learner):
+        out = [pack(p, "owner") for p in products.values()]
+    else:
+        from datetime import datetime, timezone
+
+        full_codes: set[str] = set()
+        rows = db.execute(
+            select(Enrollment).where(
+                Enrollment.learner_id == learner.id,
+                Enrollment.status == "active",
+            )
+        ).scalars().all()
+        now = datetime.now(timezone.utc)
+        for row in rows:
+            if not svc.settlement_ok(db, row):
+                continue
+            expires = svc._aware(row.expires_at)
+            if expires is not None and expires <= now:
+                continue
+            if row.product_code in products and row.product_code not in full_codes:
+                full_codes.add(row.product_code)
+                out.append(pack(products[row.product_code], "full"))
+
+        grant_rows = db.execute(
+            select(ModuleGrant, Module)
+            .join(Module, Module.id == ModuleGrant.module_id)
+            .where(
+                ModuleGrant.learner_id == learner.id,
+                ModuleGrant.status == "active",
+            )
+        ).all()
+        seen_partial: set[str] = set()
+        for _grant, module in grant_rows:
+            code = module.product_code
+            if code in full_codes or code in seen_partial or code not in products:
+                continue
+            seen_partial.add(code)
+            out.append(pack(products[code], "partial"))
+
+    out.sort(key=lambda c: c["title"])
+    return {"courses": out}
