@@ -755,10 +755,14 @@ def _watermark_image(data: bytes, text: str) -> bytes:
             corner_font = diag_font = ImageFont.load_default()
 
         tag = f"Licensed to {text} · ProReadyEngineer LLC"
-        # Corner tag, bottom-left, readable but quiet.
-        draw.text((int(w * 0.012), int(h * 0.962)), tag,
-                  fill=(255, 255, 255, 150), font=corner_font,
-                  stroke_width=1, stroke_fill=(0, 0, 0, 130))
+        # Centered, in the clear band ABOVE the deck's own footer bar —
+        # bottom-left collided with the slides' footer text. ~90% height
+        # keeps it off both the footer and (usually) the content, and a
+        # translucent centered tag reads as a watermark rather than a
+        # rendering defect.
+        draw.text((w // 2, int(h * 0.9)), tag,
+                  fill=(255, 255, 255, 140), font=corner_font, anchor="mm",
+                  stroke_width=1, stroke_fill=(0, 0, 0, 120))
         # Faint diagonal across the middle.
         diag = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         ddraw = ImageDraw.Draw(diag)
