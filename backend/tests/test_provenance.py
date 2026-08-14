@@ -236,7 +236,7 @@ def test_copy_open_under_a_second_account_reports_itself(client, setup):
         a.get(f"/api/academy/asset/{setup['lesson_id']}").text)[0]
 
     b = _sign_in(OWNER_B)          # the file was passed to a colleague
-    _beacon(b, token, "https://api.proreadyengineer.com/api/academy/asset/1")
+    _beacon(b, token, "https://testserver/api/academy/asset/1")
 
     r = client.get("/api/admin/academy/integrity", headers=ADMIN)
     hit = [x for x in r.json()["alerts"] if x["token"] == token]
@@ -249,7 +249,7 @@ def test_normal_use_raises_no_alert(client, setup):
     s = _sign_in(OWNER_A)
     token = prov.extract_tokens(
         s.get(f"/api/academy/asset/{setup['lesson_id']}").text)[0]
-    _beacon(s, token, "https://api.proreadyengineer.com/api/academy/asset/1")
+    _beacon(s, token, "https://testserver/api/academy/asset/1")
 
     r = client.get("/api/admin/academy/integrity", headers=ADMIN)
     assert not [a for a in r.json()["alerts"] if a["token"] == token]
@@ -259,6 +259,52 @@ def test_normal_use_raises_no_alert(client, setup):
     assert t["matches"][0]["ping_count"] == 1
     assert t["matches"][0]["worst_status"] == prov.PING_OK
     assert t["matches"][0]["pings"][0]["status"] == prov.PING_OK
+
+
+def test_copy_opened_on_the_host_that_served_it_is_never_an_alert(client, setup):
+    """The false-positive that would make this feature useless.
+
+    `testserver` is deliberately NOT in ASSET_ALLOWED_HOSTS. Normal use must
+    still read as normal, because the host a copy was served from is recorded
+    on the delivery and counts as on-site for that copy. Nothing about "where
+    does the API live" is left to a config value somebody has to keep right.
+    """
+    from app.config import get_settings
+    assert "testserver" not in get_settings().asset_allowed_hosts_set
+
+    s = _sign_in(OWNER_A)
+    token = prov.extract_tokens(
+        s.get(f"/api/academy/asset/{setup['lesson_id']}").text)[0]
+    _beacon(s, token, "https://testserver/api/academy/asset/1")
+
+    r = client.get("/api/admin/academy/integrity", headers=ADMIN)
+    assert not [a for a in r.json()["alerts"] if a["token"] == token]
+
+
+def test_reviewing_an_alert_takes_it_out_of_the_inbox(client, setup):
+    s = _sign_in(OWNER_A)
+    token = prov.extract_tokens(
+        s.get(f"/api/academy/asset/{setup['lesson_id']}").text)[0]
+    anon = TestClient(app, base_url="https://testserver")
+    _beacon(anon, token, "file:///D:/shared/sim.html")
+
+    live = client.get("/api/admin/academy/integrity", headers=ADMIN).json()
+    mine = [a for a in live["alerts"] if a["token"] == token]
+    assert mine, "the alert must appear before it is reviewed"
+
+    r = client.post("/api/admin/academy/integrity/dismiss",
+                    json={"ping_ids": [mine[0]["id"]], "note": "spoke to them"},
+                    headers=ADMIN)
+    assert r.json()["reviewed"] == 1
+
+    after = client.get("/api/admin/academy/integrity", headers=ADMIN).json()
+    assert not [a for a in after["alerts"] if a["token"] == token]
+
+    # Reviewing hides it; it never deletes the evidence.
+    hist = client.get("/api/admin/academy/integrity",
+                      params={"include_reviewed": "true"}, headers=ADMIN).json()
+    kept = [a for a in hist["alerts"] if a["token"] == token]
+    assert kept and kept[0]["reviewed_at"]
 
 
 def test_beacon_never_errors_on_junk(client):
