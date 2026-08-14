@@ -9,6 +9,8 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
+  Play,
+  X,
 } from 'lucide-react';
 import { usePageMeta } from '../../lib/meta';
 import {
@@ -17,6 +19,7 @@ import {
   LessonDetail,
   lessonAssetUrl,
   slideImageUrl,
+  slideVideoUrl,
 } from '../../lib/academyApi';
 
 /* Lesson player.
@@ -78,6 +81,10 @@ const SlideViewer = ({
   // Fullscreen API is unavailable or denied (locked-down corporate
   // browsers, embedded contexts). Present must always work.
   const [theater, setTheater] = useState(false);
+  // A movie embedded on the current slide is playing (replaces the still).
+  const [playing, setPlaying] = useState(false);
+  const playingRef = useRef(false);
+  playingRef.current = playing;
   const stripRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const current = slides[index];
@@ -110,7 +117,11 @@ const SlideViewer = ({
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && /^(input|textarea|select)$/i.test(target.tagName)) return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+      // While a slide movie is playing, space belongs to the player.
+      if (
+        (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') &&
+        !(e.key === ' ' && playingRef.current)
+      ) {
         e.preventDefault();
         go(1);
       }
@@ -141,9 +152,11 @@ const SlideViewer = ({
     };
   }, [theater]);
 
-  // Show the spinner until THIS slide's pixels arrive.
+  // Show the spinner until THIS slide's pixels arrive; leaving a slide
+  // always stops its movie.
   useEffect(() => {
     setImgLoaded(false);
+    setPlaying(false);
   }, [index]);
 
   // Report progress upward (furthest slide, and whether it's the last one).
@@ -191,20 +204,38 @@ const SlideViewer = ({
             : 'rounded-xl border border-slate-800'
         }`}
       >
-        <img
-          key={current.number}
-          src={slideImageUrl(moduleId, current.number, 'lg')}
-          crossOrigin="use-credentials"
-          draggable={false}
-          onLoad={() => setImgLoaded(true)}
-          alt={current.title || `Slide ${current.number}`}
-          className={
-            presenting
-              ? 'max-h-full max-w-full w-auto h-auto object-contain'
-              : 'w-full h-auto block'
-          }
-        />
-        {!imgLoaded && (
+        {playing && current.has_video ? (
+          <video
+            key={`v-${current.number}`}
+            src={slideVideoUrl(moduleId, current.number)}
+            controls
+            autoPlay
+            crossOrigin="use-credentials"
+            controlsList="nodownload noremoteplayback"
+            disablePictureInPicture
+            onContextMenu={(e) => e.preventDefault()}
+            className={
+              presenting
+                ? 'max-h-full max-w-full w-auto h-auto object-contain'
+                : 'w-full h-auto block max-h-[80vh] bg-black'
+            }
+          />
+        ) : (
+          <img
+            key={current.number}
+            src={slideImageUrl(moduleId, current.number, 'lg')}
+            crossOrigin="use-credentials"
+            draggable={false}
+            onLoad={() => setImgLoaded(true)}
+            alt={current.title || `Slide ${current.number}`}
+            className={
+              presenting
+                ? 'max-h-full max-w-full w-auto h-auto object-contain'
+                : 'w-full h-auto block'
+            }
+          />
+        )}
+        {!imgLoaded && !playing && (
           <div className="absolute inset-0 grid place-items-center bg-slate-950/70 z-20">
             <span className="inline-flex items-center gap-2 text-sm font-mono uppercase tracking-widest text-cyan-400">
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -213,19 +244,50 @@ const SlideViewer = ({
           </div>
         )}
         <Watermark text={lesson.watermark} />
-        {/* Click zones: left third back, rest forward. */}
-        <button
-          type="button"
-          aria-label="Previous slide"
-          onClick={() => go(-1)}
-          className="absolute inset-y-0 left-0 w-1/3 cursor-w-resize opacity-0"
-        />
-        <button
-          type="button"
-          aria-label="Next slide"
-          onClick={() => go(1)}
-          className="absolute inset-y-0 right-0 w-2/3 cursor-e-resize opacity-0"
-        />
+        {/* Click zones: left third back, rest forward. Hidden while a movie
+            plays so they never sit over the player's controls. */}
+        {!playing && (
+          <>
+            <button
+              type="button"
+              aria-label="Previous slide"
+              onClick={() => go(-1)}
+              className="absolute inset-y-0 left-0 w-1/3 cursor-w-resize opacity-0"
+            />
+            <button
+              type="button"
+              aria-label="Next slide"
+              onClick={() => go(1)}
+              className="absolute inset-y-0 right-0 w-2/3 cursor-e-resize opacity-0"
+            />
+          </>
+        )}
+        {/* This slide carries a movie — offer Play over the still. */}
+        {current.has_video && !playing && (
+          <button
+            type="button"
+            aria-label="Play the video on this slide"
+            onClick={() => setPlaying(true)}
+            className="absolute inset-0 z-30 grid place-items-center group"
+          >
+            <span className="grid place-items-center w-20 h-20 rounded-full bg-slate-950/70 border border-cyan-400/60 shadow-lg backdrop-blur-sm transition-transform group-hover:scale-110">
+              <Play className="w-9 h-9 text-cyan-300 translate-x-0.5" aria-hidden="true" />
+            </span>
+            <span className="absolute bottom-4 px-3 py-1 rounded-full bg-slate-950/80 border border-slate-700 text-xs font-mono uppercase tracking-widest text-cyan-300">
+              This slide has a video — click to play
+            </span>
+          </button>
+        )}
+        {playing && (
+          <button
+            type="button"
+            aria-label="Close the video and return to the slide"
+            onClick={() => setPlaying(false)}
+            className="absolute top-3 right-3 z-30 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-950/80 border border-slate-600 text-xs text-slate-200 hover:border-cyan-400"
+          >
+            <X className="w-3.5 h-3.5" aria-hidden="true" /> Back to slide
+          </button>
+        )}
       </div>
 
       <div
