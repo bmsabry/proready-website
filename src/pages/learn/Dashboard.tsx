@@ -184,6 +184,35 @@ const ModuleCard = ({
             </Link>
           )}
 
+          {module.has_summative && (
+            <Link
+              to={module.formative_passed || !module.has_formative ? `/learn/quiz/${module.id}/summative` : '#'}
+              onClick={(e) => {
+                if (!(module.formative_passed || !module.has_formative)) e.preventDefault();
+              }}
+              aria-disabled={!(module.formative_passed || !module.has_formative)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mt-1 border transition-colors ${
+                module.summative_passed
+                  ? 'border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/10'
+                  : module.formative_passed || !module.has_formative
+                    ? 'border-slate-700 hover:border-cyan-500/40 hover:bg-slate-900/60'
+                    : 'border-slate-800 opacity-50 cursor-not-allowed'
+              }`}
+            >
+              <Award className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden="true" />
+              <span className="flex-1 text-sm font-medium text-white">
+                {module.summative_passed
+                  ? 'Mastery check — passed'
+                  : 'Mastery check'}
+              </span>
+              <span className="text-xs text-slate-400">
+                {module.formative_passed || !module.has_formative
+                  ? 'transfer scenarios · counts toward the certificate'
+                  : 'pass the evaluation first'}
+              </span>
+            </Link>
+          )}
+
           {module.quiz_app_url && (
             <a
               href={module.quiz_app_url}

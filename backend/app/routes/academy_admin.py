@@ -806,6 +806,9 @@ class SlideIn(BaseModel):
     appears_at_s: int = -1
     image_lg_b64: str = ""
     image_sm_b64: str = ""
+    # AssetBlob key of a movie embedded on this slide (upload the bytes via
+    # POST /assets first). Empty string clears/none.
+    video_asset_key: str = ""
 
 
 class SlideBatchIn(BaseModel):
@@ -840,6 +843,7 @@ def load_slides(
         row.section = s.section
         row.text = s.text
         row.appears_at_s = s.appears_at_s
+        row.video_asset = s.video_asset_key
         for size, b64 in (("lg", s.image_lg_b64), ("sm", s.image_sm_b64)):
             if not b64:
                 continue

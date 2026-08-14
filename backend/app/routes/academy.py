@@ -532,6 +532,9 @@ def lesson_detail(
                 "appears_at_s": s_.appears_at_s,
                 "image_sm": s_.image_sm,
                 "image_lg": s_.image_lg,
+                # A movie is embedded on this slide — the viewer offers Play
+                # and streams it from the gated slide-video endpoint.
+                "has_video": bool(s_.video_asset),
             }
             for s_ in slides
         ],
@@ -967,3 +970,78 @@ def my_courses(
 
     out.sort(key=lambda c: c["title"])
     return {"courses": out}
+
+
+@router.get("/slide-video/{module_id}/{number}")
+def slide_video(
+    module_id: int,
+    number: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> Response:
+    """A movie embedded on a slide, streamed with HTTP Range support.
+
+    Same entitlement rule as the slide's pixels: module-scoped, so a
+    Day-1-only grant cannot pull Day 2's clips. Range handling is what lets
+    the <video> element start instantly and seek; caching stays
+    browser-private, keyed on the session cookie, like the slide images.
+    """
+    module = db.get(Module, module_id)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found.")
+    if not svc.module_unlocked(db, learner, module):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this material.",
+        )
+    slide = db.execute(
+        select(Slide).where(Slide.module_id == module_id, Slide.number == number)
+    ).scalar_one_or_none()
+    if slide is None or not slide.video_asset:
+        raise HTTPException(status_code=404, detail="This slide has no video.")
+    blob = db.execute(
+        select(AssetBlob).where(AssetBlob.key == slide.video_asset)
+    ).scalar_one_or_none()
+    if blob is None:
+        raise HTTPException(status_code=404, detail="Video not found.")
+
+    data = blob.data
+    size = len(data)
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, max-age=900",
+        "Vary": "Cookie",
+        "X-Robots-Tag": "noindex, nofollow",
+        "Content-Disposition": "inline",
+    }
+
+    range_header = request.headers.get("range", "")
+    if range_header.startswith("bytes="):
+        try:
+            spec = range_header[len("bytes="):].split(",")[0].strip()
+            start_s, _, end_s = spec.partition("-")
+            start = int(start_s) if start_s else 0
+            end = int(end_s) if end_s else size - 1
+        except ValueError:
+            raise HTTPException(status_code=416, detail="Bad range.")
+        # An open start ("bytes=-500") means the LAST 500 bytes.
+        if not start_s:
+            start = max(0, size - (int(end_s) if end_s else 0))
+            end = size - 1
+        end = min(end, size - 1)
+        if start > end or start >= size:
+            raise HTTPException(
+                status_code=416,
+                detail="Range not satisfiable.",
+                headers={"Content-Range": f"bytes */{size}"},
+            )
+        headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+        return Response(
+            content=data[start:end + 1],
+            status_code=206,
+            media_type=blob.content_type,
+            headers=headers,
+        )
+
+    return Response(content=data, media_type=blob.content_type, headers=headers)

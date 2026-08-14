@@ -76,6 +76,11 @@ def _run_column_migrations() -> None:
     _ensure_column(
         "academy_products", "sequential_gate", "BOOLEAN NOT NULL DEFAULT TRUE"
     )
+    # academy_slides.video_asset — AssetBlob key of a movie embedded on the
+    # slide; the viewer swaps the still image for a gated player.
+    _ensure_column(
+        "academy_slides", "video_asset", "VARCHAR(128) NOT NULL DEFAULT ''"
+    )
     # courses price — online seat price for live cohorts (0 = invoice-only).
     _ensure_column("courses", "price_cents", "INTEGER NOT NULL DEFAULT 0")
     _ensure_column("courses", "currency", "VARCHAR(8) NOT NULL DEFAULT 'usd'")
