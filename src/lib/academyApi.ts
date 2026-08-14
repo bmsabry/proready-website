@@ -6,6 +6,7 @@
  * it to report whether you already own the course).
  */
 
+/* Build marker: gate-messaging release (sequential mastery gate). */
 export const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
 
