@@ -123,6 +123,19 @@ def _run_column_migrations() -> None:
     _ensure_column(
         "academy_enrollments", "settlement_deadline", "TIMESTAMP WITH TIME ZONE"
     )
+    # Asset provenance. These tables ship new, but a column added to them in a
+    # LATER release still needs migrating — create_all made the table on the
+    # first deploy and will never touch it again. Shipping origin_host without
+    # this line 500'd the simulator in production for ten minutes.
+    _ensure_column(
+        "academy_asset_deliveries", "origin_host", "VARCHAR(200) NOT NULL DEFAULT ''"
+    )
+    _ensure_column(
+        "academy_asset_pings", "reviewed_at", "TIMESTAMP WITH TIME ZONE"
+    )
+    _ensure_column(
+        "academy_asset_pings", "reviewed_note", "VARCHAR(300) NOT NULL DEFAULT ''"
+    )
 
 
 _run_column_migrations()
