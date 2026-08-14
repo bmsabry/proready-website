@@ -72,6 +72,22 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/academy", tags=["academy"])
 
+class GateLocked(HTTPException):
+    """403 for a sequential-gate refusal.
+
+    `detail` stays a plain sentence so any client — including a cached older
+    build of the SPA — renders something a human can read. The structured
+    payload rides alongside under `gate`, which is what the current UI uses
+    to link straight to the blocking evaluation. See the handler registered
+    in main.py.
+    """
+
+    def __init__(self, blocker: dict) -> None:
+        super().__init__(status_code=status.HTTP_403_FORBIDDEN,
+                         detail=blocker["message"])
+        self.blocker = blocker
+
+
 
 # -----------------------------------------------------------------------------
 # Schemas
@@ -471,6 +487,8 @@ def lesson_detail(
 
     ok, reason = svc.lesson_accessible(db, learner, lesson)
     if not ok:
+        if isinstance(reason, dict):
+            raise GateLocked(reason)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=reason)
 
     module = db.get(Module, lesson.module_id)
@@ -559,6 +577,8 @@ def lesson_progress(
         raise HTTPException(status_code=404, detail="Lesson not found.")
     ok, reason = svc.lesson_accessible(db, learner, lesson)
     if not ok:
+        if isinstance(reason, dict):
+            raise GateLocked(reason)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=reason)
 
     row = svc.record_progress(
@@ -587,8 +607,8 @@ def _module_for_learner(db: Session, module_id: int, learner: Learner) -> Module
         )
     blocker = svc.gate_blocker(db, learner, module)
     if blocker is not None:
-        # Structured so the UI can point at the exact evaluation to sit.
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=blocker)
+        # Readable message + structured payload; see GateLocked.
+        raise GateLocked(blocker)
     return module
 
 
@@ -805,7 +825,7 @@ def slide_image(
         )
     blocker = svc.gate_blocker(db, learner, module)
     if blocker is not None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=blocker)
+        raise GateLocked(blocker)
     row = db.execute(
         select(SlideImage).where(
             SlideImage.module_id == module_id,
@@ -867,6 +887,8 @@ def lesson_asset(
         raise HTTPException(status_code=404, detail="Lesson not found.")
     ok, reason = svc.lesson_accessible(db, learner, lesson)
     if not ok:
+        if isinstance(reason, dict):
+            raise GateLocked(reason)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=reason)
 
     path = lesson.asset_path or ""
@@ -1003,7 +1025,7 @@ def slide_video(
         )
     blocker = svc.gate_blocker(db, learner, module)
     if blocker is not None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=blocker)
+        raise GateLocked(blocker)
     slide = db.execute(
         select(Slide).where(Slide.module_id == module_id, Slide.number == number)
     ).scalar_one_or_none()

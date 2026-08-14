@@ -236,11 +236,14 @@ def test_locked_module_lesson_is_denied(client):
     assert r.status_code == 403
     # The refusal now names the blocking module and what to do there, so the
     # UI can send the learner straight to that evaluation.
-    detail = r.json()["detail"]
-    assert detail["code"] == "gate_locked"
-    assert detail["blocking_module_id"] == modules[0]["id"]
-    assert detail["needs"] in ("quiz", "lessons")
-    assert modules[0]["title"] in detail["message"]
+    body = r.json()
+    # A readable sentence for any client, plus the structured payload.
+    assert isinstance(body["detail"], str)
+    assert modules[0]["title"] in body["detail"]
+    gate = body["gate"]
+    assert gate["code"] == "gate_locked"
+    assert gate["blocking_module_id"] == modules[0]["id"]
+    assert gate["needs"] in ("quiz", "lessons")
 
 
 def test_locked_module_quiz_is_denied(client):

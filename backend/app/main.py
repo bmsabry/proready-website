@@ -34,6 +34,25 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+
+def _register_gate_handler(application: FastAPI) -> None:
+    """Serialize a sequential-gate refusal so old and new clients both cope.
+
+    Body: {"detail": "<readable sentence>", "gate": {…structured…}}. A client
+    that only knows `detail` shows a proper message; the current UI reads
+    `gate` and links straight to the evaluation that unlocks the section.
+    """
+    from fastapi.responses import JSONResponse
+
+    from .routes.academy import GateLocked
+
+    @application.exception_handler(GateLocked)
+    async def _gate_locked_handler(request, exc: GateLocked):  # noqa: ANN001
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "gate": exc.blocker},
+        )
+
 settings = get_settings()
 
 # Create tables on startup. Safe for a single-table schema; swap to
@@ -210,6 +229,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+_register_gate_handler(app)
 
 app.include_router(seats_routes.router)
 app.include_router(register_routes.router)
