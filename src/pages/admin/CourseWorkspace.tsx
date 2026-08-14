@@ -570,7 +570,7 @@ function AccessTab({
     } finally {
       setLoading(false);
     }
-  }, [productCode, onAuthError]);
+  }, [productCode, onAuthError, showReviewed]);
 
   useEffect(() => {
     void load();
@@ -2249,6 +2249,7 @@ type Ping = {
   issued_at?: string | null;
   issued_ip?: string;
   asset_key?: string;
+  reviewed_at?: string | null;
 };
 
 type IntegrityReport = {
@@ -2352,6 +2353,8 @@ function IntegrityTab({
   const [tracing, setTracing] = useState(false);
   const [trace, setTrace] = useState<TraceResult | null>(null);
   const [showLog, setShowLog] = useState(false);
+  const [showReviewed, setShowReviewed] = useState(false);
+  const [busy, setBusy] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!productCode) return;
@@ -2360,7 +2363,8 @@ function IntegrityTab({
     try {
       setReport(
         await api<IntegrityReport>(
-          `/api/admin/academy/integrity?product_code=${encodeURIComponent(productCode)}`,
+          `/api/admin/academy/integrity?product_code=${encodeURIComponent(productCode)}` +
+            (showReviewed ? '&include_reviewed=true' : ''),
         ),
       );
     } catch (err) {
@@ -2373,6 +2377,21 @@ function IntegrityTab({
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function dismiss(pingId: number) {
+    setBusy(pingId);
+    try {
+      await api('/api/admin/academy/integrity/dismiss', {
+        method: 'POST',
+        body: JSON.stringify({ ping_ids: [pingId] }),
+      });
+      await load();
+    } catch (err) {
+      reportError(err, onAuthError, setError);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function runTrace(content: string) {
     if (!content.trim()) return;
@@ -2443,13 +2462,24 @@ function IntegrityTab({
             )}
             Copies that called home from somewhere they should not be
           </h3>
-          <button
-            onClick={() => void load()}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-cyan-500 hover:text-white"
-          >
-            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-slate-400">
+              <input
+                type="checkbox"
+                checked={showReviewed}
+                onChange={(e) => setShowReviewed(e.target.checked)}
+                className="accent-cyan-500"
+              />
+              Include reviewed
+            </label>
+            <button
+              onClick={() => void load()}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-cyan-500 hover:text-white"
+            >
+              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              Refresh
+            </button>
+          </div>
         </header>
 
         {!alerts.length ? (
@@ -2482,6 +2512,19 @@ function IntegrityTab({
                       <span className="font-semibold">{a.issued_to || 'unknown'}</span>
                     </span>
                     <span className="text-xs text-slate-500">{when(a.seen_at)}</span>
+                    {a.reviewed_at ? (
+                      <span className="text-[11px] text-slate-500">
+                        reviewed {when(a.reviewed_at)}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => void dismiss(a.id)}
+                        disabled={busy === a.id}
+                        className="ml-auto rounded-lg border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 hover:border-cyan-500 hover:text-white disabled:opacity-40"
+                      >
+                        {busy === a.id ? 'Saving…' : 'Mark reviewed'}
+                      </button>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-slate-400">{meaning.blurb}</p>
                   <dl className="mt-2 grid gap-x-6 gap-y-1 text-xs text-slate-400 sm:grid-cols-2">
