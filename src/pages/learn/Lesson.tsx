@@ -45,7 +45,9 @@ const Watermark = ({ text }: { text: string }) =>
       <span className="absolute top-3 right-4 text-[11px] font-mono text-white/35 drop-shadow">
         {text}
       </span>
-      <span className="absolute bottom-3 left-4 text-[11px] font-mono text-white/25 drop-shadow">
+      {/* Centered above the deck's footer band — the bottom-left corner
+          collided with the slides' own footer text. */}
+      <span className="absolute bottom-[13%] left-1/2 -translate-x-1/2 text-[11px] font-mono text-white/25 drop-shadow">
         {text}
       </span>
     </div>
