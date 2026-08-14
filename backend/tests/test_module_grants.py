@@ -681,7 +681,8 @@ def test_next_chapter_is_locked_until_the_quiz_is_passed(client, gated):
     # Every protected read on the locked chapter refuses, with the same detail.
     r = s.get(f"/api/academy/lesson/{lessons['CH-2']}")
     assert r.status_code == 403
-    assert r.json()["detail"]["blocking_module_id"] == ids["CH-1"]
+    assert isinstance(r.json()["detail"], str)      # readable on any client
+    assert r.json()["gate"]["blocking_module_id"] == ids["CH-1"]
     assert s.get(f"/api/academy/quiz/{ids['CH-2']}/formative").status_code == 403
     assert s.get(f"/api/academy/slide-image/{ids['CH-2']}/1/lg").status_code == 403
 
