@@ -279,14 +279,27 @@ const SlideViewer = ({
           </button>
         )}
         {playing && (
-          <button
-            type="button"
-            aria-label="Close the video and return to the slide"
-            onClick={() => setPlaying(false)}
-            className="absolute top-3 right-3 z-30 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-950/80 border border-slate-600 text-xs text-slate-200 hover:border-cyan-400"
-          >
-            <X className="w-3.5 h-3.5" aria-hidden="true" /> Back to slide
-          </button>
+          <>
+            <button
+              type="button"
+              aria-label="Close the video and return to the slide"
+              onClick={() => setPlaying(false)}
+              className="absolute top-3 right-3 z-30 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-950/80 border border-slate-600 text-xs text-slate-200 hover:border-cyan-400"
+            >
+              <X className="w-3.5 h-3.5" aria-hidden="true" /> Back to slide
+            </button>
+            {/* Escape hatch for browsers that throttle embedded media
+                (corporate policies, battery savers): a top-level open of the
+                same gated URL — the session cookie rides along. */}
+            <a
+              href={slideVideoUrl(moduleId, current.number)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute bottom-3 right-3 z-30 px-2.5 py-1 rounded-full bg-slate-950/80 border border-slate-700 text-[11px] text-slate-400 hover:text-cyan-300 hover:border-cyan-500/50"
+            >
+              Trouble playing? Open in a new tab
+            </a>
+          </>
         )}
       </div>
 
