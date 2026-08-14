@@ -125,6 +125,8 @@ export type SlideMeta = {
   appears_at_s: number;
   image_sm: string;
   image_lg: string;
+  /* A movie is embedded on this slide — the viewer offers Play. */
+  has_video: boolean;
 };
 
 export type LessonDetail = {
@@ -282,6 +284,13 @@ export function slideImageUrl(moduleId: number, number: number, size: 'lg' | 'sm
  * top-level navigation, so the SameSite=None cookie is sent automatically. */
 export function lessonAssetUrl(lessonId: number) {
   return `${API_BASE}/api/academy/asset/${lessonId}`;
+}
+
+/* Absolute URL for a movie embedded on a slide. The <video> element must be
+ * rendered with crossOrigin="use-credentials" so the session cookie rides
+ * along with its (range) requests. */
+export function slideVideoUrl(moduleId: number, number: number) {
+  return `${API_BASE}/api/academy/slide-video/${moduleId}/${number}`;
 }
 
 export function formatDuration(seconds: number): string {
