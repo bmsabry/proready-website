@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import base64
 import logging
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from .. import academy as svc
+from .. import provenance as prov
 from ..config import get_settings
 from ..db import get_db
 from ..deps import require_admin
@@ -21,6 +23,8 @@ from ..emailer import enrollment_granted_html, login_link_html, send_email
 from ..learner_auth import issue_login_token
 from ..models import (
     AssetBlob,
+    AssetDelivery,
+    AssetPing,
     Chapter,
     Enrollment,
     Learner,
@@ -1021,3 +1025,213 @@ def revoke_module(
     log.info("Admin %s revoked module %s from %s (changed=%s)",
              admin, module.code, learner.email, changed)
     return {"ok": True, "changed": changed}
+
+
+# -----------------------------------------------------------------------------
+# Integrity — who has copies, and which copies have gone walkabout
+# -----------------------------------------------------------------------------
+
+class TraceIn(BaseModel):
+    # A whole pasted file, a fragment of one, or just the id. Big enough for
+    # the full stamped simulator; anything larger is trimmed client-side.
+    content: str = Field(min_length=4, max_length=4_000_000)
+
+
+def _delivery_out(db: Session, d: AssetDelivery) -> dict:
+    learner = db.get(Learner, d.learner_id)
+    return {
+        "token": d.token,
+        "learner_id": d.learner_id,
+        "email": d.learner_email or (learner.email if learner else ""),
+        "full_name": (learner.full_name if learner else ""),
+        "product_code": d.product_code,
+        "module_id": d.module_id,
+        "lesson_id": d.lesson_id,
+        "asset_key": d.asset_key,
+        "served_at": d.served_at.isoformat() if d.served_at else None,
+        "ip": d.ip,
+        "user_agent": d.user_agent,
+        "bytes_sent": d.bytes_sent,
+        "ping_count": d.ping_count or 0,
+        "worst_status": d.worst_status or "",
+    }
+
+
+def _ping_out(p: AssetPing) -> dict:
+    return {
+        "id": p.id,
+        "token": p.token,
+        "status": p.status,
+        "seen_at": p.seen_at.isoformat() if p.seen_at else None,
+        "page_url": p.page_url,
+        "origin": p.origin,
+        "referrer": p.referrer,
+        "ip": p.ip,
+        "user_agent": p.user_agent,
+        "screen": p.screen,
+        "timezone": p.timezone,
+        "session_email": p.session_email,
+    }
+
+
+@router.post("/integrity/trace")
+def integrity_trace(
+    body: TraceIn,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin),
+) -> dict:
+    """"Somebody sent me this file — who leaked it?"
+
+    Paste the file. Every copy carries a per-download id in four different
+    places (an HTML comment, invisible characters inside the licence line, a
+    data attribute, and the beacon script), so the id survives casual
+    tampering; whichever carrier is intact answers the question.
+
+    Returns the matching download(s): the account, the minute, the IP, the
+    browser, and every time that copy has since been opened.
+    """
+    tokens = prov.extract_tokens(body.content)
+    matches, unknown = [], []
+    for token in tokens[:20]:
+        delivery = db.execute(
+            select(AssetDelivery).where(AssetDelivery.token == token)
+        ).scalar_one_or_none()
+        if delivery is None:
+            unknown.append(token)
+            continue
+        pings = db.execute(
+            select(AssetPing)
+            .where(AssetPing.token == token)
+            .order_by(AssetPing.seen_at.desc())
+            .limit(50)
+        ).scalars().all()
+        sibling_count = db.execute(
+            select(func.count(AssetDelivery.id))
+            .where(AssetDelivery.learner_id == delivery.learner_id)
+        ).scalar_one()
+        matches.append({
+            **_delivery_out(db, delivery),
+            "pings": [_ping_out(p) for p in pings],
+            "downloads_by_this_account": sibling_count,
+        })
+
+    return {
+        "tokens_found": tokens,
+        "matches": matches,
+        "unknown_tokens": unknown,
+        "verdict": (
+            "traced" if matches
+            else "no-id-found" if not tokens
+            else "id-not-issued-by-us"
+        ),
+    }
+
+
+@router.get("/integrity")
+def integrity_report(
+    product_code: str = "",
+    days: int = 180,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin),
+) -> dict:
+    """"Has anything leaked that I don't know about?"
+
+    Three lists, worst first:
+
+      alerts   — copies that called home from somewhere they should not be:
+                 a hard drive or another website (`offsite`), a different
+                 signed-in account (`other_account`), or an id we never
+                 issued (`unknown_token`). These are the ones to act on.
+      watch    — accounts whose behaviour is unusual: many downloads, or the
+                 same account appearing from several IP addresses. Not proof
+                 of anything; a prompt to look.
+      recent   — the plain download log, newest first.
+    """
+    since = datetime.now(timezone.utc) - timedelta(days=max(1, min(days, 3650)))
+
+    dq = select(AssetDelivery).where(AssetDelivery.served_at >= since)
+    if product_code:
+        dq = dq.where(AssetDelivery.product_code == product_code)
+    deliveries = db.execute(
+        dq.order_by(AssetDelivery.served_at.desc()).limit(500)
+    ).scalars().all()
+    by_token = {d.token: d for d in deliveries}
+
+    alerts = db.execute(
+        select(AssetPing)
+        .where(AssetPing.seen_at >= since)
+        .where(AssetPing.status.in_(list(prov.ALERT_STATUSES)))
+        .order_by(AssetPing.seen_at.desc())
+        .limit(200)
+    ).scalars().all()
+
+    alert_rows = []
+    for p in alerts:
+        d = by_token.get(p.token) or db.execute(
+            select(AssetDelivery).where(AssetDelivery.token == p.token)
+        ).scalar_one_or_none()
+        if product_code and d is not None and d.product_code != product_code:
+            continue
+        alert_rows.append({
+            **_ping_out(p),
+            "issued_to": d.learner_email if d else "",
+            "issued_at": d.served_at.isoformat() if d and d.served_at else None,
+            "issued_ip": d.ip if d else "",
+            "asset_key": d.asset_key if d else "",
+        })
+
+    # Behavioural watch list. Deliberately simple and explainable — an admin
+    # has to be able to say why a name is on it.
+    watch: dict[int, dict] = {}
+    for d in deliveries:
+        row = watch.setdefault(d.learner_id, {
+            "learner_id": d.learner_id, "email": d.learner_email,
+            "downloads": 0, "ips": set(), "user_agents": set(),
+            "last_at": None, "alerts": 0,
+        })
+        row["downloads"] += 1
+        if d.ip:
+            row["ips"].add(d.ip)
+        if d.user_agent:
+            row["user_agents"].add(d.user_agent[:120])
+        if d.worst_status in prov.ALERT_STATUSES:
+            row["alerts"] += 1
+        stamp = d.served_at.isoformat() if d.served_at else None
+        if stamp and (row["last_at"] is None or stamp > row["last_at"]):
+            row["last_at"] = stamp
+
+    watch_rows = []
+    for row in watch.values():
+        ips, uas = len(row["ips"]), len(row["user_agents"])
+        reasons = []
+        if row["alerts"]:
+            reasons.append(f"{row['alerts']} copy(ies) opened off-site")
+        if ips >= 4:
+            reasons.append(f"{ips} different IP addresses")
+        if uas >= 4:
+            reasons.append(f"{uas} different browsers/devices")
+        if row["downloads"] >= 25:
+            reasons.append(f"{row['downloads']} downloads")
+        if not reasons:
+            continue
+        watch_rows.append({
+            "learner_id": row["learner_id"], "email": row["email"],
+            "downloads": row["downloads"], "distinct_ips": ips,
+            "distinct_agents": uas, "alerts": row["alerts"],
+            "last_at": row["last_at"], "reasons": reasons,
+        })
+    watch_rows.sort(key=lambda r: (r["alerts"], r["distinct_ips"],
+                                   r["downloads"]), reverse=True)
+
+    return {
+        "since": since.isoformat(),
+        "product_code": product_code,
+        "totals": {
+            "downloads": len(deliveries),
+            "accounts": len(watch),
+            "alerts": len(alert_rows),
+        },
+        "alerts": alert_rows,
+        "watch": watch_rows[:50],
+        "recent": [_delivery_out(db, d) for d in deliveries[:100]],
+    }

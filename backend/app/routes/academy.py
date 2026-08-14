@@ -6,6 +6,7 @@ Public (no auth):
   POST /api/academy/auth/request-link          — email a sign-in link
   POST /api/academy/auth/verify                — exchange link token for session
   GET  /api/academy/verify/{cert_code}         — public certificate check
+  POST /api/academy/beacon                     — a stamped copy calling home
 
 Learner (session cookie):
   GET  /api/academy/me                         — identity + entitlements
@@ -27,10 +28,16 @@ Slide images and asset blobs exist ONLY behind the two endpoints above:
 both check the module-level entitlement, both send no-store cache headers,
 and both stamp the learner's identity into what they serve — the slide
 pixels are watermarked server-side, and HTML assets get a licensed-to
-banner injected. There is no public URL to find.
+banner plus a per-copy fingerprint. There is no public URL to find.
+
+Every HTML asset is stamped with a token unique to that download and a row
+in `academy_asset_deliveries`, so a leaked copy names the account it came
+from; and it calls `/beacon` once when opened, so a copy running off a hard
+drive or under another account reports itself. See app/provenance.py.
 """
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -39,6 +46,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import academy as svc
+from .. import provenance as prov
 from ..config import get_settings
 from ..db import get_db
 from ..emailer import login_link_html, send_email
@@ -53,6 +61,8 @@ from ..learner_auth import (
 )
 from ..models import (
     AssetBlob,
+    AssetDelivery,
+    AssetPing,
     Certificate,
     Chapter,
     Enrollment,
@@ -855,24 +865,10 @@ def slide_image(
                     headers=headers)
 
 
-_ASSET_BANNER = """
-<style>
-#pre-license-banner{position:fixed;left:0;right:0;bottom:0;z-index:2147483647;
-background:rgba(12,18,32,.92);color:#cfe3ff;font:12px/1.5 system-ui,Segoe UI,sans-serif;
-padding:6px 14px;display:flex;gap:14px;justify-content:space-between;align-items:center;
-border-top:1px solid rgba(120,160,255,.35);pointer-events:none}
-#pre-license-banner b{color:#fff;font-weight:600}
-</style>
-<div id="pre-license-banner">
-<span>Licensed to <b>__EMAIL__</b> — personal, non-transferable training use only. Do not copy or redistribute.</span>
-<span>Training simulation — NOT for operation of any real engine. © ProReadyEngineer LLC</span>
-</div>
-"""
-
-
 @router.get("/asset/{lesson_id}")
 def lesson_asset(
     lesson_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     learner: Learner = Depends(require_learner),
 ) -> Response:
@@ -907,16 +903,143 @@ def lesson_asset(
     if blob.content_type.startswith("text/html"):
         try:
             html = data.decode("utf-8", errors="replace")
-            banner = _ASSET_BANNER.replace("__EMAIL__", learner.email)
-            lowered = html.lower()
-            idx = lowered.rfind("</body>")
-            html = (html[:idx] + banner + html[idx:]) if idx != -1 else html + banner
+            token = prov.new_token()
+            html = prov.stamp_html(
+                html,
+                email=learner.email,
+                token=token,
+                beacon_url=_beacon_url(request),
+            )
             data = html.encode("utf-8")
+            _record_delivery(
+                db, request, learner=learner, lesson=lesson,
+                token=token, asset_key=path[len("blob:"):], size=len(data),
+            )
         except Exception:  # pragma: no cover
-            log.exception("Asset banner injection failed; serving original")
+            log.exception("Asset stamping failed; serving unstamped copy")
 
     log.info("Asset %s served to %s", path, learner.email)
     return Response(content=data, media_type=blob.content_type, headers=headers)
+
+
+# -----------------------------------------------------------------------------
+# Provenance — stamp every copy, and listen for the ones that call home
+# -----------------------------------------------------------------------------
+
+def _client_ip(request: Request) -> str:
+    """Caller's IP as seen through Render's proxy."""
+    fwd = request.headers.get("x-forwarded-for", "")
+    if fwd:
+        return fwd.split(",")[0].strip()[:64]
+    return (request.client.host if request.client else "")[:64]
+
+
+def _beacon_url(request: Request) -> str:
+    """Absolute URL for the call-home ping.
+
+    Derived from the request that served the asset unless pinned in config,
+    so a copy opened from a hard drive still knows where to report — the
+    whole point is that it works when nothing else about the environment is
+    ours any more.
+    """
+    settings = get_settings()
+    if settings.ASSET_BEACON_URL:
+        return settings.ASSET_BEACON_URL
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/api/academy/beacon"
+
+
+def _record_delivery(
+    db: Session, request: Request, *, learner: Learner, lesson: Lesson,
+    token: str, asset_key: str, size: int,
+) -> None:
+    """Write the row that makes a stamped copy traceable."""
+    module = db.get(Module, lesson.module_id) if lesson.module_id else None
+    db.add(AssetDelivery(
+        token=token,
+        learner_id=learner.id,
+        learner_email=learner.email,
+        lesson_id=lesson.id,
+        module_id=lesson.module_id or 0,
+        product_code=(module.product_code if module else "") or "",
+        asset_key=asset_key[:128],
+        ip=_client_ip(request),
+        user_agent=request.headers.get("user-agent", "")[:400],
+        bytes_sent=size,
+    ))
+    db.commit()
+
+
+@router.post("/beacon", include_in_schema=False)
+async def asset_beacon(
+    request: Request,
+    db: Session = Depends(get_db),
+    learner: Learner | None = Depends(optional_learner),
+) -> Response:
+    """A stamped copy reporting that it was opened. Public by design.
+
+    A leaked copy has no session, so this endpoint cannot require one — the
+    unauthenticated ping *is* the evidence. It is posted by `sendBeacon` with
+    a text/plain body, which is a CORS-simple request: it goes out from a
+    `file://` page and from any host, and needs no CORS response headers.
+
+    Always answers 204. Nothing here is worth telling a caller about, and a
+    silent endpoint gives a leaker no signal that anything was recorded.
+    """
+    try:
+        raw = (await request.body())[:2000].decode("utf-8", errors="replace")
+        payload = json.loads(raw) if raw.strip().startswith("{") else {}
+        token = str(payload.get("t", ""))[:32]
+        if not token:
+            return Response(status_code=204)
+
+        delivery = db.execute(
+            select(AssetDelivery).where(AssetDelivery.token == token)
+        ).scalar_one_or_none()
+
+        status_ = prov.classify_ping(
+            page_url=str(payload.get("u", ""))[:500],
+            origin=str(payload.get("o", ""))[:300],
+            allowed_hosts=get_settings().asset_allowed_hosts_set,
+            issued_to_learner_id=delivery.learner_id if delivery else None,
+            session_learner_id=learner.id if learner else None,
+        )
+
+        db.add(AssetPing(
+            token=token,
+            delivery_id=delivery.id if delivery else None,
+            status=status_,
+            page_url=str(payload.get("u", ""))[:500],
+            origin=str(payload.get("o", ""))[:300],
+            referrer=str(payload.get("r", ""))[:300],
+            ip=_client_ip(request),
+            user_agent=request.headers.get("user-agent", "")[:400],
+            screen=str(payload.get("s", ""))[:32],
+            timezone=str(payload.get("z", ""))[:64],
+            session_learner_id=learner.id if learner else None,
+            session_email=(learner.email if learner else "")[:320],
+        ))
+
+        if delivery is not None:
+            delivery.ping_count = (delivery.ping_count or 0) + 1
+            order = {
+                prov.PING_OFFSITE: 4, prov.PING_OTHER_ACCOUNT: 3,
+                prov.PING_UNKNOWN: 2, prov.PING_ANONYMOUS: 1, prov.PING_OK: 0,
+            }
+            if order.get(status_, 0) > order.get(delivery.worst_status or "", -1):
+                delivery.worst_status = status_
+        db.commit()
+
+        if status_ in prov.ALERT_STATUSES:
+            log.warning(
+                "ASSET LEAK SIGNAL %s token=%s issued_to=%s url=%s ip=%s",
+                status_, token,
+                delivery.learner_email if delivery else "?",
+                str(payload.get("u", ""))[:200], _client_ip(request),
+            )
+    except Exception:  # pragma: no cover — a beacon must never 500
+        log.exception("Beacon handling failed")
+    return Response(status_code=204)
 
 
 # -----------------------------------------------------------------------------
