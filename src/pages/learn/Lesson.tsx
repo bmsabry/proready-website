@@ -74,9 +74,14 @@ const SlideViewer = ({
   });
   const [imgLoaded, setImgLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Theater mode: a CSS full-viewport overlay used when the native
+  // Fullscreen API is unavailable or denied (locked-down corporate
+  // browsers, embedded contexts). Present must always work.
+  const [theater, setTheater] = useState(false);
   const stripRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const current = slides[index];
+  const presenting = isFullscreen || theater;
 
   const go = useCallback(
     (delta: number) =>
@@ -87,12 +92,19 @@ const SlideViewer = ({
   const togglePresent = useCallback(() => {
     if (document.fullscreenElement) {
       void document.exitFullscreen();
-    } else {
-      shellRef.current?.requestFullscreen?.().catch(() => {
-        /* not available — the inline viewer still works */
-      });
+      return;
     }
-  }, []);
+    if (theater) {
+      setTheater(false);
+      return;
+    }
+    const el = shellRef.current;
+    if (el?.requestFullscreen) {
+      el.requestFullscreen().catch(() => setTheater(true));
+    } else {
+      setTheater(true);
+    }
+  }, [theater]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -107,6 +119,7 @@ const SlideViewer = ({
         go(-1);
       }
       if (e.key === 'f' || e.key === 'F') togglePresent();
+      if (e.key === 'Escape') setTheater(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -117,6 +130,16 @@ const SlideViewer = ({
     document.addEventListener('fullscreenchange', onFsChange);
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
+
+  // Theater mode owns the viewport — stop the page behind it from scrolling.
+  useEffect(() => {
+    if (!theater) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [theater]);
 
   // Show the spinner until THIS slide's pixels arrive.
   useEffect(() => {
@@ -153,15 +176,17 @@ const SlideViewer = ({
     <div
       ref={shellRef}
       className={`select-none ${
-        isFullscreen
-          ? 'bg-black h-screen w-screen flex flex-col items-center justify-center px-6 py-4'
+        presenting
+          ? `bg-black flex flex-col items-center justify-center px-6 py-4 ${
+              theater ? 'fixed inset-0 z-[100]' : 'h-screen w-screen'
+            }`
           : 'mb-6'
       }`}
       onContextMenu={(e) => e.preventDefault()}
     >
       <div
         className={`relative overflow-hidden bg-black ${
-          isFullscreen
+          presenting
             ? 'flex-1 min-h-0 w-full flex items-center justify-center'
             : 'rounded-xl border border-slate-800'
         }`}
@@ -174,7 +199,7 @@ const SlideViewer = ({
           onLoad={() => setImgLoaded(true)}
           alt={current.title || `Slide ${current.number}`}
           className={
-            isFullscreen
+            presenting
               ? 'max-h-full max-w-full w-auto h-auto object-contain'
               : 'w-full h-auto block'
           }
@@ -205,7 +230,7 @@ const SlideViewer = ({
 
       <div
         className={`flex items-center justify-between gap-3 mt-3 ${
-          isFullscreen ? 'w-full max-w-3xl shrink-0' : ''
+          presenting ? 'w-full max-w-3xl shrink-0' : ''
         }`}
       >
         <button type="button" onClick={() => go(-1)} disabled={index === 0}
@@ -216,16 +241,16 @@ const SlideViewer = ({
           <span>
             {index + 1} / {slides.length}
           </span>
-          {current.section && !isFullscreen ? (
+          {current.section && !presenting ? (
             <span className="text-slate-500 hidden sm:inline">{current.section}</span>
           ) : null}
           <button
             type="button"
             onClick={togglePresent}
             className="btn-secondary !py-1.5 !px-3 text-xs"
-            title={isFullscreen ? 'Exit presentation (F or Esc)' : 'Present fullscreen (F)'}
+            title={presenting ? 'Exit presentation (F or Esc)' : 'Present fullscreen (F)'}
           >
-            {isFullscreen ? (
+            {presenting ? (
               <>
                 <Minimize2 className="w-3.5 h-3.5" aria-hidden="true" /> Exit
               </>
@@ -242,7 +267,7 @@ const SlideViewer = ({
         </button>
       </div>
 
-      {!isFullscreen && (
+      {!presenting && (
         <div
           ref={stripRef}
           className="mt-3 flex gap-2 overflow-x-auto pb-2"
