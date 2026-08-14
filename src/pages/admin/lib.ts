@@ -271,6 +271,7 @@ export type CourseTab =
   | 'registrations'
   | 'buyers'
   | 'access'
+  | 'integrity'
   | 'comms'
   | 'stats'
   | 'materials'
@@ -280,6 +281,7 @@ export const COURSE_TABS: CourseTab[] = [
   'registrations',
   'buyers',
   'access',
+  'integrity',
   'comms',
   'stats',
   'materials',

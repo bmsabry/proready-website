@@ -32,6 +32,8 @@ import {
   Search,
   Send,
   Settings,
+  ShieldAlert,
+  ShieldCheck,
   Trash2,
   Unlock,
   Users,
@@ -89,6 +91,7 @@ const TAB_DEFS: { key: CourseTab; label: string; icon: React.ReactNode }[] = [
   { key: 'registrations', label: 'Registrations', icon: <Users className="w-4 h-4" /> },
   { key: 'buyers', label: 'Buyers', icon: <GraduationCap className="w-4 h-4" /> },
   { key: 'access', label: 'Access', icon: <Lock className="w-4 h-4" /> },
+  { key: 'integrity', label: 'Integrity', icon: <ShieldAlert className="w-4 h-4" /> },
   { key: 'comms', label: 'Comms', icon: <Mail className="w-4 h-4" /> },
   { key: 'stats', label: 'Stats', icon: <BarChart3 className="w-4 h-4" /> },
   { key: 'materials', label: 'Materials', icon: <PlayCircle className="w-4 h-4" /> },
@@ -195,6 +198,13 @@ export default function CourseWorkspace({ code, tab, onTab, onBack, onAuthError 
       )}
       {course && tab === 'access' && (
         <AccessTab
+          course={course}
+          onAuthError={onAuthError}
+          gotoSettings={() => onTab('settings')}
+        />
+      )}
+      {course && tab === 'integrity' && (
+        <IntegrityTab
           course={course}
           onAuthError={onAuthError}
           gotoSettings={() => onTab('settings')}
@@ -2202,6 +2212,551 @@ function DayDatesEditor({
         <Plus className="w-3 h-3" />
         Add day
       </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Integrity — trace a leaked copy, and see the copies that called home
+// ---------------------------------------------------------------------------
+
+type Delivery = {
+  token: string;
+  email: string;
+  full_name: string;
+  asset_key: string;
+  served_at: string | null;
+  ip: string;
+  user_agent: string;
+  ping_count: number;
+  worst_status: string;
+  downloads_by_this_account?: number;
+  pings?: Ping[];
+};
+
+type Ping = {
+  id: number;
+  token: string;
+  status: string;
+  seen_at: string | null;
+  page_url: string;
+  origin: string;
+  ip: string;
+  user_agent: string;
+  timezone: string;
+  session_email: string;
+  issued_to?: string;
+  issued_at?: string | null;
+  issued_ip?: string;
+  asset_key?: string;
+};
+
+type IntegrityReport = {
+  totals: { downloads: number; accounts: number; alerts: number };
+  alerts: Ping[];
+  watch: {
+    learner_id: number;
+    email: string;
+    downloads: number;
+    distinct_ips: number;
+    distinct_agents: number;
+    alerts: number;
+    last_at: string | null;
+    reasons: string[];
+  }[];
+  recent: Delivery[];
+};
+
+type TraceResult = {
+  verdict: 'traced' | 'no-id-found' | 'id-not-issued-by-us';
+  tokens_found: string[];
+  matches: Delivery[];
+  unknown_tokens: string[];
+};
+
+/** Plain-English meaning of a call-home status. */
+const PING_MEANING: Record<string, { label: string; blurb: string; tone: string }> = {
+  offsite: {
+    label: 'Opened off your site',
+    blurb:
+      'This copy was opened from a hard drive or another website. It is not on ' +
+      'proreadyengineer.com any more — this is a leak, not a maybe.',
+    tone: 'text-rose-300 border-rose-500/40 bg-rose-500/10',
+  },
+  other_account: {
+    label: 'Opened by a different account',
+    blurb:
+      'The person who opened this copy was signed in as somebody else. The file ' +
+      'was passed from the account it was issued to, to this one.',
+    tone: 'text-amber-300 border-amber-500/40 bg-amber-500/10',
+  },
+  unknown_token: {
+    label: 'Edited or very old copy',
+    blurb:
+      'A copy called home with an id you never issued — usually a file whose id ' +
+      'was tampered with, or one from before this tracking existed.',
+    tone: 'text-amber-300 border-amber-500/40 bg-amber-500/10',
+  },
+  anonymous: {
+    label: 'Nobody signed in',
+    blurb:
+      'Opened on your site but with no active session — usually just an expired ' +
+      'login. Worth a glance, not an alarm.',
+    tone: 'text-slate-300 border-slate-600 bg-slate-800/60',
+  },
+  ok: {
+    label: 'Normal use',
+    blurb: 'Your site, the right account. Nothing to do.',
+    tone: 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10',
+  },
+};
+
+function when(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function browserOf(ua: string): string {
+  if (!ua) return '—';
+  const os = /Windows/.test(ua) ? 'Windows'
+    : /Mac OS X|Macintosh/.test(ua) ? 'Mac'
+    : /Android/.test(ua) ? 'Android'
+    : /iPhone|iPad/.test(ua) ? 'iOS'
+    : /Linux/.test(ua) ? 'Linux' : '';
+  const br = /Edg\//.test(ua) ? 'Edge'
+    : /OPR\//.test(ua) ? 'Opera'
+    : /Chrome\//.test(ua) ? 'Chrome'
+    : /Firefox\//.test(ua) ? 'Firefox'
+    : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+  return [br, os].filter(Boolean).join(' · ');
+}
+
+function IntegrityTab({
+  course,
+  onAuthError,
+  gotoSettings,
+}: {
+  course: Course;
+  onAuthError: () => void;
+  gotoSettings: () => void;
+}) {
+  const productCode = course.recorded_product_code;
+  const [report, setReport] = useState<IntegrityReport | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [paste, setPaste] = useState('');
+  const [tracing, setTracing] = useState(false);
+  const [trace, setTrace] = useState<TraceResult | null>(null);
+  const [showLog, setShowLog] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!productCode) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setReport(
+        await api<IntegrityReport>(
+          `/api/admin/academy/integrity?product_code=${encodeURIComponent(productCode)}`,
+        ),
+      );
+    } catch (err) {
+      reportError(err, onAuthError, setError);
+    } finally {
+      setLoading(false);
+    }
+  }, [productCode, onAuthError]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function runTrace(content: string) {
+    if (!content.trim()) return;
+    setTracing(true);
+    setError(null);
+    setTrace(null);
+    try {
+      setTrace(
+        await api<TraceResult>('/api/admin/academy/integrity/trace', {
+          method: 'POST',
+          body: JSON.stringify({ content: content.slice(0, 3_500_000) }),
+        }),
+      );
+    } catch (err) {
+      reportError(err, onAuthError, setError);
+    } finally {
+      setTracing(false);
+    }
+  }
+
+  async function traceFile(file: File) {
+    const text = await file.text();
+    setPaste(`${file.name} — ${(file.size / 1024).toFixed(0)} KB`);
+    await runTrace(text);
+  }
+
+  if (!productCode) {
+    return (
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 text-sm text-slate-300">
+        This course has no materials product linked yet, so there is nothing to
+        track.{' '}
+        <button onClick={gotoSettings} className="text-cyan-300 underline">
+          Link one in Settings
+        </button>
+        .
+      </div>
+    );
+  }
+
+  const alerts = report?.alerts ?? [];
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-300">
+        <p>
+          <span className="font-semibold text-white">Every download is stamped.</span>{' '}
+          The simulator and any HTML lab carry a hidden id unique to that download —
+          not to the student, to the download. Two things follow from that: a copy
+          that turns up somewhere can be traced back to the account it came from,
+          and every copy quietly reports itself the moment it is opened.
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">
+          {error}
+        </div>
+      )}
+
+      {/* ---- Alerts ---------------------------------------------------- */}
+      <section className="rounded-xl border border-slate-800 bg-slate-900/40">
+        <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+          <h3 className="flex items-center gap-2 font-semibold text-white">
+            {alerts.length ? (
+              <ShieldAlert className="h-4 w-4 text-rose-400" />
+            ) : (
+              <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            )}
+            Copies that called home from somewhere they should not be
+          </h3>
+          <button
+            onClick={() => void load()}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-cyan-500 hover:text-white"
+          >
+            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+            Refresh
+          </button>
+        </header>
+
+        {!alerts.length ? (
+          <p className="px-4 py-6 text-sm text-slate-400">
+            Nothing. Every copy that has been opened was opened on your site, by
+            the account it was issued to.{' '}
+            {report ? (
+              <span className="text-slate-500">
+                {report.totals.downloads} download
+                {report.totals.downloads === 1 ? '' : 's'} by{' '}
+                {report.totals.accounts} account
+                {report.totals.accounts === 1 ? '' : 's'} in the last 180 days.
+              </span>
+            ) : null}
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-800">
+            {alerts.map((a) => {
+              const meaning = PING_MEANING[a.status] ?? PING_MEANING.anonymous;
+              return (
+                <li key={a.id} className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${meaning.tone}`}
+                    >
+                      {meaning.label}
+                    </span>
+                    <span className="text-sm text-white">
+                      issued to{' '}
+                      <span className="font-semibold">{a.issued_to || 'unknown'}</span>
+                    </span>
+                    <span className="text-xs text-slate-500">{when(a.seen_at)}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">{meaning.blurb}</p>
+                  <dl className="mt-2 grid gap-x-6 gap-y-1 text-xs text-slate-400 sm:grid-cols-2">
+                    <div className="sm:col-span-2 break-all">
+                      <dt className="inline text-slate-500">Opened at: </dt>
+                      <dd className="inline font-mono text-slate-300">
+                        {a.page_url || '—'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="inline text-slate-500">From IP: </dt>
+                      <dd className="inline text-slate-300">{a.ip || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline text-slate-500">Browser: </dt>
+                      <dd className="inline text-slate-300">{browserOf(a.user_agent)}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline text-slate-500">Downloaded: </dt>
+                      <dd className="inline text-slate-300">
+                        {when(a.issued_at)} from {a.issued_ip || '—'}
+                      </dd>
+                    </div>
+                    {a.session_email ? (
+                      <div>
+                        <dt className="inline text-slate-500">Signed in as: </dt>
+                        <dd className="inline text-slate-300">{a.session_email}</dd>
+                      </div>
+                    ) : null}
+                    {a.timezone ? (
+                      <div>
+                        <dt className="inline text-slate-500">Time zone: </dt>
+                        <dd className="inline text-slate-300">{a.timezone}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* ---- Trace ------------------------------------------------------ */}
+      <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+        <h3 className="font-semibold text-white">Somebody sent you a file — whose is it?</h3>
+        <p className="mt-1 text-sm text-slate-400">
+          Drop the file in, or paste any part of it. The id survives in four
+          separate places, including invisible characters inside the licence
+          line, so deleting the obvious one does not help whoever leaked it.
+        </p>
+
+        <label
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const f = e.dataTransfer.files?.[0];
+            if (f) void traceFile(f);
+          }}
+          className="mt-3 flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-slate-700 px-4 py-4 text-sm text-slate-400 hover:border-cyan-500 hover:text-slate-200"
+        >
+          <input
+            type="file"
+            accept=".html,.htm,.txt"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void traceFile(f);
+            }}
+          />
+          Drop the suspect file here, or click to choose one
+        </label>
+
+        <textarea
+          value={paste}
+          onChange={(e) => setPaste(e.target.value)}
+          rows={3}
+          placeholder="…or paste the file contents, or just the id, here"
+          className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-white placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
+        />
+        <div className="mt-2 flex items-center gap-3">
+          <button
+            onClick={() => void runTrace(paste)}
+            disabled={tracing || !paste.trim()}
+            className="flex items-center gap-2 rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-40"
+          >
+            {tracing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            Trace this copy
+          </button>
+          {trace ? (
+            <button
+              onClick={() => {
+                setTrace(null);
+                setPaste('');
+              }}
+              className="text-xs text-slate-400 hover:text-white"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+
+        {trace && trace.verdict === 'traced' && (
+          <div className="mt-4 space-y-3">
+            {trace.matches.map((m) => (
+              <div
+                key={m.token}
+                className="rounded-lg border border-cyan-500/40 bg-cyan-500/5 p-3"
+              >
+                <p className="text-sm text-white">
+                  Downloaded by{' '}
+                  <span className="font-semibold text-cyan-300">{m.email}</span>
+                  {m.full_name ? ` (${m.full_name})` : ''} on {when(m.served_at)}.
+                </p>
+                <dl className="mt-2 grid gap-x-6 gap-y-1 text-xs text-slate-400 sm:grid-cols-2">
+                  <div>
+                    <dt className="inline text-slate-500">From IP: </dt>
+                    <dd className="inline text-slate-300">{m.ip || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline text-slate-500">Browser: </dt>
+                    <dd className="inline text-slate-300">{browserOf(m.user_agent)}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline text-slate-500">File: </dt>
+                    <dd className="inline text-slate-300">{m.asset_key}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline text-slate-500">This account has downloaded: </dt>
+                    <dd className="inline text-slate-300">
+                      {m.downloads_by_this_account ?? '—'} time
+                      {m.downloads_by_this_account === 1 ? '' : 's'}
+                    </dd>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <dt className="inline text-slate-500">Copy id: </dt>
+                    <dd className="inline font-mono text-slate-300">{m.token}</dd>
+                  </div>
+                </dl>
+                {m.pings?.length ? (
+                  <div className="mt-3 border-t border-slate-800 pt-2">
+                    <p className="text-xs font-semibold text-slate-300">
+                      Every time this exact copy was opened
+                    </p>
+                    <ul className="mt-1 space-y-1">
+                      {m.pings.slice(0, 12).map((p) => (
+                        <li key={p.id} className="text-xs text-slate-400">
+                          <span
+                            className={`mr-2 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                              (PING_MEANING[p.status] ?? PING_MEANING.anonymous).tone
+                            }`}
+                          >
+                            {(PING_MEANING[p.status] ?? PING_MEANING.anonymous).label}
+                          </span>
+                          {when(p.seen_at)} · {p.ip} ·{' '}
+                          <span className="break-all font-mono">{p.page_url}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-slate-500">
+                    This copy has never reported being opened — it was downloaded
+                    and, as far as the platform knows, never run online.
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {trace && trace.verdict === 'no-id-found' && (
+          <p className="mt-4 rounded-lg border border-slate-700 bg-slate-950/60 p-3 text-sm text-slate-300">
+            No id in that. Either it is not one of your stamped files, or it is an
+            older copy from before stamping was switched on
+            {report ? '' : ''} — or someone rebuilt the file from scratch.
+          </p>
+        )}
+
+        {trace && trace.verdict === 'id-not-issued-by-us' && (
+          <p className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+            That file carries an id ({trace.unknown_tokens.join(', ')}) that this
+            platform never issued. It has been edited, or it came from a copy made
+            before stamping was switched on.
+          </p>
+        )}
+      </section>
+
+      {/* ---- Watch list -------------------------------------------------- */}
+      {report?.watch?.length ? (
+        <section className="rounded-xl border border-slate-800 bg-slate-900/40">
+          <header className="border-b border-slate-800 px-4 py-3">
+            <h3 className="font-semibold text-white">Worth a look</h3>
+            <p className="mt-0.5 text-xs text-slate-400">
+              Not proof of anything — accounts whose pattern stands out from the rest.
+            </p>
+          </header>
+          <ul className="divide-y divide-slate-800">
+            {report.watch.map((w) => (
+              <li key={w.learner_id} className="flex flex-wrap items-baseline gap-x-3 px-4 py-2.5">
+                <span className="text-sm font-medium text-white">{w.email}</span>
+                <span className="text-xs text-slate-400">{w.reasons.join(' · ')}</span>
+                <span className="ml-auto text-xs text-slate-500">
+                  last {when(w.last_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* ---- Full log ---------------------------------------------------- */}
+      <section className="rounded-xl border border-slate-800 bg-slate-900/40">
+        <button
+          onClick={() => setShowLog((v) => !v)}
+          className="flex w-full items-center justify-between px-4 py-3 text-left"
+        >
+          <h3 className="font-semibold text-white">
+            Download log{' '}
+            <span className="text-sm font-normal text-slate-500">
+              ({report?.recent.length ?? 0} most recent)
+            </span>
+          </h3>
+          <span className="text-xs text-slate-400">{showLog ? 'Hide' : 'Show'}</span>
+        </button>
+        {showLog && (
+          <div className="overflow-x-auto border-t border-slate-800">
+            <table className="w-full text-left text-xs">
+              <thead className="text-slate-500">
+                <tr>
+                  <th className="px-4 py-2 font-medium">When</th>
+                  <th className="px-4 py-2 font-medium">Account</th>
+                  <th className="px-4 py-2 font-medium">File</th>
+                  <th className="px-4 py-2 font-medium">IP</th>
+                  <th className="px-4 py-2 font-medium">Browser</th>
+                  <th className="px-4 py-2 font-medium">Opened</th>
+                  <th className="px-4 py-2 font-medium">Copy id</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/70">
+                {(report?.recent ?? []).map((d) => (
+                  <tr key={d.token} className="text-slate-300">
+                    <td className="whitespace-nowrap px-4 py-1.5">{when(d.served_at)}</td>
+                    <td className="px-4 py-1.5">{d.email}</td>
+                    <td className="px-4 py-1.5 text-slate-400">{d.asset_key}</td>
+                    <td className="px-4 py-1.5 text-slate-400">{d.ip}</td>
+                    <td className="whitespace-nowrap px-4 py-1.5 text-slate-400">
+                      {browserOf(d.user_agent)}
+                    </td>
+                    <td className="px-4 py-1.5">
+                      {d.ping_count ? (
+                        <span
+                          className={
+                            d.worst_status === 'ok' || !d.worst_status
+                              ? 'text-slate-400'
+                              : 'text-rose-300'
+                          }
+                        >
+                          {d.ping_count}×{' '}
+                          {d.worst_status && d.worst_status !== 'ok'
+                            ? (PING_MEANING[d.worst_status] ?? PING_MEANING.anonymous).label
+                            : ''}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">never</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-1.5 font-mono text-slate-500">{d.token}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

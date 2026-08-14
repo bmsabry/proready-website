@@ -939,3 +939,74 @@ class EmailLog(Base):
     ok: Mapped[bool] = mapped_column(Boolean, default=False)
     # Resend message id when the API accepted the send — empty otherwise.
     provider_id: Mapped[str] = mapped_column(String(64), default="")
+
+
+class AssetDelivery(Base):
+    """One row per *download* of a protected HTML asset.
+
+    Not per learner and not per session — per copy. The token in this row is
+    stamped into the bytes that were sent (see app/provenance.py), so a file
+    that turns up somewhere it should not be can be traced back to the exact
+    account, minute and IP that fetched it.
+
+    `learner_email` is denormalised on purpose: the evidence has to survive
+    the learner row being edited or deleted later.
+    """
+
+    __tablename__ = "academy_asset_deliveries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+
+    learner_id: Mapped[int] = mapped_column(Integer, index=True)
+    learner_email: Mapped[str] = mapped_column(String(320), default="", index=True)
+    lesson_id: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    module_id: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    product_code: Mapped[str] = mapped_column(String(64), default="", index=True)
+    asset_key: Mapped[str] = mapped_column(String(128), default="")
+
+    served_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    user_agent: Mapped[str] = mapped_column(String(400), default="")
+    bytes_sent: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Rolled up when a ping arrives, so the admin list can sort by "noisy"
+    # without a join: count of pings and the worst status seen.
+    ping_count: Mapped[int] = mapped_column(Integer, default=0)
+    worst_status: Mapped[str] = mapped_column(String(16), default="")
+
+
+class AssetPing(Base):
+    """A stamped copy calling home when it was opened.
+
+    Every delivered copy pings once per open. A ping from our own site by the
+    account it was issued to is `ok` and boring. A ping carrying a `file://`
+    URL, or another host, or a different signed-in account, is the thing this
+    table exists to catch: it means a copy is alive somewhere it was never
+    supposed to be, and it names the account it came from.
+    """
+
+    __tablename__ = "academy_asset_pings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token: Mapped[str] = mapped_column(String(32), index=True)
+    delivery_id: Mapped[int | None] = mapped_column(Integer, index=True, default=None)
+
+    seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    # ok | anonymous | other_account | offsite | unknown_token
+    status: Mapped[str] = mapped_column(String(16), default="", index=True)
+
+    page_url: Mapped[str] = mapped_column(String(500), default="")
+    origin: Mapped[str] = mapped_column(String(300), default="")
+    referrer: Mapped[str] = mapped_column(String(300), default="")
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    user_agent: Mapped[str] = mapped_column(String(400), default="")
+    screen: Mapped[str] = mapped_column(String(32), default="")
+    timezone: Mapped[str] = mapped_column(String(64), default="")
+    # Who was signed in on the machine that pinged, if anyone.
+    session_learner_id: Mapped[int | None] = mapped_column(Integer, default=None)
+    session_email: Mapped[str] = mapped_column(String(320), default="")

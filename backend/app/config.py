@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     # Click-wrap terms document version. Bump this string when the training
     # terms/liability notice changes materially — every learner is then asked
     # to accept the new version before opening protected material again.
-    TERMS_VERSION: str = "2026-08-v1"
+    TERMS_VERSION: str = "2026-08-v2"
 
     # --- Legacy quiz-app compatibility ------------------------------------
     # The five standalone smallgasturbine.gt-XX apps speak an email+password
@@ -136,6 +136,28 @@ class Settings(BaseSettings):
     CF_STREAM_SIGNING_KEY_JWK: str = ""
     # Playback tokens are deliberately short-lived; the player refreshes.
     STREAM_TOKEN_TTL_SECONDS: int = 60 * 60 * 2  # 2 hours
+
+    # --- Asset provenance -------------------------------------------------
+    # Hostnames the protected material is legitimately served from. A
+    # call-home ping carrying any other host — or a file:// path — is
+    # reported as `offsite`, which is the clearest leak signal there is.
+    ASSET_ALLOWED_HOSTS: str = (
+        "proreadyengineer.com,www.proreadyengineer.com,"
+        "api.proreadyengineer.com,proready-api.onrender.com,"
+        "proready-website.pages.dev,localhost,127.0.0.1"
+    )
+    # Absolute URL the beacon posts to. Left empty, it is derived per-request
+    # from the URL the asset itself was served on, which is correct in every
+    # environment including local dev.
+    ASSET_BEACON_URL: str = ""
+
+    @property
+    def asset_allowed_hosts_set(self) -> set:
+        return {
+            h.strip().lower()
+            for h in self.ASSET_ALLOWED_HOSTS.split(",")
+            if h.strip()
+        }
 
     # --- CORS -------------------------------------------------------------
     # Comma-separated origins. In prod: https://proreadyengineer.com
