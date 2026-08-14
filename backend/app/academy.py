@@ -618,32 +618,84 @@ def module_gate_passed(db: Session, learner: Learner | None, module: Module) -> 
     )
 
 
+def gate_blocker(
+    db: Session, learner: Learner | None, module: Module
+) -> dict | None:
+    """Which earlier module is holding this one shut? None when it is open.
+
+    Sequential mastery: a learner may not start a module until every earlier
+    module *they are entitled to* has had its gate passed. The returned dict
+    is what the API and the UI both speak — it names the blocking module and
+    what has to happen there, so the learner is told exactly where to go
+    instead of "finish the previous module".
+
+    Two rules that keep learners from being stranded:
+
+      * **Support modules are exempt** (`gate_exempt`) — the simulator or a
+        resource pack is a tool, not a step. It never blocks, and is never
+        blocked.
+      * **Only entitled modules count.** Someone granted Day 3 alone cannot
+        be held behind Day 1's quiz, because they can't open Day 1 at all.
+    """
+    if is_owner(learner) or module.gate_exempt:
+        return None
+    product = db.get(Product, module.product_code)
+    if product is not None and not product.sequential_gate:
+        return None
+
+    earlier = db.execute(
+        select(Module)
+        .where(
+            Module.product_code == module.product_code,
+            Module.position < module.position,
+        )
+        .order_by(Module.position)
+    ).scalars().all()
+
+    for prior in earlier:
+        if prior.gate_exempt:
+            continue
+        if not module_access(db, learner, prior):
+            continue  # not theirs to complete — cannot be a blocker
+        if module_gate_passed(db, learner, prior):
+            continue
+        has_quiz = module_has_items(db, prior.id, "formative")
+        threshold = get_settings().MASTERY_THRESHOLD_PCT
+        attempt = best_attempt(db, learner, prior.id, "formative")
+        if has_quiz:
+            message = (
+                f"Finish “{prior.title}” first: pass its evaluation "
+                f"({threshold:g}% to pass) to unlock “{module.title}”."
+            )
+        else:
+            message = (
+                f"Finish “{prior.title}” first: complete its material to "
+                f"unlock “{module.title}”."
+            )
+        return {
+            "code": "gate_locked",
+            "message": message,
+            "blocking_module_id": prior.id,
+            "blocking_module_code": prior.code,
+            "blocking_module_title": prior.title,
+            "needs": "quiz" if has_quiz else "lessons",
+            "threshold": threshold,
+            "best_score": attempt.score_pct if attempt else None,
+        }
+    return None
+
+
 def module_unlocked(db: Session, learner: Learner | None, module: Module) -> bool:
     """Is this one module open to this learner?
 
     Entitlement first (product enrollment OR a grant for this module), then
-    the mastery gate — but only for products that use sequential gating.
-    Cohort-mode products (sequential_gate=False) open every entitled module
-    at once: the admin's grants are the whole access story there.
-
-    Kept separate from `course_state` because the progress heartbeat calls
-    this on every beat, and building the entire course view (with all
-    lessons serialized) just to answer one boolean was the hot path.
+    the sequential mastery gate. Kept separate from `course_state` because
+    the progress heartbeat calls this on every beat, and building the entire
+    course view just to answer one boolean was the hot path.
     """
     if not module_access(db, learner, module):
         return False
-    if is_owner(learner):
-        return True
-    product = db.get(Product, module.product_code)
-    if product is not None and not product.sequential_gate:
-        return True
-    earlier = db.execute(
-        select(Module).where(
-            Module.product_code == module.product_code,
-            Module.position < module.position,
-        )
-    ).scalars().all()
-    return all(module_gate_passed(db, learner, m) for m in earlier)
+    return gate_blocker(db, learner, module) is None
 
 
 def course_state(db: Session, learner: Learner | None, product_code: str) -> list[dict]:
@@ -679,14 +731,14 @@ def course_state(db: Session, learner: Learner | None, product_code: str) -> lis
     totals = slide_totals(db, [m.id for m in modules])
 
     out: list[dict] = []
-    previous_passed = True  # module 1 is always open
     for module in modules:
         lessons = by_module.get(module.id, [])
         # Entitled to this module: product-wide access or a per-module grant.
         entitled_here = entitled or module.id in granted_ids
-        # The mastery gate only applies on sequentially-gated products.
-        gate_open = owner or (not sequential) or previous_passed
-        unlocked = entitled_here and gate_open
+        # One rule, shared with every protected read: gate_blocker names the
+        # earlier module holding this one shut (None when nothing does).
+        blocker = gate_blocker(db, learner, module) if entitled_here else None
+        unlocked = entitled_here and blocker is None
 
         done = sum(
             1
@@ -717,6 +769,11 @@ def course_state(db: Session, learner: Learner | None, product_code: str) -> lis
                 # from "pass the previous gate first" (entitled, not unlocked)
                 # so the UI can say the honest thing in each case.
                 "entitled": entitled_here,
+                # When entitled but locked: which module is in the way, and
+                # what has to happen there. The UI turns this into a message
+                # plus a button straight to that evaluation.
+                "blocked_by": blocker,
+                "gate_exempt": module.gate_exempt,
                 "lesson_count": len(lessons),
                 "lessons_completed": done,
                 "duration_s": total_s,
@@ -752,19 +809,21 @@ def course_state(db: Session, learner: Learner | None, product_code: str) -> lis
                 ],
             }
         )
-        previous_passed = module_gate_passed(db, learner, module)
-
     return out
 
 
 def lesson_accessible(
     db: Session, learner: Learner | None, lesson: Lesson
-) -> tuple[bool, str]:
-    """Can this learner open this lesson? Returns (ok, reason_if_not).
+) -> tuple[bool, dict | str]:
+    """Can this learner open this lesson? Returns (ok, detail_if_not).
 
     Two independent checks, both of which must pass: the entitlement (a
-    product enrollment or a grant for this lesson's module) and the mastery
-    gate (on sequentially-gated products only). Preview lessons bypass both.
+    product enrollment or a grant for this lesson's module) and the
+    sequential mastery gate. Preview lessons bypass both.
+
+    On a gate refusal the detail is the `gate_blocker` dict, so the 403 body
+    carries the blocking module and its quiz — the UI shows a message and a
+    button rather than a dead end.
     """
     if lesson.is_preview:
         return True, ""
@@ -776,8 +835,9 @@ def lesson_accessible(
     if not module_access(db, learner, module):
         return False, "This lesson requires an enrollment."
 
-    if not module_unlocked(db, learner, module):
-        return False, "Finish the previous module to unlock this one."
+    blocker = gate_blocker(db, learner, module)
+    if blocker is not None:
+        return False, blocker
     return True, ""
 
 

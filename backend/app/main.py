@@ -81,6 +81,11 @@ def _run_column_migrations() -> None:
     _ensure_column(
         "academy_slides", "video_asset", "VARCHAR(128) NOT NULL DEFAULT ''"
     )
+    # academy_modules.gate_exempt — support modules (simulator, resources)
+    # sit outside the sequential chain.
+    _ensure_column(
+        "academy_modules", "gate_exempt", "BOOLEAN NOT NULL DEFAULT FALSE"
+    )
     # courses price — online seat price for live cohorts (0 = invoice-only).
     _ensure_column("courses", "price_cents", "INTEGER NOT NULL DEFAULT 0")
     _ensure_column("courses", "currency", "VARCHAR(8) NOT NULL DEFAULT 'usd'")
