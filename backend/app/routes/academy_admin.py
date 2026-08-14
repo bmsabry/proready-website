@@ -1131,6 +1131,7 @@ def integrity_trace(
 def integrity_report(
     product_code: str = "",
     days: int = 180,
+    include_reviewed: bool = False,
     db: Session = Depends(get_db),
     _: str = Depends(require_admin),
 ) -> dict:
@@ -1157,12 +1158,15 @@ def integrity_report(
     ).scalars().all()
     by_token = {d.token: d for d in deliveries}
 
-    alerts = db.execute(
+    aq = (
         select(AssetPing)
         .where(AssetPing.seen_at >= since)
         .where(AssetPing.status.in_(list(prov.ALERT_STATUSES)))
-        .order_by(AssetPing.seen_at.desc())
-        .limit(200)
+    )
+    if not include_reviewed:
+        aq = aq.where(AssetPing.reviewed_at.is_(None))
+    alerts = db.execute(
+        aq.order_by(AssetPing.seen_at.desc()).limit(200)
     ).scalars().all()
 
     alert_rows = []
@@ -1178,6 +1182,7 @@ def integrity_report(
             "issued_at": d.served_at.isoformat() if d and d.served_at else None,
             "issued_ip": d.ip if d else "",
             "asset_key": d.asset_key if d else "",
+            "reviewed_at": p.reviewed_at.isoformat() if p.reviewed_at else None,
         })
 
     # Behavioural watch list. Deliberately simple and explainable — an admin
@@ -1235,3 +1240,32 @@ def integrity_report(
         "watch": watch_rows[:50],
         "recent": [_delivery_out(db, d) for d in deliveries[:100]],
     }
+
+
+class DismissIn(BaseModel):
+    ping_ids: list[int] = Field(min_length=1, max_length=200)
+    note: str = ""
+
+
+@router.post("/integrity/dismiss")
+def integrity_dismiss(
+    body: DismissIn,
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin),
+) -> dict:
+    """Mark alerts as looked at.
+
+    The alert list is an inbox: an item you have investigated should stop
+    shouting, or the list stops being read at all. Reviewing never deletes
+    the ping — the evidence outlives the admin's attention, and
+    `include_reviewed=true` brings the whole history back.
+    """
+    rows = db.execute(
+        select(AssetPing).where(AssetPing.id.in_(body.ping_ids))
+    ).scalars().all()
+    stamp = datetime.now(timezone.utc)
+    for row in rows:
+        row.reviewed_at = stamp
+        row.reviewed_note = (body.note or f"reviewed by {admin}")[:300]
+    db.commit()
+    return {"ok": True, "reviewed": len(rows)}

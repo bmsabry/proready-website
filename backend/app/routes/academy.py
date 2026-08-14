@@ -966,6 +966,7 @@ def _record_delivery(
         ip=_client_ip(request),
         user_agent=request.headers.get("user-agent", "")[:400],
         bytes_sent=size,
+        origin_host=(request.url.hostname or "").lower()[:200],
     ))
     db.commit()
 
@@ -997,10 +998,17 @@ async def asset_beacon(
             select(AssetDelivery).where(AssetDelivery.token == token)
         ).scalar_one_or_none()
 
+        # The host that served this very copy counts as on-site for it. That
+        # makes the check self-correcting: no config value can be wrong about
+        # where the API lives, because the delivery row remembers.
+        allowed = set(get_settings().asset_allowed_hosts_set)
+        if delivery is not None and delivery.origin_host:
+            allowed.add(delivery.origin_host)
+
         status_ = prov.classify_ping(
             page_url=str(payload.get("u", ""))[:500],
             origin=str(payload.get("o", ""))[:300],
-            allowed_hosts=get_settings().asset_allowed_hosts_set,
+            allowed_hosts=allowed,
             issued_to_learner_id=delivery.learner_id if delivery else None,
             session_learner_id=learner.id if learner else None,
         )
