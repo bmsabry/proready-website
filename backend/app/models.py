@@ -680,6 +680,12 @@ class Slide(Base):
     image_lg: Mapped[str] = mapped_column(String(300), default="")
     image_sm: Mapped[str] = mapped_column(String(300), default="")
 
+    # AssetBlob key of a movie embedded on this slide (empty = none). The
+    # deck's own animations don't survive rendering to images, but embedded
+    # videos do matter — the viewer swaps the still for a player, and the
+    # bytes serve only through the entitlement-checked slide-video endpoint.
+    video_asset: Mapped[str] = mapped_column(String(128), default="")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
