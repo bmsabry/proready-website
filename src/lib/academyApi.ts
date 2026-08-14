@@ -53,15 +53,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     // `detail` is usually a string; a gate refusal sends an object carrying
     // the blocking module so the UI can link straight to its evaluation.
+    // A gate refusal sends a readable `detail` sentence plus a structured
+    // `gate` object; older shapes put the object in `detail` itself.
     const detail = data?.detail;
-    if (detail && typeof detail === 'object') {
-      throw new ApiError(
-        res.status,
-        detail.message || `Request failed (${res.status})`,
-        detail as GateBlock
-      );
-    }
-    throw new ApiError(res.status, detail || `Request failed (${res.status})`);
+    const gate: GateBlock | undefined =
+      data?.gate ?? (detail && typeof detail === 'object' ? detail : undefined);
+    const message =
+      (typeof detail === 'string' ? detail : gate?.message) ||
+      `Request failed (${res.status})`;
+    throw new ApiError(res.status, message, gate);
   }
   return data as T;
 }
