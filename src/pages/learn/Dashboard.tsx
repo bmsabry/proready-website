@@ -411,6 +411,15 @@ const TermsGate = ({
           of access without refund.
         </p>
         <p>
+          <strong className="text-white">Copy tracking.</strong> Each download of
+          the simulator and any interactive material carries an identifier
+          unique to that download, and reports back to ProReadyEngineer LLC when
+          it is opened — recording the time, the address it was opened from, and
+          the network address of the device. This is used solely to detect and
+          attribute unauthorized redistribution of licensed material. By
+          accepting, you consent to this.
+        </p>
+        <p>
           Questions:{' '}
           <a href="mailto:info@proreadyengineer.com" className="text-cyan-400">
             info@proreadyengineer.com
