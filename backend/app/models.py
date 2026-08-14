@@ -972,6 +972,11 @@ class AssetDelivery(Base):
     user_agent: Mapped[str] = mapped_column(String(400), default="")
     bytes_sent: Mapped[int] = mapped_column(Integer, default=0)
 
+    # The host this copy was actually served from. Recorded rather than
+    # configured: a ping from the host that issued the file is by definition
+    # on-site, so "where does my API live" is never a thing to get wrong.
+    origin_host: Mapped[str] = mapped_column(String(200), default="")
+
     # Rolled up when a ping arrives, so the admin list can sort by "noisy"
     # without a join: count of pings and the worst status seen.
     ping_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -1010,3 +1015,10 @@ class AssetPing(Base):
     # Who was signed in on the machine that pinged, if anyone.
     session_learner_id: Mapped[int | None] = mapped_column(Integer, default=None)
     session_email: Mapped[str] = mapped_column(String(320), default="")
+
+    # An alert is an inbox item: once looked at, it stops shouting. Reviewing
+    # never deletes the row — the evidence outlives the admin's attention.
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    reviewed_note: Mapped[str] = mapped_column(String(300), default="")
