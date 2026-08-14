@@ -2,7 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, RotateCcw, X } from 'lucide-react';
 import { usePageMeta } from '../../lib/meta';
-import { academy, ApiError, QuizItem, QuizResult, QuizSet } from '../../lib/academyApi';
+import {
+  academy,
+  ApiError,
+  GateBlock,
+  QuizItem,
+  QuizResult,
+  QuizSet,
+} from '../../lib/academyApi';
 
 /* Module assessment runner.
  *
@@ -24,6 +31,7 @@ const Quiz: React.FC = () => {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [result, setResult] = useState<QuizResult | null>(null);
   const [error, setError] = useState('');
+  const [gate, setGate] = useState<GateBlock | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,6 +50,9 @@ const Quiz: React.FC = () => {
         if (err instanceof ApiError && err.status === 401) {
           navigate('/learn/signin', { replace: true });
           return;
+        }
+        if (err instanceof ApiError && err.info?.code === 'gate_locked') {
+          setGate(err.info);
         }
         setError(err instanceof ApiError ? err.message : 'Could not load the assessment.');
       } finally {
@@ -104,8 +115,18 @@ const Quiz: React.FC = () => {
     return (
       <div className="pt-40 pb-32 container-site max-w-lg text-center">
         <div className="card p-8">
-          <h1 className="text-xl font-bold mb-3">Assessment unavailable</h1>
+          <h1 className="text-xl font-bold mb-3">
+            {gate ? 'Finish the previous section first' : 'Assessment unavailable'}
+          </h1>
           <p className="text-slate-300 mb-6">{error}</p>
+          {gate?.needs === 'quiz' && (
+            <Link
+              to={`/learn/quiz/${gate.blocking_module_id}/formative`}
+              className="btn-primary mb-3 mr-3"
+            >
+              Take the {gate.blocking_module_code} evaluation
+            </Link>
+          )}
           <Link to="/learn" className="btn-secondary">
             Back to your course
           </Link>

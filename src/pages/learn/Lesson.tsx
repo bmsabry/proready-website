@@ -16,6 +16,7 @@ import { usePageMeta } from '../../lib/meta';
 import {
   academy,
   ApiError,
+  GateBlock,
   LessonDetail,
   lessonAssetUrl,
   slideImageUrl,
@@ -384,6 +385,8 @@ const Lesson: React.FC = () => {
 
   const [lesson, setLesson] = useState<LessonDetail | null>(null);
   const [error, setError] = useState('');
+  // Structured gate refusal — lets us link to the blocking evaluation.
+  const [gate, setGate] = useState<GateBlock | null>(null);
   const [loading, setLoading] = useState(true);
   const [completed, setCompleted] = useState(false);
 
@@ -414,6 +417,9 @@ const Lesson: React.FC = () => {
         if (err instanceof ApiError && err.status === 401) {
           navigate('/learn/signin', { replace: true });
           return;
+        }
+        if (err instanceof ApiError && err.info?.code === 'gate_locked') {
+          setGate(err.info);
         }
         setError(err instanceof ApiError ? err.message : 'Could not open this lesson.');
       } finally {
@@ -482,11 +488,27 @@ const Lesson: React.FC = () => {
     return (
       <div className="pt-40 pb-32 container-site max-w-lg text-center">
         <div className="card p-8">
-          <h1 className="text-xl font-bold mb-3">This lesson isn't available</h1>
+          <h1 className="text-xl font-bold mb-3">
+            {gate ? 'Finish the previous section first' : "This lesson isn't available"}
+          </h1>
           <p className="text-slate-300 mb-6">{error}</p>
-          <Link to="/learn" className="btn-secondary">
-            Back to your course
-          </Link>
+          {gate?.needs === 'quiz' ? (
+            <div className="flex flex-wrap gap-3 justify-center">
+              <Link
+                to={`/learn/quiz/${gate.blocking_module_id}/formative`}
+                className="btn-primary"
+              >
+                Take the {gate.blocking_module_code} evaluation
+              </Link>
+              <Link to="/learn" className="btn-secondary">
+                Back to your course
+              </Link>
+            </div>
+          ) : (
+            <Link to="/learn" className="btn-secondary">
+              Back to your course
+            </Link>
+          )}
         </div>
       </div>
     );

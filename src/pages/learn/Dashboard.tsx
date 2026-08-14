@@ -116,7 +116,8 @@ const ModuleCard = ({
           {locked && (
             <span className="block mt-2 text-xs text-slate-500">
               {module.entitled
-                ? 'Clear the previous module to unlock this one.'
+                ? module.blocked_by?.message ||
+                  'Clear the previous module to unlock this one.'
                 : 'Not part of your current access — contact info@proreadyengineer.com to add it.'}
             </span>
           )}
@@ -129,6 +130,25 @@ const ModuleCard = ({
           />
         )}
       </button>
+
+      {/* Locked by the gate: send them straight to the evaluation that opens
+          it, rather than leaving them to hunt for it. */}
+      {locked && module.blocked_by?.needs === 'quiz' && (
+        <div className="px-5 pb-5 -mt-1">
+          <Link
+            to={`/learn/quiz/${module.blocked_by.blocking_module_id}/formative`}
+            className="btn-primary text-sm"
+          >
+            <GraduationCap className="w-4 h-4" aria-hidden="true" />
+            Take the {module.blocked_by.blocking_module_code} evaluation
+          </Link>
+          {module.blocked_by.best_score !== null && (
+            <span className="ml-3 text-xs text-amber-300/90">
+              Best so far {module.blocked_by.best_score}% — {module.blocked_by.threshold}% to pass.
+            </span>
+          )}
+        </div>
+      )}
 
       {open && !locked && (
         <div className="px-5 pb-5 space-y-1">
