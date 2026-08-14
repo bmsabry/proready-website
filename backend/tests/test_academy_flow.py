@@ -234,7 +234,13 @@ def test_locked_module_lesson_is_denied(client):
     locked = [l for l in gt05["lessons"] if not l["is_preview"]][0]
     r = client.get(f"/api/academy/lesson/{locked['id']}")
     assert r.status_code == 403
-    assert "previous module" in r.json()["detail"].lower()
+    # The refusal now names the blocking module and what to do there, so the
+    # UI can send the learner straight to that evaluation.
+    detail = r.json()["detail"]
+    assert detail["code"] == "gate_locked"
+    assert detail["blocking_module_id"] == modules[0]["id"]
+    assert detail["needs"] in ("quiz", "lessons")
+    assert modules[0]["title"] in detail["message"]
 
 
 def test_locked_module_quiz_is_denied(client):

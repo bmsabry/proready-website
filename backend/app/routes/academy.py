@@ -585,11 +585,10 @@ def _module_for_learner(db: Session, module_id: int, learner: Learner) -> Module
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this course yet.",
         )
-    if not svc.module_unlocked(db, learner, module):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Finish the previous module to unlock this one.",
-        )
+    blocker = svc.gate_blocker(db, learner, module)
+    if blocker is not None:
+        # Structured so the UI can point at the exact evaluation to sit.
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=blocker)
     return module
 
 
@@ -799,11 +798,14 @@ def slide_image(
     module = db.get(Module, module_id)
     if module is None:
         raise HTTPException(status_code=404, detail="Module not found.")
-    if not svc.module_unlocked(db, learner, module):
+    if not svc.module_access(db, learner, module):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this material.",
         )
+    blocker = svc.gate_blocker(db, learner, module)
+    if blocker is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=blocker)
     row = db.execute(
         select(SlideImage).where(
             SlideImage.module_id == module_id,
@@ -994,11 +996,14 @@ def slide_video(
     module = db.get(Module, module_id)
     if module is None:
         raise HTTPException(status_code=404, detail="Module not found.")
-    if not svc.module_unlocked(db, learner, module):
+    if not svc.module_access(db, learner, module):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this material.",
         )
+    blocker = svc.gate_blocker(db, learner, module)
+    if blocker is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=blocker)
     slide = db.execute(
         select(Slide).where(Slide.module_id == module_id, Slide.number == number)
     ).scalar_one_or_none()

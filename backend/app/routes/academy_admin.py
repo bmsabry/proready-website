@@ -672,6 +672,9 @@ class ModuleUpsert(BaseModel):
     objectives: list = []
     topics: list = []
     quiz_app_url: str = ""
+    # Support modules (simulator, resource packs) sit outside the
+    # sequential chain: always open when entitled, never a blocker.
+    gate_exempt: bool = False
 
 
 @router.post("/products/{code}/modules")
@@ -692,7 +695,7 @@ def upsert_module(
         module = Module(product_code=code, code=body.code)
         db.add(module)
     for field in ("title", "summary", "position", "hours", "objectives",
-                  "topics", "quiz_app_url"):
+                  "topics", "quiz_app_url", "gate_exempt"):
         setattr(module, field, getattr(body, field))
     db.commit()
     db.refresh(module)

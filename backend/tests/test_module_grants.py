@@ -589,3 +589,153 @@ def test_slide_video_serves_with_range_and_respects_grants(client, setup):
         json={"slides": [{"number": 1, "title": "Cover"}]},
         headers=ADMIN,
     )
+
+
+# -----------------------------------------------------------------------------
+# Sequential gating — no advancing to the next module until the quiz is passed
+# -----------------------------------------------------------------------------
+
+GATED = "gated-course-test"
+GATED_STUDENT = "gated.student@example.com"
+
+
+@pytest.fixture(scope="module")
+def gated(client):
+    """A sequentially-gated product: 3 chapters + 1 exempt support module."""
+    r = client.post(
+        "/api/admin/academy/products",
+        json={"code": GATED, "title": "Gated (test)", "sequential_gate": True},
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+
+    ids, lessons = {}, {}
+    specs = [(1, "CH-1", False), (2, "CH-2", False), (3, "CH-3", False),
+             (4, "TOOLS", True)]
+    for pos, code, exempt in specs:
+        r = client.post(
+            f"/api/admin/academy/products/{GATED}/modules",
+            json={"code": code, "title": f"Chapter {code}", "position": pos,
+                  "gate_exempt": exempt},
+            headers=ADMIN,
+        )
+        assert r.status_code == 200, r.text
+        ids[code] = r.json()["module_id"]
+        r = client.post(
+            f"/api/admin/academy/modules/{ids[code]}/lessons",
+            json={"code": f"{code}-l1", "title": "Reading", "kind": "reading"},
+            headers=ADMIN,
+        )
+        lessons[code] = r.json()["lesson_id"]
+
+    # Every chapter has a 2-item formative gate; TOOLS has none.
+    for code in ("CH-1", "CH-2", "CH-3"):
+        client.post(
+            f"/api/admin/academy/modules/{ids[code]}/quiz-items",
+            json={"items": [
+                {"code": f"{code}-Q1", "stem": "Pick A",
+                 "options": [{"key": "A", "text": "a"}, {"key": "B", "text": "b"}],
+                 "answer": {"key": "A"}, "position": 1},
+                {"code": f"{code}-Q2", "stem": "Pick B",
+                 "options": [{"key": "A", "text": "a"}, {"key": "B", "text": "b"}],
+                 "answer": {"key": "B"}, "position": 2},
+            ]},
+            headers=ADMIN,
+        )
+    return ids, lessons
+
+
+def _pass_quiz(session, module_id, code):
+    r = session.post(
+        f"/api/academy/quiz/{module_id}/formative",
+        json={"responses": {f"{code}-Q1": "A", f"{code}-Q2": "B"}},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["passed"] is True
+    return r
+
+
+def test_next_chapter_is_locked_until_the_quiz_is_passed(client, gated):
+    ids, lessons = gated
+    client.post(
+        "/api/admin/academy/grant",
+        json={"email": GATED_STUDENT, "product_code": GATED,
+              "send_email_invite": False},
+        headers=ADMIN,
+    )
+    s = _sign_in(client, GATED_STUDENT)
+
+    by_code = {m["code"]: m for m in s.get(f"/api/academy/course/{GATED}").json()["modules"]}
+    assert by_code["CH-1"]["unlocked"] is True          # first chapter always open
+    assert by_code["CH-2"]["unlocked"] is False         # locked behind CH-1's quiz
+    assert by_code["CH-2"]["entitled"] is True          # but they DO own it
+    assert by_code["TOOLS"]["unlocked"] is True         # support module is exempt
+
+    # The lock explains itself and names the blocking module.
+    blocked = by_code["CH-2"]["blocked_by"]
+    assert blocked["blocking_module_id"] == ids["CH-1"]
+    assert blocked["needs"] == "quiz"
+    assert "Chapter CH-1" in blocked["message"]
+    assert "evaluation" in blocked["message"]
+
+    # Every protected read on the locked chapter refuses, with the same detail.
+    r = s.get(f"/api/academy/lesson/{lessons['CH-2']}")
+    assert r.status_code == 403
+    assert r.json()["detail"]["blocking_module_id"] == ids["CH-1"]
+    assert s.get(f"/api/academy/quiz/{ids['CH-2']}/formative").status_code == 403
+    assert s.get(f"/api/academy/slide-image/{ids['CH-2']}/1/lg").status_code == 403
+
+    # Failing the quiz does NOT unlock it.
+    s.post(f"/api/academy/quiz/{ids['CH-1']}/formative",
+           json={"responses": {"CH-1-Q1": "B", "CH-1-Q2": "A"}})
+    assert s.get(f"/api/academy/lesson/{lessons['CH-2']}").status_code == 403
+
+    # Passing it does.
+    _pass_quiz(s, ids["CH-1"], "CH-1")
+    assert s.get(f"/api/academy/lesson/{lessons['CH-2']}").status_code == 200
+    by_code = {m["code"]: m for m in s.get(f"/api/academy/course/{GATED}").json()["modules"]}
+    assert by_code["CH-2"]["unlocked"] is True
+    assert by_code["CH-2"]["blocked_by"] is None
+    # …and only by one step: chapter 3 still waits on chapter 2.
+    assert by_code["CH-3"]["unlocked"] is False
+    assert by_code["CH-3"]["blocked_by"]["blocking_module_id"] == ids["CH-2"]
+
+
+def test_support_module_never_blocks_and_is_never_blocked(client, gated):
+    ids, lessons = gated
+    s = _sign_in(client, GATED_STUDENT)
+    # TOOLS sits last in order but is exempt, so it opened from the start
+    # (asserted above) and it must not gate anything after it either.
+    by_code = {m["code"]: m for m in s.get(f"/api/academy/course/{GATED}").json()["modules"]}
+    assert by_code["TOOLS"]["gate_exempt"] is True
+    assert s.get(f"/api/academy/lesson/{lessons['TOOLS']}").status_code == 200
+
+
+def test_a_grant_that_skips_earlier_chapters_is_not_stranded(client, gated):
+    """Someone granted only Chapter 3 cannot be held behind Chapter 1's quiz —
+    they can't open Chapter 1 at all, so it can never be a blocker."""
+    ids, lessons = gated
+    skipper = "skipper@example.com"
+    r = client.post(
+        "/api/admin/academy/grant-module",
+        json={"email": skipper, "module_id": ids["CH-3"]},
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+    s = _sign_in(client, skipper)
+
+    by_code = {m["code"]: m for m in s.get(f"/api/academy/course/{GATED}").json()["modules"]}
+    assert by_code["CH-3"]["unlocked"] is True
+    assert by_code["CH-3"]["blocked_by"] is None
+    assert by_code["CH-1"]["entitled"] is False
+    assert s.get(f"/api/academy/lesson/{lessons['CH-3']}").status_code == 200
+
+
+def test_owner_bypasses_the_gate(client, gated):
+    from app.config import get_settings
+
+    ids, lessons = gated
+    o = _sign_in(client, get_settings().owner_emails_list[0])
+    by_code = {m["code"]: m for m in o.get(f"/api/academy/course/{GATED}").json()["modules"]}
+    assert all(m["unlocked"] for m in by_code.values())
+    assert o.get(f"/api/academy/lesson/{lessons['CH-3']}").status_code == 200

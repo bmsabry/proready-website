@@ -577,6 +577,14 @@ class Module(Base):
     # The standalone interactive quiz app for this session, if one exists.
     quiz_app_url: Mapped[str] = mapped_column(String(300), default="")
 
+    # Exempt from sequential gating. A support module — the simulator, a
+    # resource pack, a glossary — is a tool the learner reaches for while
+    # working through the course, not a step in it. An exempt module opens
+    # as soon as the learner is entitled to it, and never blocks a later
+    # module. Without this, the simulator (ordered last) would demand every
+    # day's quiz before it could be used in the class it belongs to.
+    gate_exempt: Mapped[bool] = mapped_column(Boolean, default=False)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

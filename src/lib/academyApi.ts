@@ -9,11 +9,27 @@
 export const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
 
+/* A refusal the API explains in structured form — today, a sequential-gate
+ * lock naming the module whose evaluation must be passed first. */
+export type GateBlock = {
+  code: 'gate_locked';
+  message: string;
+  blocking_module_id: number;
+  blocking_module_code: string;
+  blocking_module_title: string;
+  needs: 'quiz' | 'lessons';
+  threshold: number;
+  best_score: number | null;
+};
+
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /* Present when the API returned a structured detail rather than a string. */
+  info?: GateBlock;
+  constructor(status: number, message: string, info?: GateBlock) {
     super(message);
     this.status = status;
+    this.info = info;
   }
 }
 
@@ -34,7 +50,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const text = await res.text();
   const data = text ? JSON.parse(text) : {};
   if (!res.ok) {
-    throw new ApiError(res.status, data?.detail || `Request failed (${res.status})`);
+    // `detail` is usually a string; a gate refusal sends an object carrying
+    // the blocking module so the UI can link straight to its evaluation.
+    const detail = data?.detail;
+    if (detail && typeof detail === 'object') {
+      throw new ApiError(
+        res.status,
+        detail.message || `Request failed (${res.status})`,
+        detail as GateBlock
+      );
+    }
+    throw new ApiError(res.status, detail || `Request failed (${res.status})`);
   }
   return data as T;
 }
@@ -86,6 +112,10 @@ export type ModuleState = {
   /* True when this learner holds this module (full enrollment or a day grant).
      unlocked=false + entitled=false means "not included in your access". */
   entitled: boolean;
+  /* Set when entitled but locked: the earlier module in the way. */
+  blocked_by: GateBlock | null;
+  /* Support modules (simulator, resources) sit outside the sequential chain. */
+  gate_exempt: boolean;
   lesson_count: number;
   lessons_completed: number;
   duration_s: number;
