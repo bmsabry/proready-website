@@ -504,3 +504,88 @@ def test_slides_lesson_completes_on_last_slide_not_first_open(client, setup):
         json={"position_s": 1, "watched_delta_s": 5},
     )
     assert r.json()["completed"] is True
+
+
+# -----------------------------------------------------------------------------
+# Embedded slide videos — gated, range-capable streaming
+# -----------------------------------------------------------------------------
+
+def test_slide_video_serves_with_range_and_respects_grants(client, setup):
+    module_ids, _ = setup
+    fake_mp4 = b"\x00\x00\x00\x18ftypmp42" + bytes(range(256)) * 8  # 2072 bytes
+
+    # Upload the clip and link it to DAY-1 slide 1.
+    import base64 as _b64
+
+    r = client.post(
+        "/api/admin/academy/assets",
+        json={
+            "key": "slidevid-test.mp4",
+            "content_type": "video/mp4",
+            "data_b64": _b64.b64encode(fake_mp4).decode(),
+        },
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(
+        f"/api/admin/academy/modules/{module_ids['DAY-1']}/slides",
+        json={
+            "slides": [
+                {"number": 1, "title": "Cover", "video_asset_key": "slidevid-test.mp4"}
+            ]
+        },
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+
+    client.post(
+        "/api/admin/academy/grant-module",
+        json={"email": STUDENT, "module_id": module_ids["DAY-1"]},
+        headers=ADMIN,
+    )
+    s = _sign_in(client, STUDENT)
+
+    # The lesson now reports the movie.
+    lesson_id = client.get(
+        f"/api/admin/academy/products/{PRODUCT}/content", headers=ADMIN
+    ).json()["modules"][0]["lessons"][0]["id"]
+    detail = s.get(f"/api/academy/lesson/{lesson_id}").json()
+    slide1 = next(x for x in detail["slides"] if x["number"] == 1)
+    assert slide1["has_video"] is True
+
+    # Full fetch.
+    full = s.get(f"/api/academy/slide-video/{module_ids['DAY-1']}/1")
+    assert full.status_code == 200
+    assert full.content == fake_mp4
+    assert full.headers["accept-ranges"] == "bytes"
+    assert full.headers["cache-control"].startswith("private")
+
+    # Range fetch — the seek path the <video> element uses.
+    part = s.get(
+        f"/api/academy/slide-video/{module_ids['DAY-1']}/1",
+        headers={"Range": "bytes=8-15"},
+    )
+    assert part.status_code == 206
+    assert part.content == fake_mp4[8:16]
+    assert part.headers["content-range"] == f"bytes 8-15/{len(fake_mp4)}"
+
+    # Suffix range.
+    tail = s.get(
+        f"/api/academy/slide-video/{module_ids['DAY-1']}/1",
+        headers={"Range": "bytes=-16"},
+    )
+    assert tail.status_code == 206
+    assert tail.content == fake_mp4[-16:]
+
+    # No grant on DAY-2 → its (nonexistent anyway) videos refuse before 404.
+    assert s.get(f"/api/academy/slide-video/{module_ids['DAY-2']}/1").status_code == 403
+
+    # A slide without a movie 404s cleanly.
+    assert s.get(f"/api/academy/slide-video/{module_ids['DAY-1']}/2").status_code == 404
+
+    # Unlink so other tests see the fixture unchanged.
+    client.post(
+        f"/api/admin/academy/modules/{module_ids['DAY-1']}/slides",
+        json={"slides": [{"number": 1, "title": "Cover"}]},
+        headers=ADMIN,
+    )
