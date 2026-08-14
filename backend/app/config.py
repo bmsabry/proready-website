@@ -141,9 +141,12 @@ class Settings(BaseSettings):
     # Hostnames the protected material is legitimately served from. A
     # call-home ping carrying any other host — or a file:// path — is
     # reported as `offsite`, which is the clearest leak signal there is.
+    # The host that served a copy is always treated as allowed for that copy
+    # (AssetDelivery.origin_host), so this list only needs the *other* places
+    # material may legitimately be opened from.
     ASSET_ALLOWED_HOSTS: str = (
         "proreadyengineer.com,www.proreadyengineer.com,"
-        "api.proreadyengineer.com,proready-api.onrender.com,"
+        "proreadyengineer-training-api-jd9a.onrender.com,"
         "proready-website.pages.dev,localhost,127.0.0.1"
     )
     # Absolute URL the beacon posts to. Left empty, it is derived per-request
