@@ -570,7 +570,7 @@ function AccessTab({
     } finally {
       setLoading(false);
     }
-  }, [productCode, onAuthError, showReviewed]);
+  }, [productCode, onAuthError]);
 
   useEffect(() => {
     void load();
@@ -2372,7 +2372,7 @@ function IntegrityTab({
     } finally {
       setLoading(false);
     }
-  }, [productCode, onAuthError]);
+  }, [productCode, onAuthError, showReviewed]);
 
   useEffect(() => {
     void load();

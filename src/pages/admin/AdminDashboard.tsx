@@ -28,6 +28,7 @@ import SoftwarePage from './SoftwarePage';
 import CommsPage from './CommsPage';
 import AiPage from './AiPage';
 import ChatWidget from './ChatWidget';
+import ViewErrorBoundary from './ViewErrorBoundary';
 
 const NAV: { page: ViewState['page']; label: string; icon: LucideIcon }[] = [
   { page: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -58,10 +59,21 @@ export default function AdminDashboard() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  const go = useCallback((v: ViewState) => {
+  /**
+   * Navigate. `replace` swaps the current history entry instead of adding one —
+   * used for switching tabs inside a course, so that Back leaves the course in
+   * a single press rather than walking back through every tab that was opened.
+   */
+  const go = useCallback((v: ViewState, opts?: { replace?: boolean }) => {
     const h = hashFor(v);
-    if (window.location.hash === h) setView(v);
-    else window.location.hash = h; // hashchange listener updates state
+    if (window.location.hash === h) {
+      setView(v);
+    } else if (opts?.replace) {
+      window.history.replaceState(null, '', h);
+      setView(v); // replaceState fires no hashchange, so sync state here
+    } else {
+      window.location.hash = h; // pushes; the hashchange listener syncs state
+    }
   }, []);
 
   // Session check — same behaviour as before: 401 bounces to /admin/login.
@@ -106,7 +118,7 @@ export default function AdminDashboard() {
           key={code}
           code={code}
           tab={view.tab ?? 'registrations'}
-          onTab={(t) => go({ page: 'courses', course: code, tab: t })}
+          onTab={(t) => go({ page: 'courses', course: code, tab: t }, { replace: true })}
           onBack={() => go({ page: 'courses' })}
           onAuthError={onAuthError}
         />
@@ -192,7 +204,10 @@ export default function AdminDashboard() {
         {/* Active view */}
         <main className="flex-1 min-w-0">
           {fatal && <Notice kind="error">{fatal}</Notice>}
-          {content}
+          {/* A crash in one view must not take down the shell: the hash router
+              never reloads the document, so a dead tree means the sidebar and
+              the back button stop working too. */}
+          <ViewErrorBoundary resetKey={hashFor(view)}>{content}</ViewErrorBoundary>
         </main>
       </div>
 
