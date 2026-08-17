@@ -1,10 +1,10 @@
 {
-  "version": "2.54.0",
-  "name": "Review Memory",
+  "version": "2.55.0",
+  "name": "Engineering Review Copilot",
   "highlights": [
-    "Named view bookmarks and view-linked issue pins",
-    "Arrow & rectangle redlines with captured measurements",
-    "Review packages: CSV, or offline HTML/PDF with model snapshots",
-    "Explicit isolate/deactivate and Flip front/back"
+    "Persistent Object Inspector with semantic search and smart filters",
+    "Deterministic model/import health report with affected-part selection",
+    "Undoable BOM cleanup and metadata-completeness audit",
+    "Safe command palette with preview, approval, audit and restore"
   ]
 }
