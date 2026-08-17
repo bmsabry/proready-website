@@ -29,6 +29,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import desc, func, select
@@ -36,6 +37,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from .. import support_service as svc
+from ..config import get_settings
 from ..crypto import CryptoNotConfigured, decrypt, encrypt
 from ..db import SessionLocal, get_db
 from ..deps import require_admin
@@ -332,6 +334,41 @@ def _pick(data: dict, body: dict, *names: str) -> str:
     return ""
 
 
+def _fetch_received_email(email_id: str) -> Optional[dict]:
+    """Pull the full inbound message from Resend's receiving API.
+
+    Returns None on any failure — the caller stores what it has and the
+    ticket still reaches the inbox. A dropped body is recoverable (the
+    ref, sender and subject are all there); a dropped ticket is not.
+    """
+    key = (get_settings().RESEND_API_KEY or "").strip()
+    if not key:
+        log.warning("[support] cannot fetch inbound body: RESEND_API_KEY is unset")
+        return None
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.get(
+                f"https://api.resend.com/emails/receiving/{email_id}",
+                headers={"Authorization": f"Bearer {key}"},
+            )
+    except httpx.HTTPError as e:
+        log.error("[support] inbound body fetch failed for %s: %s", email_id, e)
+        return None
+    if resp.status_code >= 300:
+        log.error(
+            "[support] inbound body fetch for %s returned %s: %s",
+            email_id,
+            resp.status_code,
+            resp.text[:300],
+        )
+        return None
+    try:
+        data = resp.json()
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def _parse_from(raw: str, headers: dict) -> tuple[str, str]:
     """Split a From header into (email, display name)."""
     src = raw or ""
@@ -410,11 +447,32 @@ def _handle_inbound(body: dict, background: BackgroundTasks, db: Session) -> dic
         data, body, "messageId", "message_id"
     )
 
+    # Resend's email.received webhook carries metadata ONLY — no body, no
+    # headers. The full message has to be fetched by id, or every inbound
+    # reply lands as an empty message. (Older/other payload shapes do
+    # include the body inline, hence the check rather than an
+    # unconditional fetch.)
+    email_id = _pick(data, body, "email_id", "id")
+    if (not body_text and not body_html) and email_id:
+        fetched = _fetch_received_email(email_id)
+        if fetched:
+            subject = fetched.get("subject") or subject
+            body_text = fetched.get("text") or body_text
+            body_html = fetched.get("html") or body_html
+            fh = fetched.get("headers")
+            if isinstance(fh, dict):
+                lowered = {str(k).lower(): str(v) for k, v in fh.items()}
+                in_reply_to = in_reply_to or lowered.get("in-reply-to", "")
+                references = references or lowered.get("references", "")
+                message_id = message_id or lowered.get("message-id", "")
+
     if not body_text and not body_html:
         log.warning(
-            "[support] inbound from %s had no body (subject=%r) — stored empty",
+            "[support] inbound from %s had no body (subject=%r, email_id=%r) — "
+            "stored empty; check RESEND_API_KEY and the receiving API",
             from_email,
             subject[:80],
+            email_id,
         )
 
     try:

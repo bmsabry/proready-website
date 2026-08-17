@@ -1001,3 +1001,129 @@ def test_assistant_rejects_invalid_status_and_category(client, db, monkeypatch):
     ok = update_ticket(db, ref=ref, category="payment")
     assert ok["ok"] is True
     assert ok["ticket"]["priority"] == svc.CATEGORY_PRIORITY["payment"]
+
+
+# ---------------------------------------------------------------------------
+# Resend's real webhook shape
+# ---------------------------------------------------------------------------
+
+
+def test_metadata_only_webhook_fetches_the_body(client, db, monkeypatch):
+    """Resend's email.received carries metadata only — no body, no headers.
+
+    Without the follow-up fetch every inbound reply would land as an empty
+    message, which looks to Bassam like the customer sent nothing.
+    """
+    fake_llm(monkeypatch, None)
+    from app.routes import support as routes
+
+    monkeypatch.setattr(
+        routes,
+        "_fetch_received_email",
+        lambda email_id: {
+            "subject": "Re: my order",
+            "text": "The link still doesn't work for me.",
+            "html": "<p>The link still doesn't work for me.</p>",
+            "headers": {"Message-ID": "<fetched-1@mail.example>"},
+        },
+    )
+
+    r = client.post(
+        "/api/webhooks/resend-inbound",
+        json={
+            "type": "email.received",
+            "created_at": "2026-08-17T10:00:00Z",
+            "data": {
+                "email_id": "abc-123",
+                "from": "Nadia Aziz <nadia@example.com>",
+                "to": ["info@mail.proreadyengineer.com"],
+                "subject": "Re: my order",
+                # No text, no html, no headers — exactly what Resend sends.
+            },
+        },
+    )
+    assert r.status_code == 200
+
+    db.expire_all()
+    t = db.execute(
+        select(SupportTicket).where(SupportTicket.submitter_email == "nadia@example.com")
+    ).scalars().first()
+    assert t is not None
+    assert "still doesn't work" in t.body
+    assert any("still doesn't work" in (m.body_text or "") for m in messages(db, t.id))
+
+
+def test_body_fetch_failure_still_creates_the_ticket(client, db, monkeypatch):
+    """A dropped body is recoverable. A dropped ticket is not."""
+    fake_llm(monkeypatch, None)
+    from app.routes import support as routes
+
+    monkeypatch.setattr(routes, "_fetch_received_email", lambda email_id: None)
+
+    r = client.post(
+        "/api/webhooks/resend-inbound",
+        json={
+            "data": {
+                "email_id": "broken-1",
+                "from": "quiet@example.com",
+                "subject": "Something went wrong",
+            }
+        },
+    )
+    assert r.status_code == 200
+    db.expire_all()
+    t = db.execute(
+        select(SupportTicket).where(SupportTicket.submitter_email == "quiet@example.com")
+    ).scalars().first()
+    assert t is not None, "the ticket must exist even with no body"
+    assert t.subject == "Something went wrong"
+
+
+def test_webhook_always_returns_200(client, db, monkeypatch):
+    """A non-2xx makes Resend retry forever on a payload that cannot parse."""
+    fake_llm(monkeypatch, None)
+    for payload in (
+        {},
+        {"data": {}},
+        {"data": {"from": ""}},
+        {"nonsense": [1, 2, 3]},
+        {"data": {"from": "x@y.z", "headers": [{"name": "Message-ID", "value": "<a@b>"}]}},
+    ):
+        assert client.post("/api/webhooks/resend-inbound", json=payload).status_code == 200
+    # Not even valid JSON.
+    assert client.post(
+        "/api/webhooks/resend-inbound",
+        content=b"this is not json",
+        headers={"Content-Type": "application/json"},
+    ).status_code == 200
+
+
+def test_list_style_headers_are_understood(client, db, monkeypatch):
+    """Some providers send headers as [{name, value}] rather than an object."""
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "listhdr@example.com", "subject": "Question", "message": "hi"},
+    ).json()["ref"]
+    db.expire_all()
+    parent = ticket_by_ref(db, ref).email_message_id
+
+    client.post(
+        "/api/webhooks/resend-inbound",
+        json={
+            "data": {
+                "from": "listhdr@example.com",
+                "subject": "Re: Question",
+                "text": "Following up.",
+                "headers": [
+                    {"name": "Message-ID", "value": "<list-1@mail.example>"},
+                    {"name": "In-Reply-To", "value": parent},
+                ],
+            }
+        },
+    )
+    db.expire_all()
+    found = db.execute(
+        select(SupportTicket).where(SupportTicket.submitter_email == "listhdr@example.com")
+    ).scalars().all()
+    assert len(found) == 1, "In-Reply-To from a list-style header must still thread"
