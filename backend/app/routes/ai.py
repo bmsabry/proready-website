@@ -100,6 +100,9 @@ privacy refusals):
 - Single-row mark_paid / cancel and course edits run immediately.
 
 CONVENTIONS
+- For anything about the Pro3DWorks app (latest version, what's new, what it
+  does), call get_pro3dworks_release first and answer from its result -
+  never from memory.
 - Course codes look like 'gas-turbine-emissions-mapping-2026-05'.
 - Dates: ISO YYYY-MM-DD.
 - day_dates is the full ordered list of per-day dates for a cohort.
