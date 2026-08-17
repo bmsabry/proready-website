@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Download, CheckCircle2, ShieldCheck, Sparkles, Boxes, Camera, Ruler, Heart, CircleDollarSign, ClipboardCheck,
+  Download, CheckCircle2, ShieldCheck, Sparkles, Boxes, Camera, Ruler, Heart, CircleDollarSign, ClipboardCheck, Wand2,
 } from 'lucide-react';
 import highlights from '../data/pro3dworks-highlights.json';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
@@ -19,7 +19,7 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
   {
     icon: <Ruler aria-hidden="true" className="w-5 h-5" />,
     title: 'Real inspection tools',
-    text: 'Measure vertices, edges and faces; section views; exploded views; mass properties; interference checks; model scaling.',
+    text: 'Measure vertices, edges and faces; section views; exploded views; mass properties; interference checks; model scaling. Now with a persistent Object Inspector — identity, materials, metadata and “select similar” — and a deterministic model/import health report: click any finding to frame the affected parts, or copy it out as an engineering handoff.',
   },
   {
     icon: <Camera aria-hidden="true" className="w-5 h-5" />,
@@ -35,6 +35,11 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
     icon: <ClipboardCheck aria-hidden="true" className="w-5 h-5" />,
     title: 'Design reviews that remember',
     text: 'Run a real design review inside the viewer: named view bookmarks, issue pins tied to the exact camera view, arrow and rectangle redlines with captured measurements. Export the whole review as CSV or a self-contained HTML/PDF package — every markup composited over a snapshot of the model.',
+  },
+  {
+    icon: <Wand2 aria-hidden="true" className="w-5 h-5" />,
+    title: 'Engineering Review Copilot — commands you approve',
+    text: 'Describe a viewer task in plain words — isolate these parts, section that view, save this review state. The safe command palette previews every proposed step with evidence, confidence and exact match counts; nothing runs until you approve it, and every action is audited and restorable. Explicit wording works fully offline — your configured AI can interpret broader phrasing, gated by the same strict validator. Plus a confidence-ranked, undoable BOM cleanup: material gaps are never guessed.',
   },
   {
     icon: <CircleDollarSign aria-hidden="true" className="w-5 h-5" />,
