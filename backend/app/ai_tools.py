@@ -448,3 +448,39 @@ def summarize_call(tool_name: str, args: Dict[str, Any]) -> str:
         action = "Mark paid" if tool_name == "bulk_mark_paid" else "Cancel"
         return f"{action} {len(ids)} registration(s): {ids}"
     return f"{tool_name} with {args}"
+
+
+# ---------------------------------------------------------------------------
+# Pro3DWorks release knowledge (read-only)
+# ---------------------------------------------------------------------------
+
+PRO3DWORKS_HIGHLIGHTS_URL = "https://www.proreadyengineer.com/pro3dworks-highlights.json"
+
+
+def get_pro3dworks_release(db: Session, _: Any) -> Dict[str, Any]:
+    """Fetch the latest published Pro3DWorks release highlights from the website.
+
+    Read-only and network-bound: the public manifest is written by the
+    release pipeline, so the agent always describes the version that is
+    actually live on the download page - never a remembered one.
+    """
+    try:
+        import httpx
+
+        resp = httpx.get(PRO3DWORKS_HIGHLIGHTS_URL, timeout=8.0)
+        resp.raise_for_status()
+        return {"ok": True, "release": resp.json()}
+    except Exception as exc:  # report, never crash the agent loop
+        return {"ok": False, "error": f"could not fetch release highlights: {exc}"}
+
+
+TOOL_HANDLERS["get_pro3dworks_release"] = get_pro3dworks_release
+TOOL_SPECS.append(
+    _fn(
+        "get_pro3dworks_release",
+        "Read the latest published Pro3DWorks release (version number, release name, headline "
+        "features) from the live website manifest. Call this for ANY question about the "
+        "Pro3DWorks app, its newest version, or what changed recently - do not answer from memory.",
+        {"type": "object", "properties": {}, "required": []},
+    )
+)
