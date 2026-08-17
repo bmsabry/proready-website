@@ -27,6 +27,7 @@ from .routes import register as register_routes
 from .routes import seats as seats_routes
 from .routes import software as software_routes
 from .routes import stats as stats_routes
+from .routes import support as support_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -136,6 +137,17 @@ def _run_column_migrations() -> None:
     _ensure_column(
         "academy_asset_pings", "reviewed_note", "VARCHAR(300) NOT NULL DEFAULT ''"
     )
+    # Support desk. support_tickets/_messages/_events are brand-new tables,
+    # so create_all builds them complete — but ai_settings already exists in
+    # production and needs the two new columns added by hand.
+    #   scope   — 'assistant' (the admin chat) vs 'support' (the desk). The
+    #             existing row predates the column and must become
+    #             'assistant', which the DEFAULT gives us.
+    #   kb_text — admin-authored facts the auto-replier may state.
+    _ensure_column(
+        "ai_settings", "scope", "VARCHAR(16) NOT NULL DEFAULT 'assistant'"
+    )
+    _ensure_column("ai_settings", "kb_text", "TEXT NOT NULL DEFAULT ''")
 
 
 _run_column_migrations()
@@ -261,6 +273,8 @@ app.include_router(checkout_routes.router)
 app.include_router(payments_routes.router)
 app.include_router(academy_admin_routes.router)
 app.include_router(comms_routes.router)
+app.include_router(support_routes.public_router)
+app.include_router(support_routes.admin_router)
 # Legacy contract for the standalone quiz apps. Mounted at /auth and
 # /learning (no /api prefix) because that is what those apps already call.
 app.include_router(compat_routes.auth_router)

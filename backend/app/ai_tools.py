@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date
+from datetime import date, datetime, timezone
 from html import escape as _html_escape
 from typing import Any, Dict, List, Optional
 
@@ -39,6 +39,8 @@ from .models import (
     Product,
     Registration,
     SoftwareProduct,
+    SupportTicket,
+    SupportTicketMessage,
 )
 from .routes import academy_admin as academy_admin_routes
 from .routes import admin as admin_routes
@@ -624,6 +626,253 @@ def update_software(db: Session, slug: str, fields: Optional[Dict[str, Any]] = N
     return {"ok": True, "changed_fields": sorted(fields), "software": row}
 
 
+
+
+# ---------------------------------------------------------------------------
+# Support desk
+# ---------------------------------------------------------------------------
+#
+# These let the assistant work the inbox conversationally — "what's waiting
+# on me?", "read me ticket 7A3C91B2", "reply to it explaining the refund
+# window". Sending is deliberately high-stakes: everything else here only
+# moves rows around inside the admin panel, but reply_to_ticket puts words
+# in Bassam's name in front of a customer, and that is not something an
+# agent should be able to do on its own reading of the situation.
+
+
+def _ticket_brief(db: Session, t: SupportTicket) -> Dict[str, Any]:
+    last = db.execute(
+        select(SupportTicketMessage)
+        .where(SupportTicketMessage.ticket_id == t.id)
+        .order_by(SupportTicketMessage.id.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    return {
+        "ref": t.ref,
+        "subject": t.subject,
+        "from": t.submitter_email,
+        "name": t.submitter_name or "",
+        "category": t.category,
+        "priority": t.priority,
+        "status": t.status,
+        "source": t.source,
+        "summary": (t.ai_result or {}).get("summary", "") if t.ai_result else "",
+        "created_at": _iso(t.created_at),
+        "last_message_at": _iso(t.last_message_at or t.created_at),
+        "waiting_on_us": bool(last is not None and last.sender_kind == "customer"),
+    }
+
+
+def _ticket_or_error(
+    db: Session, ref: str
+) -> tuple[Optional[SupportTicket], Optional[Dict[str, Any]]]:
+    t = db.execute(
+        select(SupportTicket).where(SupportTicket.ref == (ref or "").strip().upper())
+    ).scalar_one_or_none()
+    if t is None:
+        return None, {"ok": False, "error": f"No support ticket with ref '{ref}'."}
+    return t, None
+
+
+def list_tickets(
+    db: Session,
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    limit: int = 25,
+    **_: Any,
+) -> Dict[str, Any]:
+    from . import support_service as svc
+
+    stmt = select(SupportTicket)
+    if status == "open" or status is None:
+        stmt = stmt.where(
+            SupportTicket.status.in_(
+                ["new", "ai_handling", "escalated", "awaiting_customer"]
+            )
+        )
+    elif status != "all":
+        stmt = stmt.where(SupportTicket.status == status)
+    if category:
+        if category not in svc.CATEGORIES:
+            return {
+                "ok": False,
+                "error": f"Unknown category '{category}'. Valid: {sorted(svc.CATEGORIES)}",
+            }
+        stmt = stmt.where(SupportTicket.category == category)
+
+    rows = (
+        db.execute(
+            stmt.order_by(
+                SupportTicket.priority.asc(),
+                func.coalesce(
+                    SupportTicket.last_message_at, SupportTicket.created_at
+                ).desc(),
+            ).limit(max(1, min(int(limit or 25), 100)))
+        )
+        .scalars()
+        .all()
+    )
+    return {"ok": True, "count": len(rows), "tickets": [_ticket_brief(db, t) for t in rows]}
+
+
+def get_ticket(db: Session, ref: str) -> Dict[str, Any]:
+    from . import support_service as svc
+
+    t, err = _ticket_or_error(db, ref)
+    if err:
+        return err
+    assert t is not None
+    msgs = (
+        db.execute(
+            select(SupportTicketMessage)
+            .where(SupportTicketMessage.ticket_id == t.id)
+            .order_by(SupportTicketMessage.id)
+        )
+        .scalars()
+        .all()
+    )
+    return {
+        "ok": True,
+        "ticket": _ticket_brief(db, t),
+        "customer": svc.customer_context(db, t.submitter_email),
+        "thread": [
+            {
+                "from": m.sender_kind,
+                "name": m.sender_name or "",
+                "at": _iso(m.created_at),
+                "text": (m.body_text or svc._html_to_text(m.body_html))[:4000],
+                "delivered": m.email_delivered,
+            }
+            for m in msgs
+        ],
+    }
+
+
+def reply_to_ticket(db: Session, ref: str, body: str, resolve: bool = False) -> Dict[str, Any]:
+    """Email a reply to the customer. High-stakes — needs approval."""
+    from . import support_service as svc
+
+    t, err = _ticket_or_error(db, ref)
+    if err:
+        return err
+    assert t is not None
+    if not (body or "").strip():
+        return {"ok": False, "error": "Reply body is empty."}
+
+    html = _plain_text_to_email_html(body) if "<" not in body else body
+    delivered, mid = svc.send_ticket_email(db, t, body_html=html)
+    svc.add_message(
+        db,
+        t,
+        sender_kind="admin",
+        sender_name="Bassam Sabry",
+        body_html=html,
+        body_text=svc._html_to_text(html),
+        direction="outbound",
+        email_message_id=mid,
+        email_delivered=delivered,
+    )
+    if not t.first_responded_at:
+        t.first_responded_at = datetime.now(timezone.utc)
+    # A send Resend refused reached nobody — never close on a failed send.
+    t.status = ("resolved" if resolve else "awaiting_customer") if delivered else "escalated"
+    if t.status == "resolved" and not t.resolved_at:
+        t.resolved_at = datetime.now(timezone.utc)
+    svc.emit_event(
+        db, t, "admin_reply", actor="ai-assistant", payload={"delivered": delivered}
+    )
+    db.commit()
+    return {
+        "ok": True,
+        "delivered": delivered,
+        "status": t.status,
+        "note": "" if delivered else "Email send FAILED — ticket left escalated.",
+    }
+
+
+def update_ticket(
+    db: Session,
+    ref: str,
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Move a ticket's status or fix its category. Never emails anyone."""
+    from . import support_service as svc
+
+    t, err = _ticket_or_error(db, ref)
+    if err:
+        return err
+    assert t is not None
+    changed: Dict[str, Any] = {}
+    if category is not None:
+        if category not in svc.CATEGORIES:
+            return {
+                "ok": False,
+                "error": f"Unknown category '{category}'. Valid: {sorted(svc.CATEGORIES)}",
+            }
+        changed["category"] = {"from": t.category, "to": category}
+        t.category = category
+        t.priority = svc.CATEGORY_PRIORITY[category]
+    if status is not None:
+        if status not in svc.STATUSES:
+            return {
+                "ok": False,
+                "error": f"Unknown status '{status}'. Valid: {list(svc.STATUSES)}",
+            }
+        changed["status"] = {"from": t.status, "to": status}
+        t.status = status
+        if status == "resolved" and not t.resolved_at:
+            t.resolved_at = datetime.now(timezone.utc)
+        if status == "spam":
+            t.is_spam = True
+    if changed:
+        svc.emit_event(db, t, "status_change", actor="ai-assistant", payload=changed)
+        db.commit()
+    return {"ok": True, "ticket": _ticket_brief(db, t), "changed": changed}
+
+
+def add_ticket_note(db: Session, ref: str, note: str) -> Dict[str, Any]:
+    """Leave an internal note. Never emailed to the customer."""
+    from . import support_service as svc
+
+    t, err = _ticket_or_error(db, ref)
+    if err:
+        return err
+    assert t is not None
+    if not (note or "").strip():
+        return {"ok": False, "error": "Note is empty."}
+    svc.add_message(
+        db,
+        t,
+        sender_kind="note",
+        sender_name="ai-assistant",
+        body_text=note.strip(),
+        direction="internal",
+    )
+    svc.emit_event(db, t, "note", actor="ai-assistant", payload={})
+    db.commit()
+    return {"ok": True, "ref": t.ref}
+
+
+def get_support_stats(db: Session, **_: Any) -> Dict[str, Any]:
+    rows = db.execute(
+        select(SupportTicket.status, func.count(SupportTicket.id)).group_by(
+            SupportTicket.status
+        )
+    ).all()
+    by_status = {str(s): int(n) for s, n in rows}
+    return {
+        "ok": True,
+        "by_status": by_status,
+        "needs_human": by_status.get("escalated", 0),
+        "open": sum(
+            by_status.get(s, 0)
+            for s in ("new", "ai_handling", "escalated", "awaiting_customer")
+        ),
+        "total": sum(by_status.values()),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Tool registry
 # ---------------------------------------------------------------------------
@@ -653,6 +902,12 @@ TOOL_HANDLERS = {
     "revoke_enrollment": revoke_enrollment,
     "update_lesson": update_lesson,
     "update_software": update_software,
+    "list_tickets": list_tickets,
+    "get_ticket": get_ticket,
+    "reply_to_ticket": reply_to_ticket,
+    "update_ticket": update_ticket,
+    "add_ticket_note": add_ticket_note,
+    "get_support_stats": get_support_stats,
 }
 
 
@@ -932,8 +1187,87 @@ TOOL_SPECS = [
             "required": ["slug", "fields"],
         },
     ),
+    _fn(
+        "get_support_stats",
+        "Support desk overview: how many tickets are open and how many are escalated (waiting on Bassam). Read-only; the fastest answer to 'what needs me today?'.",
+        {"type": "object", "properties": {}, "required": []},
+    ),
+    _fn(
+        "list_tickets",
+        "List support tickets, most urgent first. Defaults to open tickets only. Read-only.",
+        {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "description": "'open' (default), 'all', or an exact status: new, ai_handling, awaiting_customer, escalated, auto_resolved, resolved, archived, spam.",
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Filter by category: payment, access, bug, business, enrollment, course_info, software, general.",
+                },
+                "limit": {"type": "integer", "description": "Max rows, 1-100. Default 25."},
+            },
+            "required": [],
+        },
+    ),
+    _fn(
+        "get_ticket",
+        "Read one support ticket in full: the whole message thread plus who the customer is (their registrations, enrolments and orders). Read this before drafting any reply — the customer context is what makes the reply accurate.",
+        {
+            "type": "object",
+            "properties": {"ref": {"type": "string", "description": "8-character ticket ref, e.g. 7A3C91B2."}},
+            "required": ["ref"],
+        },
+    ),
+    _fn(
+        "reply_to_ticket",
+        "Email a reply to the customer on a ticket, as Bassam. Requires his approval before it sends. Call get_ticket first so the reply is grounded in their actual account state. Write plain prose — it is converted to email HTML. Do not add a sign-off or ticket reference; the system appends those.",
+        {
+            "type": "object",
+            "properties": {
+                "ref": {"type": "string", "description": "8-character ticket ref."},
+                "body": {"type": "string", "description": "The reply, in plain prose."},
+                "resolve": {
+                    "type": "boolean",
+                    "description": "True to close the ticket after sending. Leave false when you expect them to answer.",
+                },
+            },
+            "required": ["ref", "body"],
+        },
+    ),
+    _fn(
+        "update_ticket",
+        "Change a ticket's status or fix its category. Never emails the customer — use reply_to_ticket for that.",
+        {
+            "type": "object",
+            "properties": {
+                "ref": {"type": "string"},
+                "status": {
+                    "type": "string",
+                    "description": "new, ai_handling, awaiting_customer, escalated, auto_resolved, resolved, archived, spam.",
+                },
+                "category": {
+                    "type": "string",
+                    "description": "payment, access, bug, business, enrollment, course_info, software, general. Priority follows automatically.",
+                },
+            },
+            "required": ["ref"],
+        },
+    ),
+    _fn(
+        "add_ticket_note",
+        "Leave an internal note on a ticket. Never emailed to the customer and never shown to the auto-replier — use it to record what was done off-platform (a call, a manual refund).",
+        {
+            "type": "object",
+            "properties": {
+                "ref": {"type": "string"},
+                "note": {"type": "string"},
+            },
+            "required": ["ref", "note"],
+        },
+    ),
 ]
-
 
 # Tools that always require admin confirmation in chat.
 HIGH_STAKES_ALWAYS = {
@@ -942,6 +1276,9 @@ HIGH_STAKES_ALWAYS = {
     "grant_enrollment",
     "revoke_enrollment",
     "update_lesson",
+    # Puts words in Bassam's name in front of a customer. Reading and
+    # triaging tickets is free; speaking for him is not.
+    "reply_to_ticket",
 }
 
 # Tools that are high-stakes only at large size.
@@ -990,6 +1327,14 @@ def summarize_call(tool_name: str, args: Dict[str, Any]) -> str:
     if tool_name == "update_software":
         fields = sorted((args.get("fields") or {}).keys())
         return f"Update software '{args.get('slug', '?')}' — fields: {fields}"
+    if tool_name == "reply_to_ticket":
+        body = str(args.get("body", ""))
+        preview = body[:160] + ("…" if len(body) > 160 else "")
+        closing = " and mark it resolved" if args.get("resolve") else ""
+        return (
+            f"Email a reply to the customer on ticket #{args.get('ref', '?')}"
+            f"{closing}:\n\n{preview}"
+        )
     if tool_name in {"bulk_mark_paid", "bulk_cancel"}:
         ids = args.get("registration_ids") or []
         action = "Mark paid" if tool_name == "bulk_mark_paid" else "Cancel"

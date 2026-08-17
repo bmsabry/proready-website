@@ -13,6 +13,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  LifeBuoy,
   Mail,
   MonitorDown,
   Sparkles,
@@ -26,6 +27,7 @@ import CourseWorkspace from './CourseWorkspace';
 import AcademyPage from './AcademyPage';
 import SoftwarePage from './SoftwarePage';
 import CommsPage from './CommsPage';
+import SupportPage from './SupportPage';
 import AiPage from './AiPage';
 import ChatWidget from './ChatWidget';
 import ViewErrorBoundary from './ViewErrorBoundary';
@@ -36,6 +38,7 @@ const NAV: { page: ViewState['page']; label: string; icon: LucideIcon }[] = [
   { page: 'academy', label: 'Academy', icon: GraduationCap },
   { page: 'software', label: 'Software', icon: MonitorDown },
   { page: 'comms', label: 'Comms', icon: Mail },
+  { page: 'support', label: 'Support', icon: LifeBuoy },
   { page: 'ai', label: 'AI Assistant', icon: Sparkles },
 ];
 
@@ -144,6 +147,11 @@ export default function AdminDashboard() {
       break;
     case 'comms':
       content = <CommsPage onAuthError={onAuthError} />;
+      break;
+    case 'support':
+      content = (
+        <SupportPage refOpen={view.ref ?? null} go={go} onAuthError={onAuthError} />
+      );
       break;
     case 'ai':
       content = <AiPage onAuthError={onAuthError} />;

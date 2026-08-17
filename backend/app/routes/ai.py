@@ -93,6 +93,13 @@ THE PLATFORM
 - Comms: notify_course targets a cohort (audiences all/paid/pending/
   recorded/everyone); notify_product_buyers targets a recorded product's
   active buyers. Every send lands in the email log (get_email_log).
+- Support desk: customer messages arrive from the contact form, the learner
+  portal and inbound email, and become tickets with an 8-character ref like
+  7A3C91B2. A triage model already classified each one and answered the
+  easy ones by itself; anything touching payment, access, a bug, or a
+  business enquiry was escalated and is waiting on Bassam. get_support_stats
+  gives the count, list_tickets the queue, get_ticket the full thread plus
+  who the customer is.
 
 DATA SHARING POSTURE
 Bassam needs operational access to his own data. When he asks for names,
@@ -106,11 +113,19 @@ RULES
   list_software, list_learners, list_course_content.
 - Asked about a person ("who is X?", "what did X buy?") — prefer
   find_person(email); it spans registrations, learner, enrollments, orders.
+- Before replying to any ticket, call get_ticket first. Its customer block
+  is the difference between "let me check your order" and "your seat on the
+  May cohort is paid". Never state a fact about someone's account, payment
+  or access that is not in what you just read.
+- If a ticket needs a decision only Bassam can make — a refund, a discount,
+  an exception, a deadline — do not write around it. Say what the ticket
+  needs and let him decide.
 - These wait for Bassam to click Approve in chat: every broadcast
   (notify_course, notify_product_buyers), grant_enrollment,
-  revoke_enrollment, update_lesson, update_software status changes, and
-  bulk mark_paid/cancel on 3+ rows. Reads and other single-row edits run
-  immediately.
+  revoke_enrollment, update_lesson, update_software status changes,
+  reply_to_ticket, and bulk mark_paid/cancel on 3+ rows. Reads and other
+  single-row edits run immediately. Show him the reply text before asking
+  him to approve it — he is signing his name to it.
 
 CONVENTIONS
 - Dates: ISO YYYY-MM-DD. day_dates is the full ordered per-day list for a
@@ -129,9 +144,18 @@ WORKING STYLE
 
 
 def _get_or_create_settings(db: Session) -> AISettings:
-    row = db.execute(select(AISettings).limit(1)).scalar_one_or_none()
+    """The assistant's config row.
+
+    Scoped explicitly: ai_settings now also holds the support desk's row,
+    and an unfiltered `limit(1)` would hand the assistant whichever row the
+    database returned first — silently running the admin chat on the
+    support model, or overwriting the support key when settings are saved.
+    """
+    row = db.execute(
+        select(AISettings).where(AISettings.scope == "assistant").limit(1)
+    ).scalar_one_or_none()
     if row is None:
-        row = AISettings()
+        row = AISettings(scope="assistant")
         db.add(row)
         db.commit()
         db.refresh(row)

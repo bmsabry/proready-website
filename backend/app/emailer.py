@@ -100,6 +100,9 @@ def send_email(
     scope_code: str = "",
     audience: str = "",
     template: str = "",
+    headers: Optional[dict] = None,
+    from_override: Optional[str] = None,
+    text: Optional[str] = None,
 ) -> bool:
     """Send one email via Resend. Returns True on 2xx, False otherwise.
 
@@ -111,6 +114,13 @@ def send_email(
     When `db` is supplied, the outcome (including stubbed/failed sends)
     is recorded as an EmailLog row tagged with scope_kind/scope_code/
     audience/template — the raw material for the admin comms log.
+
+    `headers` passes RFC-2822 headers straight through to Resend. The
+    support desk uses it for Message-ID/In-Reply-To/References so a
+    customer's reply threads back onto its ticket instead of opening a
+    new one; nothing else needs it. `from_override` lets the support desk
+    send as its own address while the rest of the platform keeps
+    EMAIL_FROM, and `text` supplies a plain-text alternative part.
     """
     settings = get_settings()
 
@@ -128,15 +138,23 @@ def send_email(
         )
     else:
         payload: dict = {
-            "from": settings.EMAIL_FROM,
+            "from": from_override or settings.EMAIL_FROM,
             "to": [to],
             "subject": subject,
             "html": html,
         }
+        if text:
+            payload["text"] = text
         if reply_to or settings.EMAIL_REPLY_TO:
             payload["reply_to"] = reply_to or settings.EMAIL_REPLY_TO
         if bcc:
             payload["bcc"] = [bcc]
+        if headers:
+            # Drop empties: Resend rejects a header whose value is null, and
+            # an absent In-Reply-To is normal on the first mail of a thread.
+            clean = {k: v for k, v in headers.items() if v}
+            if clean:
+                payload["headers"] = clean
 
         r = _resend_post(RESEND_URL, payload, settings.RESEND_API_KEY)
         if r is None:
