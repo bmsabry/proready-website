@@ -86,7 +86,7 @@ def _admin_row(product: SoftwareProduct, downloads: int, launches: int, usage: i
         "name": product.name,
         "blurb": product.blurb,
         "asset_path": product.asset_path,
-        "latest_version": product.latest_version,
+        "latest_version": _live_version(product.slug, product.latest_version),
         "status": product.status,
         "created_at": product.created_at.isoformat() if product.created_at else "",
         "downloads": downloads,
@@ -111,7 +111,7 @@ def list_software_public(db: Session = Depends(get_db)) -> List[dict]:
             "slug": p.slug,
             "name": p.name,
             "blurb": p.blurb,
-            "latest_version": p.latest_version,
+            "latest_version": _live_version(p.slug, p.latest_version),
             "download_count": downloads.get(p.slug, 0),
             # The Pages download function (/download/{slug}) resolves slugs to
             # assets from this list. Asset paths are public by design — the
@@ -202,3 +202,42 @@ def patch_software(
         launches.get(product.slug, 0),
         usage.get(product.slug, 0),
     )
+
+
+# ---------------------------------------------------------------------------
+# Live version resolution
+# ---------------------------------------------------------------------------
+# The registry's stored latest_version is whatever an admin last typed, so it
+# goes stale the moment the release pipeline ships a new build. The website's
+# /{slug}-version.json manifest is rewritten by that pipeline on every
+# release (it is what the in-app update check reads), so it is the source of
+# truth for the shipped version. Read it with a short cache and fall back to
+# the stored value when the manifest is missing or unreachable - the page
+# must never break because of a manifest hiccup.
+
+import time
+
+_LIVE_VERSION_TTL_SECONDS = 300.0
+_live_version_cache: dict = {}
+
+
+def _live_version(slug: str, stored: str | None) -> str | None:
+    now = time.monotonic()
+    cached = _live_version_cache.get(slug)
+    if cached is not None and now - cached[0] < _LIVE_VERSION_TTL_SECONDS:
+        return cached[1] or stored
+    fetched: str | None = None
+    try:
+        import httpx
+
+        resp = httpx.get(
+            f"https://www.proreadyengineer.com/{slug}-version.json", timeout=4.0
+        )
+        if resp.status_code == 200:
+            value = str((resp.json() or {}).get("latest") or "").strip()
+            if value:
+                fetched = value
+    except Exception:
+        fetched = None
+    _live_version_cache[slug] = (now, fetched)
+    return fetched or stored
