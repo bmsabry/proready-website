@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Download, CheckCircle2, ShieldCheck, Sparkles, Boxes, Camera, Ruler, Heart, CircleDollarSign,
+  Download, CheckCircle2, ShieldCheck, Sparkles, Boxes, Camera, Ruler, Heart, CircleDollarSign, ClipboardCheck,
 } from 'lucide-react';
+import highlights from '../data/pro3dworks-highlights.json';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
 
@@ -31,6 +32,11 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
     text: 'Identify components, color by function, generate a BOM with order-of-magnitude cost estimates (exported as a formatted Excel workbook), review the design, or chat with your model. Works with any OpenAI-compatible endpoint — or fully local and private with LM Studio.',
   },
   {
+    icon: <ClipboardCheck aria-hidden="true" className="w-5 h-5" />,
+    title: 'Design reviews that remember',
+    text: 'Run a real design review inside the viewer: named view bookmarks, issue pins tied to the exact camera view, arrow and rectangle redlines with captured measurements. Export the whole review as CSV or a self-contained HTML/PDF package — every markup composited over a snapshot of the model.',
+  },
+  {
     icon: <CircleDollarSign aria-hidden="true" className="w-5 h-5" />,
     title: 'Estimates your cost savings — AI vs. manual labor',
     text: 'Every AI run is metered in real dollars, and the built-in cost & savings log estimates what the same work would cost an engineer doing it by hand, at your own labor rate. Each model session becomes a line item — AI cost, manual estimate, and money saved — with a running total.',
@@ -38,7 +44,7 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
   {
     icon: <ShieldCheck aria-hidden="true" className="w-5 h-5" />,
     title: 'Private by design',
-    text: 'One HTML file that runs entirely on your machine. No install, no account, no upload — your models never leave your computer.',
+    text: 'One HTML file that runs entirely on your machine. No install, no account, no upload — your models never leave your computer. A ? button in the app lists every network touch this file can make — each with an off switch.',
   },
 ];
 
@@ -123,6 +129,15 @@ export default function Products() {
                     <> · <span className="text-cyan-300">{downloads.toLocaleString()} download{downloads === 1 ? '' : 's'}</span></>
                   )}
                 </p>
+                {highlights?.version && highlights.highlights?.length > 0 && (
+                  <div className="mt-4 rounded-lg border border-cyan-500/25 bg-cyan-500/5 px-4 py-3 text-sm">
+                    <span className="text-cyan-300 font-semibold">
+                      New in v{highlights.version}
+                      {highlights.name ? ` — ${highlights.name}` : ''}:
+                    </span>{' '}
+                    <span className="text-slate-300">{highlights.highlights.join(' · ')}</span>
+                  </div>
+                )}
                 <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
                   <p className="text-sm text-slate-300 font-semibold mb-2">Getting started — 30 seconds</p>
                   <ol className="text-sm text-slate-400 space-y-1 list-decimal list-inside">
