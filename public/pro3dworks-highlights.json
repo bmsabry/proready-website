@@ -1,0 +1,10 @@
+{
+  "version": "2.54.0",
+  "name": "Review Memory",
+  "highlights": [
+    "Named view bookmarks and view-linked issue pins",
+    "Arrow & rectangle redlines with captured measurements",
+    "Review packages: CSV, or offline HTML/PDF with model snapshots",
+    "Explicit isolate/deactivate and Flip front/back"
+  ]
+}
