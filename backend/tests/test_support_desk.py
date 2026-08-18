@@ -1476,6 +1476,39 @@ def test_unconfirmed_list_flags_people_who_did_reply(client, db, monkeypatch, re
     assert "warning" in out
 
 
+def test_confirmation_survives_the_attempt_cap(client, db, monkeypatch, registrant):
+    """Someone who confirms on the third message still confirmed.
+
+    The attempt cap exists to stop the AI talking in circles, not to decide
+    whether a registrant is coming. Recording sits above that gate too.
+    """
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "attendance", "priority": 8, "is_spam": False,
+            "confidence": 0.97, "summary": "Confirming, finally.",
+            "reply_html": "", "can_auto_resolve": True, "escalation_reason": "",
+        },
+    )
+    r = client.post(
+        "/api/support/contact",
+        json={"email": "yusuf@example.com", "subject": "Re: confirm", "message": "Yes."},
+    )
+    t = ticket_by_ref(db, r.json()["ref"])
+
+    # Burn through the cap, clear the confirmation, and triage once more.
+    t.ai_attempt_count = svc.MAX_AI_ATTEMPTS + 5
+    registrant.attendance_confirmed_at = None
+    db.commit()
+    svc.process_ticket(db, t.id)
+
+    db.expire_all()
+    db.refresh(registrant)
+    assert registrant.attendance_confirmed_at is not None, (
+        "an exhausted thread must still record the confirmation"
+    )
+
+
 def test_a_miscategorised_confirmation_is_still_flagged(client, db, monkeypatch, registrant):
     """The categoriser is a language model. "Confirmed, and one question about
     the software" can land in course_info — and then nothing records the

@@ -751,3 +751,67 @@ withdrew, so they are not outstanding.
 **Correction to §1 of this file:** Render auto-deploys the backend from `main`,
 not from `feature/registration-backend` (that branch is stale — its head predates
 the support desk). One push to `main` ships both halves.
+
+---
+
+## Incident: a confirmation reply that never reached the registration (2026-08-18)
+
+**Symptom.** Bassam saw a reply in Resend saying "Confirmed and thank you". The
+admin panel and `list_unconfirmed` both said nobody had confirmed. The AI
+assistant, asked why, replied that "replies to a broadcast do not automatically
+update their status" — which is false, and it never opened the support inbox to
+check.
+
+**Root cause.** Ordering inside `_process_ticket_inner`. The attendance branch
+sat BELOW the `can_auto_resolve` gate:
+
+```
+if not can_auto_resolve:      -> acknowledge, escalate, return    # exited here
+if category == "attendance":  -> confirm_attendance(...)          # never reached
+```
+
+The classifier tagged the real reply `attendance` with **0.98 confidence** and
+then asked for human review. Both are reasonable; together they dropped the
+fact. The customer got a good reply, the ticket escalated correctly, and the
+only thing missing was the database row.
+
+**Fix.** Recording happens immediately after classification, above every branch
+that can return — including the attempt cap, because someone who confirms on
+their third message still confirmed. Escalation still happens exactly as the
+classifier asks; the escalation reason gains "(attendance already recorded as
+confirmed)" so the inbox shows the seat is marked. Recording is idempotent (a
+second confirmation keeps the first timestamp) and undoable from the
+Registrations tab, so recording by default is the safe direction.
+
+**Second fix — make the gap visible.** `list_unconfirmed` now returns
+`replied_but_unmarked`: any non-spam ticket from a registrant who is still
+unconfirmed, flagged with `looks_like_a_confirmation`. Deliberately NOT filtered
+to `category == "attendance"` — "Confirmed, and one question about the software"
+lands in `course_info`, and a cross-check that trusted the category would miss
+exactly the cases that get lost. The assistant's prompt now forbids reporting
+zero confirmations without saying what is in that list, and requires it to
+search `list_tickets` before explaining why it cannot see a reply Bassam says
+exists.
+
+**Proof, both directions.**
+
+- `backend/tests/test_confirmation_e2e_replay.py` drives the whole chain —
+  Resend's metadata-only `email.received` webhook, the body fetch, the recipient
+  guard, ingest, threading, triage, `confirm_attendance`, the row — stubbing only
+  the two external services. The classifier output is copied verbatim from
+  production ticket 54D8E46F. Run against the pre-fix tree it FAILS; against the
+  fix it passes.
+- Live on production: registration 10 was un-confirmed, then ticket 54D8E46F was
+  retriaged. The live classifier again returned `can_auto_resolve: false`, and
+  this time the row was marked. Audit trail:
+  `20:46:48 escalated` (no attendance event, row untouched) →
+  `21:34:13 ai_classified {can_auto_resolve: false}` →
+  `21:34:13 attendance_confirmed {registration_id: 10}` →
+  `21:34:23 escalated "... (attendance already recorded as confirmed)"`.
+
+**Where the indicator lives:** admin → a course workspace → **Registrations**
+tab. Attendance column between Status and Payment; a **Confirmed** KPI tile; an
+**unconfirmed** filter chip; `Attendance confirmed at` in the CSV; and
+**mark confirmed / undo** per row (`POST /api/admin/attendance`). The admin is a
+single-page app — a tab left open across a deploy keeps running the old bundle,
+so reload the page before concluding a new column is missing.
