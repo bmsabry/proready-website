@@ -95,7 +95,15 @@ def _log_rows(**filters) -> list[EmailLog]:
 # A. Software registry
 # -----------------------------------------------------------------------------
 
-def test_public_software_list_has_seeded_pro3dworks(client):
+def test_public_software_list_has_seeded_pro3dworks(client, monkeypatch):
+    # The endpoint prefers the live /{slug}-version.json manifest over the
+    # stored value. Neutralise that here: a unit test must not depend on
+    # production being reachable (and returning a particular version), or it
+    # fails every time the real release pipeline ships a build.
+    from app.routes import software as software_routes
+
+    monkeypatch.setattr(software_routes, "_live_version", lambda slug, stored: stored)
+
     r = client.get("/api/products/software")
     assert r.status_code == 200
     products = r.json()

@@ -16,37 +16,45 @@ import {
 } from 'lucide-react';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
+import {
+  courseSnapshot,
+  formatIsoDate as formatStartDate,
+  snapshotStartLabel,
+} from '../data/courseSnapshot';
 
 // Courses backed by the registration API expose a `code` so the card can show
 // live seats / start date instead of hardcoded values.
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
 
-// Parse "2026-05-16" -> "May 16, 2026" without timezone drift.
-const formatStartDate = (iso: string): string => {
-  const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));
-  if (!y || !m || !d) return iso;
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  return `${months[m - 1]} ${d}, ${y}`;
-};
+// formatStartDate ("2026-08-29" -> "August 29, 2026", no timezone drift) is
+// imported above from data/courseSnapshot, so the build-time snapshot and the
+// runtime fetch format dates identically.
+
+// The flagship's course code, needed before `courses` is declared because its
+// prerender fallbacks are read from the build-time snapshot.
+const FLAGSHIP_CODE = 'gas-turbine-emissions-mapping-2026-05';
+const FLAGSHIP_SNAPSHOT = courseSnapshot(FLAGSHIP_CODE);
 
 const courses = [
   {
     id: 1,
     title: "Gas Turbine Emissions Mapping",
     category: "Thermal Fluids",
-    duration: "4 Days",
+    // Duration, seats and date are prerender fallbacks. They are what crawlers
+    // and no-JS visitors read, so they are taken from the build-time snapshot
+    // of the live course record rather than typed here — a typed value goes
+    // stale the moment the admin moves the cohort. See data/courseSnapshot.
+    duration: FLAGSHIP_SNAPSHOT?.dayDates.length
+      ? `${FLAGSHIP_SNAPSHOT.dayDates.length} Days`
+      : "4 Days",
     level: "Beginner to Expert",
-    attendees: "15 Seats",
+    attendees: FLAGSHIP_SNAPSHOT?.totalSeats
+      ? `${FLAGSHIP_SNAPSHOT.totalSeats} Seats`
+      : "15 Seats",
     description: "De-mystify DLE combustion. Master the dynamics corridor, emissions mapping strategy, and flex-fuel troubleshooting from first principles to expert level. No prior gas turbine knowledge required.",
-    // Prerendered fallback only — the live API overrides this on hydration.
-    // It is still what crawlers and no-JS visitors read, so a stale value
-    // advertises a cohort that has already moved.
-    nextDate: "August 29, 2026",
+    nextDate: snapshotStartLabel(FLAGSHIP_CODE, "August 29, 2026"),
     slug: "gas-turbine-emissions-mapping",
-    code: "gas-turbine-emissions-mapping-2026-05",
+    code: FLAGSHIP_CODE,
     featured: true
   },
   {

@@ -20,6 +20,11 @@ import {
 import { Reveal } from '../../components/ui';
 import PayPalButtons, { fetchPaymentsConfig, PaymentsConfig } from '../../components/PayPalButtons';
 import { usePageMeta } from '../../lib/meta';
+import {
+  formatIsoDate as formatStartDate,
+  snapshotDayLabels,
+  snapshotStartLabel,
+} from '../../data/courseSnapshot';
 
 // -----------------------------------------------------------------------------
 // Course constants
@@ -29,7 +34,10 @@ import { usePageMeta } from '../../lib/meta';
 // local preview before the backend is reachable.
 const COURSE_CODE = 'gas-turbine-emissions-mapping-2026-05';
 const DEFAULT_CAPACITY = 15;
-const DEFAULT_COHORT_DATE = 'May 15, 2026';
+// Prerender fallback for the cohort start, taken from the build-time snapshot
+// of the live course record (see data/courseSnapshot). The literal is only a
+// last resort for a course the build has never been able to reach.
+const DEFAULT_COHORT_DATE = snapshotStartLabel(COURSE_CODE, 'August 29, 2026');
 
 // Backend endpoints. Set VITE_API_BASE in your deploy env to the Render URL,
 // e.g. https://proreadyengineer-training-api.onrender.com
@@ -47,16 +55,8 @@ const formatAmount = (cents: number, currency: string): string =>
     minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
   }).format(cents / 100);
 
-// Parse an ISO yyyy-mm-dd date into "May 15, 2026" without timezone drift.
-const formatStartDate = (iso: string): string => {
-  const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));
-  if (!y || !m || !d) return iso;
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  return `${months[m - 1]} ${d}, ${y}`;
-};
+// formatStartDate (ISO -> "August 29, 2026", no timezone drift) is imported
+// above from data/courseSnapshot so the build script and the page agree.
 
 // JSON-LD Course schema for search engines.
 const COURSE_JSONLD = JSON.stringify({
@@ -155,26 +155,25 @@ const IDEAL_FOR = [
 // -----------------------------------------------------------------------------
 // Page component
 // -----------------------------------------------------------------------------
-// Default schedule used when the API hasn't responded yet (or is unavailable
-// in local preview). Admin can override these any time via the dashboard.
+// Schedule shown before the runtime API fetch lands. This is NOT merely a
+// loading state: the page is prerendered to static HTML at build time and only
+// swaps to live data after hydration, so this list is the published schedule
+// that search engines, link previews and no-JS visitors read.
 //
-// This list is also what search engines and no-JS visitors see, because the
-// page is prerendered to static HTML at build time and only swaps to live
-// data after hydration. So it is not merely a loading state — it is the
-// published schedule until the fetch lands, and a stale one advertises a
-// cohort that no longer exists.
+// It used to be hand-typed, and it went stale twice — the site kept advertising
+// a cohort the admin had already moved. So it is now pulled from the live
+// course record at BUILD time by scripts/fetch-course-data.mjs. Move the dates
+// in the admin dashboard and the next deploy picks them up; there is nothing
+// here left to forget to update.
 //
-// Keep it the same LENGTH as CURRICULUM. Any day beyond CURRICULUM renders
-// as "Schedule TBD" (that fallback exists so an admin can extend a cohort
-// past the written curriculum without a code change) — which is fine for a
-// deliberately longer cohort, and embarrassing when it is just this list
-// having gone out of date.
-const DEFAULT_DAY_DATES: string[] = [
+// The literal below is a last resort only: it applies if a brand-new course
+// code has never once been reachable at build time.
+const DEFAULT_DAY_DATES: string[] = snapshotDayLabels(COURSE_CODE, [
   'August 29, 2026',
   'August 30, 2026',
   'September 5, 2026',
   'September 6, 2026',
-];
+]);
 
 const GasTurbineEmissionsMapping = () => {
   usePageMeta(

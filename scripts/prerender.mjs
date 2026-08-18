@@ -13,9 +13,27 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const ORIGIN = 'https://proreadyengineer.com';
+
+// Course facts fetched from the live API before the bundle was built. Used to
+// verify that what we just prerendered actually says what the backend says —
+// see the "schedule check" at the bottom of this file.
+const courseSnapshot = JSON.parse(readFileSync('src/data/course-snapshot.json', 'utf8'));
 const { render, PRERENDER_ROUTES } = await import('../dist-ssr/entry-server.js');
 
 const template = readFileSync('dist/index.html', 'utf8');
+
+// dist/index.html is BOTH the template and one of the outputs (route '/'), so
+// running this script twice without a fresh `vite build` in between would feed
+// the already-rendered homepage back in as the template — every route would
+// then be written as a copy of the homepage. Catch that loudly instead of
+// silently publishing 33 identical pages.
+if (template.includes('data-ssr')) {
+  console.error(
+    'dist/index.html is already a prerendered page, not the Vite template. ' +
+      'Run `vite build` first — `npm run build` does this in the right order.',
+  );
+  process.exit(1);
+}
 
 const escAttr = (s) =>
   String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -76,6 +94,75 @@ writeFileSync(
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`
 );
 console.log(`  ✓ sitemap.xml (${PRERENDER_ROUTES.length} URLs)`);
+
+// -----------------------------------------------------------------------------
+// Schedule check
+// -----------------------------------------------------------------------------
+// The prerendered HTML is what crawlers and no-JS visitors read; the live API
+// is the truth. Twice, a page shipped advertising a cohort that had already
+// moved, because a hand-typed fallback was never updated. Course pages now
+// derive their fallback from the build-time snapshot — this check proves that
+// wiring is actually intact in the emitted HTML, so if anyone reintroduces a
+// hardcoded date the build stops instead of quietly publishing the wrong one.
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+const labelFor = (iso) => {
+  const [y, m, d] = String(iso).split('-').map((n) => parseInt(n, 10));
+  return `${MONTHS[m - 1]} ${d}, ${y}`;
+};
+
+// route -> { code, days }. days:'all' means the page publishes the full
+// day-by-day schedule and every date must match; days:'start' means it only
+// shows the cohort start.
+//
+// Checking every day matters: the start date alone also appears in the hero
+// and the register box, so a page could keep showing the right start while its
+// day-by-day timeline had silently reverted to a hardcoded list.
+const SCHEDULE_PAGES = {
+  '/training/gas-turbine-emissions-mapping': { code: 'gas-turbine-emissions-mapping-2026-05', days: 'all' },
+  '/training': { code: 'gas-turbine-emissions-mapping-2026-05', days: 'start' },
+};
+
+const todayIso = new Date().toISOString().slice(0, 10);
+for (const [route, spec] of Object.entries(SCHEDULE_PAGES)) {
+  const course = courseSnapshot.courses?.[spec.code];
+  if (!course) {
+    console.warn(`  ! ${route}: no snapshot for ${spec.code}; schedule check skipped.`);
+    continue;
+  }
+  const file = route === '/' ? 'dist/index.html' : join('dist', `${route}.html`);
+  let html;
+  try {
+    html = readFileSync(file, 'utf8');
+  } catch {
+    continue; // the render already failed and was counted above
+  }
+  const expected = labelFor(course.dayDates[0] ?? course.startDate);
+  const required = spec.days === 'all' ? course.dayDates.map(labelFor) : [expected];
+  const missing = required.filter((label) => !html.includes(label));
+  if (missing.length > 0) {
+    failures++;
+    console.error(
+      `  ✗ ${route}: prerendered HTML is missing ${missing.length} live cohort date(s) ` +
+        `(${missing.join(', ')}). Something is publishing a hardcoded schedule instead of ` +
+        `the build-time snapshot.`,
+    );
+  } else if ((course.dayDates[course.dayDates.length - 1] ?? course.startDate) < todayIso) {
+    // Not a build failure: an unrelated deploy shouldn't be blocked because a
+    // cohort ended. But it must be impossible to miss in the deploy log.
+    console.warn(
+      `  ! ${route}: the published cohort (${expected}) has already finished. ` +
+        `Set the next cohort's dates in the admin dashboard and redeploy.`,
+    );
+  } else {
+    console.log(
+      `  ✓ ${route} schedule matches the live course ` +
+        `(${required.length === 1 ? expected : `${required.length} days from ${expected}`})`,
+    );
+  }
+}
 
 if (failures > 0) {
   console.error(`Prerender failed for ${failures} route(s).`);

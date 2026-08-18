@@ -36,6 +36,7 @@ import {
   ShieldCheck,
   Trash2,
   Unlock,
+  UserCheck,
   Users,
   X,
   XCircle,
@@ -256,7 +257,11 @@ function RegistrationsTab({
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid' | 'cancelled'>('all');
+  // 'unconfirmed' is not a registration status — it is the chase list: who
+  // still hasn't answered the confirm-your-seat email.
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'pending' | 'paid' | 'cancelled' | 'unconfirmed'
+  >('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -275,12 +280,18 @@ function RegistrationsTab({
   }, [load]);
 
   const counts = useMemo(() => {
-    const c = { pending: 0, paid: 0, cancelled: 0, total: 0 };
+    // confirmed/unconfirmed count ACTIVE rows only — someone who cancelled
+    // isn't outstanding, so counting them would inflate the chase list.
+    const c = { pending: 0, paid: 0, cancelled: 0, total: 0, confirmed: 0, unconfirmed: 0 };
     for (const r of regs ?? []) {
       c.total += 1;
       if (r.status === 'pending') c.pending += 1;
       else if (r.status === 'paid') c.paid += 1;
       else if (r.status === 'cancelled') c.cancelled += 1;
+      if (r.status !== 'cancelled') {
+        if (r.attendance_confirmed_at) c.confirmed += 1;
+        else c.unconfirmed += 1;
+      }
     }
     return c;
   }, [regs]);
@@ -288,7 +299,11 @@ function RegistrationsTab({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (regs ?? []).filter((r) => {
-      if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+      if (statusFilter === 'unconfirmed') {
+        if (r.status === 'cancelled' || r.attendance_confirmed_at) return false;
+      } else if (statusFilter !== 'all' && r.status !== statusFilter) {
+        return false;
+      }
       if (!q) return true;
       return [r.full_name, r.email, r.company, r.job_title, r.location]
         .join(' ')
@@ -316,6 +331,25 @@ function RegistrationsTab({
     }
   }
 
+  /** Record a confirmation that arrived off-email (a call, a different address). */
+  async function setAttendance(id: number, confirmed: boolean) {
+    setBusyId(id);
+    setError(null);
+    try {
+      const body = await api<{ ok: boolean; taken: number; registration: Registration }>(
+        '/api/admin/attendance',
+        { method: 'POST', body: JSON.stringify({ registration_id: id, confirmed }) },
+      );
+      setRegs((prev) =>
+        prev ? prev.map((r) => (r.id === body.registration.id ? body.registration : r)) : prev,
+      );
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function exportCsv() {
     downloadCsv(
       `registrations-${code}.csv`,
@@ -331,6 +365,7 @@ function RegistrationsTab({
         'Payment',
         'Registered',
         'Paid at',
+        'Attendance confirmed at',
       ],
       filtered.map((r) => [
         r.id,
@@ -344,6 +379,7 @@ function RegistrationsTab({
         r.payment_provider || 'invoice',
         r.created_at,
         r.paid_at ?? '',
+        r.attendance_confirmed_at ?? '',
       ]),
     );
   }
@@ -351,7 +387,7 @@ function RegistrationsTab({
   return (
     <div>
       {/* KPI row for this course */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Kpi
           icon={<Users className="w-4 h-4" />}
           label="Seats"
@@ -361,6 +397,15 @@ function RegistrationsTab({
         />
         <Kpi icon={<Clock className="w-4 h-4" />} label="Pending" value={counts.pending} accent="amber" />
         <Kpi icon={<CheckCircle2 className="w-4 h-4" />} label="Paid" value={counts.paid} accent="emerald" />
+        {/* Attendance is the answer to "who actually replied to the confirm-your-seat
+            email" — it updates by itself when a reply lands in the support desk. */}
+        <Kpi
+          icon={<UserCheck className="w-4 h-4" />}
+          label="Confirmed"
+          value={`${counts.confirmed} / ${counts.confirmed + counts.unconfirmed}`}
+          sub={counts.unconfirmed > 0 ? `${counts.unconfirmed} awaiting reply` : 'everyone replied'}
+          accent={counts.unconfirmed > 0 ? 'amber' : 'emerald'}
+        />
         <Kpi icon={<Ban className="w-4 h-4" />} label="Cancelled" value={counts.cancelled} accent="slate" />
       </div>
 
@@ -377,10 +422,15 @@ function RegistrationsTab({
             className="bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 w-64 max-w-full"
           />
         </div>
-        {(['all', 'pending', 'paid', 'cancelled'] as const).map((s) => (
+        {(['all', 'pending', 'paid', 'cancelled', 'unconfirmed'] as const).map((s) => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
+            title={
+              s === 'unconfirmed'
+                ? "Active registrants who haven't confirmed attendance yet"
+                : undefined
+            }
             className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
               statusFilter === s
                 ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-200'
@@ -422,6 +472,7 @@ function RegistrationsTab({
                   <th className="text-left px-4 py-3">Company / Role</th>
                   <th className="text-left px-4 py-3">Location</th>
                   <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-left px-4 py-3">Attendance</th>
                   <th className="text-left px-4 py-3">Payment</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Registered</th>
                   <th className="text-right px-4 py-3">Actions</th>
@@ -460,6 +511,47 @@ function RegistrationsTab({
                       {r.paid_at && (
                         <div className="text-[11px] text-slate-300 mt-1">
                           paid {formatDate(r.paid_at)}
+                        </div>
+                      )}
+                    </td>
+                    {/* Attendance. Set automatically when the registrant replies to
+                        the confirm-your-seat email (the support desk records it on
+                        the way in), or by hand here when they answer some other way. */}
+                    <td className="px-4 py-3 align-top">
+                      {r.status === 'cancelled' ? (
+                        <span className="text-xs text-slate-500">—</span>
+                      ) : r.attendance_confirmed_at ? (
+                        <div>
+                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-200">
+                            <UserCheck className="w-3 h-3" />
+                            Confirmed
+                          </span>
+                          <div className="text-[11px] text-slate-300 mt-1">
+                            {formatDate(r.attendance_confirmed_at)}
+                          </div>
+                          <button
+                            onClick={() => void setAttendance(r.id, false)}
+                            disabled={busyId === r.id}
+                            title="Recorded against the wrong person? Clear it."
+                            className="text-[11px] text-slate-400 hover:text-slate-200 underline mt-0.5 disabled:opacity-50"
+                          >
+                            undo
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-200">
+                            <Clock className="w-3 h-3" />
+                            Awaiting reply
+                          </span>
+                          <button
+                            onClick={() => void setAttendance(r.id, true)}
+                            disabled={busyId === r.id}
+                            title="They confirmed some other way (a call, a different address)"
+                            className="block text-[11px] text-cyan-300 hover:text-cyan-200 underline mt-1 disabled:opacity-50"
+                          >
+                            mark confirmed
+                          </button>
                         </div>
                       )}
                     </td>

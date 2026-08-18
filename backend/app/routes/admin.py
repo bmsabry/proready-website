@@ -5,6 +5,7 @@ Endpoints:
                                      (most recent first, ?course= to filter)
   POST /api/admin/mark-paid        — flip a pending row to paid
   POST /api/admin/cancel           — flip a row to cancelled (release seat if paid)
+  POST /api/admin/attendance       — set/clear the attendance confirmation by hand
 
 mark-paid/cancel operate on whatever course the row belongs to — the old
 hardwiring to settings.COURSE_CODE predates multi-course support.
@@ -28,6 +29,7 @@ from ..learner_auth import issue_login_token
 from ..models import Course, Product, Registration
 from ..schemas import (
     AdminRegistrationOut,
+    AttendanceIn,
     MarkPaidIn,
     MarkPaidOut,
 )
@@ -215,6 +217,38 @@ def cancel(body: CancelIn, db: Session = Depends(get_db)) -> MarkPaidOut:
                 "Cohort materials auto-revoke failed for %s — revoke manually",
                 reg.email,
             )
+
+    return MarkPaidOut(
+        ok=True,
+        taken=count_active(db, reg.course_code),
+        registration=AdminRegistrationOut.model_validate(reg),
+    )
+
+
+@router.post("/attendance", response_model=MarkPaidOut)
+def set_attendance(body: AttendanceIn, db: Session = Depends(get_db)) -> MarkPaidOut:
+    """Confirm (or un-confirm) a seat by hand.
+
+    Most confirmations arrive by email and are recorded automatically when the
+    reply lands in the support desk. This is for the ones that don't: someone
+    tells Bassam on a call, or replies from an address that isn't the one they
+    registered with. Without it the only way to correct the list would be the
+    database.
+
+    Confirming is idempotent — a row that already has a timestamp keeps it, so
+    "when did they answer" stays true.
+    """
+    reg = db.get(Registration, body.registration_id)
+    if reg is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found.")
+
+    if body.confirmed:
+        if reg.attendance_confirmed_at is None:
+            reg.attendance_confirmed_at = datetime.now(timezone.utc)
+    else:
+        reg.attendance_confirmed_at = None
+    db.commit()
+    db.refresh(reg)
 
     return MarkPaidOut(
         ok=True,

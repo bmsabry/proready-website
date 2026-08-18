@@ -73,6 +73,13 @@ class MarkPaidOut(BaseModel):
     registration: AdminRegistrationOut
 
 
+class AttendanceIn(BaseModel):
+    registration_id: int
+    # False un-confirms — for when a confirmation was recorded against the
+    # wrong person and the list needs correcting.
+    confirmed: bool = True
+
+
 class LoginIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=200)

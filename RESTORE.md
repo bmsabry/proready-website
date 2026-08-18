@@ -13,7 +13,7 @@
 | Layer | Tech | Where it runs |
 |---|---|---|
 | Frontend | Vite + React + TypeScript + Tailwind | Cloudflare Pages (auto-deploys from `main`) |
-| Backend | FastAPI + SQLAlchemy + Postgres | Render Web Service `proreadyengineer-training-api` (auto-deploys from `feature/registration-backend`) |
+| Backend | FastAPI + SQLAlchemy + Postgres | Render Web Service `proreadyengineer-training-api` (auto-deploys from `main`; the old `feature/registration-backend` branch is stale) |
 | Email | Resend, sender `info@mail.proreadyengineer.com` | DKIM+SPF on Cloudflare DNS |
 | Repo | https://github.com/bmsabry/proready-website | branches: `main` (prod), `feature/registration-backend` (Render deploy), `preview/gas-turbine-emissions-mapping` (Cloudflare Pages preview, currently disabled in dashboard) |
 
@@ -672,3 +672,82 @@ table auto-created by `create_all` on Render deploy):
 bump the version string on `src/pages/Products.tsx`, push `main`.
 
 **IP addresses are never stored** — geo stops at city (Cloudflare edge data).
+
+---
+
+## Course dates are fetched at build time, not typed (added 2026-08-18)
+
+**The bug this kills.** Every public course page is prerendered to static HTML
+at build time and only swaps to live API data after hydration. So whatever the
+component used as its "not loaded yet" default was also what Google, link
+previews and no-JS visitors read. Those defaults were hand-typed constants, and
+twice they went stale after the cohort moved in the admin dashboard — the site
+advertised a cohort that no longer existed (May 2026, 5 days, long after it had
+become 29 Aug 2026, 4 days).
+
+**How it works now.**
+
+1. `scripts/fetch-course-data.mjs` runs first in `npm run build`. It reads
+   `VITE_API_BASE` (the same variable the browser bundle uses — set in the
+   Cloudflare Pages project settings) and pulls `/api/courses/{code}` for every
+   code in its `COURSE_CODES` list.
+2. It writes `src/data/course-snapshot.json`, which **is committed** — so a
+   failed fetch falls back to the last known good data, not to nothing.
+3. `src/data/courseSnapshot.ts` exposes it typed. `Training.tsx` and
+   `training/GasTurbineEmissionsMapping.tsx` take their prerender fallbacks from
+   there instead of literals.
+4. `scripts/prerender.mjs` then verifies the emitted HTML actually contains every
+   day of the live schedule, and **fails the build** if it doesn't. That is the
+   part that makes this stick: reintroducing a hardcoded date stops the deploy
+   instead of quietly publishing the wrong cohort.
+
+**Rules it follows.** It never fails the build (Render's free tier sleeps; three
+attempts, 45 s each, then the committed snapshot). It refuses to overwrite a good
+snapshot with a payload that has no usable dates. It only rewrites the file when a
+course fact actually changed, so `generatedAt` doesn't churn the diff. It
+deliberately does **not** snapshot seats-taken or price — a stale "3 seats left"
+baked into static HTML is worse than the generic label shown until the live fetch
+lands.
+
+**Adding a course:** add its code to `COURSE_CODES` in the fetch script, and add
+its route to `SCHEDULE_PAGES` in `scripts/prerender.mjs` (`days: 'all'` if the
+page publishes a day-by-day timeline, `days: 'start'` if it only shows the start).
+
+**The remaining gap, stated plainly:** prerendered HTML only refreshes when the
+site is rebuilt. Change dates in the admin dashboard and the static HTML still
+shows the old ones until the next Cloudflare Pages deploy (any push to `main`, or
+a manual "Retry deployment"). The browser shows the new dates immediately either
+way; it is crawlers and no-JS visitors who see the older ones in between. A
+Cloudflare deploy hook fired from the backend on course edit would close it.
+
+**Also fixed here:** `scripts/prerender.mjs` now refuses to run when
+`dist/index.html` is already a rendered page. It is both the template and the
+output for route `/`, so running it twice without a `vite build` in between used
+to write the homepage into all 33 routes.
+
+---
+
+## Attendance confirmation is visible in the admin UI (added 2026-08-18)
+
+`Registration.attendance_confirmed_at` is set automatically when a registrant
+replies to a confirm-your-seat broadcast (the support desk records it as the
+reply is processed). Until now it was only readable through the AI assistant.
+
+The Registrations tab of a course workspace now shows it directly:
+
+- an **Attendance** column per row — green "Confirmed" with the date, or amber
+  "Awaiting reply"
+- a **Confirmed** KPI tile (`confirmed / active`, with "N awaiting reply")
+- an **unconfirmed** filter chip — the chase list, active rows only
+- the CSV export carries an `Attendance confirmed at` column
+- **mark confirmed** / **undo** per row, hitting `POST /api/admin/attendance`
+  (`{registration_id, confirmed}`), for confirmations that arrive by phone or
+  from an address the person didn't register with
+
+Confirming is idempotent — re-confirming keeps the original timestamp, so "when
+did they answer" stays true. Cancelled rows are excluded from every count: they
+withdrew, so they are not outstanding.
+
+**Correction to §1 of this file:** Render auto-deploys the backend from `main`,
+not from `feature/registration-backend` (that branch is stale — its head predates
+the support desk). One push to `main` ships both halves.

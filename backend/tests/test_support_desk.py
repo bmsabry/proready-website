@@ -1445,6 +1445,85 @@ def test_assistant_can_list_who_has_not_confirmed(db, registrant):
     assert after["confirmed_count"] >= 1
 
 
+def test_admin_can_confirm_attendance_by_hand(client, db, registrant):
+    """Not every confirmation arrives by email.
+
+    Someone says yes on a call, or replies from an address they didn't
+    register with. Without a way to record that, the admin's confirmed list
+    is wrong and the only correction available is the database.
+    """
+    r = client.post(
+        "/api/admin/attendance",
+        json={"registration_id": registrant.id, "confirmed": True},
+        headers=AUTH,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["registration"]["attendance_confirmed_at"] is not None
+
+    db.refresh(registrant)
+    assert registrant.attendance_confirmed_at is not None
+
+
+def test_confirming_by_hand_twice_keeps_the_first_timestamp(client, db, registrant):
+    first = client.post(
+        "/api/admin/attendance",
+        json={"registration_id": registrant.id, "confirmed": True},
+        headers=AUTH,
+    ).json()["registration"]["attendance_confirmed_at"]
+    second = client.post(
+        "/api/admin/attendance",
+        json={"registration_id": registrant.id, "confirmed": True},
+        headers=AUTH,
+    ).json()["registration"]["attendance_confirmed_at"]
+    assert first == second, "re-confirming must not rewrite when they answered"
+
+
+def test_admin_can_undo_a_confirmation(client, db, registrant):
+    """A confirmation recorded against the wrong person has to be reversible."""
+    client.post(
+        "/api/admin/attendance",
+        json={"registration_id": registrant.id, "confirmed": True},
+        headers=AUTH,
+    )
+    r = client.post(
+        "/api/admin/attendance",
+        json={"registration_id": registrant.id, "confirmed": False},
+        headers=AUTH,
+    )
+    assert r.status_code == 200
+    assert r.json()["registration"]["attendance_confirmed_at"] is None
+    db.refresh(registrant)
+    assert registrant.attendance_confirmed_at is None
+
+
+def test_attendance_endpoint_is_admin_only_and_404s_cleanly(client, registrant):
+    assert client.post(
+        "/api/admin/attendance", json={"registration_id": registrant.id}
+    ).status_code in (401, 403)
+    assert client.post(
+        "/api/admin/attendance", json={"registration_id": 9_999_999}, headers=AUTH
+    ).status_code == 404
+
+
+def test_admin_registration_list_exposes_the_confirmation(client, db, registrant):
+    """The admin table renders this field — if the API stops sending it the
+    Attendance column silently shows everyone as awaiting a reply."""
+    rows = client.get(
+        "/api/admin/registrations?course=attend-test", headers=AUTH
+    ).json()
+    row = next(r for r in rows if r["email"] == "yusuf@example.com")
+    assert "attendance_confirmed_at" in row
+    assert row["attendance_confirmed_at"] is None
+
+    svc.confirm_attendance(db, "yusuf@example.com")
+    db.commit()
+    rows = client.get(
+        "/api/admin/registrations?course=attend-test", headers=AUTH
+    ).json()
+    row = next(r for r in rows if r["email"] == "yusuf@example.com")
+    assert row["attendance_confirmed_at"] is not None
+
+
 def test_assistant_reports_unknown_course_and_email_cleanly(db):
     from app.ai_tools import list_unconfirmed, mark_attendance_confirmed
 
