@@ -925,15 +925,22 @@ def list_unconfirmed(db: Session, course_code: str, **_: Any) -> Dict[str, Any]:
     # in Resend that the desk had recorded as a ticket but never applied to the
     # registration; nothing in this tool's output hinted at it, so the honest
     # answer looked like "nobody has confirmed".
+    # Deliberately NOT filtered to category == "attendance". The categoriser
+    # is a language model: a reply that says "confirmed, and one question about
+    # the software" can land in course_info, and then nothing records the
+    # confirmation and nothing flags it either. Any message from someone who
+    # has not confirmed is worth a look — the whole point of this field is that
+    # "they never answered" and "they answered and we missed it" must not look
+    # identical.
     unconfirmed_addresses = {r.email.lower().strip() for r in unconfirmed}
     replied_but_unmarked: List[Dict[str, Any]] = []
     if unconfirmed_addresses:
         tickets = (
             db.execute(
                 select(SupportTicket)
-                .where(SupportTicket.category == "attendance")
+                .where(SupportTicket.is_spam.is_(False))
                 .order_by(SupportTicket.created_at.desc())
-                .limit(200)
+                .limit(400)
             )
             .scalars()
             .all()
@@ -946,6 +953,8 @@ def list_unconfirmed(db: Session, course_code: str, **_: Any) -> Dict[str, Any]:
                         "email": t.submitter_email,
                         "ticket_ref": t.ref,
                         "ticket_status": t.status,
+                        "category": t.category,
+                        "looks_like_a_confirmation": t.category == "attendance",
                         "summary": (t.ai_result or {}).get("summary", ""),
                         "subject": t.subject,
                         "received_at": _iso(t.created_at),
@@ -964,10 +973,11 @@ def list_unconfirmed(db: Session, course_code: str, **_: Any) -> Dict[str, Any]:
     }
     if replied_but_unmarked:
         out["warning"] = (
-            f"{len(replied_but_unmarked)} of the unconfirmed registrants have an "
-            "attendance ticket in the support desk — they appear to have replied "
-            "without being marked confirmed. Read the ticket with get_ticket and, "
-            "if they did confirm, record it with mark_attendance_confirmed."
+            f"{len(replied_but_unmarked)} of the unconfirmed registrants have written "
+            "to the support desk. They may have confirmed in a message that was not "
+            "recorded against their registration. Read each one with get_ticket "
+            "before reporting that they never answered, and record any real "
+            "confirmation with mark_attendance_confirmed."
         )
     return out
 

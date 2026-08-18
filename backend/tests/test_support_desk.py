@@ -1476,6 +1476,42 @@ def test_unconfirmed_list_flags_people_who_did_reply(client, db, monkeypatch, re
     assert "warning" in out
 
 
+def test_a_miscategorised_confirmation_is_still_flagged(client, db, monkeypatch, registrant):
+    """The categoriser is a language model. "Confirmed, and one question about
+    the software" can land in course_info — and then nothing records the
+    confirmation. The cross-check must not itself depend on the category being
+    right, or it only catches the cases that were never going to be lost."""
+    from app.ai_tools import list_unconfirmed
+
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "course_info", "priority": 6, "is_spam": False,
+            "confidence": 0.9, "summary": "Confirming, plus a question.",
+            "reply_html": "<p>Thanks.</p>", "can_auto_resolve": False,
+            "escalation_reason": "Needs a human.",
+        },
+    )
+    client.post(
+        "/api/support/contact",
+        json={
+            "email": "yusuf@example.com",
+            "subject": "Re: confirm",
+            "message": "Confirmed. Also, which software will we use?",
+        },
+    )
+
+    out = list_unconfirmed(db, course_code="attend-test")
+    flagged = out["replied_but_unmarked"]
+    assert flagged, "a confirmation hiding in another category must still surface"
+    assert all(f["email"] == "yusuf@example.com" for f in flagged)
+    # Other tests in this module leave tickets behind, so find ours by category
+    # rather than assuming it sorts first.
+    mine = [f for f in flagged if f["category"] == "course_info"]
+    assert mine, "the course_info ticket must be in the list"
+    assert mine[0]["looks_like_a_confirmation"] is False
+
+
 def test_confirmation_names_the_course_back(client, db, monkeypatch, registrant, captured_mail):
     """Say what was confirmed, not a vague 'you're all set'."""
     fake_llm(
