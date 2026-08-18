@@ -75,6 +75,8 @@ export type Registration = {
   admin_notes?: string | null;
   created_at: string;
   paid_at?: string | null;
+  /** Null until they reply to a "confirm your seat" broadcast. */
+  attendance_confirmed_at?: string | null;
 };
 
 export type Course = {

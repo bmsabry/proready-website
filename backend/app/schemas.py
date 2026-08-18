@@ -58,6 +58,8 @@ class AdminRegistrationOut(BaseModel):
     admin_notes: Optional[str] = None
     created_at: datetime
     paid_at: Optional[datetime] = None
+    # Null = has not replied to a "confirm your seat" broadcast yet.
+    attendance_confirmed_at: Optional[datetime] = None
 
 
 class MarkPaidIn(BaseModel):
