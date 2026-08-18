@@ -48,7 +48,7 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
   },
   {
     icon: <Wand2 aria-hidden="true" className="w-5 h-5" />,
-    title: 'Engineering Review Copilot — commands you approve',
+    title: 'Engineering Review Assistant — commands you approve',
     text: 'Describe a viewer task in plain words — isolate these parts, section that view, save this review state. The safe command palette previews every proposed step with evidence, confidence and exact match counts; nothing runs until you approve it, and every action is audited and restorable. Explicit wording works fully offline — your configured AI can interpret broader phrasing, gated by the same strict validator. Plus a confidence-ranked, undoable BOM cleanup: material gaps are never guessed.',
   },
   {
