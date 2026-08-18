@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Download, CheckCircle2, ShieldCheck, Sparkles, Boxes, Camera, Ruler, Heart, CircleDollarSign, ClipboardCheck, Wand2, FolderOpen, GitCompare,
+  Download, CheckCircle2, ShieldCheck, Sparkles, Boxes, Camera, Ruler, Heart, CircleDollarSign, ClipboardCheck,
 } from 'lucide-react';
 import highlights from '../data/pro3dworks-highlights.json';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
@@ -17,44 +17,29 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
     text: 'STEP, IGES, STL, Parasolid (.x_t), 3MF, GLB, OBJ and more — including large assemblies, with an instant reopen cache.',
   },
   {
-    icon: <FolderOpen aria-hidden="true" className="w-5 h-5" />,
-    title: 'Save the whole review as a project',
-    text: 'One .p3dproject file captures the model plus your entire workspace — names, classifications and materials, visibility, bookmarks, issues, redlines, captured measurements, camera and section state. Reopen it tomorrow and continue exactly where you stopped — without the original CAD file. Ctrl+S and done.',
+    icon: <ClipboardCheck aria-hidden="true" className="w-5 h-5" />,
+    title: 'The whole design review, start to finish',
+    text: 'Mark up the model like a real review: named view bookmarks, issue pins tied to the exact camera view, redlines with captured measurements. Compare two revisions into a deterministic change map — modified, moved, added, removed — and find duplicate or similar parts by geometric fingerprint. Export it as CSV or a self-contained HTML/PDF review package, and save everything as one .p3dproject file: reopen it tomorrow, without the original CAD, exactly where you stopped.',
   },
   {
     icon: <Ruler aria-hidden="true" className="w-5 h-5" />,
     title: 'Real inspection tools',
-    text: 'Measure vertices, edges and faces; section views; mass properties; interference checks; model scaling. Exploded views now generate automatic, collision-screened disassembly sequences — play them back or export CSV, JSON and WebM. Plus a persistent Object Inspector, a deterministic model/import health report, and geometry-quality scans that catch sliver triangles, open boundaries and non-manifold edges.',
-  },
-  {
-    icon: <Camera aria-hidden="true" className="w-5 h-5" />,
-    title: 'Photoreal rendering',
-    text: 'Ray-traced studio images and 4K exports — presentation-grade output straight from a browser tab.',
+    text: 'Measure vertices, edges and faces; section views; mass properties; interference checks; model scaling; exploded views with automatic, collision-screened disassembly sequences you can play back or export. Plus a persistent Object Inspector and deterministic health and geometry-quality checks — click a finding to frame the affected parts.',
   },
   {
     icon: <Sparkles aria-hidden="true" className="w-5 h-5" />,
-    title: 'AI Engineer built in',
-    text: 'Identify components, color by function, generate a BOM with order-of-magnitude cost estimates (exported as a formatted Excel workbook), review the design, or chat with your model. Works with any OpenAI-compatible endpoint — or fully local and private with LM Studio.',
-  },
-  {
-    icon: <ClipboardCheck aria-hidden="true" className="w-5 h-5" />,
-    title: 'Design reviews that remember',
-    text: 'Run a real design review inside the viewer: named view bookmarks, issue pins tied to the exact camera view, arrow and rectangle redlines with captured measurements. Export the whole review as CSV or a self-contained HTML/PDF package — every markup composited over a snapshot of the model.',
-  },
-  {
-    icon: <GitCompare aria-hidden="true" className="w-5 h-5" />,
-    title: 'Engineering change review — two revisions, one answer',
-    text: 'Load revision A and revision B side by side and get a deterministic change map: modified, moved, added, removed, metadata-only and unchanged — a detected global shift is disclosed and removed before anything is classified as moved. The same geometry fingerprints power a duplicate and similar-part finder: exact repeats, opposite-handed, scaled and near-similar families, each selectable or isolated with size, area and volume evidence.',
-  },
-  {
-    icon: <Wand2 aria-hidden="true" className="w-5 h-5" />,
-    title: 'Engineering Review Assistant — commands you approve',
-    text: 'Describe a viewer task in plain words — isolate these parts, section that view, save this review state. The safe command palette previews every proposed step with evidence, confidence and exact match counts; nothing runs until you approve it, and every action is audited and restorable. Explicit wording works fully offline — your configured AI can interpret broader phrasing, gated by the same strict validator. Plus a confidence-ranked, undoable BOM cleanup: material gaps are never guessed.',
+    title: 'AI Engineer built in — you stay in command',
+    text: 'Identify components, color by function, generate a BOM with cost estimates (formatted Excel export), review the design, or chat with your model — through any OpenAI-compatible endpoint, or fully local and private with LM Studio. An assistant takes plain-language commands too: every proposed step is previewed with evidence and match counts, runs only after you approve it, and stays audited and restorable.',
   },
   {
     icon: <CircleDollarSign aria-hidden="true" className="w-5 h-5" />,
     title: 'Estimates your cost savings — AI vs. manual labor',
     text: 'Every AI run is metered in real dollars, and the built-in cost & savings log estimates what the same work would cost an engineer doing it by hand, at your own labor rate. Each model session becomes a line item — AI cost, manual estimate, and money saved — with a running total.',
+  },
+  {
+    icon: <Camera aria-hidden="true" className="w-5 h-5" />,
+    title: 'Photoreal rendering',
+    text: 'Ray-traced studio images and 4K exports — presentation-grade output straight from a browser tab.',
   },
   {
     icon: <ShieldCheck aria-hidden="true" className="w-5 h-5" />,
