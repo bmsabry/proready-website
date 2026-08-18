@@ -41,7 +41,10 @@ const courses = [
     level: "Beginner to Expert",
     attendees: "15 Seats",
     description: "De-mystify DLE combustion. Master the dynamics corridor, emissions mapping strategy, and flex-fuel troubleshooting from first principles to expert level. No prior gas turbine knowledge required.",
-    nextDate: "May 15, 2026",
+    // Prerendered fallback only — the live API overrides this on hydration.
+    // It is still what crawlers and no-JS visitors read, so a stale value
+    // advertises a cohort that has already moved.
+    nextDate: "August 29, 2026",
     slug: "gas-turbine-emissions-mapping",
     code: "gas-turbine-emissions-mapping-2026-05",
     featured: true

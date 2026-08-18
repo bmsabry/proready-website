@@ -157,12 +157,23 @@ const IDEAL_FOR = [
 // -----------------------------------------------------------------------------
 // Default schedule used when the API hasn't responded yet (or is unavailable
 // in local preview). Admin can override these any time via the dashboard.
+//
+// This list is also what search engines and no-JS visitors see, because the
+// page is prerendered to static HTML at build time and only swaps to live
+// data after hydration. So it is not merely a loading state — it is the
+// published schedule until the fetch lands, and a stale one advertises a
+// cohort that no longer exists.
+//
+// Keep it the same LENGTH as CURRICULUM. Any day beyond CURRICULUM renders
+// as "Schedule TBD" (that fallback exists so an admin can extend a cohort
+// past the written curriculum without a code change) — which is fine for a
+// deliberately longer cohort, and embarrassing when it is just this list
+// having gone out of date.
 const DEFAULT_DAY_DATES: string[] = [
-  'May 16, 2026',
-  'May 17, 2026',
-  'May 23, 2026',
-  'May 24, 2026',
-  'May 30, 2026',
+  'August 29, 2026',
+  'August 30, 2026',
+  'September 5, 2026',
+  'September 6, 2026',
 ];
 
 const GasTurbineEmissionsMapping = () => {
