@@ -12,3 +12,4 @@ itsdangerous==2.2.0
 cryptography==43.0.3
 stripe==12.5.1
 pillow==11.3.0
+tzdata==2025.2

@@ -1659,5 +1659,210 @@ def test_prompt_forbids_inventing_a_time():
 
     assert "NEVER state a time of day" in SYSTEM_PROMPT
     assert "session_time_utc" in SYSTEM_PROMPT
-    # Converting a real time to local zones is explicitly still allowed.
-    assert "local zones" in SYSTEM_PROMPT
+    # Converting a real time to attendees' own zones is still encouraged —
+    # it just has to go through the tool that does it correctly.
+    assert "session_local_times" in SYSTEM_PROMPT
+
+
+def test_patch_course_persists_the_session_time(client, db):
+    """The PATCH handler silently dropped these fields when they shipped."""
+    from datetime import date
+
+    from app.models import Course
+
+    if db.execute(select(Course).where(Course.code == "patchtime")).scalar_one_or_none() is None:
+        db.add(Course(code="patchtime", title="P", start_date=date(2026, 9, 1), total_seats=5))
+        db.commit()
+
+    r = client.patch(
+        "/api/admin/courses/patchtime",
+        json={"session_time_utc": "14:00", "session_duration_minutes": 340},
+        headers=AUTH,
+    )
+    assert r.status_code == 200
+    assert r.json()["session_time_utc"] == "14:00"
+    assert r.json()["session_duration_minutes"] == 340
+
+    db.expire_all()
+    c = db.execute(select(Course).where(Course.code == "patchtime")).scalar_one()
+    assert c.session_time_utc == "14:00"
+
+
+def test_prompt_sends_the_agent_to_the_website_for_times():
+    from app.routes.ai import SYSTEM_PROMPT
+
+    assert "PUBLISHED ON THE WEBSITE" in SYSTEM_PROMPT
+    assert "/training/gas-turbine-emissions-mapping" in SYSTEM_PROMPT
+    assert "disagree" in SYSTEM_PROMPT
+
+
+# ---------------------------------------------------------------------------
+# Local session times
+# ---------------------------------------------------------------------------
+#
+# Registrants are in Ohio, British Columbia, Québec, Algeria and Saudi
+# Arabia. "UTC+3" makes them do the conversion; "17:00 for you in Saudi
+# Arabia" does not. The arithmetic lives in Python because offsets move
+# with the season and an hour wrong is an attendee who misses a session.
+
+
+@pytest.mark.parametrize(
+    "location,expected",
+    [
+        ("West Chester Township", "America/New_York"),
+        ("Kitimat, BC, CAN", "America/Vancouver"),   # BC beats CAN
+        ("Kitimat, Canada", "America/Vancouver"),    # city beats country
+        ("Montréal Canada", "America/Toronto"),
+        ("Laghouat", "Africa/Algiers"),
+        ("algeria", "Africa/Algiers"),
+        ("Yanbu", "Asia/Riyadh"),
+        ("  YANBU  ", "Asia/Riyadh"),
+    ],
+)
+def test_real_registrant_locations_resolve(location, expected):
+    from app.local_times import resolve_zone
+
+    assert resolve_zone(location) == expected
+
+
+@pytest.mark.parametrize("ambiguous", ["Kingston", "Springfield", "", "   ", "asdfgh"])
+def test_ambiguous_places_resolve_to_nothing(ambiguous):
+    """Kingston is Jamaica, Ontario, London and New York. Guessing is worse
+    than admitting, because nobody double-checks a time that looks right."""
+    from app.local_times import resolve_zone
+
+    assert resolve_zone(ambiguous) is None
+
+
+def test_country_substring_does_not_beat_the_city():
+    """'south africa' must not be matched by 'africa', and 'new york' the
+    city must not be swallowed by the 'york' in another word."""
+    from app.local_times import resolve_zone
+
+    assert resolve_zone("South Africa") == "Africa/Johannesburg"
+    assert resolve_zone("New York") == "America/New_York"
+
+
+def test_local_times_match_the_published_website_schedule():
+    """14:00 UTC must reproduce exactly what /training already tells people:
+    Pacific 07:00, Eastern 10:00, UTC+1 15:00, UTC+3 17:00."""
+    from app.local_times import local_schedule
+
+    out = local_schedule(
+        session_time_utc="14:00",
+        duration_minutes=340,
+        day_dates=["2026-08-29", "2026-08-30", "2026-09-05", "2026-09-06"],
+        locations=["Kitimat, BC, CAN", "Montréal Canada", "Laghouat", "Yanbu"],
+    )
+    assert out["ok"] is True
+    first = {z["timezone"]: z["sessions"][0] for z in out["zones"]}
+    assert first["America/Vancouver"]["start"] == "07:00"
+    assert first["America/Toronto"]["start"] == "10:00"
+    assert first["Africa/Algiers"]["start"] == "15:00"
+    assert first["Asia/Riyadh"]["start"] == "17:00"
+    # End of a 5h40m day, as published (Eastern 10:00 -> 15:40).
+    assert first["America/Toronto"]["end"] == "15:40"
+    assert first["Asia/Riyadh"]["end"] == "22:40"
+
+
+def test_daylight_saving_is_handled_per_date():
+    """The same UTC time is a different local hour in December. A fixed
+    offset table would get this wrong and nobody would notice until people
+    joined an hour late."""
+    from app.local_times import local_schedule
+
+    out = local_schedule(
+        session_time_utc="14:00", duration_minutes=60,
+        day_dates=["2026-08-29", "2026-12-15"], locations=["Montréal Canada"],
+    )
+    sessions = out["zones"][0]["sessions"]
+    assert sessions[0]["start"] == "10:00" and sessions[0]["abbrev"] == "EDT"
+    assert sessions[1]["start"] == "09:00" and sessions[1]["abbrev"] == "EST"
+
+
+def test_unresolved_locations_are_reported_not_buried():
+    from app.local_times import local_schedule
+
+    out = local_schedule(
+        session_time_utc="14:00", duration_minutes=60,
+        day_dates=["2026-08-29"], locations=["Yanbu", "Kingston"],
+    )
+    assert "Kingston" in out["unresolved_locations"]
+    assert [z["timezone"] for z in out["zones"]] == ["Asia/Riyadh"]
+
+
+def test_no_session_time_refuses_rather_than_assuming_utc():
+    from app.local_times import local_schedule
+
+    out = local_schedule(
+        session_time_utc="", duration_minutes=60,
+        day_dates=["2026-08-29"], locations=["Yanbu"],
+    )
+    assert out["ok"] is False
+    assert "website" in out["error"].lower()
+
+
+def test_utc_anchor_is_always_returned():
+    """Anyone whose zone is missing must still be able to convert."""
+    from app.local_times import local_schedule
+
+    out = local_schedule(
+        session_time_utc="14:00", duration_minutes=60,
+        day_dates=["2026-08-29"], locations=["Yanbu"],
+    )
+    assert out["utc_sessions"][0]["start"] == "14:00"
+    assert "14:00 UTC" in out["note"]
+
+
+def test_tool_groups_registrants_and_flags_the_unknown_ones(db):
+    from datetime import date
+
+    from app.ai_tools import session_local_times
+    from app.models import Course, Registration
+
+    if db.execute(select(Course).where(Course.code == "tz-course")).scalar_one_or_none() is None:
+        db.add(Course(code="tz-course", title="TZ", start_date=date(2026, 8, 29),
+                      total_seats=20, day_dates=["2026-08-29"],
+                      session_time_utc="14:00", session_duration_minutes=340))
+        db.commit()
+    for old in db.execute(
+        select(Registration).where(Registration.course_code == "tz-course")
+    ).scalars().all():
+        db.delete(old)
+    db.commit()
+
+    people = [
+        ("Yusuf", "Yanbu", "YASREF"),
+        ("Aissa", "Laghouat", "Sonatrach"),
+        # Bare "Kingston" is ambiguous, but the company names the city.
+        ("Tawfik", "Kingston", "Kingston University London"),
+        ("Nobody", "Atlantis", "Unknown Co"),
+    ]
+    for name, loc, company in people:
+        db.add(Registration(course_code="tz-course", full_name=name,
+                            email=f"{name.lower()}@example.com", job_title="Eng",
+                            company=company, years_experience="5", location=loc,
+                            status="pending"))
+    db.commit()
+
+    out = session_local_times(db, course_code="tz-course")
+    assert out["ok"] is True
+    zones = {z["timezone"]: z for z in out["zones"]}
+    assert zones["Asia/Riyadh"]["sessions"][0]["start"] == "17:00"
+    assert zones["Africa/Algiers"]["sessions"][0]["start"] == "15:00"
+    # Company rescued the ambiguous location.
+    assert "Europe/London" in zones
+    assert zones["Europe/London"]["sessions"][0]["start"] == "15:00"
+    # The genuinely unknown one is named, not guessed.
+    unknown = [u["name"] for u in out["registrants_without_a_known_timezone"]]
+    assert unknown == ["Nobody"]
+    assert "Do NOT guess" in out["unknown_warning"]
+    # No empty zones padding the list.
+    assert all(z["registrants"] for z in out["zones"])
+
+
+def test_prompt_routes_timing_through_the_tool():
+    from app.routes.ai import SYSTEM_PROMPT
+
+    assert "session_local_times" in SYSTEM_PROMPT
+    assert "never do this arithmetic yourself" in SYSTEM_PROMPT.lower()

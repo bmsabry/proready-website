@@ -96,6 +96,8 @@ def _to_out(course: Course, db: Session) -> CourseOut:
         price_cents=course.price_cents,
         currency=course.currency,
         recorded_product_code=course.recorded_product_code,
+        session_time_utc=course.session_time_utc or "",
+        session_duration_minutes=course.session_duration_minutes or 0,
     )
 
 
@@ -227,6 +229,10 @@ def patch_course(
         course.price_cents = body.price_cents
     if body.currency is not None:
         course.currency = body.currency.lower()
+    if body.session_time_utc is not None:
+        course.session_time_utc = body.session_time_utc.strip()
+    if body.session_duration_minutes is not None:
+        course.session_duration_minutes = body.session_duration_minutes
     if "recorded_product_code" in body.model_fields_set:
         # Explicit null clears the link; omitting the field leaves it alone.
         if body.recorded_product_code:

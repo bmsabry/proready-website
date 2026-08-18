@@ -993,6 +993,75 @@ def search_site(db: Session, query: str, limit: int = 6) -> Dict[str, Any]:
     return {"ok": True, "count": len(hits), "results": hits}
 
 
+
+
+def session_local_times(db: Session, course_code: str, **_: Any) -> Dict[str, Any]:
+    """Session times in each registrant's own local zone.
+
+    "17:00 for you in Saudi Arabia" beats "UTC+3". The arithmetic is done
+    with the IANA database rather than by the model, because offsets move
+    with the season and an hour wrong in a joining email is an attendee who
+    misses the session.
+    """
+    from .local_times import local_schedule, resolve_zone
+
+    course, err = _course_or_error(db, course_code)
+    if err:
+        return err
+
+    regs = (
+        db.execute(
+            select(Registration).where(
+                Registration.course_code == course_code,
+                Registration.status != "cancelled",
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    def _zone_for(r: Registration) -> Optional[str]:
+        # Company can disambiguate a city that cannot stand alone:
+        # "Kingston" is four different places; "Kingston University London"
+        # is not.
+        return resolve_zone(r.location or "") or resolve_zone(r.company or "")
+
+    zones_from_company = [z for z in (_zone_for(r) for r in regs) if z]
+    out = local_schedule(
+        session_time_utc=course.session_time_utc or "",
+        duration_minutes=course.session_duration_minutes or 0,
+        day_dates=[str(d) for d in (course.day_dates or [])],
+        locations=[r.location or "" for r in regs],
+        extra_zones=zones_from_company,
+    )
+    if not out.get("ok"):
+        return out
+
+    by_zone: Dict[str, List[str]] = {}
+    unknown: List[Dict[str, str]] = []
+    for r in regs:
+        z = _zone_for(r)
+        if z:
+            by_zone.setdefault(z, []).append(f"{r.full_name} ({r.location})")
+        else:
+            unknown.append({"name": r.full_name, "location": r.location or "(blank)"})
+
+    for zone in out["zones"]:
+        zone["registrants"] = by_zone.get(zone["timezone"], [])
+    # Drop zones nobody is actually in — a list of empty time zones in an
+    # email is noise that makes the real ones harder to find.
+    out["zones"] = [z for z in out["zones"] if z["registrants"]]
+    out["course_code"] = course_code
+    out["registrants_without_a_known_timezone"] = unknown
+    if unknown:
+        out["unknown_warning"] = (
+            "These registrants' locations could not be matched to a timezone. "
+            "Do NOT guess their local time — leave them to the UTC line, or "
+            "ask Bassam where they are."
+        )
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Tool registry
 # ---------------------------------------------------------------------------
@@ -1033,6 +1102,7 @@ TOOL_HANDLERS = {
     "list_site_pages": list_site_pages,
     "read_site_page": read_site_page,
     "search_site": search_site,
+    "session_local_times": session_local_times,
 }
 
 
@@ -1438,7 +1508,18 @@ TOOL_SPECS = [
         "List every public page on the website with its title. Use to see what exists before searching or reading. Read-only.",
         {"type": "object", "properties": {}, "required": []},
     ),
-]# Tools that always require admin confirmation in chat.
+    _fn(
+        "session_local_times",
+        "Session start and end times converted into the local timezone of every registrant on a cohort, from the locations they gave. Use this whenever an email has to tell people WHEN to attend. Daylight saving on each session date is handled for you — never do this arithmetic yourself. Registrants whose location cannot be matched to a timezone come back in their own list and must not be guessed at.",
+        {
+            "type": "object",
+            "properties": {"course_code": {"type": "string", "description": "Course code from list_courses."}},
+            "required": ["course_code"],
+        },
+    ),
+]
+
+# Tools that always require admin confirmation in chat.
 HIGH_STAKES_ALWAYS = {
     "notify_course",
     "notify_product_buyers",
