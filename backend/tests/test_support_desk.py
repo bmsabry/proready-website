@@ -1127,3 +1127,114 @@ def test_list_style_headers_are_understood(client, db, monkeypatch):
         select(SupportTicket).where(SupportTicket.submitter_email == "listhdr@example.com")
     ).scalars().all()
     assert len(found) == 1, "In-Reply-To from a list-style header must still thread"
+
+
+# ---------------------------------------------------------------------------
+# Cross-brand isolation
+# ---------------------------------------------------------------------------
+#
+# Resend webhooks subscribe to EVENT TYPES, not domains — there is no
+# per-domain filter anywhere in the dashboard or the API. Every
+# `email.received` in the account is fanned out to every endpoint listening
+# for it, and this account also serves promechdirectory.com, which runs its
+# own support desk on its own inbound webhook. Without a recipient check,
+# each business ingests the other's customers and answers them under the
+# wrong brand. These tests are the guard on that.
+
+
+def test_mail_for_another_brand_is_ignored(client, db, monkeypatch, captured_mail):
+    """A ProMechDirectory customer must never open a ProReadyEngineer ticket."""
+    fake_llm(monkeypatch, None)
+    before = len(db.execute(select(SupportTicket)).scalars().all())
+
+    r = client.post(
+        "/api/webhooks/resend-inbound",
+        json={
+            "type": "email.received",
+            "data": {
+                "email_id": "promech-1",
+                "from": "buyer@othercompany.example",
+                "to": ["info@mail.promechdirectory.com"],
+                "received_for": "info@mail.promechdirectory.com",
+                "subject": "RFQ question",
+                "text": "How do I submit an RFQ?",
+            },
+        },
+    )
+    assert r.status_code == 200
+    db.expire_all()
+    assert len(db.execute(select(SupportTicket)).scalars().all()) == before
+    assert captured_mail == [], "must not auto-reply to another brand's customer"
+
+
+def test_mail_for_us_is_accepted(client, db, monkeypatch):
+    """The guard must not reject our own mail."""
+    fake_llm(monkeypatch, None)
+    client.post(
+        "/api/webhooks/resend-inbound",
+        json={
+            "data": {
+                "email_id": "ours-1",
+                "from": "student@example.com",
+                "to": ["info@mail.proreadyengineer.com"],
+                "received_for": "info@mail.proreadyengineer.com",
+                "subject": "Course dates",
+                "text": "When does the next cohort run?",
+            }
+        },
+    )
+    db.expire_all()
+    found = db.execute(
+        select(SupportTicket).where(SupportTicket.submitter_email == "student@example.com")
+    ).scalars().all()
+    assert len(found) == 1
+
+
+@pytest.mark.parametrize(
+    "recipients,expected",
+    [
+        (["info@mail.proreadyengineer.com"], True),
+        (["ProReadyEngineer <info@mail.proreadyengineer.com>"], True),
+        (["INFO@MAIL.PROREADYENGINEER.COM"], True),
+        (["anything@mail.proreadyengineer.com"], True),
+        # Someone else on the same Resend account.
+        (["info@mail.promechdirectory.com"], False),
+        (["support@promechdirectory.com"], False),
+        # Multi-recipient: ours anywhere in the list counts.
+        (["info@mail.promechdirectory.com", "info@mail.proreadyengineer.com"], True),
+        ("a@promechdirectory.com, info@mail.proreadyengineer.com", True),
+        # Unknown/absent recipient: treated as ours so a human still sees it.
+        ([], True),
+        (None, True),
+        (["not-an-address"], True),
+        # A lookalike domain must NOT pass.
+        (["info@mail.proreadyengineer.com.evil.example"], False),
+        (["info@notmail.proreadyengineer.com"], False),
+    ],
+)
+def test_recipient_matching(recipients, expected):
+    assert svc.is_for_us(recipients) is expected
+
+
+def test_promech_inbound_does_not_reach_our_triage(client, db, monkeypatch):
+    """End to end: the fan-out lands, and nothing at all happens."""
+    calls = []
+    monkeypatch.setattr(
+        svc, "process_ticket", lambda db_, tid: calls.append(tid)
+    )
+    for addr in (
+        "info@mail.promechdirectory.com",
+        "sales@promechdirectory.com",
+    ):
+        client.post(
+            "/api/webhooks/resend-inbound",
+            json={
+                "data": {
+                    "from": "someone@example.com",
+                    "received_for": addr,
+                    "subject": "Not ours",
+                    "text": "hello",
+                }
+            },
+        )
+    assert calls == [], "triage must never run for another brand's mail"

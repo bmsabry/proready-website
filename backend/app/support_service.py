@@ -145,6 +145,17 @@ def support_from() -> str:
 SUPPORT_ADDRESS = "info@mail.proreadyengineer.com"
 SUPPORT_DOMAIN = "mail.proreadyengineer.com"
 
+# Inbound mail is only ours if it was addressed to this domain.
+#
+# This guard is not paranoia — it is required. Resend webhooks subscribe to
+# EVENT TYPES, not domains: there is no per-domain filter in the dashboard or
+# the API. Every `email.received` in the account is delivered to every
+# endpoint listening for it. This Resend account also serves
+# promechdirectory.com, which has its own receiving domain and its own
+# inbound webhook, so without this check each business would ingest the
+# other's customers and auto-reply to them under the wrong brand.
+RECEIVING_DOMAINS = {SUPPORT_DOMAIN}
+
 # Mail from any of these is us. Auto-replying to our own address is how a
 # support desk mails itself into a loop until the sending quota is gone.
 OUR_ADDRESSES = {
@@ -1351,6 +1362,38 @@ def _normalize_subject(subject: str) -> str:
     return s.lower()
 
 
+def is_for_us(recipients: list[str] | str | None) -> bool:
+    """True when an inbound email was addressed to one of our domains.
+
+    Resend fans `email.received` out to every endpoint subscribed to that
+    event across the whole account, with no per-domain filter, so an
+    endpoint has to decide for itself whether a message is its business.
+
+    Unknown/empty recipients return True: a message we cannot attribute is
+    better handled as ours (it reaches a human) than dropped silently. The
+    cross-brand leak this guards against always carries an explicit
+    recipient, so the permissive fallback does not reopen it.
+    """
+    if not recipients:
+        return True
+    if isinstance(recipients, str):
+        recipients = [recipients]
+    seen_any = False
+    for entry in recipients:
+        if not isinstance(entry, str):
+            continue
+        for part in entry.split(","):
+            part = part.strip().lower()
+            if "<" in part and ">" in part:
+                part = part.split("<", 1)[1].split(">", 1)[0].strip()
+            if "@" not in part:
+                continue
+            seen_any = True
+            if part.rsplit("@", 1)[-1] in RECEIVING_DOMAINS:
+                return True
+    return not seen_any
+
+
 def ingest_inbound(
     db: Session,
     *,
@@ -1362,11 +1405,13 @@ def ingest_inbound(
     in_reply_to: str = "",
     references: str = "",
     message_id: str = "",
+    to: list[str] | str | None = None,
 ) -> tuple[Optional[SupportTicket], bool]:
     """Land an inbound email on a ticket. Returns (ticket, needs_triage).
 
     needs_triage is False when nothing should run — a duplicate webhook
-    delivery, or a message we sent ourselves.
+    delivery, a message we sent ourselves, or mail for a different brand
+    on the same Resend account.
     """
     addr = (from_email or "").lower().strip()
     if not addr:
@@ -1375,6 +1420,13 @@ def ingest_inbound(
 
     if addr in OUR_ADDRESSES:
         log.info("[support] inbound from our own address (%s) — ignored", addr)
+        return None, False
+
+    if not is_for_us(to):
+        log.info(
+            "[support] inbound addressed to %s — not one of our domains, ignored",
+            to,
+        )
         return None, False
 
     # Resend redelivers on any non-2xx, so the same Message-ID can arrive

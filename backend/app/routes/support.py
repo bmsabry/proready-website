@@ -369,6 +369,16 @@ def _fetch_received_email(email_id: str) -> Optional[dict]:
     return data if isinstance(data, dict) else None
 
 
+def _hdr_lookup(headers: dict, *names: str) -> str:
+    """Case-insensitive header read across the shapes Resend has used."""
+    for n in names:
+        for key in (n, n.lower(), n.title(), n.upper()):
+            v = headers.get(key)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+    return ""
+
+
 def _parse_from(raw: str, headers: dict) -> tuple[str, str]:
     """Split a From header into (email, display name)."""
     src = raw or ""
@@ -428,6 +438,27 @@ def _handle_inbound(body: dict, background: BackgroundTasks, db: Session) -> dic
         log.warning("[support] inbound webhook: no sender; keys=%s", list(body)[:12])
         return {"ok": True}
 
+    # Who was this addressed to? Resend delivers every `email.received` in
+    # the account to every endpoint subscribed to that event — there is no
+    # per-domain filter — and this account also serves promechdirectory.com.
+    # Without checking the recipient, each brand's desk would ingest the
+    # other's customers. `received_for` is Resend's own "which of your
+    # addresses caught this" field, so it is the most reliable signal.
+    recipients: list[str] = []
+    for key in ("received_for", "to", "cc", "bcc"):
+        for src in (data, body):
+            if not isinstance(src, dict):
+                continue
+            v = src.get(key)
+            if isinstance(v, str) and v.strip():
+                recipients.append(v)
+            elif isinstance(v, list):
+                recipients.extend(x for x in v if isinstance(x, str))
+    if not recipients:
+        hdr_to = _hdr_lookup(headers, "to", "delivered-to", "x-original-to")
+        if hdr_to:
+            recipients.append(hdr_to)
+
     subject = _pick(data, body, "subject") or "(no subject)"
     body_text = _pick(data, body, "text", "plain", "textBody", "text_body")
     body_html = _pick(data, body, "html", "htmlBody", "html_body")
@@ -459,6 +490,12 @@ def _handle_inbound(body: dict, background: BackgroundTasks, db: Session) -> dic
             subject = fetched.get("subject") or subject
             body_text = fetched.get("text") or body_text
             body_html = fetched.get("html") or body_html
+            for key in ("received_for", "to"):
+                fv = fetched.get(key)
+                if isinstance(fv, str) and fv.strip():
+                    recipients.append(fv)
+                elif isinstance(fv, list):
+                    recipients.extend(x for x in fv if isinstance(x, str))
             fh = fetched.get("headers")
             if isinstance(fh, dict):
                 lowered = {str(k).lower(): str(v) for k, v in fh.items()}
@@ -486,6 +523,7 @@ def _handle_inbound(body: dict, background: BackgroundTasks, db: Session) -> dic
             in_reply_to=in_reply_to,
             references=references,
             message_id=message_id,
+            to=recipients,
         )
         db.commit()
     except Exception:
