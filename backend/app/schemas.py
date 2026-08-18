@@ -199,6 +199,10 @@ class AIChatMessage(BaseModel):
 
 class AIChatIn(BaseModel):
     messages: List[AIChatMessage] = Field(min_length=1, max_length=200)
+    # Which admin screen Bassam is looking at, sent by the chat widget.
+    # Without it the assistant asks him to type things that are already on
+    # his screen — "which course?" while he is standing in one.
+    page_context: Optional[str] = Field(default=None, max_length=300)
 
 
 class PendingActionOut(BaseModel):

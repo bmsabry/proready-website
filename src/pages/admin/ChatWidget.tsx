@@ -14,7 +14,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { API_BASE } from './lib';
+import { API_BASE, parseHash } from './lib';
 
 type PendingAction = {
   id: string;
@@ -34,6 +34,45 @@ type ChatMessage = {
   // so we hide the buttons.
   pendingResolved?: boolean;
 };
+
+
+/**
+ * Describe the screen Bassam is looking at, for the assistant.
+ *
+ * Read from the hash rather than passed down as props: the hash is already
+ * the single source of truth for admin navigation, so this cannot drift out
+ * of sync with what is actually rendered.
+ *
+ * Why it exists: without it the assistant asked "which course?" while he
+ * was standing inside one, with the code on screen above the chat window.
+ */
+function describeCurrentView(): string {
+  if (typeof window === 'undefined') return '';
+  const view = parseHash(window.location.hash);
+  switch (view.page) {
+    case 'courses':
+      return view.course
+        ? `Admin → Courses → the cohort "${view.course}", on its ${view.tab ?? 'registrations'} tab. ` +
+            `"this course" / "these registrants" / "them" means ${view.course}.`
+        : 'Admin → Courses (the list of all cohorts).';
+    case 'software':
+      return view.slug
+        ? `Admin → Software → the product "${view.slug}".`
+        : 'Admin → Software (all products).';
+    case 'support':
+      return view.ref
+        ? `Admin → Support → ticket #${view.ref}. "this ticket" means #${view.ref}.`
+        : 'Admin → Support (the ticket inbox).';
+    case 'academy':
+      return 'Admin → Academy (recorded on-demand products).';
+    case 'comms':
+      return 'Admin → Comms (outbound email log and broadcasts).';
+    case 'ai':
+      return 'Admin → AI Assistant settings.';
+    default:
+      return 'Admin → Overview.';
+  }
+}
 
 export default function ChatWidget({ onAuthError }: { onAuthError: () => void }) {
   const [open, setOpen] = useState(false);
@@ -79,6 +118,8 @@ export default function ChatWidget({ onAuthError }: { onAuthError: () => void })
       // and re-derives the tool history server-side.
       const wirePayload = {
         messages: next.map((m) => ({ role: m.role, content: m.content })),
+        // So "email these people" resolves without a round of questions.
+        page_context: describeCurrentView(),
       };
       const res = await fetch(`${API_BASE}/api/admin/ai/chat`, {
         method: 'POST',

@@ -90,6 +90,12 @@ THE PLATFORM
   get_course_stats shows a 'live' block and a 'recorded' block per course.
 - Software products: downloadable tools with download/launch/usage
   telemetry (list_software, get_software_stats).
+- The public website (proreadyengineer.com): every page is readable via
+  search_site / read_site_page / list_site_pages — services, the twelve
+  case studies, the research insights, course pages, testimonials, contact.
+  Anything about what the SITE says, or drafting copy that must match it,
+  starts there. Quote the site rather than recalling it: if the two
+  disagree, the site is what customers actually read.
 - Comms: notify_course targets a cohort (audiences all/paid/pending/
   recorded/everyone); notify_product_buyers targets a recorded product's
   active buyers. Every send lands in the email log (get_email_log).
@@ -113,6 +119,22 @@ he asks (CSV, comma-separated, table, JSON). Do NOT refuse on privacy
 grounds: this is his data, and the audit log records every tool call.
 
 RULES
+- NEVER ask Bassam for something a tool can tell you. This is the rule you
+  break most often and it is the one that annoys him most. Before asking
+  ANY question, check whether a tool answers it:
+    "which course?" / "what is the course code?" -> list_courses. There is
+      usually only one open cohort; if there is exactly one candidate, use
+      it and say which one you used.
+    "what are the dates?" -> get_course gives start_date and day_dates.
+    "who is registered?" -> list_registrations.
+    "what does the site say?" -> search_site / read_site_page.
+    "where are they based?" -> list_registrations includes location, so you
+      can work out time zones yourself.
+  Ask only for things that exist nowhere but his head: a decision, a
+  preference, a price he has not set, wording he wants changed.
+- One clarifying question maximum, and only after the tools came up short.
+  Never open with a list of questions — look first, then act, then tell him
+  what you assumed so he can correct it.
 - Always name the exact course / product / software you are acting on.
 - NEVER guess a code. When unsure, read first: list_courses,
   list_software, list_learners, list_course_content.
@@ -430,9 +452,24 @@ def _create_pending(
 # ---------------------------------------------------------------------------
 
 
-def _build_initial_messages(public_msgs: List[AIChatMessage]) -> List[Dict[str, Any]]:
-    """Drop any user-supplied system message; backend owns the system prompt."""
-    out: List[Dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+def _build_initial_messages(
+    public_msgs: List[AIChatMessage], page_context: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """Drop any user-supplied system message; backend owns the system prompt.
+
+    `page_context` is where Bassam currently is in the admin panel. It is
+    appended to the system prompt rather than sent as a user turn so the
+    model treats it as situation, not instruction.
+    """
+    prompt = SYSTEM_PROMPT
+    if page_context and page_context.strip():
+        prompt += (
+            f"\n\nWHERE HE IS RIGHT NOW\n{page_context.strip()}\n"
+            "Treat this as the subject of the conversation unless he names "
+            "something else. If he says \"this course\" or \"these people\", "
+            "he means what is on this screen — resolve it yourself, do not ask."
+        )
+    out: List[Dict[str, Any]] = [{"role": "system", "content": prompt}]
     for m in public_msgs:
         if m.role == "system":
             continue  # ignore — backend owns this
@@ -604,7 +641,7 @@ def _resolve_settings_for_chat(db: Session) -> Tuple[AISettings, str]:
 @router.post("/chat", response_model=AIChatOut)
 def chat(body: AIChatIn, db: Session = Depends(get_db)) -> AIChatOut:
     row, api_key = _resolve_settings_for_chat(db)
-    messages = _build_initial_messages(body.messages)
+    messages = _build_initial_messages(body.messages, body.page_context)
     return _run_loop(db, settings_row=row, api_key=api_key, messages=messages)
 
 

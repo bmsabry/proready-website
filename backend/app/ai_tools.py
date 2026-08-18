@@ -923,6 +923,57 @@ def mark_attendance_confirmed(db: Session, email: str) -> Dict[str, Any]:
     return {"ok": True, "confirmed": confirmed}
 
 
+
+
+# ---------------------------------------------------------------------------
+# The public website
+# ---------------------------------------------------------------------------
+#
+# The assistant used to know every row in the database and nothing about
+# the site those rows belong to. These read the live prerendered pages, so
+# what it quotes is what a visitor actually sees today.
+
+
+def list_site_pages(db: Session, **_: Any) -> Dict[str, Any]:
+    from . import site_content
+
+    pages = site_content.list_pages()
+    if not pages:
+        return {
+            "ok": False,
+            "error": "Could not read the website right now. Answer from the database instead, and say you could not check the site.",
+        }
+    return {"ok": True, "count": len(pages), "pages": pages}
+
+
+def read_site_page(db: Session, path: str) -> Dict[str, Any]:
+    from . import site_content
+
+    page = site_content.read_page(path)
+    if page is None:
+        available = [p["path"] for p in site_content.list_pages()]
+        return {
+            "ok": False,
+            "error": f"No public page at '{path}'.",
+            "available_paths": available,
+        }
+    return {"ok": True, **page}
+
+
+def search_site(db: Session, query: str, limit: int = 6) -> Dict[str, Any]:
+    from . import site_content
+
+    hits = site_content.search(query, limit=max(1, min(int(limit or 6), 15)))
+    if not hits:
+        return {
+            "ok": True,
+            "count": 0,
+            "results": [],
+            "note": f"Nothing on the website mentions '{query}'. Do not claim the site says something it does not.",
+        }
+    return {"ok": True, "count": len(hits), "results": hits}
+
+
 # ---------------------------------------------------------------------------
 # Tool registry
 # ---------------------------------------------------------------------------
@@ -960,6 +1011,9 @@ TOOL_HANDLERS = {
     "get_support_stats": get_support_stats,
     "list_unconfirmed": list_unconfirmed,
     "mark_attendance_confirmed": mark_attendance_confirmed,
+    "list_site_pages": list_site_pages,
+    "read_site_page": read_site_page,
+    "search_site": search_site,
 }
 
 
@@ -1337,8 +1391,33 @@ TOOL_SPECS = [
             "required": ["email"],
         },
     ),
-]
-# Tools that always require admin confirmation in chat.
+    _fn(
+        "search_site",
+        "Search the live public website (proreadyengineer.com) for a word or topic and get matching pages with excerpts. Use this whenever a question is about what the WEBSITE says — services, case studies, research insights, course descriptions, positioning, wording. Read-only.",
+        {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Words to look for, e.g. 'hydrogen', 'test cell', 'emissions mapping'."},
+                "limit": {"type": "integer", "description": "Max pages to return, 1-15. Default 6."},
+            },
+            "required": ["query"],
+        },
+    ),
+    _fn(
+        "read_site_page",
+        "Read the full text of one public page exactly as a visitor sees it. Use after search_site, or when you know the path. Read-only.",
+        {
+            "type": "object",
+            "properties": {"path": {"type": "string", "description": "Path such as /services/gas-turbine-combustion or /training."}},
+            "required": ["path"],
+        },
+    ),
+    _fn(
+        "list_site_pages",
+        "List every public page on the website with its title. Use to see what exists before searching or reading. Read-only.",
+        {"type": "object", "properties": {}, "required": []},
+    ),
+]# Tools that always require admin confirmation in chat.
 HIGH_STAKES_ALWAYS = {
     "notify_course",
     "notify_product_buyers",

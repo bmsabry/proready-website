@@ -558,6 +558,23 @@ def customer_context(db: Session, email: str) -> dict[str, Any]:
     return out
 
 
+def site_index() -> str:
+    """What pages the public website has, for the auto-replier.
+
+    The index, not the prose: enough for it to point someone at the right
+    page ("we cover that in the hydrogen conversion article at /insights/…")
+    without dragging a hundred thousand characters of copy into every
+    single ticket classification.
+    """
+    try:
+        from . import site_content
+
+        return site_content.index_summary()
+    except Exception:
+        log.warning("[support] site index unavailable", exc_info=True)
+        return ""
+
+
 def platform_context(db: Session) -> dict[str, Any]:
     """Live facts about what's on sale, so the model quotes real dates.
 
@@ -597,7 +614,11 @@ def platform_context(db: Session) -> dict[str, Any]:
         }
         for p in db.execute(select(Product)).scalars().all()
     ]
-    return {"live_courses": courses, "recorded_products": products}
+    return {
+        "live_courses": courses,
+        "recorded_products": products,
+        "website_pages": site_index(),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -787,6 +808,10 @@ WRITING THE REPLY
   claim to have checked anything.
 - Use the supplied PLATFORM CONTEXT for dates, seats and prices. Never
   state a date, price, or seat count that is not in it.
+- PLATFORM CONTEXT also lists every page on proreadyengineer.com. You may
+  point someone at a page that is in that list ("there's a detailed write-up
+  at /insights/vortex-breakdown"). Never invent a URL that is not listed,
+  and never claim to know what a page says beyond its title.
 - HTML only: <p>, <ul>, <li>, <strong>, <a>. No headings, no inline styles.
   Under 180 words. Do not add a sign-off or a ticket reference — the system
   appends those.

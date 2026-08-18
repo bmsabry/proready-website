@@ -1450,3 +1450,123 @@ def test_assistant_reports_unknown_course_and_email_cleanly(db):
 
     assert list_unconfirmed(db, course_code="no-such-course")["ok"] is False
     assert mark_attendance_confirmed(db, email="nobody@nowhere.example")["ok"] is False
+
+
+# ---------------------------------------------------------------------------
+# The assistant knowing the website, and knowing where you are
+# ---------------------------------------------------------------------------
+#
+# The complaint that produced these: standing inside a course workspace,
+# with the course code on screen, the assistant asked "what is the course
+# code?" — a question three separate tools could have answered.
+
+
+def test_site_tools_read_real_pages(monkeypatch):
+    from app import site_content
+    from app.ai_tools import list_site_pages, read_site_page, search_site
+
+    monkeypatch.setattr(
+        site_content,
+        "_refresh",
+        lambda force=False: {
+            "fetched_at": 9e9,
+            "order": ["/training", "/services/gas-turbine-combustion"],
+            "pages": {
+                "/training": {"title": "Training", "text": "Gas Turbine Emissions Mapping runs live online."},
+                "/services/gas-turbine-combustion": {
+                    "title": "Combustion Consulting",
+                    "text": "DLN and DLE combustion tuning, hydrogen conversion, dynamics diagnosis.",
+                },
+            },
+        },
+    )
+
+    listed = list_site_pages(None)
+    assert listed["ok"] is True and listed["count"] == 2
+
+    page = read_site_page(None, path="/training")
+    assert page["ok"] is True and "Emissions Mapping" in page["text"]
+
+    # Path forgiveness — a trailing slash is not a different page.
+    assert read_site_page(None, path="training")["ok"] is True
+
+    found = search_site(None, query="hydrogen")
+    assert found["count"] == 1
+    assert found["results"][0]["path"] == "/services/gas-turbine-combustion"
+
+
+def test_site_search_does_not_invent_matches(monkeypatch):
+    """A miss must read as a miss, or the agent will pad it into a claim."""
+    from app import site_content
+    from app.ai_tools import search_site
+
+    monkeypatch.setattr(
+        site_content, "_refresh",
+        lambda force=False: {"fetched_at": 9e9, "order": ["/x"],
+                             "pages": {"/x": {"title": "X", "text": "nothing relevant"}}},
+    )
+    out = search_site(None, query="nuclear submarines")
+    assert out["count"] == 0
+    assert "do not claim" in out["note"].lower()
+
+
+def test_unknown_page_lists_what_does_exist(monkeypatch):
+    from app import site_content
+    from app.ai_tools import read_site_page
+
+    monkeypatch.setattr(
+        site_content, "_refresh",
+        lambda force=False: {"fetched_at": 9e9, "order": ["/training"],
+                             "pages": {"/training": {"title": "T", "text": "t"}}},
+    )
+    out = read_site_page(None, path="/nope")
+    assert out["ok"] is False
+    assert "/training" in out["available_paths"]
+
+
+def test_site_unreachable_degrades_to_an_error_not_a_crash(monkeypatch):
+    from app import site_content
+    from app.ai_tools import list_site_pages
+
+    monkeypatch.setattr(
+        site_content, "_refresh",
+        lambda force=False: {"fetched_at": 0, "order": [], "pages": {}},
+    )
+    out = list_site_pages(None)
+    assert out["ok"] is False
+    assert "database" in out["error"].lower()
+
+
+def test_page_context_reaches_the_system_prompt():
+    """The fix for 'which course?' asked while standing in one."""
+    from app.routes.ai import _build_initial_messages
+    from app.schemas import AIChatMessage
+
+    msgs = _build_initial_messages(
+        [AIChatMessage(role="user", content="email these people")],
+        'Admin → Courses → the cohort "gas-turbine-emissions-mapping-2026-05", '
+        'on its registrations tab.',
+    )
+    system = msgs[0]["content"]
+    assert msgs[0]["role"] == "system"
+    assert "gas-turbine-emissions-mapping-2026-05" in system
+    assert "WHERE HE IS RIGHT NOW" in system
+    assert "do not ask" in system.lower()
+
+
+def test_no_page_context_leaves_the_prompt_alone():
+    from app.routes.ai import SYSTEM_PROMPT, _build_initial_messages
+    from app.schemas import AIChatMessage
+
+    msgs = _build_initial_messages([AIChatMessage(role="user", content="hi")], None)
+    assert msgs[0]["content"] == SYSTEM_PROMPT
+
+
+def test_prompt_forbids_asking_what_a_tool_answers():
+    from app.routes.ai import SYSTEM_PROMPT
+
+    assert "NEVER ask Bassam for something a tool can tell you" in SYSTEM_PROMPT
+    # The exact questions it actually asked, now explicitly routed to tools.
+    for q in ("what is the course code?", "what are the dates?"):
+        assert q in SYSTEM_PROMPT
+    assert "search_site" in SYSTEM_PROMPT
