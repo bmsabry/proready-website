@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Download, CheckCircle2, ShieldCheck, Sparkles, Boxes, Camera, Ruler, Heart, CircleDollarSign, ClipboardCheck, Wand2,
+  Download, CheckCircle2, ShieldCheck, Sparkles, Boxes, Camera, Ruler, Heart, CircleDollarSign, ClipboardCheck, Wand2, FolderOpen, GitCompare,
 } from 'lucide-react';
 import highlights from '../data/pro3dworks-highlights.json';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
@@ -17,9 +17,14 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
     text: 'STEP, IGES, STL, Parasolid (.x_t), 3MF, GLB, OBJ and more — including large assemblies, with an instant reopen cache.',
   },
   {
+    icon: <FolderOpen aria-hidden="true" className="w-5 h-5" />,
+    title: 'Save the whole review as a project',
+    text: 'One .p3dproject file captures the model plus your entire workspace — names, classifications and materials, visibility, bookmarks, issues, redlines, captured measurements, camera and section state. Reopen it tomorrow and continue exactly where you stopped — without the original CAD file. Ctrl+S and done.',
+  },
+  {
     icon: <Ruler aria-hidden="true" className="w-5 h-5" />,
     title: 'Real inspection tools',
-    text: 'Measure vertices, edges and faces; section views; exploded views; mass properties; interference checks; model scaling. Now with a persistent Object Inspector — identity, materials, metadata and “select similar” — and a deterministic model/import health report: click any finding to frame the affected parts, or copy it out as an engineering handoff.',
+    text: 'Measure vertices, edges and faces; section views; mass properties; interference checks; model scaling. Exploded views now generate automatic, collision-screened disassembly sequences — play them back or export CSV, JSON and WebM. Plus a persistent Object Inspector, a deterministic model/import health report, and geometry-quality scans that catch sliver triangles, open boundaries and non-manifold edges.',
   },
   {
     icon: <Camera aria-hidden="true" className="w-5 h-5" />,
@@ -35,6 +40,11 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
     icon: <ClipboardCheck aria-hidden="true" className="w-5 h-5" />,
     title: 'Design reviews that remember',
     text: 'Run a real design review inside the viewer: named view bookmarks, issue pins tied to the exact camera view, arrow and rectangle redlines with captured measurements. Export the whole review as CSV or a self-contained HTML/PDF package — every markup composited over a snapshot of the model.',
+  },
+  {
+    icon: <GitCompare aria-hidden="true" className="w-5 h-5" />,
+    title: 'Engineering change review — two revisions, one answer',
+    text: 'Load revision A and revision B side by side and get a deterministic change map: modified, moved, added, removed, metadata-only and unchanged — a detected global shift is disclosed and removed before anything is classified as moved. The same geometry fingerprints power a duplicate and similar-part finder: exact repeats, opposite-handed, scaled and near-similar families, each selectable or isolated with size, area and volume evidence.',
   },
   {
     icon: <Wand2 aria-hidden="true" className="w-5 h-5" />,
