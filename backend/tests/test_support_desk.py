@@ -1,0 +1,1129 @@
+"""Support desk: intake, triage, threading, and the admin panel.
+
+The LLM is faked throughout — these tests are about the routing rules that
+sit around it, which are the part that can quietly lose a customer. What
+is actually asserted:
+
+  * A customer always hears back. Every intake path sends something, and
+    the paths that exist *because* the model failed still send something.
+  * Money and access questions never get an automated answer, however
+    confident the model is.
+  * A reply threads back onto its ticket rather than opening a new one —
+    through the Message-ID, the [#REF] tag, or the subject, because real
+    mail clients drop any given one of them.
+  * A webhook retry does not become a second ticket.
+"""
+from __future__ import annotations
+
+import re
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+
+from app import support_service as svc
+from app.db import SessionLocal
+from app.main import app
+from app.models import SupportTicket, SupportTicketEvent, SupportTicketMessage
+from tests.conftest import ADMIN_TOKEN
+
+AUTH = {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+
+
+@pytest.fixture()
+def client():
+    with TestClient(app) as c:
+        yield c
+
+
+@pytest.fixture()
+def db():
+    s = SessionLocal()
+    try:
+        yield s
+    finally:
+        s.close()
+
+
+@pytest.fixture(autouse=True)
+def captured_mail(monkeypatch):
+    """Capture outbound mail instead of sending it.
+
+    Patched at emailer.send_email — the seam every support send goes
+    through — so the assertions cover what would actually leave.
+    """
+    sent: list[dict] = []
+
+    def fake_send(to, subject, html, **kw):
+        sent.append({"to": to, "subject": subject, "html": html, **kw})
+        return True
+
+    monkeypatch.setattr(svc, "send_email", fake_send)
+    return sent
+
+
+def fake_llm(monkeypatch, payload):
+    """Make the classifier return `payload` (or None to simulate an outage)."""
+    monkeypatch.setattr(svc, "_call_support_llm", lambda *a, **k: payload)
+
+
+def ticket_by_ref(db, ref) -> SupportTicket:
+    return db.execute(
+        select(SupportTicket).where(SupportTicket.ref == ref)
+    ).scalar_one()
+
+
+def messages(db, ticket_id):
+    return list(
+        db.execute(
+            select(SupportTicketMessage)
+            .where(SupportTicketMessage.ticket_id == ticket_id)
+            .order_by(SupportTicketMessage.id)
+        )
+        .scalars()
+        .all()
+    )
+
+
+def events(db, ticket_id):
+    return [
+        e.event_type
+        for e in db.execute(
+            select(SupportTicketEvent)
+            .where(SupportTicketEvent.ticket_id == ticket_id)
+            .order_by(SupportTicketEvent.id)
+        )
+        .scalars()
+        .all()
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Intake
+# ---------------------------------------------------------------------------
+
+
+def test_contact_form_creates_ticket_and_auto_answers(client, db, monkeypatch, captured_mail):
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "course_info",
+            "priority": 6,
+            "is_spam": False,
+            "confidence": 0.9,
+            "summary": "Asking how long the course runs.",
+            "reply_html": "<p>It runs over five days.</p>",
+            "can_auto_resolve": True,
+            "escalation_reason": "",
+        },
+    )
+    r = client.post(
+        "/api/support/contact",
+        json={
+            "name": "Dana Reed",
+            "email": "dana@example.com",
+            "subject": "Quick question",
+            "message": "How many days is the gas turbine course?",
+        },
+    )
+    assert r.status_code == 201
+    ref = r.json()["ref"]
+    assert len(ref) == 8
+
+    t = ticket_by_ref(db, ref)
+    assert t.status == "auto_resolved"
+    assert t.category == "course_info"
+    assert t.priority == 6
+    assert t.resolved_at is not None
+    assert t.first_responded_at is not None
+
+    kinds = [m.sender_kind for m in messages(db, t.id)]
+    assert kinds == ["customer", "ai"]
+    assert "auto_resolved" in events(db, t.id)
+
+    # The answer actually went out, tagged so a reply comes back to us.
+    assert len(captured_mail) == 1
+    assert captured_mail[0]["to"] == "dana@example.com"
+    assert f"[#{ref}]" in captured_mail[0]["subject"]
+    assert "five days" in captured_mail[0]["html"]
+
+
+@pytest.mark.parametrize("category", sorted(svc.ESCALATE_ALWAYS))
+def test_sensitive_categories_never_auto_resolve(
+    client, db, monkeypatch, captured_mail, category
+):
+    """Money, access, faults and sales leads go to a human.
+
+    The model is deliberately made maximally wrong here — high confidence,
+    can_auto_resolve=True — because the whole point is that the routing
+    rule overrides the model rather than trusting it.
+    """
+    fake_llm(
+        monkeypatch,
+        {
+            "category": category,
+            "priority": svc.CATEGORY_PRIORITY[category],
+            "is_spam": False,
+            "confidence": 0.99,
+            "summary": "Model is sure it can handle this.",
+            "reply_html": "<p>All sorted, no need to worry.</p>",
+            "can_auto_resolve": True,
+            "escalation_reason": "",
+        },
+    )
+    r = client.post(
+        "/api/support/contact",
+        json={
+            "email": f"{category}@example.com",
+            "subject": "Help",
+            "message": "Something is wrong.",
+        },
+    )
+    t = ticket_by_ref(db, r.json()["ref"])
+    assert t.status == "escalated", f"{category} must reach a human"
+    assert t.resolved_at is None
+    # The customer still heard back immediately, and Bassam was alerted.
+    assert any(m["to"] == f"{category}@example.com" for m in captured_mail)
+    assert any(m.get("audience") == "admin" for m in captured_mail)
+
+
+def test_low_confidence_blocks_auto_reply(client, db, monkeypatch):
+    """A model unsure what it is reading doesn't get to answer alone."""
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "general",
+            "priority": 8,
+            "is_spam": False,
+            "confidence": 0.2,
+            "summary": "Unclear.",
+            "reply_html": "<p>Possibly this?</p>",
+            "can_auto_resolve": True,
+            "escalation_reason": "",
+        },
+    )
+    r = client.post(
+        "/api/support/contact",
+        json={"email": "vague@example.com", "subject": "hm", "message": "?"},
+    )
+    assert ticket_by_ref(db, r.json()["ref"]).status == "escalated"
+
+
+def test_llm_outage_still_answers_and_escalates(client, db, monkeypatch, captured_mail):
+    """The model being down must not mean silence."""
+    fake_llm(monkeypatch, None)
+    r = client.post(
+        "/api/support/contact",
+        json={
+            "name": "Sam",
+            "email": "sam@example.com",
+            "subject": "Question",
+            "message": "Are seats still open?",
+        },
+    )
+    t = ticket_by_ref(db, r.json()["ref"])
+    assert t.status == "escalated"
+    assert t.first_responded_at is not None
+    assert [m.sender_kind for m in messages(db, t.id)] == ["customer", "ai"]
+    assert any("reached us" in m["html"] for m in captured_mail)
+
+
+def test_spam_is_parked_without_replying(client, db, monkeypatch, captured_mail):
+    """Never answer spam — a reply confirms the address is live."""
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "general",
+            "priority": 8,
+            "is_spam": True,
+            "confidence": 0.95,
+            "summary": "SEO pitch.",
+            "reply_html": "<p>ignored</p>",
+            "can_auto_resolve": False,
+            "escalation_reason": "",
+        },
+    )
+    r = client.post(
+        "/api/support/contact",
+        json={"email": "seo@spam.example", "subject": "Rank #1", "message": "Buy links"},
+    )
+    t = ticket_by_ref(db, r.json()["ref"])
+    assert t.status == "spam" and t.is_spam is True
+    assert captured_mail == []
+
+
+def test_honeypot_is_accepted_and_discarded(client, db, captured_mail):
+    """A bot gets a success page and nothing is created."""
+    before = db.execute(select(SupportTicket)).scalars().all()
+    r = client.post(
+        "/api/support/contact",
+        json={
+            "email": "bot@example.com",
+            "subject": "hi",
+            "message": "hi",
+            "website": "http://spam.example",
+        },
+    )
+    assert r.status_code == 201
+    assert r.json()["ref"] == "00000000"
+    db.expire_all()
+    assert len(db.execute(select(SupportTicket)).scalars().all()) == len(before)
+    assert captured_mail == []
+
+
+# ---------------------------------------------------------------------------
+# Inbound email
+# ---------------------------------------------------------------------------
+
+
+def _inbound(client, **kw):
+    payload = {
+        "from": kw.get("from_", "Rae Lin <rae@example.com>"),
+        "subject": kw.get("subject", "Hello"),
+        "text": kw.get("text", "A question."),
+        "headers": {
+            "message-id": kw.get("message_id", "<abc@mail.example>"),
+            "in-reply-to": kw.get("in_reply_to", ""),
+            "references": kw.get("references", ""),
+        },
+    }
+    return client.post("/api/webhooks/resend-inbound", json=payload)
+
+
+def test_inbound_email_opens_a_ticket(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    assert _inbound(client, message_id="<new-1@mail.example>").status_code == 200
+    t = db.execute(
+        select(SupportTicket).where(SupportTicket.submitter_email == "rae@example.com")
+    ).scalars().first()
+    assert t is not None
+    assert t.source == "inbound_email"
+    assert t.submitter_name == "Rae Lin"
+
+
+def test_reply_threads_onto_the_same_ticket(client, db, monkeypatch, captured_mail):
+    """The core promise: a reply continues the conversation."""
+    fake_llm(monkeypatch, None)
+    r = client.post(
+        "/api/support/contact",
+        json={"email": "loop@example.com", "subject": "Access", "message": "First message."},
+    )
+    ref = r.json()["ref"]
+    t = ticket_by_ref(db, ref)
+    parent_message_id = t.email_message_id
+    assert parent_message_id, "the outbound reply must carry a Message-ID to thread against"
+
+    _inbound(
+        client,
+        from_="loop@example.com",
+        subject=f"Re: Access [#{ref}]",
+        text="Thanks, that worked.",
+        message_id="<reply-1@mail.example>",
+        in_reply_to=parent_message_id,
+    )
+
+    db.expire_all()
+    assert len(db.execute(select(SupportTicket)).scalars().all()) >= 1
+    same = db.execute(
+        select(SupportTicket).where(SupportTicket.submitter_email == "loop@example.com")
+    ).scalars().all()
+    assert len(same) == 1, "a reply must not open a second ticket"
+    assert any(
+        m.sender_kind == "customer" and "that worked" in (m.body_text or "")
+        for m in messages(db, same[0].id)
+    )
+
+
+def test_threading_survives_a_client_that_strips_headers(client, db, monkeypatch):
+    """Only the [#REF] subject tag survives — it must be enough."""
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "tagonly@example.com", "subject": "Invoice", "message": "Hi."},
+    ).json()["ref"]
+
+    _inbound(
+        client,
+        from_="tagonly@example.com",
+        subject=f"Re: Invoice [#{ref}]",
+        text="Following up.",
+        message_id="<bare-1@mail.example>",
+        in_reply_to="",
+        references="",
+    )
+    db.expire_all()
+    found = db.execute(
+        select(SupportTicket).where(SupportTicket.submitter_email == "tagonly@example.com")
+    ).scalars().all()
+    assert len(found) == 1
+
+
+def test_duplicate_webhook_delivery_is_ignored(client, db, monkeypatch):
+    """Resend retries on any non-2xx — retries must not multiply tickets."""
+    fake_llm(monkeypatch, None)
+    for _ in range(3):
+        _inbound(client, from_="dupe@example.com", message_id="<same-id@mail.example>")
+    db.expire_all()
+    found = db.execute(
+        select(SupportTicket).where(SupportTicket.submitter_email == "dupe@example.com")
+    ).scalars().all()
+    assert len(found) == 1
+    assert sum(1 for m in messages(db, found[0].id) if m.sender_kind == "customer") == 1
+
+
+def test_mail_from_our_own_address_is_dropped(client, db):
+    """The loop guard: never auto-reply to ourselves."""
+    before = len(db.execute(select(SupportTicket)).scalars().all())
+    _inbound(client, from_="info@mail.proreadyengineer.com", message_id="<self@x>")
+    db.expire_all()
+    assert len(db.execute(select(SupportTicket)).scalars().all()) == before
+
+
+def test_reply_on_an_escalated_ticket_does_not_re_trigger_the_bot(
+    client, db, monkeypatch, captured_mail
+):
+    """Once a human owns the thread, the bot stops talking over him."""
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "human@example.com", "subject": "Refund", "message": "Please refund."},
+    ).json()["ref"]
+    t = ticket_by_ref(db, ref)
+    assert t.status == "escalated"
+    before = len([m for m in messages(db, t.id) if m.sender_kind == "ai"])
+
+    _inbound(
+        client,
+        from_="human@example.com",
+        subject=f"Re: Refund [#{ref}]",
+        text="Any update?",
+        message_id="<chase-1@mail.example>",
+    )
+    db.expire_all()
+    t = ticket_by_ref(db, ref)
+    after = len([m for m in messages(db, t.id) if m.sender_kind == "ai"])
+    assert after == before, "no automated reply once escalated"
+
+
+# ---------------------------------------------------------------------------
+# Quoted-reply stripping
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "My new question.\n\nOn Mon, 5 May 2026 at 10:00, Support <info@x.com> wrote:\n> old text\n> more old",
+        "My new question.\n\n-----Original Message-----\nFrom: Support\nold text",
+        "My new question.\n\n> quoted\n> quoted more",
+    ],
+)
+def test_quoted_history_is_stripped(raw):
+    assert svc.strip_quoted_reply(raw).strip() == "My new question."
+
+
+def test_stripping_never_empties_a_message():
+    """If the markers would eat everything, keep the original.
+
+    A message shown with quote noise is cosmetic. A message shown as blank
+    is a customer who thinks they were ignored.
+    """
+    only_quote = "On Mon, someone <a@b.c> wrote:\n> everything is quoted"
+    assert svc.strip_quoted_reply(only_quote).strip() != ""
+
+
+# ---------------------------------------------------------------------------
+# Admin panel
+# ---------------------------------------------------------------------------
+
+
+def test_admin_endpoints_require_auth(client):
+    for method, path in [
+        ("get", "/api/admin/support/tickets"),
+        ("get", "/api/admin/support/stats"),
+        ("get", "/api/admin/support/settings"),
+    ]:
+        assert getattr(client, method)(path).status_code == 401
+
+
+def test_admin_inbox_lists_and_sorts_by_priority(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    client.post(
+        "/api/support/contact",
+        json={"email": "p8@example.com", "subject": "Chat", "message": "hi"},
+    )
+    # Force one ticket to P1 so ordering is observable.
+    low = client.post(
+        "/api/support/contact",
+        json={"email": "p1@example.com", "subject": "Charged twice", "message": "help"},
+    ).json()["ref"]
+    client.patch(
+        f"/api/admin/support/tickets/{low}",
+        json={"category": "payment"},
+        headers=AUTH,
+    )
+
+    r = client.get("/api/admin/support/tickets", headers=AUTH)
+    assert r.status_code == 200
+    items = r.json()["items"]
+    assert items, "inbox should not be empty"
+    assert items[0]["priority"] <= items[-1]["priority"]
+    assert items[0]["ref"] == low
+
+
+def test_admin_reply_sends_and_records(client, db, monkeypatch, captured_mail):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "reply@example.com", "subject": "Question", "message": "hi"},
+    ).json()["ref"]
+    captured_mail.clear()
+
+    r = client.post(
+        f"/api/admin/support/tickets/{ref}/reply",
+        json={"body_html": "<p>Here is the answer.</p>", "set_status": "resolved"},
+        headers=AUTH,
+    )
+    assert r.status_code == 200
+    assert r.json()["delivered"] is True
+    assert r.json()["status"] == "resolved"
+
+    db.expire_all()
+    t = ticket_by_ref(db, ref)
+    assert t.resolved_at is not None
+    assert [m.sender_kind for m in messages(db, t.id)][-1] == "admin"
+    assert "Here is the answer." in captured_mail[-1]["html"]
+    assert f"[#{ref}]" in captured_mail[-1]["subject"]
+
+
+def test_failed_send_leaves_the_ticket_open(client, db, monkeypatch):
+    """A reply Resend refused has reached nobody — don't close the ticket."""
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "bounce@example.com", "subject": "Q", "message": "hi"},
+    ).json()["ref"]
+
+    monkeypatch.setattr(svc, "send_email", lambda *a, **k: False)
+    r = client.post(
+        f"/api/admin/support/tickets/{ref}/reply",
+        json={"body_html": "<p>Answer.</p>", "set_status": "resolved"},
+        headers=AUTH,
+    )
+    assert r.json()["delivered"] is False
+    assert r.json()["status"] == "escalated"
+    assert r.json()["warning"]
+    db.expire_all()
+    assert ticket_by_ref(db, ref).resolved_at is None
+
+
+def test_internal_note_is_never_emailed(client, db, monkeypatch, captured_mail):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "note@example.com", "subject": "Q", "message": "hi"},
+    ).json()["ref"]
+    captured_mail.clear()
+
+    assert client.post(
+        f"/api/admin/support/tickets/{ref}/note",
+        json={"body": "Called him, sending an invoice."},
+        headers=AUTH,
+    ).status_code == 200
+
+    assert captured_mail == [], "notes must not leave the building"
+    db.expire_all()
+    t = ticket_by_ref(db, ref)
+    assert messages(db, t.id)[-1].sender_kind == "note"
+
+
+def test_notes_are_hidden_from_the_model(db, monkeypatch):
+    """An internal note must not end up quoted back to the customer."""
+    ticket = SupportTicket(ref="TESTNOTE", submitter_email="x@y.z", subject="s")
+    msgs = [
+        SupportTicketMessage(sender_kind="customer", body_text="the question"),
+        SupportTicketMessage(sender_kind="note", body_text="he still owes us money"),
+    ]
+    rendered = svc._thread_for_prompt(msgs)
+    assert "the question" in rendered
+    assert "owes us money" not in rendered
+
+
+def test_category_override_resets_priority(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "cat@example.com", "subject": "Q", "message": "hi"},
+    ).json()["ref"]
+
+    r = client.patch(
+        f"/api/admin/support/tickets/{ref}",
+        json={"category": "payment"},
+        headers=AUTH,
+    )
+    assert r.status_code == 200
+    assert r.json()["ticket"]["priority"] == svc.CATEGORY_PRIORITY["payment"]
+
+    bad = client.patch(
+        f"/api/admin/support/tickets/{ref}", json={"category": "nonsense"}, headers=AUTH
+    )
+    assert bad.status_code == 400
+
+
+def test_ticket_detail_carries_customer_context(client, db, monkeypatch):
+    """The thread view answers "who is this?" without a second lookup."""
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "ctx@example.com", "subject": "Q", "message": "hi"},
+    ).json()["ref"]
+
+    body = client.get(f"/api/admin/support/tickets/{ref}", headers=AUTH).json()
+    assert body["ticket"]["ref"] == ref
+    assert "customer" in body
+    assert body["customer"]["email"] == "ctx@example.com"
+    assert body["messages"]
+    assert body["events"]
+
+
+def test_settings_roundtrip_keeps_the_key_when_left_blank(client, monkeypatch):
+    """Saving the knowledge base must not wipe the stored credential."""
+    monkeypatch.setenv("AI_SETTINGS_KEY", "u5Ml1_hZ8b7cQvVQ0M6RH8HRlqYRIbNJ0lWfR0dO5vE=")
+    from app import crypto
+
+    crypto._fernet.cache_clear()
+
+    first = client.put(
+        "/api/admin/support/settings",
+        json={
+            "api_url": "https://api.deepinfra.com/v1/openai",
+            "api_key": "secret-key-1234",
+            "model_name": "moonshotai/Kimi-K2.5",
+            "kb_text": "Refunds within 14 days.",
+        },
+        headers=AUTH,
+    )
+    assert first.status_code == 200
+    assert first.json()["api_key_masked"].endswith("1234")
+    assert first.json()["is_configured"] is True
+
+    second = client.put(
+        "/api/admin/support/settings",
+        json={
+            "api_url": "https://api.deepinfra.com/v1/openai",
+            "api_key": "",  # untouched
+            "model_name": "moonshotai/Kimi-K2.5",
+            "kb_text": "Refunds within 30 days.",
+        },
+        headers=AUTH,
+    )
+    assert second.json()["api_key_masked"].endswith("1234")
+    assert second.json()["kb_text"] == "Refunds within 30 days."
+    assert second.json()["is_configured"] is True
+
+
+def test_support_settings_do_not_collide_with_the_assistant(client, db, monkeypatch):
+    """Two rows, two scopes. Saving one must not overwrite the other."""
+    monkeypatch.setenv("AI_SETTINGS_KEY", "u5Ml1_hZ8b7cQvVQ0M6RH8HRlqYRIbNJ0lWfR0dO5vE=")
+    from app import crypto
+    from app.models import AISettings
+
+    crypto._fernet.cache_clear()
+
+    client.put(
+        "/api/admin/ai/settings",
+        json={
+            "api_url": "https://assistant.example/v1",
+            "api_key": "assistant-key",
+            "model_name": "assistant-model",
+        },
+        headers=AUTH,
+    )
+    client.put(
+        "/api/admin/support/settings",
+        json={
+            "api_url": "https://support.example/v1",
+            "api_key": "support-key",
+            "model_name": "support-model",
+            "kb_text": "",
+        },
+        headers=AUTH,
+    )
+
+    db.expire_all()
+    rows = {
+        r.scope: r for r in db.execute(select(AISettings)).scalars().all()
+    }
+    assert rows["assistant"].model_name == "assistant-model"
+    assert rows["support"].model_name == "support-model"
+
+    assert client.get("/api/admin/ai/settings", headers=AUTH).json()["model_name"] == "assistant-model"
+    assert client.get("/api/admin/support/settings", headers=AUTH).json()["model_name"] == "support-model"
+
+
+def test_support_falls_back_to_assistant_credentials(client, db, monkeypatch):
+    """Support works the moment the assistant is configured."""
+    monkeypatch.setenv("AI_SETTINGS_KEY", "u5Ml1_hZ8b7cQvVQ0M6RH8HRlqYRIbNJ0lWfR0dO5vE=")
+    from app import crypto
+    from app.models import AISettings
+
+    crypto._fernet.cache_clear()
+    for row in db.execute(select(AISettings)).scalars().all():
+        db.delete(row)
+    db.commit()
+
+    assert svc.get_support_settings(db) is None
+
+    client.put(
+        "/api/admin/ai/settings",
+        json={
+            "api_url": "https://assistant.example/v1",
+            "api_key": "assistant-key",
+            "model_name": "assistant-model",
+        },
+        headers=AUTH,
+    )
+    db.expire_all()
+    active = svc.get_support_settings(db)
+    assert active is not None and active.model_name == "assistant-model"
+
+
+def test_bulk_actions_only_touch_named_refs(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    keep = client.post(
+        "/api/support/contact",
+        json={"email": "keep@example.com", "subject": "Q", "message": "hi"},
+    ).json()["ref"]
+    drop = client.post(
+        "/api/support/contact",
+        json={"email": "drop@example.com", "subject": "Q", "message": "hi"},
+    ).json()["ref"]
+
+    r = client.post(
+        "/api/admin/support/tickets/bulk",
+        json={"refs": [drop], "action": "archive"},
+        headers=AUTH,
+    )
+    assert r.json()["updated"] == 1
+    db.expire_all()
+    assert ticket_by_ref(db, drop).status == "archived"
+    assert ticket_by_ref(db, keep).status != "archived"
+
+
+def test_archived_and_spam_are_hidden_from_the_default_inbox(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "hidden@example.com", "subject": "Q", "message": "hi"},
+    ).json()["ref"]
+    client.post(
+        "/api/admin/support/tickets/bulk",
+        json={"refs": [ref], "action": "archive"},
+        headers=AUTH,
+    )
+
+    default = client.get("/api/admin/support/tickets", headers=AUTH).json()
+    assert ref not in [i["ref"] for i in default["items"]]
+
+    archived = client.get(
+        "/api/admin/support/tickets?status_filter=archived", headers=AUTH
+    ).json()
+    assert ref in [i["ref"] for i in archived["items"]]
+
+
+def test_search_matches_ref_email_and_subject(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={
+            "name": "Priya Nandan",
+            "email": "priya@findme.example",
+            "subject": "Turbine mapping enquiry",
+            "message": "hi",
+        },
+    ).json()["ref"]
+
+    for q in (ref, "priya@findme", "turbine mapping", "Priya"):
+        found = client.get(
+            f"/api/admin/support/tickets?q={q}&status_filter=", headers=AUTH
+        ).json()["items"]
+        assert ref in [i["ref"] for i in found], f"search for {q!r} missed the ticket"
+
+
+def test_stats_counts_what_needs_a_human(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)  # every ticket escalates
+    client.post(
+        "/api/support/contact",
+        json={"email": "stat@example.com", "subject": "Q", "message": "hi"},
+    )
+    stats = client.get("/api/admin/support/stats", headers=AUTH).json()
+    assert stats["needs_human"] >= 1
+    assert stats["open"] >= 1
+    assert stats["total"] >= 1
+
+
+def test_draft_reports_a_clear_error_when_unconfigured(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "draft@example.com", "subject": "Q", "message": "hi"},
+    ).json()["ref"]
+
+    monkeypatch.setattr(svc, "get_support_settings", lambda db: None)
+    r = client.post(
+        f"/api/admin/support/tickets/{ref}/draft", json={"instruction": ""}, headers=AUTH
+    )
+    assert r.status_code == 412
+    assert "not configured" in r.json()["detail"].lower()
+
+
+def test_draft_returns_editable_html_and_flags_gaps(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "gap@example.com", "subject": "Refund", "message": "Can I refund?"},
+    ).json()["ref"]
+
+    fake_llm(
+        monkeypatch,
+        {
+            "reply_html": "<p>Hi — about your refund…</p>",
+            "needs_from_admin": ["Confirm whether the 14-day window applies here."],
+            "suggested_status": "resolved",
+        },
+    )
+    r = client.post(
+        f"/api/admin/support/tickets/{ref}/draft",
+        json={"instruction": "Be warm, offer a call."},
+        headers=AUTH,
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert "<p>" in body["reply_html"]
+    assert body["needs_from_admin"] == ["Confirm whether the 14-day window applies here."]
+    # Drafting is not sending: the thread is unchanged.
+    db.expire_all()
+    t = ticket_by_ref(db, ref)
+    assert all(m.sender_kind != "admin" for m in messages(db, t.id))
+    assert "ai_draft" in events(db, t.id)
+
+
+def test_retriage_lets_the_ai_try_again(client, db, monkeypatch, captured_mail):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "retry@example.com", "subject": "Dates?", "message": "When?"},
+    ).json()["ref"]
+    assert ticket_by_ref(db, ref).status == "escalated"
+
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "enrollment",
+            "priority": 5,
+            "is_spam": False,
+            "confidence": 0.9,
+            "summary": "Wants the dates.",
+            "reply_html": "<p>The next cohort starts in May.</p>",
+            "can_auto_resolve": True,
+            "escalation_reason": "",
+        },
+    )
+    assert client.post(
+        f"/api/admin/support/tickets/{ref}/retriage", headers=AUTH
+    ).status_code == 200
+
+    db.expire_all()
+    t = ticket_by_ref(db, ref)
+    assert t.status == "auto_resolved"
+    assert t.category == "enrollment"
+
+
+def test_ai_gives_up_after_the_attempt_cap(client, db, monkeypatch):
+    """A customer going round in circles with a bot gets a human."""
+    answerable = {
+        "category": "general",
+        "priority": 8,
+        "is_spam": False,
+        "confidence": 0.95,
+        "summary": "Keeps asking.",
+        "reply_html": "<p>Here you go.</p>",
+        "can_auto_resolve": True,
+        "escalation_reason": "",
+    }
+    fake_llm(monkeypatch, answerable)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "circles@example.com", "subject": "Still stuck", "message": "one"},
+    ).json()["ref"]
+    assert ticket_by_ref(db, ref).status == "auto_resolved"
+
+    for n in range(2, 5):
+        _inbound(
+            client,
+            from_="circles@example.com",
+            subject=f"Re: Still stuck [#{ref}]",
+            text=f"message {n}",
+            message_id=f"<circle-{n}@mail.example>",
+        )
+        db.expire_all()
+
+    t = ticket_by_ref(db, ref)
+    assert t.status == "escalated", "the bot must hand over rather than loop forever"
+
+
+def test_ref_is_not_guessable_from_the_id(client, db, monkeypatch):
+    """Refs are random, not sequential — they appear in customer email."""
+    fake_llm(monkeypatch, None)
+    refs = [
+        client.post(
+            "/api/support/contact",
+            json={"email": f"r{i}@example.com", "subject": "Q", "message": "hi"},
+        ).json()["ref"]
+        for i in range(3)
+    ]
+    assert len(set(refs)) == 3
+    assert all(re.fullmatch(r"[0-9A-F]{8}", r) for r in refs)
+
+
+# ---------------------------------------------------------------------------
+# The admin AI assistant's ticket tools
+# ---------------------------------------------------------------------------
+
+
+def test_assistant_can_read_but_not_silently_send(client, db, monkeypatch):
+    """Reading the inbox is free; speaking for Bassam is not.
+
+    The whole safety story for the assistant is this asymmetry: it can
+    triage all day without asking, but a customer-facing email pauses for
+    an explicit Approve click.
+    """
+    from app.ai_tools import TOOL_HANDLERS, is_high_stakes
+
+    assert is_high_stakes("reply_to_ticket", {"ref": "AB", "body": "hi"}) is True
+    for read_only in ("list_tickets", "get_ticket", "get_support_stats", "add_ticket_note"):
+        assert is_high_stakes(read_only, {}) is False
+        assert read_only in TOOL_HANDLERS
+
+
+def test_assistant_tools_see_the_thread_and_the_customer(client, db, monkeypatch):
+    from app.ai_tools import get_ticket, get_support_stats, list_tickets
+
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={
+            "name": "Omar Haddad",
+            "email": "omar@example.com",
+            "subject": "Invoice question",
+            "message": "Can I pay by bank transfer?",
+        },
+    ).json()["ref"]
+
+    listed = list_tickets(db)
+    assert listed["ok"] is True
+    assert ref in [t["ref"] for t in listed["tickets"]]
+
+    detail = get_ticket(db, ref=ref)
+    assert detail["ok"] is True
+    assert detail["ticket"]["from"] == "omar@example.com"
+    assert any("bank transfer" in m["text"] for m in detail["thread"])
+    assert detail["customer"]["email"] == "omar@example.com"
+
+    assert get_support_stats(db)["open"] >= 1
+
+
+def test_assistant_unknown_ref_returns_an_error_not_an_exception(db):
+    """Handlers hand the agent an error it can reason about."""
+    from app.ai_tools import get_ticket, reply_to_ticket, update_ticket
+
+    for call in (
+        lambda: get_ticket(db, ref="ZZZZZZZZ"),
+        lambda: reply_to_ticket(db, ref="ZZZZZZZZ", body="hi"),
+        lambda: update_ticket(db, ref="ZZZZZZZZ", status="resolved"),
+    ):
+        out = call()
+        assert out["ok"] is False
+        assert "ZZZZZZZZ" in out["error"]
+
+
+def test_assistant_reply_records_and_can_resolve(client, db, monkeypatch, captured_mail):
+    from app.ai_tools import reply_to_ticket
+
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "agent@example.com", "subject": "Dates", "message": "When?"},
+    ).json()["ref"]
+    captured_mail.clear()
+
+    out = reply_to_ticket(
+        db, ref=ref, body="The next cohort starts on 15 May.", resolve=True
+    )
+    assert out["ok"] is True and out["delivered"] is True
+    assert out["status"] == "resolved"
+    assert "15 May" in captured_mail[-1]["html"]
+
+    db.expire_all()
+    t = ticket_by_ref(db, ref)
+    assert messages(db, t.id)[-1].sender_kind == "admin"
+
+
+def test_assistant_reply_does_not_resolve_on_a_failed_send(client, db, monkeypatch):
+    from app.ai_tools import reply_to_ticket
+
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "agentfail@example.com", "subject": "Q", "message": "hi"},
+    ).json()["ref"]
+
+    monkeypatch.setattr(svc, "send_email", lambda *a, **k: False)
+    out = reply_to_ticket(db, ref=ref, body="Answer.", resolve=True)
+    assert out["delivered"] is False
+    assert out["status"] == "escalated"
+    assert "FAILED" in out["note"]
+
+
+def test_assistant_rejects_invalid_status_and_category(client, db, monkeypatch):
+    from app.ai_tools import update_ticket
+
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "val@example.com", "subject": "Q", "message": "hi"},
+    ).json()["ref"]
+
+    assert update_ticket(db, ref=ref, status="banana")["ok"] is False
+    assert update_ticket(db, ref=ref, category="banana")["ok"] is False
+
+    ok = update_ticket(db, ref=ref, category="payment")
+    assert ok["ok"] is True
+    assert ok["ticket"]["priority"] == svc.CATEGORY_PRIORITY["payment"]
+
+
+# ---------------------------------------------------------------------------
+# Resend's real webhook shape
+# ---------------------------------------------------------------------------
+
+
+def test_metadata_only_webhook_fetches_the_body(client, db, monkeypatch):
+    """Resend's email.received carries metadata only — no body, no headers.
+
+    Without the follow-up fetch every inbound reply would land as an empty
+    message, which looks to Bassam like the customer sent nothing.
+    """
+    fake_llm(monkeypatch, None)
+    from app.routes import support as routes
+
+    monkeypatch.setattr(
+        routes,
+        "_fetch_received_email",
+        lambda email_id: {
+            "subject": "Re: my order",
+            "text": "The link still doesn't work for me.",
+            "html": "<p>The link still doesn't work for me.</p>",
+            "headers": {"Message-ID": "<fetched-1@mail.example>"},
+        },
+    )
+
+    r = client.post(
+        "/api/webhooks/resend-inbound",
+        json={
+            "type": "email.received",
+            "created_at": "2026-08-17T10:00:00Z",
+            "data": {
+                "email_id": "abc-123",
+                "from": "Nadia Aziz <nadia@example.com>",
+                "to": ["info@mail.proreadyengineer.com"],
+                "subject": "Re: my order",
+                # No text, no html, no headers — exactly what Resend sends.
+            },
+        },
+    )
+    assert r.status_code == 200
+
+    db.expire_all()
+    t = db.execute(
+        select(SupportTicket).where(SupportTicket.submitter_email == "nadia@example.com")
+    ).scalars().first()
+    assert t is not None
+    assert "still doesn't work" in t.body
+    assert any("still doesn't work" in (m.body_text or "") for m in messages(db, t.id))
+
+
+def test_body_fetch_failure_still_creates_the_ticket(client, db, monkeypatch):
+    """A dropped body is recoverable. A dropped ticket is not."""
+    fake_llm(monkeypatch, None)
+    from app.routes import support as routes
+
+    monkeypatch.setattr(routes, "_fetch_received_email", lambda email_id: None)
+
+    r = client.post(
+        "/api/webhooks/resend-inbound",
+        json={
+            "data": {
+                "email_id": "broken-1",
+                "from": "quiet@example.com",
+                "subject": "Something went wrong",
+            }
+        },
+    )
+    assert r.status_code == 200
+    db.expire_all()
+    t = db.execute(
+        select(SupportTicket).where(SupportTicket.submitter_email == "quiet@example.com")
+    ).scalars().first()
+    assert t is not None, "the ticket must exist even with no body"
+    assert t.subject == "Something went wrong"
+
+
+def test_webhook_always_returns_200(client, db, monkeypatch):
+    """A non-2xx makes Resend retry forever on a payload that cannot parse."""
+    fake_llm(monkeypatch, None)
+    for payload in (
+        {},
+        {"data": {}},
+        {"data": {"from": ""}},
+        {"nonsense": [1, 2, 3]},
+        {"data": {"from": "x@y.z", "headers": [{"name": "Message-ID", "value": "<a@b>"}]}},
+    ):
+        assert client.post("/api/webhooks/resend-inbound", json=payload).status_code == 200
+    # Not even valid JSON.
+    assert client.post(
+        "/api/webhooks/resend-inbound",
+        content=b"this is not json",
+        headers={"Content-Type": "application/json"},
+    ).status_code == 200
+
+
+def test_list_style_headers_are_understood(client, db, monkeypatch):
+    """Some providers send headers as [{name, value}] rather than an object."""
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "listhdr@example.com", "subject": "Question", "message": "hi"},
+    ).json()["ref"]
+    db.expire_all()
+    parent = ticket_by_ref(db, ref).email_message_id
+
+    client.post(
+        "/api/webhooks/resend-inbound",
+        json={
+            "data": {
+                "from": "listhdr@example.com",
+                "subject": "Re: Question",
+                "text": "Following up.",
+                "headers": [
+                    {"name": "Message-ID", "value": "<list-1@mail.example>"},
+                    {"name": "In-Reply-To", "value": parent},
+                ],
+            }
+        },
+    )
+    db.expire_all()
+    found = db.execute(
+        select(SupportTicket).where(SupportTicket.submitter_email == "listhdr@example.com")
+    ).scalars().all()
+    assert len(found) == 1, "In-Reply-To from a list-style header must still thread"

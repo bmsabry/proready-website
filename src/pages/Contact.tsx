@@ -3,6 +3,8 @@ import { Mail, Phone, MapPin, Send, CheckCircle2, Youtube, ShieldCheck, Clock, U
 import { Reveal, PageHero } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
 
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
+
 const inputClass =
   'w-full bg-slate-900/60 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30 transition-colors';
 
@@ -21,33 +23,77 @@ const Contact = () => {
   );
 
   const [submitted, setSubmitted] = useState(false);
+  const [ticketRef, setTicketRef] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Submits to our own support desk rather than a third-party form service.
+   * The message becomes a tracked ticket: it is triaged, acknowledged by
+   * email straight away, and the reply threads back to the same
+   * conversation — none of which a fire-and-forget form relay can do.
+   */
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (!API_BASE) {
+      setError(
+        'The contact form is temporarily unavailable. Please email info@proreadyengineer.com directly.',
+      );
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    const formData = new FormData(e.currentTarget);
+    const form = new FormData(e.currentTarget);
+    const inquiry = String(form.get('inquiry_type') ?? '').trim();
+    const company = String(form.get('company') ?? '').trim();
+    const message = String(form.get('message') ?? '').trim();
+
+    // The inquiry type and company are context for whoever reads this, so
+    // they travel in the body rather than being dropped on the floor.
+    const body = [
+      message,
+      '',
+      inquiry ? `Inquiry type: ${inquiry}` : '',
+      company ? `Company: ${company}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     try {
-      const response = await fetch('https://formspree.io/f/mvzkjrbn', {
+      const res = await fetch(`${API_BASE}/api/support/contact`, {
         method: 'POST',
-        body: formData,
-        headers: {
-          'Accept': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: String(form.get('name') ?? '').trim(),
+          email: String(form.get('email') ?? '').trim(),
+          subject: inquiry ? `${inquiry} enquiry` : 'Website enquiry',
+          message: body,
+          website: String(form.get('website') ?? ''),
+        }),
       });
 
-      if (response.ok) {
+      const data = (await res.json().catch(() => ({}))) as {
+        ref?: string;
+        detail?: unknown;
+      };
+
+      if (res.ok) {
+        setTicketRef(data.ref ?? null);
         setSubmitted(true);
       } else {
-        const data = await response.json();
-        setError(data.error || 'Something went wrong. Please try again.');
+        setError(
+          typeof data.detail === 'string'
+            ? data.detail
+            : 'Something went wrong. Please try again, or email info@proreadyengineer.com.',
+        );
       }
-    } catch (err) {
-      setError('Failed to send message. Please check your connection.');
+    } catch {
+      setError(
+        'Could not send your message. Please check your connection, or email info@proreadyengineer.com.',
+      );
     } finally {
       setLoading(false);
     }
@@ -190,10 +236,27 @@ const Contact = () => {
                       <CheckCircle2 className="w-10 h-10 text-cyan-400" aria-hidden="true" />
                     </div>
                     <h2 className="text-2xl font-bold mb-4">Message Received</h2>
-                    <p className="text-slate-300 mb-8 max-w-md mx-auto">
-                      Thank you for reaching out. One of our principal engineers will review your inquiry and contact you shortly.
+                    <p className="text-slate-300 mb-4 max-w-md mx-auto">
+                      Thank you for reaching out. You&rsquo;ll get a confirmation by email in the next
+                      few minutes, and a reply from one of our principal engineers within one
+                      business day.
                     </p>
-                    <button onClick={() => setSubmitted(false)} className="btn-secondary">
+                    {ticketRef && ticketRef !== '00000000' && (
+                      <p className="text-sm text-slate-400 mb-8">
+                        Your reference:{' '}
+                        <span className="font-mono text-cyan-400">#{ticketRef}</span>
+                        <span className="block text-xs text-slate-500 mt-1">
+                          Replying to that email keeps everything in one conversation.
+                        </span>
+                      </p>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSubmitted(false);
+                        setTicketRef(null);
+                      }}
+                      className="btn-secondary"
+                    >
                       Send Another Message
                     </button>
                   </div>
@@ -207,6 +270,14 @@ const Contact = () => {
                         {error}
                       </div>
                     )}
+
+                    {/* Honeypot: off-screen and hidden from assistive tech, so
+                        only a bot fills it. A filled value is accepted and
+                        silently discarded server-side. */}
+                    <div className="absolute left-[-9999px] w-px h-px overflow-hidden" aria-hidden="true">
+                      <label htmlFor="website">Leave this field empty</label>
+                      <input id="website" type="text" name="website" tabIndex={-1} autoComplete="off" />
+                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>

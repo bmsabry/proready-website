@@ -256,6 +256,168 @@ export type AuditRow = {
   model: string;
 };
 
+
+// ----- Support desk ----------------------------------------------------------
+
+export type SupportCategory =
+  | 'payment'
+  | 'access'
+  | 'bug'
+  | 'business'
+  | 'enrollment'
+  | 'course_info'
+  | 'software'
+  | 'general';
+
+export type SupportStatus =
+  | 'new'
+  | 'ai_handling'
+  | 'awaiting_customer'
+  | 'escalated'
+  | 'auto_resolved'
+  | 'resolved'
+  | 'archived'
+  | 'spam';
+
+export type SupportTicket = {
+  ref: string;
+  subject: string;
+  submitter_email: string;
+  submitter_name: string;
+  category: SupportCategory | string;
+  category_label: string;
+  priority: number;
+  status: SupportStatus | string;
+  source: string;
+  is_spam: boolean;
+  ai_attempt_count: number;
+  summary: string;
+  created_at: string | null;
+  last_message_at: string | null;
+  last_customer_message_at: string | null;
+  first_responded_at: string | null;
+  resolved_at: string | null;
+  needs_reply: boolean;
+};
+
+export type SupportMessage = {
+  id: number;
+  sender_kind: 'customer' | 'ai' | 'admin' | 'note';
+  sender_name: string;
+  body_text: string;
+  body_html: string;
+  direction: string;
+  email_delivered: boolean | null;
+  created_at: string | null;
+};
+
+export type SupportEvent = {
+  id: number;
+  event_type: string;
+  actor: string;
+  payload: Record<string, unknown>;
+  created_at: string | null;
+};
+
+/** What we know about the person who wrote in, assembled server-side. */
+export type SupportCustomer = {
+  email?: string;
+  known?: boolean;
+  learner?: { id: number; full_name: string; created_at: string | null };
+  registrations?: {
+    id: number;
+    course_code: string;
+    course_title: string;
+    status: string;
+    company: string;
+    full_name: string;
+    payment_provider: string;
+    created_at: string | null;
+    paid_at: string | null;
+  }[];
+  enrollments?: {
+    product_code: string;
+    product_title: string;
+    status: string;
+    settlement_status: string;
+    granted_at: string | null;
+  }[];
+  orders?: {
+    id: number;
+    product_code: string;
+    status: string;
+    provider: string;
+    amount_cents: number | null;
+    created_at: string | null;
+  }[];
+  prior_tickets?: {
+    ref: string;
+    subject: string;
+    status: string;
+    category: string;
+    created_at: string | null;
+  }[];
+};
+
+export type SupportTicketDetail = {
+  ticket: SupportTicket;
+  ai_result: {
+    summary?: string;
+    confidence?: number;
+    can_auto_resolve?: boolean;
+    escalation_reason?: string;
+    source?: string;
+  };
+  meta: Record<string, unknown>;
+  messages: SupportMessage[];
+  events: SupportEvent[];
+  customer: SupportCustomer;
+};
+
+export type SupportStats = {
+  by_status: Record<string, number>;
+  by_category: Record<string, number>;
+  open: number;
+  needs_human: number;
+  total: number;
+};
+
+export type SupportDraft = {
+  ok: boolean;
+  reply_html: string;
+  needs_from_admin: string[];
+  suggested_status: string;
+};
+
+export type SupportSettings = {
+  api_url: string;
+  model_name: string;
+  api_key_masked: string;
+  kb_text: string;
+  is_configured: boolean;
+  using_own_credentials: boolean;
+  llm_available: boolean;
+  categories: {
+    key: string;
+    label: string;
+    priority: number;
+    auto: boolean;
+    description: string;
+  }[];
+};
+
+/** Human labels for the ticket lifecycle, used by the inbox and the thread. */
+export const SUPPORT_STATUS_LABEL: Record<string, string> = {
+  new: 'New',
+  ai_handling: 'AI triaging',
+  awaiting_customer: 'Awaiting customer',
+  escalated: 'Needs you',
+  auto_resolved: 'Auto-resolved',
+  resolved: 'Resolved',
+  archived: 'Archived',
+  spam: 'Spam',
+};
+
 export type NotifyAudience = 'all' | 'paid' | 'pending' | 'recorded' | 'everyone';
 
 export type NotifyResult = {
@@ -294,6 +456,7 @@ export type ViewState =
   | { page: 'academy' }
   | { page: 'software'; slug?: string }
   | { page: 'comms' }
+  | { page: 'support'; ref?: string }
   | { page: 'ai' };
 
 export function hashFor(v: ViewState): string {
@@ -308,6 +471,8 @@ export function hashFor(v: ViewState): string {
       return '#academy';
     case 'comms':
       return '#comms';
+    case 'support':
+      return v.ref ? `#support/${encodeURIComponent(v.ref)}` : '#support';
     case 'ai':
       return '#ai';
     default:
@@ -342,6 +507,8 @@ export function parseHash(raw: string): ViewState {
       return { page: 'academy' };
     case 'comms':
       return { page: 'comms' };
+    case 'support':
+      return a ? { page: 'support', ref: a } : { page: 'support' };
     case 'ai':
       return { page: 'ai' };
     default:

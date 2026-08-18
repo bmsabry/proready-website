@@ -133,9 +133,20 @@ class AISettings(Base):
     __tablename__ = "ai_settings"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Which consumer this row configures: 'assistant' = the admin chat,
+    # 'support' = the support-desk classifier and auto-reply writer. Two
+    # rows so triage can run on a cheap fast model while the assistant runs
+    # on a stronger one. A missing 'support' row falls back to 'assistant',
+    # so support works the moment the assistant is configured.
+    scope: Mapped[str] = mapped_column(String(16), default="assistant", index=True)
     api_url: Mapped[str] = mapped_column(String(500), default="")
     api_key_encrypted: Mapped[str] = mapped_column(Text, default="")
     model_name: Mapped[str] = mapped_column(String(200), default="")
+    # Support scope only: admin-authored facts the auto-replier is allowed to
+    # state (refund window, prerequisites, what a seat includes…). The model
+    # is told to answer from this and from live DB state, and to escalate
+    # rather than invent when the answer isn't in either.
+    kb_text: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -1022,3 +1033,173 @@ class AssetPing(Base):
         DateTime(timezone=True), default=None
     )
     reviewed_note: Mapped[str] = mapped_column(String(300), default="")
+
+
+# ---------------------------------------------------------------------------
+# Support desk
+# ---------------------------------------------------------------------------
+#
+# Three tables, one thread per customer issue:
+#   support_tickets          — the thread itself (state, classification, routing)
+#   support_ticket_messages  — every message on it, whoever sent it
+#   support_ticket_events    — immutable audit trail of what happened and why
+#
+# Ported from the ProMechDirectory support panel, adapted to this codebase's
+# sync-session/int-PK conventions and to a training business (the categories
+# are courses/enrolment/access rather than RFQ/NDA).
+
+
+class SupportTicket(Base):
+    """One customer issue, from first contact through resolution.
+
+    Tickets arrive from three places — the public contact form, the
+    signed-in learner portal, and inbound email (a customer replying to a
+    support message threads back into the ticket it came from).
+
+    `ref` is the short code the customer sees ("Ticket 7A3C91B2"). The
+    integer id stays internal: a sequential id in a customer-facing string
+    leaks how many tickets exist, and is guessable by anyone who wants to
+    fish for someone else's thread.
+    """
+
+    __tablename__ = "support_tickets"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # Customer-facing opaque reference. Uppercase hex, generated at creation.
+    ref: Mapped[str] = mapped_column(String(16), unique=True, index=True)
+
+    # --- Who -------------------------------------------------------------
+    # Always captured, from the form field or the email From header. Not a
+    # real FK to learners/registrations: someone can write in before they
+    # have an account, and their account shouldn't vanish their history.
+    submitter_email: Mapped[str] = mapped_column(String(320), index=True)
+    submitter_name: Mapped[str] = mapped_column(String(200), default="")
+
+    # --- What ------------------------------------------------------------
+    subject: Mapped[str] = mapped_column(String(500))
+    # First message body. Everything after it lives in support_ticket_messages.
+    body: Mapped[str] = mapped_column(Text, default="")
+
+    # --- Classification (LLM-assigned, admin-overridable) -----------------
+    # See support_service.CATEGORIES. 'general' is the safe default.
+    category: Mapped[str] = mapped_column(String(32), default="general", index=True)
+    # 1 = most urgent. Derived from category; see CATEGORY_PRIORITY.
+    priority: Mapped[int] = mapped_column(Integer, default=8, index=True)
+    # 'new' | 'ai_handling' | 'awaiting_customer' | 'escalated'
+    # | 'auto_resolved' | 'resolved' | 'archived' | 'spam'
+    status: Mapped[str] = mapped_column(String(32), default="new", index=True)
+
+    # --- Email threading --------------------------------------------------
+    # Message-ID of the first outbound mail we sent for this ticket. Inbound
+    # replies quote it in In-Reply-To/References, which is how we match a
+    # reply back to its thread instead of opening a duplicate ticket.
+    email_message_id: Mapped[str] = mapped_column(String(500), default="", index=True)
+
+    # 'contact_form' | 'portal' | 'inbound_email' | 'admin'
+    source: Mapped[str] = mapped_column(String(32), default="contact_form")
+
+    # --- AI state ---------------------------------------------------------
+    # Last classifier output, kept whole for auditing why it decided what it did.
+    ai_result: Mapped[dict | None] = mapped_column(JSON, default=None)
+    # Auto-reply attempts so far. Past SUPPORT_MAX_AI_ATTEMPTS the ticket is
+    # escalated regardless of category — a customer going round in circles
+    # with a bot is worse than a slower human answer.
+    ai_attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    is_spam: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+    # --- Timestamps -------------------------------------------------------
+    first_responded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    last_customer_message_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None, index=True
+    )
+    last_message_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None, index=True
+    )
+
+    # IP, user-agent, referrer, portal course context — whatever the entry
+    # point knew at the time.
+    meta: Mapped[dict | None] = mapped_column(JSON, default=None)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+# The inbox's default sort and its most common filter, in one index.
+Index(
+    "ix_support_tickets_status_priority",
+    SupportTicket.status,
+    SupportTicket.priority,
+)
+
+
+class SupportTicketMessage(Base):
+    """One message on a ticket thread.
+
+    sender_kind:
+      'customer' — they wrote in (form submission or email reply)
+      'ai'       — the assistant answered automatically
+      'admin'    — Bassam replied from the panel
+      'note'     — internal note, never emailed to the customer
+    """
+
+    __tablename__ = "support_ticket_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    ticket_id: Mapped[int] = mapped_column(Integer, index=True)
+
+    sender_kind: Mapped[str] = mapped_column(String(16), default="customer")
+    sender_name: Mapped[str] = mapped_column(String(200), default="")
+
+    body_text: Mapped[str] = mapped_column(Text, default="")
+    body_html: Mapped[str] = mapped_column(Text, default="")
+
+    # 'inbound' | 'outbound' | 'form' | 'internal'
+    direction: Mapped[str] = mapped_column(String(16), default="form")
+
+    # RFC 2822 Message-ID of this specific email, when there was one. Also
+    # the dedupe key for webhook retries — Resend redelivers on any non-2xx.
+    email_message_id: Mapped[str] = mapped_column(String(500), default="", index=True)
+    # None = not an email at all. False = we tried to send and Resend refused.
+    email_delivered: Mapped[bool | None] = mapped_column(Boolean, default=None)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
+class SupportTicketEvent(Base):
+    """Append-only record of everything that happened to a ticket.
+
+    Every status change, classification, escalation, auto-reply and admin
+    action lands here. Nothing in this table is ever updated or deleted —
+    when a customer asks "why did nobody answer me for two days", this is
+    the answer.
+    """
+
+    __tablename__ = "support_ticket_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    ticket_id: Mapped[int] = mapped_column(Integer, index=True)
+
+    # 'created' | 'ai_classified' | 'ai_replied' | 'auto_resolved'
+    # | 'escalated' | 'admin_reply' | 'status_change' | 'note'
+    # | 'spam_flagged' | 'customer_reply' | 'reopened' | 'ai_draft'
+    event_type: Mapped[str] = mapped_column(String(48), index=True)
+    # Admin email when a human did it; empty when the system did.
+    actor: Mapped[str] = mapped_column(String(320), default="")
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
