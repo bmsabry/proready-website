@@ -148,6 +148,11 @@ def _run_column_migrations() -> None:
         "ai_settings", "scope", "VARCHAR(16) NOT NULL DEFAULT 'assistant'"
     )
     _ensure_column("ai_settings", "kb_text", "TEXT NOT NULL DEFAULT ''")
+    # registrations.attendance_confirmed_at — set when a registrant replies
+    # to confirm their seat; null means they have not answered yet.
+    _ensure_column(
+        "registrations", "attendance_confirmed_at", "TIMESTAMP WITH TIME ZONE"
+    )
 
 
 _run_column_migrations()

@@ -124,6 +124,8 @@ def _registration_summary(r: Registration) -> Dict[str, Any]:
         "job_title": r.job_title,
         "status": r.status,
         "created_at": _iso(r.created_at),
+        "attendance_confirmed_at": _iso(r.attendance_confirmed_at),
+        "attendance_confirmed": r.attendance_confirmed_at is not None,
     }
 
 
@@ -873,6 +875,54 @@ def get_support_stats(db: Session, **_: Any) -> Dict[str, Any]:
     }
 
 
+
+
+def list_unconfirmed(db: Session, course_code: str, **_: Any) -> Dict[str, Any]:
+    """Who has NOT replied to confirm their seat.
+
+    The list Bassam actually chases. Cancelled rows are excluded — they
+    already withdrew, so they are not outstanding.
+    """
+    course, err = _course_or_error(db, course_code)
+    if err:
+        return err
+    rows = (
+        db.execute(
+            select(Registration).where(
+                Registration.course_code == course_code,
+                Registration.status != "cancelled",
+            ).order_by(Registration.created_at)
+        )
+        .scalars()
+        .all()
+    )
+    unconfirmed = [r for r in rows if r.attendance_confirmed_at is None]
+    confirmed = [r for r in rows if r.attendance_confirmed_at is not None]
+    return {
+        "ok": True,
+        "course_code": course_code,
+        "total_active": len(rows),
+        "confirmed_count": len(confirmed),
+        "unconfirmed_count": len(unconfirmed),
+        "unconfirmed": [_registration_summary(r) for r in unconfirmed],
+        "confirmed": [_registration_summary(r) for r in confirmed],
+    }
+
+
+def mark_attendance_confirmed(db: Session, email: str) -> Dict[str, Any]:
+    """Record that someone confirmed their seat — e.g. they told you by phone."""
+    from . import support_service as svc
+
+    confirmed = svc.confirm_attendance(db, email)
+    if not confirmed:
+        return {
+            "ok": False,
+            "error": f"No active registration found for '{email}'.",
+        }
+    db.commit()
+    return {"ok": True, "confirmed": confirmed}
+
+
 # ---------------------------------------------------------------------------
 # Tool registry
 # ---------------------------------------------------------------------------
@@ -908,6 +958,8 @@ TOOL_HANDLERS = {
     "update_ticket": update_ticket,
     "add_ticket_note": add_ticket_note,
     "get_support_stats": get_support_stats,
+    "list_unconfirmed": list_unconfirmed,
+    "mark_attendance_confirmed": mark_attendance_confirmed,
 }
 
 
@@ -1267,8 +1319,25 @@ TOOL_SPECS = [
             "required": ["ref", "note"],
         },
     ),
+    _fn(
+        "list_unconfirmed",
+        "For one cohort: who has confirmed their seat and who has not replied yet. Use this after sending a 'reply to confirm your attendance' broadcast, and before cancelling anyone. Read-only.",
+        {
+            "type": "object",
+            "properties": {"course_code": {"type": "string", "description": "Course code from list_courses."}},
+            "required": ["course_code"],
+        },
+    ),
+    _fn(
+        "mark_attendance_confirmed",
+        "Record that a registrant confirmed their seat, when they told you outside email (a call, a message). Replies to a confirmation broadcast are recorded automatically by the support desk, so you rarely need this.",
+        {
+            "type": "object",
+            "properties": {"email": {"type": "string", "description": "The registrant's email address."}},
+            "required": ["email"],
+        },
+    ),
 ]
-
 # Tools that always require admin confirmation in chat.
 HIGH_STAKES_ALWAYS = {
     "notify_course",

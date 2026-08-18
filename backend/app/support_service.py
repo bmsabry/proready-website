@@ -72,6 +72,7 @@ CATEGORIES: dict[str, str] = {
     "enrollment": "Wants to join a cohort: seat availability, dates, how to register, prerequisites, what payment options exist.",
     "course_info": "Questions about course content, syllabus, level, duration, certificates, recordings — from someone not yet enrolled.",
     "software": "Questions about the downloadable tools (Pro3DWorks and friends): what they do, system requirements, where to get them.",
+    "attendance": "A registrant answering a message we sent asking them to confirm their seat on a cohort — 'yes I'll be there', 'confirming my attendance', 'I still plan to attend'. Only use this when they are CONFIRMING. Someone cancelling, asking to move dates, or asking a question is NOT this category.",
     "general": "Anything that does not clearly fit the categories above.",
 }
 
@@ -83,7 +84,8 @@ CATEGORY_PRIORITY: dict[str, int] = {
     "enrollment": 5,
     "course_info": 6,
     "software": 7,
-    "general": 8,
+    "attendance": 8,
+    "general": 9,
 }
 
 CATEGORY_LABEL: dict[str, str] = {
@@ -94,6 +96,7 @@ CATEGORY_LABEL: dict[str, str] = {
     "enrollment": "Enrollment",
     "course_info": "Course info",
     "software": "Software",
+    "attendance": "Attendance",
     "general": "General",
 }
 
@@ -466,6 +469,9 @@ def customer_context(db: Session, email: str) -> dict[str, Any]:
                 "payment_provider": r.payment_provider or "",
                 "created_at": r.created_at.isoformat() if r.created_at else None,
                 "paid_at": r.paid_at.isoformat() if r.paid_at else None,
+                "attendance_confirmed_at": _aware(r.attendance_confirmed_at).isoformat()
+                if r.attendance_confirmed_at
+                else None,
             }
             for r in regs
         ]
@@ -1093,6 +1099,54 @@ def _process_ticket_inner(db: Session, ticket: SupportTicket) -> None:
         db.commit()
         return
 
+    # --- Attendance confirmation ------------------------------------------
+    # A registrant answering "yes, I'll be there". Record it against their
+    # registration so the unconfirmed list is a fact rather than an inbox
+    # someone has to read, then thank them and close.
+    if result["category"] == "attendance":
+        confirmed = confirm_attendance(db, ticket.submitter_email)
+        emit_event(
+            db, ticket, "attendance_confirmed", payload={"courses": confirmed}
+        )
+        if confirmed:
+            names = ", ".join(c["course_title"] for c in confirmed)
+            ack = (
+                f"<p>Thanks — your place on <strong>{names}</strong> is confirmed. "
+                f"We'll send joining details before the first session.</p>"
+            )
+        else:
+            # They confirmed, but we cannot find a registration under this
+            # address. Do not tell them they are confirmed when they are not.
+            ack = (
+                "<p>Thanks for coming back to us. I could not match this email "
+                "address to a registration, so I have passed it to Bassam to "
+                "check personally.</p>"
+            )
+        delivered, mid = send_ticket_email(db, ticket, body_html=ack)
+        add_message(
+            db, ticket, sender_kind="ai", sender_name="ProReadyEngineer Support",
+            body_html=ack, body_text=_html_to_text(ack), direction="outbound",
+            email_message_id=mid, email_delivered=delivered,
+        )
+        if not ticket.first_responded_at:
+            ticket.first_responded_at = datetime.now(timezone.utc)
+        if confirmed and delivered:
+            ticket.status = "auto_resolved"
+            ticket.resolved_at = datetime.now(timezone.utc)
+            emit_event(db, ticket, "auto_resolved", payload={"kind": "attendance"})
+        else:
+            escalate(
+                db, ticket,
+                "Attendance confirmation could not be matched to a registration"
+                if not confirmed else "Confirmation reply could not be delivered",
+            )
+        db.commit()
+        log.info(
+            "[support] ticket %s attendance confirmed for %d registration(s)",
+            ticket.ref, len(confirmed),
+        )
+        return
+
     # --- Answered automatically -------------------------------------------
     if not reply_html:
         # The model said it could answer but produced nothing. Don't guess.
@@ -1163,6 +1217,56 @@ def _send_acknowledgement(
     if not ticket.first_responded_at:
         ticket.first_responded_at = datetime.now(timezone.utc)
     emit_event(db, ticket, "ai_replied", payload={"delivered": delivered, "kind": "stock_ack"})
+
+
+# ---------------------------------------------------------------------------
+# Attendance confirmation
+# ---------------------------------------------------------------------------
+
+
+def confirm_attendance(db: Session, email: str) -> list[dict[str, Any]]:
+    """Mark every open registration for this address as confirmed.
+
+    Returns what was confirmed, so the caller can name the course back to
+    the registrant instead of sending a vague "you're all set".
+
+    Cancelled rows are skipped: someone who already withdrew and later
+    replies to an old broadcast has not un-cancelled themselves.
+    """
+    addr = (email or "").lower().strip()
+    if not addr:
+        return []
+    rows = (
+        db.execute(
+            select(Registration).where(
+                func.lower(Registration.email) == addr,
+                Registration.status != "cancelled",
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not rows:
+        return []
+
+    titles = {c.code: c.title for c in db.execute(select(Course)).scalars().all()}
+    now = datetime.now(timezone.utc)
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        # Idempotent: a second confirmation keeps the original timestamp, so
+        # "when did they answer" stays true if they reply twice.
+        if r.attendance_confirmed_at is None:
+            r.attendance_confirmed_at = now
+        out.append(
+            {
+                "registration_id": r.id,
+                "course_code": r.course_code,
+                "course_title": titles.get(r.course_code, r.course_code),
+                "confirmed_at": _aware(r.attendance_confirmed_at).isoformat(),
+            }
+        )
+    db.flush()
+    return out
 
 
 # ---------------------------------------------------------------------------

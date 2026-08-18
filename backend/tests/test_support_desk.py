@@ -1238,3 +1238,215 @@ def test_promech_inbound_does_not_reach_our_triage(client, db, monkeypatch):
             },
         )
     assert calls == [], "triage must never run for another brand's mail"
+
+
+# ---------------------------------------------------------------------------
+# Attendance confirmation
+# ---------------------------------------------------------------------------
+#
+# The workflow this supports: broadcast "reply to confirm your seat", then
+# chase whoever didn't. That only works if replies come back to the desk
+# AND get recorded against the registration — an inbox full of "yes I'll be
+# there" that nobody has counted is not a confirmation list.
+
+
+@pytest.fixture()
+def attend_course(db):
+    """The test cohort. Created once, reused — the DB is session-scoped."""
+    from datetime import date
+
+    from app.models import Course
+
+    course = db.execute(
+        select(Course).where(Course.code == "attend-test")
+    ).scalar_one_or_none()
+    if course is None:
+        course = Course(
+            code="attend-test", title="Attendance Test Course",
+            start_date=date(2026, 12, 1), total_seats=10,
+        )
+        db.add(course)
+        db.commit()
+    return course
+
+
+@pytest.fixture()
+def registrant(db, attend_course):
+    """Exactly one active registration for yusuf@example.com.
+
+    Rebuilt per test rather than appended: the test DB persists across the
+    module, and a fixture that stacked duplicate rows would make
+    confirm_attendance look like it was confirming three seats.
+    """
+    from app.models import Registration
+
+    for old in db.execute(
+        select(Registration).where(Registration.email == "yusuf@example.com")
+    ).scalars().all():
+        db.delete(old)
+    db.commit()
+
+    reg = Registration(
+        course_code="attend-test", full_name="Yusuf Kaya",
+        email="yusuf@example.com", job_title="Engineer", company="Acme",
+        years_experience="5", location="TR", status="pending",
+    )
+    db.add(reg)
+    db.commit()
+    db.refresh(reg)
+    yield reg
+
+
+def test_broadcast_replies_come_back_to_the_desk(client, db, monkeypatch, attend_course):
+    """A broadcast asking a question must route answers to the support desk.
+
+    Without this the replies land in a personal inbox and the whole
+    confirm-your-seat workflow is manual again.
+    """
+    captured = {}
+
+    def fake_broadcast(db_, recipients, subject, html_builder, scope, reply_to=None):
+        captured["reply_to"] = reply_to
+        captured["recipients"] = list(recipients)
+        return len(list(recipients)), []
+
+    from app.routes import courses as courses_routes
+
+    monkeypatch.setattr(courses_routes, "send_broadcast", fake_broadcast)
+    r = client.post(
+        "/api/admin/courses/attend-test/notify",
+        json={
+            "subject": "Please confirm your seat",
+            "body_html": "<p>Reply to confirm.</p>",
+            "audience": "all",
+        },
+        headers=AUTH,
+    )
+    assert r.status_code == 200
+    assert captured["reply_to"] == svc.SUPPORT_ADDRESS, (
+        "broadcast replies must return to the support desk"
+    )
+
+
+def test_confirmation_reply_marks_the_registration(client, db, monkeypatch, registrant):
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "attendance",
+            "priority": 8,
+            "is_spam": False,
+            "confidence": 0.95,
+            "summary": "Confirming attendance.",
+            "reply_html": "",
+            "can_auto_resolve": True,
+            "escalation_reason": "",
+        },
+    )
+    assert registrant.attendance_confirmed_at is None
+
+    r = client.post(
+        "/api/support/contact",
+        json={
+            "name": "Yusuf Kaya",
+            "email": "yusuf@example.com",
+            "subject": "Re: Please confirm your seat",
+            "message": "Yes, confirming I will attend. Looking forward to it.",
+        },
+    )
+    ref = r.json()["ref"]
+
+    db.expire_all()
+    db.refresh(registrant)
+    assert registrant.attendance_confirmed_at is not None, "the reply must be recorded"
+    t = ticket_by_ref(db, ref)
+    assert t.status == "auto_resolved"
+    assert t.category == "attendance"
+    assert "attendance_confirmed" in events(db, t.id)
+
+
+def test_confirmation_names_the_course_back(client, db, monkeypatch, registrant, captured_mail):
+    """Say what was confirmed, not a vague 'you're all set'."""
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "attendance", "priority": 8, "is_spam": False,
+            "confidence": 0.95, "summary": "Confirming.", "reply_html": "",
+            "can_auto_resolve": True, "escalation_reason": "",
+        },
+    )
+    client.post(
+        "/api/support/contact",
+        json={"email": "yusuf@example.com", "subject": "Re: confirm", "message": "Yes."},
+    )
+    assert any("Attendance Test Course" in m["html"] for m in captured_mail)
+
+
+def test_confirmation_from_an_unknown_address_is_not_faked(client, db, monkeypatch, captured_mail):
+    """Never tell someone they're confirmed when we can't find them."""
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "attendance", "priority": 8, "is_spam": False,
+            "confidence": 0.95, "summary": "Confirming.", "reply_html": "",
+            "can_auto_resolve": True, "escalation_reason": "",
+        },
+    )
+    r = client.post(
+        "/api/support/contact",
+        json={"email": "nobody@example.com", "subject": "Re: confirm", "message": "Yes I'll be there."},
+    )
+    t = ticket_by_ref(db, r.json()["ref"])
+    assert t.status == "escalated", "an unmatched confirmation needs a human"
+    joined = " ".join(m["html"] for m in captured_mail)
+    assert "could not match" in joined.lower()
+    assert "is confirmed" not in joined.lower()
+
+
+def test_cancelled_registrations_are_not_resurrected(client, db, monkeypatch):
+    """Someone who withdrew and later replies to an old broadcast stays out."""
+    from app.models import Registration
+
+    reg = Registration(
+        course_code="attend-test", full_name="Gone Away",
+        email="gone@example.com", job_title="x", company="y",
+        years_experience="1", location="z", status="cancelled",
+    )
+    db.add(reg)
+    db.commit()
+
+    confirmed = svc.confirm_attendance(db, "gone@example.com")
+    assert confirmed == []
+    db.refresh(reg)
+    assert reg.attendance_confirmed_at is None
+
+
+def test_confirming_twice_keeps_the_first_timestamp(db, registrant):
+    first = svc.confirm_attendance(db, "yusuf@example.com")
+    db.commit()
+    assert len(first) == 1
+    again = svc.confirm_attendance(db, "yusuf@example.com")
+    db.commit()
+    assert again[0]["confirmed_at"] == first[0]["confirmed_at"]
+
+
+def test_assistant_can_list_who_has_not_confirmed(db, registrant):
+    from app.ai_tools import list_unconfirmed, mark_attendance_confirmed
+
+    before = list_unconfirmed(db, course_code="attend-test")
+    assert before["ok"] is True
+    assert "yusuf@example.com" in [r["email"] for r in before["unconfirmed"]]
+
+    out = mark_attendance_confirmed(db, email="yusuf@example.com")
+    assert out["ok"] is True
+
+    after = list_unconfirmed(db, course_code="attend-test")
+    assert "yusuf@example.com" not in [r["email"] for r in after["unconfirmed"]]
+    assert "yusuf@example.com" in [r["email"] for r in after["confirmed"]]
+    assert after["confirmed_count"] >= 1
+
+
+def test_assistant_reports_unknown_course_and_email_cleanly(db):
+    from app.ai_tools import list_unconfirmed, mark_attendance_confirmed
+
+    assert list_unconfirmed(db, course_code="no-such-course")["ok"] is False
+    assert mark_attendance_confirmed(db, email="nobody@nowhere.example")["ok"] is False

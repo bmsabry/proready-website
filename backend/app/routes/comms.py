@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import require_admin
+from .. import support_service as svc
 from ..emailer import broadcast_html, send_broadcast
 from ..models import EmailLog, Product
 from ..schemas import NotifyOut
@@ -96,6 +97,7 @@ def notify_product(
             "audience": "buyers",
             "template": "broadcast",
         },
+        reply_to=svc.SUPPORT_ADDRESS,
     )
 
     return NotifyOut(

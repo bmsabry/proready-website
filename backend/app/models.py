@@ -103,6 +103,13 @@ class Registration(Base):
     payment_ref: Mapped[str] = mapped_column(String(128), default="")
     amount_cents: Mapped[int | None] = mapped_column(Integer, default=None)
 
+    # When the registrant replied confirming they will attend. Set by the
+    # support desk when it recognises a confirmation reply, or by hand.
+    # Null means "has not answered" — which is the list Bassam chases.
+    attendance_confirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
     # Free-text admin notes (optional, nullable).
     admin_notes: Mapped[str | None] = mapped_column(String(2000), default=None)
 

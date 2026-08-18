@@ -190,6 +190,7 @@ def send_broadcast(
     subject: str,
     html_builder: Callable[[str], str],
     scope: dict,
+    reply_to: Optional[str] = None,
 ) -> tuple[int, list[str]]:
     """Send one subject to many recipients via Resend's batch endpoint.
 
@@ -203,6 +204,11 @@ def send_broadcast(
     instead of dropping the broadcast. `html_builder(email)` produces the
     body per recipient so future templates can personalize; today's
     builders ignore the argument.
+
+    `reply_to` overrides EMAIL_REPLY_TO for this broadcast. Broadcasts that
+    ask a question ("confirm your attendance") pass the support desk address
+    so the answers arrive as tickets instead of scattering into a personal
+    inbox where nobody can count them.
 
     scope keys: scope_kind, scope_code, audience, template.
     Returns (sent_count, failed_addresses).
@@ -223,7 +229,12 @@ def send_broadcast(
         nonlocal sent
         for addr in chunk:
             if send_email(
-                to=addr, subject=subject, html=html_builder(addr), db=db, **scope_kwargs
+                to=addr,
+                subject=subject,
+                html=html_builder(addr),
+                db=db,
+                reply_to=reply_to,
+                **scope_kwargs,
             ):
                 sent += 1
             else:
@@ -243,8 +254,8 @@ def send_broadcast(
                 "subject": subject,
                 "html": html_builder(addr),
             }
-            if settings.EMAIL_REPLY_TO:
-                item["reply_to"] = settings.EMAIL_REPLY_TO
+            if reply_to or settings.EMAIL_REPLY_TO:
+                item["reply_to"] = reply_to or settings.EMAIL_REPLY_TO
             payload.append(item)
 
         r = _resend_post(RESEND_BATCH_URL, payload, settings.RESEND_API_KEY)

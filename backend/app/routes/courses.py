@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import support_service as svc
 from ..db import get_db
 from ..deps import require_admin
 from ..emailer import (
@@ -289,6 +290,11 @@ def notify_course(
             "audience": body.audience,
             "template": "broadcast",
         },
+        # Replies land on the support desk, not in a personal inbox. A
+        # broadcast that asks registrants a question is worthless if the
+        # answers cannot be counted, and "reply to confirm your seat" is
+        # exactly the kind of broadcast this platform sends.
+        reply_to=svc.SUPPORT_ADDRESS,
     )
 
     return NotifyOut(
