@@ -1,10 +1,10 @@
 {
-  "version": "2.55.0",
-  "name": "Engineering Review Copilot",
+  "version": "2.56.0",
+  "name": "Engineering Change Review",
   "highlights": [
-    "Persistent Object Inspector with semantic search and smart filters",
-    "Deterministic model/import health report with affected-part selection",
-    "Undoable BOM cleanup and metadata-completeness audit",
-    "Safe command palette with preview, approval, audit and restore"
+    "Resumable project files preserve model geometry, names, classifications, appearance and review work",
+    "Deterministic similar-part finding and two-revision engineering change comparison",
+    "Geometry Quality now records kernel versus Float32 provenance and safely omits proven unusable triangles",
+    "Automatic exploded sequences include review controls plus CSV, JSON and WebM exports"
   ]
 }
