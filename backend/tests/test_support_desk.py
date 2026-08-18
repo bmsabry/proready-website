@@ -1570,3 +1570,94 @@ def test_prompt_forbids_asking_what_a_tool_answers():
     for q in ("what is the course code?", "what are the dates?"):
         assert q in SYSTEM_PROMPT
     assert "search_site" in SYSTEM_PROMPT
+
+
+# ---------------------------------------------------------------------------
+# Never invent a session time
+# ---------------------------------------------------------------------------
+#
+# Asked to email registrants with the dates and local times, the assistant
+# produced "9:00 AM UTC" — a time that appears nowhere in the data. That
+# email goes to real people who would show up at the wrong hour. Courses
+# now carry a real session time, and an unset one has to be admitted.
+
+
+def test_course_summary_flags_a_missing_session_time(db):
+    from datetime import date
+
+    from app.ai_tools import _course_summary
+    from app.models import Course
+
+    c = db.execute(select(Course).where(Course.code == "notime")).scalar_one_or_none()
+    if c is None:
+        c = Course(code="notime", title="No Time Set",
+                   start_date=date(2026, 9, 1), total_seats=5)
+        db.add(c)
+        db.commit()
+
+    out = _course_summary(c, db)
+    assert out["session_time_utc"] == ""
+    assert "NO SESSION TIME IS SET" in out["session_time_note"]
+    assert "guess" in out["session_time_note"].lower()
+
+
+def test_course_summary_is_quiet_once_the_time_is_set(db):
+    from datetime import date
+
+    from app.ai_tools import _course_summary, update_course
+    from app.models import Course
+
+    c = db.execute(select(Course).where(Course.code == "hastime")).scalar_one_or_none()
+    if c is None:
+        db.add(Course(code="hastime", title="Timed", start_date=date(2026, 9, 1),
+                      total_seats=5))
+        db.commit()
+
+    ok = update_course(db, code="hastime", session_time_utc="13:30",
+                       session_duration_minutes=180)
+    assert ok["ok"] is True
+
+    c = db.execute(select(Course).where(Course.code == "hastime")).scalar_one()
+    out = _course_summary(c, db)
+    assert out["session_time_utc"] == "13:30"
+    assert out["session_duration_minutes"] == 180
+    assert out["session_time_note"] == ""
+
+
+@pytest.mark.parametrize("bad", ["9am", "25:00", "13:60", "1:30", "noon"])
+def test_bad_session_times_are_rejected(db, bad):
+    from datetime import date
+
+    from app.ai_tools import update_course
+    from app.models import Course
+
+    if db.execute(select(Course).where(Course.code == "tval")).scalar_one_or_none() is None:
+        db.add(Course(code="tval", title="V", start_date=date(2026, 9, 1), total_seats=5))
+        db.commit()
+    out = update_course(db, code="tval", session_time_utc=bad)
+    assert out["ok"] is False
+    assert "HH:MM" in out["error"]
+
+
+def test_session_time_can_be_cleared(db):
+    from datetime import date
+
+    from app.ai_tools import update_course
+    from app.models import Course
+
+    if db.execute(select(Course).where(Course.code == "tclear")).scalar_one_or_none() is None:
+        db.add(Course(code="tclear", title="C", start_date=date(2026, 9, 1), total_seats=5))
+        db.commit()
+    assert update_course(db, code="tclear", session_time_utc="08:00")["ok"] is True
+    assert update_course(db, code="tclear", session_time_utc="")["ok"] is True
+    c = db.execute(select(Course).where(Course.code == "tclear")).scalar_one()
+    assert c.session_time_utc == ""
+
+
+def test_prompt_forbids_inventing_a_time():
+    from app.routes.ai import SYSTEM_PROMPT
+
+    assert "NEVER state a time of day" in SYSTEM_PROMPT
+    assert "session_time_utc" in SYSTEM_PROMPT
+    # Converting a real time to local zones is explicitly still allowed.
+    assert "local zones" in SYSTEM_PROMPT

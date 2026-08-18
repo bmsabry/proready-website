@@ -104,6 +104,9 @@ def _course_summary(c: Course, db: Session) -> Dict[str, Any]:
         "start_date": c.start_date.isoformat() if c.start_date else None,
         "total_seats": c.total_seats,
         "status": c.status,
+        "session_time_utc": c.session_time_utc or "",
+        "session_duration_minutes": c.session_duration_minutes or 0,
+        "session_time_note": ("" if c.session_time_utc else "NO SESSION TIME IS SET for this course. You do not know what time of day it runs. Do not state or guess one — ask Bassam, or set it with update_course."),
         "day_dates": list(c.day_dates or []),
         "price_cents": c.price_cents,
         "currency": c.currency,
@@ -161,6 +164,8 @@ def update_course(
     total_seats: Optional[int] = None,
     status: Optional[str] = None,
     day_dates: Optional[List[str]] = None,
+    session_time_utc: Optional[str] = None,
+    session_duration_minutes: Optional[int] = None,
 ) -> Dict[str, Any]:
     course, err = _course_or_error(db, code)
     if err:
@@ -193,6 +198,20 @@ def update_course(
             return {"ok": False, "error": f"day_dates contains invalid date: {e}"}
         course.day_dates = parsed
         changed.append("day_dates")
+    if session_time_utc is not None:
+        t = session_time_utc.strip()
+        if t and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t):
+            return {
+                "ok": False,
+                "error": f"session_time_utc must be 24-hour 'HH:MM' UTC, got '{t}'",
+            }
+        course.session_time_utc = t
+        changed.append("session_time_utc")
+    if session_duration_minutes is not None:
+        if not 0 <= int(session_duration_minutes) <= 1440:
+            return {"ok": False, "error": "session_duration_minutes must be 0-1440"}
+        course.session_duration_minutes = int(session_duration_minutes)
+        changed.append("session_duration_minutes")
 
     if not changed:
         return {"ok": False, "error": "no fields supplied to update"}
@@ -1052,6 +1071,8 @@ TOOL_SPECS = [
             "properties": {
                 "code": {"type": "string"},
                 "title": {"type": "string"},
+                "session_time_utc": {"type": "string", "description": "Session start time in 24-hour UTC 'HH:MM'. Send '' to clear."},
+                "session_duration_minutes": {"type": "integer", "description": "How long one session runs, in minutes."},
                 "start_date": {"type": "string", "description": "YYYY-MM-DD"},
                 "total_seats": {"type": "integer", "minimum": 1},
                 "status": {"type": "string", "enum": ["open", "closed"]},

@@ -64,6 +64,12 @@ class Course(Base):
         String(64), default=None
     )
 
+    # Session start time in UTC, "HH:MM", and how long a session runs.
+    # Empty means "not set" — and the assistant is required to say so rather
+    # than invent a time, which is exactly what it did before this existed.
+    session_time_utc: Mapped[str] = mapped_column(String(5), default="")
+    session_duration_minutes: Mapped[int] = mapped_column(Integer, default=0)
+
     # 'open' | 'closed' — 'closed' rejects new registrations.
     status: Mapped[str] = mapped_column(String(16), default="open", index=True)
 

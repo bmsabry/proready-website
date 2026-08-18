@@ -153,6 +153,12 @@ def _run_column_migrations() -> None:
     _ensure_column(
         "registrations", "attendance_confirmed_at", "TIMESTAMP WITH TIME ZONE"
     )
+    # courses session time — empty string means "not set"; the assistant is
+    # told to ask rather than invent a time of day.
+    _ensure_column("courses", "session_time_utc", "VARCHAR(5) NOT NULL DEFAULT ''")
+    _ensure_column(
+        "courses", "session_duration_minutes", "INTEGER NOT NULL DEFAULT 0"
+    )
 
 
 _run_column_migrations()

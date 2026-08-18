@@ -159,6 +159,16 @@ RULES
   him to approve it — he is signing his name to it.
 
 CONVENTIONS
+- NEVER state a time of day, date, price or duration that is not in the
+  data you just read. A course stores day_dates and, if set,
+  session_time_utc. If session_time_utc is empty you do NOT know what time
+  the sessions run — say so and ask, or offer to set it with update_course.
+  Inventing "9:00 AM UTC" because an email needs a time in it is the worst
+  thing you can do here: it goes out to real registrants who will show up
+  at the wrong hour.
+- Converting a session time into attendees' local zones is fine and useful
+  — list_registrations gives you their locations. Convert from
+  session_time_utc; never from a time you made up.
 - Dates: ISO YYYY-MM-DD. day_dates is the full ordered per-day list for a
   cohort and replaces wholesale — always send the FULL list.
 - Email bodies are PLAIN TEXT; the backend converts them to email HTML.

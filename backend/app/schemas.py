@@ -114,6 +114,10 @@ class CourseOut(BaseModel):
     currency: str = "usd"
     # Academy product carrying this course's recorded counterpart, or None.
     recorded_product_code: Optional[str] = None
+    # Session start time in UTC as "HH:MM", and length in minutes.
+    # Empty/0 mean "not scheduled yet" — never guess a time from these.
+    session_time_utc: str = ""
+    session_duration_minutes: int = 0
 
 
 class CourseCreateIn(BaseModel):
@@ -146,6 +150,11 @@ class CoursePatchIn(BaseModel):
     # Online seat price. Set to 0 to switch the cohort back to invoice-only.
     price_cents: Optional[int] = Field(default=None, ge=0)
     currency: Optional[str] = Field(default=None, min_length=3, max_length=8)
+    # "HH:MM" UTC. Send "" to clear.
+    session_time_utc: Optional[str] = Field(
+        default=None, max_length=5, pattern=r"^$|^([01]\d|2[0-3]):[0-5]\d$"
+    )
+    session_duration_minutes: Optional[int] = Field(default=None, ge=0, le=1440)
 
 
 class NotifyIn(BaseModel):
