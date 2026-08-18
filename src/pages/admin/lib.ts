@@ -532,6 +532,25 @@ export function formatDate(iso: string): string {
   }
 }
 
+/** "08/18/26" — compact mm/dd/yy for dense tables.
+ *
+ * Locale is pinned to en-US on purpose: the point is a fixed mm/dd/yy, and
+ * `undefined` would render dd/mm/yy for a browser set to most of the world.
+ * Callers should keep the full timestamp on the element's `title`, so the
+ * time of day is a hover away rather than lost.
+ */
+export function formatShortDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
+
 /** "Jun 3, 2026" — date-only fields (start_date, day_dates). */
 export function formatDay(iso: string): string {
   try {

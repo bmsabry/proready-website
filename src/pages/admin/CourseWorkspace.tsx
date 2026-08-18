@@ -47,6 +47,7 @@ import {
   downloadCsv,
   formatDate,
   formatDay,
+  formatShortDate,
   fmtDuration,
   money,
   plainTextToEmailHtml,
@@ -509,8 +510,11 @@ function RegistrationsTab({
                     <td className="px-4 py-3 align-top">
                       <StatusBadge status={r.status} />
                       {r.paid_at && (
-                        <div className="text-[11px] text-slate-300 mt-1">
-                          paid {formatDate(r.paid_at)}
+                        <div
+                          className="text-[11px] text-slate-300 mt-1"
+                          title={formatDate(r.paid_at)}
+                        >
+                          paid {formatShortDate(r.paid_at)}
                         </div>
                       )}
                     </td>
@@ -526,8 +530,11 @@ function RegistrationsTab({
                             <UserCheck className="w-3 h-3" />
                             Confirmed
                           </span>
-                          <div className="text-[11px] text-slate-300 mt-1">
-                            {formatDate(r.attendance_confirmed_at)}
+                          <div
+                            className="text-[11px] text-slate-300 mt-1"
+                            title={formatDate(r.attendance_confirmed_at)}
+                          >
+                            {formatShortDate(r.attendance_confirmed_at)}
                           </div>
                           <button
                             onClick={() => void setAttendance(r.id, false)}
@@ -558,31 +565,38 @@ function RegistrationsTab({
                     <td className="px-4 py-3 align-top">
                       <ProviderBadge provider={r.payment_provider} />
                     </td>
-                    <td className="px-4 py-3 align-top text-slate-300 text-xs whitespace-nowrap">
-                      {formatDate(r.created_at)}
+                    <td
+                      className="px-4 py-3 align-top text-slate-300 text-xs whitespace-nowrap"
+                      title={formatDate(r.created_at)}
+                    >
+                      {formatShortDate(r.created_at)}
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <div className="flex items-center justify-end gap-2">
-                        {r.status !== 'paid' && (
-                          <ConfirmButton
-                            message={`Mark ${r.full_name} (${r.email}) as paid?`}
-                            onConfirm={() => void action('mark-paid', r.id)}
-                            disabled={busyId === r.id}
-                            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-emerald-600/90 hover:bg-emerald-500 text-white disabled:opacity-50"
-                          >
-                            <CheckCircle2 className="w-3 h-3" />
-                            Mark paid
-                          </ConfirmButton>
-                        )}
+                      {/* Stacked, not side by side: at this column width the
+                          labels wrapped mid-word and the pair drifted out from
+                          under the Actions header. A fixed width keeps the two
+                          aligned even on rows where only one of them renders. */}
+                      <div className="flex flex-col items-end gap-1.5">
                         {r.status !== 'cancelled' && (
                           <ConfirmButton
                             message={`Cancel ${r.full_name}'s registration? The seat will be released.`}
                             onConfirm={() => void action('cancel', r.id)}
                             disabled={busyId === r.id}
-                            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 disabled:opacity-50"
+                            className="inline-flex items-center justify-center gap-1 whitespace-nowrap w-28 text-xs px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 disabled:opacity-50"
                           >
                             <XCircle className="w-3 h-3" />
                             Cancel
+                          </ConfirmButton>
+                        )}
+                        {r.status !== 'paid' && (
+                          <ConfirmButton
+                            message={`Mark ${r.full_name} (${r.email}) as paid?`}
+                            onConfirm={() => void action('mark-paid', r.id)}
+                            disabled={busyId === r.id}
+                            className="inline-flex items-center justify-center gap-1 whitespace-nowrap w-28 text-xs px-2 py-1 rounded-md bg-emerald-600/90 hover:bg-emerald-500 text-white disabled:opacity-50"
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            Mark paid
                           </ConfirmButton>
                         )}
                       </div>
