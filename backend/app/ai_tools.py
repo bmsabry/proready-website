@@ -917,7 +917,42 @@ def list_unconfirmed(db: Session, course_code: str, **_: Any) -> Dict[str, Any]:
     )
     unconfirmed = [r for r in rows if r.attendance_confirmed_at is None]
     confirmed = [r for r in rows if r.attendance_confirmed_at is not None]
-    return {
+
+    # Cross-check against the support desk. If someone emailed a confirmation
+    # and it is not reflected here, that gap is the single most useful thing
+    # this tool can tell you — it is the difference between "they never
+    # answered" and "they answered and we dropped it". Bassam once saw a reply
+    # in Resend that the desk had recorded as a ticket but never applied to the
+    # registration; nothing in this tool's output hinted at it, so the honest
+    # answer looked like "nobody has confirmed".
+    unconfirmed_addresses = {r.email.lower().strip() for r in unconfirmed}
+    replied_but_unmarked: List[Dict[str, Any]] = []
+    if unconfirmed_addresses:
+        tickets = (
+            db.execute(
+                select(SupportTicket)
+                .where(SupportTicket.category == "attendance")
+                .order_by(SupportTicket.created_at.desc())
+                .limit(200)
+            )
+            .scalars()
+            .all()
+        )
+        for t in tickets:
+            addr = (t.submitter_email or "").lower().strip()
+            if addr in unconfirmed_addresses:
+                replied_but_unmarked.append(
+                    {
+                        "email": t.submitter_email,
+                        "ticket_ref": t.ref,
+                        "ticket_status": t.status,
+                        "summary": (t.ai_result or {}).get("summary", ""),
+                        "subject": t.subject,
+                        "received_at": _iso(t.created_at),
+                    }
+                )
+
+    out = {
         "ok": True,
         "course_code": course_code,
         "total_active": len(rows),
@@ -925,7 +960,16 @@ def list_unconfirmed(db: Session, course_code: str, **_: Any) -> Dict[str, Any]:
         "unconfirmed_count": len(unconfirmed),
         "unconfirmed": [_registration_summary(r) for r in unconfirmed],
         "confirmed": [_registration_summary(r) for r in confirmed],
+        "replied_but_unmarked": replied_but_unmarked,
     }
+    if replied_but_unmarked:
+        out["warning"] = (
+            f"{len(replied_but_unmarked)} of the unconfirmed registrants have an "
+            "attendance ticket in the support desk — they appear to have replied "
+            "without being marked confirmed. Read the ticket with get_ticket and, "
+            "if they did confirm, record it with mark_attendance_confirmed."
+        )
+    return out
 
 
 def mark_attendance_confirmed(db: Session, email: str) -> Dict[str, Any]:

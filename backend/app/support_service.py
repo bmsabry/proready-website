@@ -1083,6 +1083,31 @@ def _process_ticket_inner(db: Session, ticket: SupportTicket) -> None:
         log.info("[support] ticket %s parked as spam", ticket.ref)
         return
 
+    # --- Record what they told us, before deciding how to answer ----------
+    # "Does a human need to look at this?" and "did this person say they are
+    # coming?" are two different questions. They used to be one: the
+    # attendance branch sat below the can_auto_resolve gate, so whenever the
+    # classifier wanted a human in the loop it also threw the confirmation
+    # away.
+    #
+    # That is not hypothetical. A registrant replied "Confirmed and thank
+    # you"; the classifier tagged it attendance with 0.98 confidence and then
+    # asked for human review — and the seat stayed unconfirmed, with the
+    # answer sitting unread in a ticket. Recording is cheap, idempotent, and
+    # undoable from the Registrations tab; losing the answer is none of those.
+    confirmed: list[dict[str, Any]] = []
+    if result["category"] == "attendance":
+        confirmed = confirm_attendance(db, ticket.submitter_email)
+        if confirmed:
+            emit_event(
+                db, ticket, "attendance_confirmed", payload={"courses": confirmed}
+            )
+            log.info(
+                "[support] ticket %s attendance recorded for %d registration(s)",
+                ticket.ref,
+                len(confirmed),
+            )
+
     # --- Too many automated turns ----------------------------------------
     if attempt > MAX_AI_ATTEMPTS:
         _send_acknowledgement(db, ticket, human_soon=True)
@@ -1115,12 +1140,15 @@ def _process_ticket_inner(db: Session, ticket: SupportTicket) -> None:
         else:
             _send_acknowledgement(db, ticket)
 
-        escalate(
-            db,
-            ticket,
+        reason = (
             result["escalation_reason"]
-            or f"Category '{result['category']}' is handled by a human",
+            or f"Category '{result['category']}' is handled by a human"
         )
+        if confirmed:
+            # Make it unambiguous in the inbox that the seat is already marked,
+            # so nobody chases someone who has answered.
+            reason = f"{reason} (attendance already recorded as confirmed)"
+        escalate(db, ticket, reason)
         db.commit()
         return
 
@@ -1129,10 +1157,7 @@ def _process_ticket_inner(db: Session, ticket: SupportTicket) -> None:
     # registration so the unconfirmed list is a fact rather than an inbox
     # someone has to read, then thank them and close.
     if result["category"] == "attendance":
-        confirmed = confirm_attendance(db, ticket.submitter_email)
-        emit_event(
-            db, ticket, "attendance_confirmed", payload={"courses": confirmed}
-        )
+        # `confirmed` was filled in above, before any branch could return.
         if confirmed:
             names = ", ".join(c["course_title"] for c in confirmed)
             ack = (
@@ -1166,10 +1191,6 @@ def _process_ticket_inner(db: Session, ticket: SupportTicket) -> None:
                 if not confirmed else "Confirmation reply could not be delivered",
             )
         db.commit()
-        log.info(
-            "[support] ticket %s attendance confirmed for %d registration(s)",
-            ticket.ref, len(confirmed),
-        )
         return
 
     # --- Answered automatically -------------------------------------------

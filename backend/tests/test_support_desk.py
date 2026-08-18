@@ -1364,6 +1364,118 @@ def test_confirmation_reply_marks_the_registration(client, db, monkeypatch, regi
     assert "attendance_confirmed" in events(db, t.id)
 
 
+def test_confirmation_is_recorded_even_when_a_human_is_wanted(
+    client, db, monkeypatch, registrant
+):
+    """The bug this exists to prevent, exactly as it happened in production.
+
+    A registrant replied "Confirmed and thank you". The classifier tagged it
+    attendance with 0.98 confidence — and then said a human should handle the
+    thread. The attendance branch sat below the can_auto_resolve gate, so the
+    function returned before recording anything: the seat stayed unconfirmed,
+    the answer sat unread in a ticket, and the honest report to Bassam was
+    "nobody has confirmed".
+
+    Whether a person needs to read the thread has nothing to do with whether
+    this registrant said they are coming. Record the fact; escalate anyway.
+    """
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "attendance",
+            "priority": 8,
+            "is_spam": False,
+            "confidence": 0.98,
+            "summary": "Customer is confirming their attendance.",
+            "reply_html": "<p>Thank you for confirming.</p>",
+            "can_auto_resolve": False,
+            "escalation_reason": "Attendance status update requires human handling.",
+        },
+    )
+    assert registrant.attendance_confirmed_at is None
+
+    r = client.post(
+        "/api/support/contact",
+        json={
+            "email": "yusuf@example.com",
+            "subject": "Re: Confirm Your Seat",
+            "message": "Confirmed and thank you",
+        },
+    )
+    ref = r.json()["ref"]
+
+    db.expire_all()
+    db.refresh(registrant)
+    assert registrant.attendance_confirmed_at is not None, (
+        "a confirmation must be recorded even when the ticket escalates"
+    )
+
+    t = ticket_by_ref(db, ref)
+    assert t.status == "escalated", "the human review the classifier asked for still happens"
+    assert "attendance_confirmed" in events(db, t.id)
+
+
+def test_escalated_confirmation_says_it_was_already_recorded(
+    client, db, monkeypatch, registrant
+):
+    """The inbox has to show the seat is marked, or Bassam chases someone who
+    already answered."""
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "attendance", "priority": 8, "is_spam": False,
+            "confidence": 0.98, "summary": "Confirming.",
+            "reply_html": "<p>Thanks.</p>", "can_auto_resolve": False,
+            "escalation_reason": "Needs a human.",
+        },
+    )
+    r = client.post(
+        "/api/support/contact",
+        json={"email": "yusuf@example.com", "subject": "Re: confirm", "message": "Confirmed"},
+    )
+    t = ticket_by_ref(db, r.json()["ref"])
+    payloads = [
+        e.payload for e in db.execute(
+            select(SupportTicketEvent).where(SupportTicketEvent.ticket_id == t.id)
+        ).scalars().all()
+        if e.event_type == "escalated"
+    ]
+    joined = " ".join(str(p) for p in payloads)
+    assert "already recorded" in joined
+
+
+def test_unconfirmed_list_flags_people_who_did_reply(client, db, monkeypatch, registrant):
+    """If someone emailed a confirmation and it never reached their row, that
+    gap must be visible — otherwise the assistant reports 'nobody confirmed'
+    while the answer sits in the support desk."""
+    from app.ai_tools import list_unconfirmed
+
+    fake_llm(
+        monkeypatch,
+        {
+            "category": "attendance", "priority": 8, "is_spam": False,
+            "confidence": 0.98, "summary": "Confirming attendance.",
+            "reply_html": "<p>Thanks.</p>", "can_auto_resolve": False,
+            "escalation_reason": "Needs a human.",
+        },
+    )
+    client.post(
+        "/api/support/contact",
+        json={"email": "yusuf@example.com", "subject": "Re: confirm", "message": "Confirmed"},
+    )
+
+    # Simulate the old broken state: ticket exists, registration not marked.
+    db.expire_all()
+    db.refresh(registrant)
+    registrant.attendance_confirmed_at = None
+    db.commit()
+
+    out = list_unconfirmed(db, course_code="attend-test")
+    assert out["replied_but_unmarked"], "the mismatch must be surfaced, not hidden"
+    assert out["replied_but_unmarked"][0]["email"] == "yusuf@example.com"
+    assert "warning" in out
+
+
 def test_confirmation_names_the_course_back(client, db, monkeypatch, registrant, captured_mail):
     """Say what was confirmed, not a vague 'you're all set'."""
     fake_llm(
