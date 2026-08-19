@@ -20,6 +20,11 @@ import {
 import { Reveal } from '../../components/ui';
 import PayPalButtons, { fetchPaymentsConfig, PaymentsConfig } from '../../components/PayPalButtons';
 import { usePageMeta } from '../../lib/meta';
+import {
+  formatIsoDate as formatStartDate,
+  snapshotDayLabels,
+  snapshotStartLabel,
+} from '../../data/courseSnapshot';
 
 // -----------------------------------------------------------------------------
 // Course constants
@@ -29,7 +34,10 @@ import { usePageMeta } from '../../lib/meta';
 // local preview before the backend is reachable.
 const COURSE_CODE = 'gas-turbine-emissions-mapping-2026-05';
 const DEFAULT_CAPACITY = 15;
-const DEFAULT_COHORT_DATE = 'August 29, 2026';
+// Prerender fallback for the cohort start, taken from the build-time snapshot
+// of the live course record (see data/courseSnapshot). The literal is only a
+// last resort for a course the build has never been able to reach.
+const DEFAULT_COHORT_DATE = snapshotStartLabel(COURSE_CODE, 'August 29, 2026');
 
 // Backend endpoints. Set VITE_API_BASE in your deploy env to the Render URL,
 // e.g. https://proreadyengineer-training-api.onrender.com
@@ -47,16 +55,8 @@ const formatAmount = (cents: number, currency: string): string =>
     minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
   }).format(cents / 100);
 
-// Parse an ISO yyyy-mm-dd date into "May 15, 2026" without timezone drift.
-const formatStartDate = (iso: string): string => {
-  const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));
-  if (!y || !m || !d) return iso;
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  return `${months[m - 1]} ${d}, ${y}`;
-};
+// formatStartDate (ISO -> "August 29, 2026", no timezone drift) is imported
+// above from data/courseSnapshot so the build script and the page agree.
 
 // JSON-LD Course schema for search engines.
 const COURSE_JSONLD = JSON.stringify({
@@ -213,12 +213,16 @@ const IDEAL_FOR = [
 // -----------------------------------------------------------------------------
 // Default schedule used when the API hasn't responded yet (or is unavailable
 // in local preview). Admin can override these any time via the dashboard.
-const DEFAULT_DAY_DATES: string[] = [
+// Taken from the build-time snapshot of the live course record: the admin moves
+// the dates in the dashboard and the next deploy picks them up, so there is
+// nothing here to forget to update. The literals are a last resort only, for a
+// course code the build has never once been able to reach.
+const DEFAULT_DAY_DATES: string[] = snapshotDayLabels(COURSE_CODE, [
   'August 29, 2026',
   'August 30, 2026',
   'September 5, 2026',
   'September 6, 2026',
-];
+]);
 
 const GasTurbineEmissionsMapping = () => {
   usePageMeta(
