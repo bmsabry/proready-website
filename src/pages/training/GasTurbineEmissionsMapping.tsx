@@ -65,7 +65,7 @@ const COURSE_JSONLD = JSON.stringify({
   name: 'Gas Turbine Emissions Mapping',
   description:
     
-    'Four-day live expert course (two weekends) on DLE gas turbine emissions mapping, built on 194 slides across 10 chapters: combustion and gas turbine fundamentals, combustion dynamics and Frame 9 DLN2.6+ operation, NOx/CO and EPA Method 7E CEMS, the step-by-step mapping procedure practised on a DLN2.6+ simulator, then ambient effects, flex fuel and field troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
+    'Four-day live expert course (two weekends) on DLE gas turbine emissions mapping, built on 194 slides across 10 chapters: combustion and gas turbine fundamentals, combustion dynamics and DLE combustion system operation, NOx/CO and EPA Method 7E CEMS, the step-by-step mapping procedure practised on a simulated combustion system, then ambient effects, flex fuel and field troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
   provider: {
     '@type': 'Organization',
     name: 'ProReadyEngineer LLC',
@@ -118,17 +118,17 @@ const CURRICULUM: Day[] = [
     title: 'Combustion Dynamics & DLE Operation',
     chapters: 'Chapters 3–4 · 45 slides',
     summary:
-      'Why premixed flames sing, what the amplitude limits actually oblige you to do, and how a Frame 9 DLN2.6+ is staged, plated and controlled.',
+      'Why premixed flames sing, what the amplitude limits actually oblige you to do, and how the combustion system is staged, trimmed and controlled.',
     topics: [
       'Thermoacoustic instability and the Rayleigh criterion — when an oscillation grows',
       'LFD and HFD amplitude bands, and the action each band requires',
       'Protection hierarchy: E-ABAL → BRNUL → stage down → trip',
       'High-cycle fatigue — what dynamics does to hardware, and how fast',
       'Dynamic pressure sensors, sampling rate, signal processing and damping',
-      'Frame 9 DLN2.6+ fuel circuits, burner modes and mode-transition risks',
+      'Combustion system fuel circuits, burner modes and mode-transition risks',
       'The key limiting tones: where each appears and the correct first action',
-      'Balance plates — what they fix, how they are identified, when to swap',
-      'Control schedules, TTRF1, operating-window boundaries and remapping triggers',
+      'Fuel orifices — what they fix, how they are identified, when to swap',
+      'Control schedules, operating-window boundaries and remapping triggers',
     ],
     outcomes: [
       'Decide from a described oscillation whether it will grow or decay',
@@ -141,23 +141,23 @@ const CURRICULUM: Day[] = [
     title: 'Emissions, CEMS & Combustion Mapping',
     chapters: 'Chapters 5–6 · 47 slides + simulator',
     summary:
-      'Where NOx and CO come from, how they are legally measured, and then the mapping procedure itself — worked step by step on a simulated DLN2.6+ engine.',
+      'Where NOx and CO come from, how they are legally measured, and then the mapping procedure itself — worked step by step on a simulated combustion system.',
     topics: [
       'NOx pathways (thermal, prompt, fuel-bound, N₂O); CO formation, quench and LBO proximity',
       'Extractive vs in-situ CEMS, and the EPA Method 7E sampling train',
       'Analyzers compared: CLD, NDIR and O₂ cells; probe siting and heated sample lines',
       'Calibration drift against the ±2.5%-of-span limit, and emissions data QA',
       'Regulatory corrections: 15% O₂, dry basis, ISO conditions',
-      'Per-circuit emissions and acoustics response: PM1, D5, PM3 and the PM2 float',
-      'IGV settings versus load, TTRF1, and part-load CO',
+      'Per-circuit emissions and acoustics response',
+      'IGV settings versus load, and part-load CO',
       'Mapping preparation, safety protocols, tools, and the step-by-step procedure',
       'Cold-tune / hot-check discipline across fuel temperature',
-      'Updating PM1, PM3 and D5 mapping tables as f(TTRF1), plus the remote tuning bias table',
+      'Updating fuel circuits mapping tables, plus the remote tuning bias table',
       'Operating-line verification and mapping documentation requirements',
     ],
     outcomes: [
       'Correct raw analyzer readings to 15% O₂ dry, and judge a daily drift check',
-      'Run a full mapping sequence on the simulator inside the ±3% PM1 / ±5% PM3 window',
+      'Run a full mapping sequence on the simulated combustion system, inside the mapping window',
       'Produce as-left mapping tables and release an engine with the right evidence behind it',
     ],
     icon: <Gauge className="w-6 h-6" />,
@@ -224,7 +224,7 @@ const GasTurbineEmissionsMapping = () => {
   usePageMeta(
     'Gas Turbine Emissions Mapping Course',
     
-    'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion and GT fundamentals, dynamics and Frame 9 DLN2.6+ operation, CEMS and the full mapping procedure on a simulator, then ambient, flex fuel and troubleshooting. Taught by a practitioner with 19+ years of field experience.',
+    'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion and GT fundamentals, dynamics and DLE combustion system operation, CEMS and the full mapping procedure on a simulator, then ambient, flex fuel and troubleshooting. Taught by a practitioner with 19+ years of field experience.',
     {
       image: 'https://proreadyengineer.com/Mapping_Training_Infographic_6.png',
       jsonLd: {
@@ -233,7 +233,7 @@ const GasTurbineEmissionsMapping = () => {
         name: 'Gas Turbine Emissions Mapping',
         description:
           
-            'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion and GT fundamentals, dynamics and Frame 9 DLN2.6+ operation, CEMS and the full mapping procedure on a simulator, then ambient, flex fuel and troubleshooting. Taught by a practitioner with 19+ years of field experience.',
+            'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion and GT fundamentals, dynamics and DLE combustion system operation, CEMS and the full mapping procedure on a simulator, then ambient, flex fuel and troubleshooting. Taught by a practitioner with 19+ years of field experience.',
         provider: { '@id': 'https://proreadyengineer.com/#org' },
         hasCourseInstance: [
           {
