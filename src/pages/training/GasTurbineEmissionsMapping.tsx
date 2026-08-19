@@ -226,7 +226,7 @@ const GasTurbineEmissionsMapping = () => {
     
     'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion and GT fundamentals, dynamics and DLE combustion system operation, CEMS and the full mapping procedure on a simulator, then ambient, flex fuel and troubleshooting. Taught by a practitioner with 19+ years of field experience.',
     {
-      image: 'https://proreadyengineer.com/Mapping_Training_Infographic_6.png',
+      image: 'https://proreadyengineer.com/Mapping_Course_Advertisement.png',
       jsonLd: {
         '@context': 'https://schema.org',
         '@type': 'Course',
@@ -536,10 +536,13 @@ const GasTurbineEmissionsMapping = () => {
             {/* Course infographic — placed directly under the title, matching site pattern */}
             <div className="card overflow-hidden mb-10 shadow-2xl shadow-cyan-900/10">
               <img
-                src="/Mapping_Training_Infographic_6.png"
-                alt="Gas Turbine Emissions Mapping — De-mystifying Complexity: 6 gas circuits (OM, OP, OE, IM, IP, IE), the dynamics corridor (Φ ≈ 0.45–0.6), and course timeline"
+                src="/Mapping_Course_Advertisement.png"
+                alt="Gas Turbine Emissions Mapping — flagship live online course: from zero to field-ready in 4 live days. Day 1 combustion and gas turbine fundamentals, Day 2 combustion dynamics and DLE operation, Day 3 emissions, CEMS and the live mapping simulator, Day 4 ambient, flex fuel and troubleshooting. 194 slides, mapping simulator, daily mastery checks, quiz and interview for certification. Led by Bassam Abdelnabi. Next cohort August 29, 2026."
                 className="w-full h-auto block"
-                loading="lazy"
+                width={1671}
+                height={941}
+                loading="eager"
+                fetchPriority="high"
               />
             </div>
 
@@ -761,9 +764,11 @@ const GasTurbineEmissionsMapping = () => {
         {/* COURSE MAP INFOGRAPHIC */}
         <Reveal className="mb-16 card overflow-hidden">
           <img
-            src="/Mapping_Training_Infographic_6.png"
-            alt="Course overview infographic — DLE emissions mapping workflow from combustion fundamentals through fuel-split optimisation to flex-fuel troubleshooting"
+            src="/Mapping_Course_Advertisement.png"
+            alt="Course overview — the four live days, what each covers, and what is included: 194 slides, the mapping simulator, daily mastery checks, and the certification quiz and interview."
             className="w-full h-auto block"
+            width={1671}
+            height={941}
             loading="lazy"
           />
         </Reveal>
