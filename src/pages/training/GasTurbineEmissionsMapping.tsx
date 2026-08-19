@@ -118,7 +118,7 @@ const CURRICULUM: Day[] = [
     title: 'Combustion Dynamics & DLE Operation',
     chapters: 'Chapters 3–4 · 45 slides',
     summary:
-      'Why premixed flames sing, what the amplitude limits actually oblige you to do, and how the combustion system is staged, trimmed and controlled.',
+      'Why premixed flames sing, what the amplitude limits actually oblige you to do, and how a combustion system is staged and controlled.',
     topics: [
       'Thermoacoustic instability and the Rayleigh criterion — when an oscillation grows',
       'LFD and HFD amplitude bands, and the action each band requires',
