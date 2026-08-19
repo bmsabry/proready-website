@@ -20,11 +20,6 @@ import {
 import { Reveal } from '../../components/ui';
 import PayPalButtons, { fetchPaymentsConfig, PaymentsConfig } from '../../components/PayPalButtons';
 import { usePageMeta } from '../../lib/meta';
-import {
-  formatIsoDate as formatStartDate,
-  snapshotDayLabels,
-  snapshotStartLabel,
-} from '../../data/courseSnapshot';
 
 // -----------------------------------------------------------------------------
 // Course constants
@@ -34,10 +29,7 @@ import {
 // local preview before the backend is reachable.
 const COURSE_CODE = 'gas-turbine-emissions-mapping-2026-05';
 const DEFAULT_CAPACITY = 15;
-// Prerender fallback for the cohort start, taken from the build-time snapshot
-// of the live course record (see data/courseSnapshot). The literal is only a
-// last resort for a course the build has never been able to reach.
-const DEFAULT_COHORT_DATE = snapshotStartLabel(COURSE_CODE, 'August 29, 2026');
+const DEFAULT_COHORT_DATE = 'August 29, 2026';
 
 // Backend endpoints. Set VITE_API_BASE in your deploy env to the Render URL,
 // e.g. https://proreadyengineer-training-api.onrender.com
@@ -55,8 +47,16 @@ const formatAmount = (cents: number, currency: string): string =>
     minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
   }).format(cents / 100);
 
-// formatStartDate (ISO -> "August 29, 2026", no timezone drift) is imported
-// above from data/courseSnapshot so the build script and the page agree.
+// Parse an ISO yyyy-mm-dd date into "May 15, 2026" without timezone drift.
+const formatStartDate = (iso: string): string => {
+  const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));
+  if (!y || !m || !d) return iso;
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  return `${months[m - 1]} ${d}, ${y}`;
+};
 
 // JSON-LD Course schema for search engines.
 const COURSE_JSONLD = JSON.stringify({
@@ -64,7 +64,8 @@ const COURSE_JSONLD = JSON.stringify({
   '@type': 'Course',
   name: 'Gas Turbine Emissions Mapping',
   description:
-    'Four-day live expert course (two weekends) on DLE gas turbine emissions mapping: combustion fundamentals, combustion dynamics, DLE operations, fuel-split mapping, ambient effects, flex fuel, and troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
+    
+    'Four-day live expert course (two weekends) on DLE gas turbine emissions mapping, built on 194 slides across 10 chapters: combustion and gas turbine fundamentals, combustion dynamics and Frame 9 DLN2.6+ operation, NOx/CO and EPA Method 7E CEMS, the step-by-step mapping procedure practised on a DLN2.6+ simulator, then ambient effects, flex fuel and field troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
   provider: {
     '@type': 'Organization',
     name: 'ProReadyEngineer LLC',
@@ -75,60 +76,113 @@ const COURSE_JSONLD = JSON.stringify({
 // Curriculum content. Index 0 -> Day 1, index 1 -> Day 2, etc.
 // Dates are *not* stored here — they come from the live API (day_dates)
 // so the admin can adjust them without a code change.
+//
+// This mirrors the delivered material one-to-one: the chapter split, the
+// slide counts and the outcomes are taken from the four day decks and from
+// the learning objectives loaded against each module on the platform. If a
+// deck changes, change this too — a buyer comparing the advertised agenda
+// with the material they receive should find no gap.
 type Day = {
   title: string;
+  chapters: string;
   summary: string;
   topics: string[];
+  outcomes: string[];
   icon: React.ReactNode;
 };
 
 const CURRICULUM: Day[] = [
   {
-    title: 'Fundamentals of Combustion',
+    title: 'Combustion & Gas Turbine Fundamentals',
+    chapters: 'Chapters 1–2 · 55 slides',
     summary:
-      'Flame types, GT cycles, premixed vs diffusion, burning velocity, equivalence ratio basics.',
+      'The physics you need before you can tune anything: how flames behave, what sets flame temperature and NOx, and how a DLE machine is actually built — from premixer to metering valve.',
     topics: [
-      'Rapid exothermic oxidation framed for field engineers',
-      'Premixed / non-premixed / partially-premixed classifications',
-      'Burning velocity S_L and its role in flashback / LBO',
-      'Equivalence ratio φ as master variable',
+      'Premixed, diffusion and partially-premixed flames — and why DLE chose premixed',
+      'Equivalence ratio φ, the lean operating window, and adiabatic flame temperature',
+      'Thermal NOx (Zeldovich) and its exponential sensitivity to flame temperature',
+      'Laminar flame speed compared: methane, heavier hydrocarbons, hydrogen',
+      'Flashback, lean blowout and flame lift-off — mechanisms, precursors, protection',
+      'Brayton cycle, gas turbine architectures, and DLE vs diffusion (SAC) philosophy',
+      'Hardware: swirler, premixer, liner, transition piece, fuel nozzle',
+      'Fuel supply chain: staging valves, metering valves and the float circuit',
+    ],
+    outcomes: [
+      'Classify any flame and predict its temperature, NOx and stability signature',
+      'Read a fuel-composition change and infer the flashback and NOx consequence',
+      'Say what each valve and sensor does — and what happens in the combustor when it degrades',
     ],
     icon: <Flame className="w-6 h-6" />,
   },
   {
-    title: 'Combustion Dynamics',
+    title: 'Combustion Dynamics & DLE Operation',
+    chapters: 'Chapters 3–4 · 45 slides',
     summary:
-      'Thermoacoustics, LFD vs HFD, the Rayleigh criterion, sensors, mitigation levers.',
+      'Why premixed flames sing, what the amplitude limits actually oblige you to do, and how a Frame 9 DLN2.6+ is staged, plated and controlled.',
     topics: [
-      'Low-Frequency Dynamics (LFD) 150–1000 Hz',
-      'High-Frequency Dynamics (HFD) >1000 Hz',
-      'Rayleigh criterion and pressure–heat-release phasing',
-      'Mitigation: pilot biasing, ELBO, T_flame trim',
+      'Thermoacoustic instability and the Rayleigh criterion — when an oscillation grows',
+      'LFD and HFD amplitude bands, and the action each band requires',
+      'Protection hierarchy: E-ABAL → BRNUL → stage down → trip',
+      'High-cycle fatigue — what dynamics does to hardware, and how fast',
+      'Dynamic pressure sensors, sampling rate, signal processing and damping',
+      'Frame 9 DLN2.6+ fuel circuits, burner modes and mode-transition risks',
+      'The key limiting tones: where each appears and the correct first action',
+      'Balance plates — what they fix, how they are identified, when to swap',
+      'Control schedules, TTRF1, operating-window boundaries and remapping triggers',
+    ],
+    outcomes: [
+      'Decide from a described oscillation whether it will grow or decay',
+      'Place a measured amplitude in the right band and take the right protective action',
+      'Move pilot split, ELBO and TFlame the correct direction — and state the NOx cost',
     ],
     icon: <Activity className="w-6 h-6" />,
   },
   {
-    title: 'DLE Operations & Emissions',
+    title: 'Emissions, CEMS & Combustion Mapping',
+    chapters: 'Chapters 5–6 · 47 slides + simulator',
     summary:
-      'Lean-premixed operating window, NOx/CO trade-off, CEMS, regulatory corrections.',
+      'Where NOx and CO come from, how they are legally measured, and then the mapping procedure itself — worked step by step on a simulated DLN2.6+ engine.',
     topics: [
-      'Thermal-NOx exponential sensitivity to flame temperature',
-      'CO surge near the lean limit',
-      'CEMS calibration drift and regulatory corrections',
-      'How to define the mapped conditions',
-      'Learn hands on using the Engine interactive simulator',
+      'NOx pathways (thermal, prompt, fuel-bound, N₂O); CO formation, quench and LBO proximity',
+      'Extractive vs in-situ CEMS, and the EPA Method 7E sampling train',
+      'Analyzers compared: CLD, NDIR and O₂ cells; probe siting and heated sample lines',
+      'Calibration drift against the ±2.5%-of-span limit, and emissions data QA',
+      'Regulatory corrections: 15% O₂, dry basis, ISO conditions',
+      'Per-circuit emissions and acoustics response: PM1, D5, PM3 and the PM2 float',
+      'IGV settings versus load, TTRF1, and part-load CO',
+      'Mapping preparation, safety protocols, tools, and the step-by-step procedure',
+      'Cold-tune / hot-check discipline across fuel temperature',
+      'Updating PM1, PM3 and D5 mapping tables as f(TTRF1), plus the remote tuning bias table',
+      'Operating-line verification and mapping documentation requirements',
+    ],
+    outcomes: [
+      'Correct raw analyzer readings to 15% O₂ dry, and judge a daily drift check',
+      'Run a full mapping sequence on the simulator inside the ±3% PM1 / ±5% PM3 window',
+      'Produce as-left mapping tables and release an engine with the right evidence behind it',
     ],
     icon: <Gauge className="w-6 h-6" />,
   },
   {
-    title: 'Mapping, Flex Fuel & Troubleshooting',
+    title: 'Ambient, Flex Fuel & Troubleshooting',
+    chapters: 'Chapters 7–10 · 47 slides',
     summary:
-      'Fuel-split optimisation, ambient corrections, hydrogen blending, and root-cause analysis of real field events.',
+      'What moves your map after you have set it — weather, fuel and failing instruments — and how to tell a real combustion event from a sensor lying to you.',
     topics: [
-      'Systematic sweep methodology for per-circuit fuel splits',
-      'Ambient corrections: inlet temperature and humidity effects',
-      'Hydrogen and propane blends: Wobbe / Modified Wobbe Index drift',
-      'RCA workflow for LBO, flashback, and stage-down events',
+      'Inlet temperature, pressure, humidity and altitude effects on NOx, stability and output',
+      'Ambient correction strategies and seasonal remapping',
+      'Wobbe Index and Modified Wobbe Index: the ±3% alarm, ±5% action and ±10% trip bands',
+      'Acoustic response to fuel-composition change; LNG-C strategies and measurement time delay',
+      'Hydrogen blending: flame speed, flame position, convective delay and flashback risk',
+      'Sensor failures — dynamic pressure, thermocouple and emissions — and their signatures',
+      'Acoustic spikes, system freeze, wrong-circuit wiring, and calibration error propagation',
+      'Root-cause analysis for LBO, flashback and stage-down events',
+      'Field case studies: LBO during load rejection, and a commissioning wiring error',
+      'Course review, operational best practices, and the common pitfalls to avoid',
+    ],
+    outcomes: [
+      'State which way NOx, stability and power move for any ambient change',
+      'Decide whether a fuel change needs a schedule correction, a remap, or hardware',
+      'Separate a failing sensor from a genuine combustion event in unit data',
     ],
     icon: <Wrench className="w-6 h-6" />,
   },
@@ -136,11 +190,13 @@ const CURRICULUM: Day[] = [
 
 // Placeholder rendered for days that exist in the admin schedule but go
 // beyond the locally-defined curriculum content. Lets admins extend a
-// course past 5 days without immediately needing a code change.
+// course past the written agenda without immediately needing a code change.
 const TBD_DAY: Day = {
   title: 'Schedule TBD',
+  chapters: '',
   summary: 'Detailed agenda for this day will be published soon.',
   topics: ['Topic outline pending'],
+  outcomes: [],
   icon: <Calendar className="w-6 h-6" />,
 };
 
@@ -155,30 +211,20 @@ const IDEAL_FOR = [
 // -----------------------------------------------------------------------------
 // Page component
 // -----------------------------------------------------------------------------
-// Schedule shown before the runtime API fetch lands. This is NOT merely a
-// loading state: the page is prerendered to static HTML at build time and only
-// swaps to live data after hydration, so this list is the published schedule
-// that search engines, link previews and no-JS visitors read.
-//
-// It used to be hand-typed, and it went stale twice — the site kept advertising
-// a cohort the admin had already moved. So it is now pulled from the live
-// course record at BUILD time by scripts/fetch-course-data.mjs. Move the dates
-// in the admin dashboard and the next deploy picks them up; there is nothing
-// here left to forget to update.
-//
-// The literal below is a last resort only: it applies if a brand-new course
-// code has never once been reachable at build time.
-const DEFAULT_DAY_DATES: string[] = snapshotDayLabels(COURSE_CODE, [
+// Default schedule used when the API hasn't responded yet (or is unavailable
+// in local preview). Admin can override these any time via the dashboard.
+const DEFAULT_DAY_DATES: string[] = [
   'August 29, 2026',
   'August 30, 2026',
   'September 5, 2026',
   'September 6, 2026',
-]);
+];
 
 const GasTurbineEmissionsMapping = () => {
   usePageMeta(
     'Gas Turbine Emissions Mapping Course',
-    'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion fundamentals, dynamics, fuel splits, ambient effects, and flex-fuel troubleshooting. Taught by a practitioner with 19+ years of field experience.',
+    
+    'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion and GT fundamentals, dynamics and Frame 9 DLN2.6+ operation, CEMS and the full mapping procedure on a simulator, then ambient, flex fuel and troubleshooting. Taught by a practitioner with 19+ years of field experience.',
     {
       image: 'https://proreadyengineer.com/Mapping_Training_Infographic_6.png',
       jsonLd: {
@@ -186,7 +232,8 @@ const GasTurbineEmissionsMapping = () => {
         '@type': 'Course',
         name: 'Gas Turbine Emissions Mapping',
         description:
-          'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion fundamentals, dynamics, fuel splits, ambient effects, and flex-fuel troubleshooting.',
+          
+            'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion and GT fundamentals, dynamics and Frame 9 DLN2.6+ operation, CEMS and the full mapping procedure on a simulator, then ambient, flex fuel and troubleshooting. Taught by a practitioner with 19+ years of field experience.',
         provider: { '@id': 'https://proreadyengineer.com/#org' },
         hasCourseInstance: [
           {
@@ -584,13 +631,10 @@ const GasTurbineEmissionsMapping = () => {
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-8">
             The {dayDates.length || CURRICULUM.length}-Day Arc
           </h2>
-          <div
-            className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
-              (dayDates.length || CURRICULUM.length) <= 5
-                ? 'lg:grid-cols-5'
-                : 'lg:grid-cols-3'
-            }`}
-          >
+          {/* Two wide columns rather than one narrow column per day: the
+              agenda now carries the real chapter detail, and five cramped
+              columns made a 4-day course render with an empty slot. */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {(dayDates.length > 0 ? dayDates : DEFAULT_DAY_DATES).map((dateLabel, i) => {
               const day = CURRICULUM[i] ?? TBD_DAY;
               return (
@@ -610,9 +654,12 @@ const GasTurbineEmissionsMapping = () => {
                       <div className="text-xs font-mono text-cyan-400 font-medium">{dateLabel}</div>
                     </div>
                   </div>
-                  <h3 className="font-bold text-white mb-2 text-lg leading-tight">{day.title}</h3>
+                  <h3 className="font-bold text-white mb-1 text-lg leading-tight">{day.title}</h3>
+                  {day.chapters && (
+                    <div className="text-[11px] font-mono text-slate-400 mb-2">{day.chapters}</div>
+                  )}
                   <p className="text-slate-300 text-sm mb-4 leading-relaxed">{day.summary}</p>
-                  <ul className="space-y-2 mt-auto">
+                  <ul className="space-y-2">
                     {day.topics.map((t) => (
                       <li
                         key={t}
@@ -623,6 +670,21 @@ const GasTurbineEmissionsMapping = () => {
                       </li>
                     ))}
                   </ul>
+                  {day.outcomes.length > 0 && (
+                    <div className="mt-5 pt-4 border-t border-slate-800">
+                      <div className="text-[11px] font-mono uppercase tracking-wider text-cyan-400 mb-2">
+                        You leave able to
+                      </div>
+                      <ul className="space-y-1.5">
+                        {day.outcomes.map((o) => (
+                          <li key={o} className="text-xs text-slate-200 flex gap-2 leading-relaxed">
+                            <span className="text-cyan-500/70 shrink-0" aria-hidden="true">→</span>
+                            <span>{o}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </Reveal>
               );
             })}
@@ -630,7 +692,7 @@ const GasTurbineEmissionsMapping = () => {
         </div>
 
         {/* DAILY SCHEDULE — applies to every cohort day. Times are fixed (no */}
-        {/* DST drift handling): the course runs in May 2026 when North */}
+        {/* DST drift handling): the course runs Aug-Sep 2026 when North */}
         {/* America is on DST, while Algeria + Saudi Arabia are DST-free. */}
         <Reveal className="mb-16">
           <span className="eyebrow mb-4">Daily Schedule</span>
@@ -801,8 +863,13 @@ const GasTurbineEmissionsMapping = () => {
               },
               {
                 icon: <Award className="w-5 h-5" aria-hidden="true" />,
-                title: 'Course Materials and Reference Content',
-                body: 'Receive access to the course content so you can review key concepts after the live sessions.',
+                title: 'Course Materials You Keep Access To',
+                body: 'All 194 slides across the four days, in your own browser account, so you can review any chapter long after the live sessions end.',
+              },
+              {
+                icon: <CheckCircle2 className="w-5 h-5" aria-hidden="true" />,
+                title: 'Daily Evaluation and Mastery Check',
+                body: 'Each day closes with a graded evaluation that teaches as it marks — every answer is explained — plus a mastery check built on scenarios you have not seen. 80% to pass, retakes allowed.',
               },
             ].map((item) => (
               <div
