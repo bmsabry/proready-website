@@ -826,7 +826,7 @@ const GasTurbineEmissionsMapping = () => {
           {/* Value framing */}
           <div className="space-y-4 prose-dark mb-10 max-w-3xl">
             <p>
-              Your seat includes live instructor-led training, AI-based gas turbine engine
+              Your seat includes live instructor-led training, interactive mapping
               simulator access, course materials, and the opportunity to ask your questions
               directly during the live sessions.
             </p>
@@ -848,7 +848,7 @@ const GasTurbineEmissionsMapping = () => {
             {[
               {
                 icon: <Activity className="w-5 h-5" aria-hidden="true" />,
-                title: 'Interactive AI-Based Engine Simulator',
+                title: 'Interactive Mapping Simulator',
                 body: 'Use a realistic simulator to see how mapping decisions affect fuel splits, NOx, CO, combustion dynamics, and safe operating windows.',
               },
               {
