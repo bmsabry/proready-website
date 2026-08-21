@@ -596,10 +596,18 @@ export function plainTextToEmailHtml(text: string): string {
   const escape = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+  // Colours are stated on every element, never inherited. Mail clients rewrite
+  // or drop <body>, so a paragraph with no colour of its own renders in the
+  // client's default — which is how a broadcast arrives unreadable. Keep these
+  // values in step with INK / LINK in backend/app/emailer.py.
+  const INK = '#334155';
+  const LINK = '#0369a1';
+
   const linkify = (s: string) =>
     s.replace(
       /(https?:\/\/[^\s<]+|mailto:[^\s<]+)/g,
-      (url) => `<a href="${url}" style="color:#22d3ee;">${url}</a>`,
+      (url) =>
+        `<a href="${url}" style="color:${LINK};text-decoration:underline;word-break:break-word;">${url}</a>`,
     );
 
   const paragraphs = text.replace(/\r\n/g, '\n').split(/\n{2,}/);
@@ -608,7 +616,7 @@ export function plainTextToEmailHtml(text: string): string {
     .filter((p) => p.length > 0)
     .map((p) => {
       const escaped = escape(p).replace(/\n/g, '<br>');
-      return `<p style="margin:0 0 16px;">${linkify(escaped)}</p>`;
+      return `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${INK};">${linkify(escaped)}</p>`;
     })
     .join('\n');
 }

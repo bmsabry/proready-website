@@ -30,6 +30,7 @@ from pydantic import ValidationError
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from . import emailer
 from .models import (
     Course,
     Enrollment,
@@ -70,11 +71,22 @@ def _plain_text_to_email_html(text: str) -> str:
         if not p:
             continue
         escaped = _html_escape(p).replace("\n", "<br>")
+        # Colours are stated here, not inherited: mail clients rewrite <body>,
+        # so a paragraph with no colour of its own renders in the client's
+        # default — which is how a broadcast ends up unreadable. The link
+        # colour is a mid blue rather than the site's cyan, because cyan on a
+        # white email card is barely legible.
         linked = _LINK_RE.sub(
-            lambda m: f'<a href="{m.group(0)}" style="color:#22d3ee;">{m.group(0)}</a>',
+            lambda m: (
+                f'<a href="{m.group(0)}" style="color:{emailer.LINK};'
+                f'text-decoration:underline;word-break:break-word;">{m.group(0)}</a>'
+            ),
             escaped,
         )
-        out.append(f'<p style="margin:0 0 16px;">{linked}</p>')
+        out.append(
+            f'<p style="margin:0 0 16px;font-size:15px;line-height:1.6;'
+            f'color:{emailer.INK};">{linked}</p>'
+        )
     return "\n".join(out)
 
 

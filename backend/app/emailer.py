@@ -12,7 +12,9 @@ is what GET /api/admin/comms/log serves.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date
+from html import unescape
 from typing import Callable, Optional, Sequence
 
 import httpx
@@ -88,6 +90,51 @@ def _log_email(
         db.rollback()
 
 
+_TAG_RE = re.compile(r"<[^>]+>")
+_BLOCK_END_RE = re.compile(r"</(p|div|tr|h1|h2|h3|table)>", re.I)
+_BR_RE = re.compile(r"<br\s*/?>", re.I)
+_HEAD_RE = re.compile(r"<(head|style|script|title)[^>]*>.*?</\1>", re.I | re.S)
+
+
+def html_to_text(html: str) -> str:
+    """A readable plain-text alternative derived from the HTML body.
+
+    Not cosmetic. A multipart message scores better with spam filters than an
+    HTML-only one, some corporate gateways strip HTML outright, and a screen
+    reader or a text-mode client gets something usable. Link URLs are kept
+    inline, because a text part whose call to action is the bare word "Open
+    the course" is useless.
+    """
+    body = _HEAD_RE.sub(" ", html)
+    # Keep the destination of every link — the label alone is not actionable.
+    def _flatten_link(m: "re.Match[str]") -> str:
+        href = m.group(1)
+        label = _TAG_RE.sub("", m.group(2)).strip()
+        bare = href[len("mailto:") :] if href.lower().startswith("mailto:") else href
+        # "info@x.com (mailto:info@x.com)" is noise — only append the URL when
+        # it actually tells the reader something the label doesn't.
+        if not label or label == bare:
+            return bare
+        return f"{label} ({bare})"
+
+    body = re.sub(
+        r'<a\b[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+        _flatten_link,
+        body,
+        flags=re.I | re.S,
+    )
+    body = _BR_RE.sub("\n", body)
+    body = _BLOCK_END_RE.sub("\n\n", body)
+    body = _TAG_RE.sub("", body)
+    body = unescape(body)
+    lines = [re.sub(r"[ \t]+", " ", ln).strip() for ln in body.split("\n")]
+    out: list[str] = []
+    for ln in lines:
+        if ln or (out and out[-1]):
+            out.append(ln)
+    return "\n".join(out).strip()
+
+
 def send_email(
     to: str,
     subject: str,
@@ -143,8 +190,11 @@ def send_email(
             "subject": subject,
             "html": html,
         }
-        if text:
-            payload["text"] = text
+        # Always send multipart. An explicit `text` wins (the support desk
+        # passes the customer's own wording); otherwise derive one.
+        body_text = text or html_to_text(html)
+        if body_text:
+            payload["text"] = body_text
         if reply_to or settings.EMAIL_REPLY_TO:
             payload["reply_to"] = reply_to or settings.EMAIL_REPLY_TO
         if bcc:
@@ -294,6 +344,151 @@ def send_broadcast(
 # -----------------------------------------------------------------------------
 # Message templates
 # -----------------------------------------------------------------------------
+# Email is not a browser. Two rules here are not style preferences, they are the
+# reason a real "your course is ready" email arrived unreadable:
+#
+#   1. EVERY piece of text carries its own explicit `color`. Gmail, Yahoo and
+#      Outlook.com rewrite or drop the <body> element, so any colour inherited
+#      from <body> is gone by the time the message renders — leaving the
+#      client's default near-black text. On the old dark-navy card that was
+#      black on navy: the greeting, the paragraph and the button label were
+#      invisible, while the few elements that did set their own colour showed
+#      up fine. Use the _p()/_kv_table() helpers below and it cannot recur.
+#
+#   2. The call-to-action is a table cell with a `bgcolor`, not an <a> with a
+#      CSS gradient. Gradients are unsupported in most mail clients; the old
+#      button fell back to a transparent background behind near-black label
+#      text, on a dark card.
+#
+# The palette is light-on-white for the same reason: clients that auto-invert
+# handle light designs far better than dark ones, and a light card cannot fail
+# into dark-on-dark. Brand identity lives in the navy header band and the cyan
+# eyebrow, both of which are solid colours every client can render.
+
+FONT = (
+    "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,"
+    "'Helvetica Neue',sans-serif"
+)
+PAGE_BG = "#eef2f7"
+CARD_BG = "#ffffff"
+CARD_BORDER = "#e2e8f0"
+BAND_BG = "#0f172a"
+BAND_TEXT = "#ffffff"
+EYEBROW = "#67e8f9"
+HEADING = "#0f172a"
+INK = "#334155"
+MUTED = "#64748b"
+LINK = "#0369a1"
+BUTTON_BG = "#0e7490"
+BUTTON_TEXT = "#ffffff"
+FOOTER_BG = "#f8fafc"
+SUPPORT_EMAIL = "info@proreadyengineer.com"
+
+
+def _p(
+    html: str,
+    *,
+    size: int = 15,
+    color: str = INK,
+    margin: str = "0 0 16px",
+    weight: int = 400,
+) -> str:
+    """A paragraph that always states its own colour. See rule 1 above."""
+    return (
+        f'<p style="margin:{margin};font-family:{FONT};font-size:{size}px;'
+        f'line-height:1.6;font-weight:{weight};color:{color};">{html}</p>'
+    )
+
+
+def _kv_table(rows: "list[tuple[str, str]]", *, size: int = 15) -> str:
+    """Label/value rows — every cell states its own colour."""
+    body = "".join(
+        f'<tr>'
+        f'<td style="padding:5px 18px 5px 0;font-family:{FONT};font-size:{size}px;'
+        f'line-height:1.5;color:{MUTED};vertical-align:top;">{k}</td>'
+        f'<td style="padding:5px 0;font-family:{FONT};font-size:{size}px;'
+        f'line-height:1.5;color:{HEADING};vertical-align:top;">{v}</td>'
+        f'</tr>'
+        for k, v in rows
+    )
+    return (
+        '<table role="presentation" cellpadding="0" cellspacing="0" border="0" '
+        f'style="margin:0 0 18px;border-collapse:collapse;">{body}</table>'
+    )
+
+
+def _link(url: str, label: str = "") -> str:
+    return (
+        f'<a href="{url}" style="color:{LINK};text-decoration:underline;'
+        f'word-break:break-word;">{label or url}</a>'
+    )
+
+
+def _cta_button(label: str, url: str) -> str:
+    """Bulletproof button: colour lives on the <td>, not in a CSS gradient.
+
+    `bgcolor` as an attribute AND as a style is deliberate — Outlook reads the
+    attribute, everything else reads the style, and if both are somehow lost
+    the label is still dark-on-white rather than invisible, because the
+    fallback colour below is never the card background.
+    """
+    return f"""\
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+        <tr>
+          <td align="center" bgcolor="{BUTTON_BG}" style="background-color:{BUTTON_BG};border-radius:8px;">
+            <a href="{url}" style="display:inline-block;padding:14px 30px;font-family:{FONT};font-size:16px;font-weight:700;line-height:1;color:{BUTTON_TEXT};text-decoration:none;border-radius:8px;">{label}</a>
+          </td>
+        </tr>
+      </table>"""
+
+
+def _shell(eyebrow: str, heading: str, body_html: str, *, width: int = 560) -> str:
+    """The one wrapper every outbound email uses.
+
+    One shell rather than a copy per template: the dark-on-dark bug shipped
+    because four near-identical wrappers had drifted, and a fix to one of them
+    would not have reached the others.
+    """
+    return f"""\
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>{heading}</title>
+</head>
+<body style="margin:0;padding:0;background-color:{PAGE_BG};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{PAGE_BG}" style="background-color:{PAGE_BG};margin:0;padding:0;width:100%;">
+  <tr>
+    <td align="center" style="padding:24px 12px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="{width}" style="width:100%;max-width:{width}px;background-color:{CARD_BG};border:1px solid {CARD_BORDER};border-radius:12px;">
+        <tr>
+          <td bgcolor="{BAND_BG}" style="background-color:{BAND_BG};padding:18px 28px;border-radius:12px 12px 0 0;">
+            <div style="font-family:{FONT};font-size:15px;font-weight:700;line-height:1.2;color:{BAND_TEXT};">ProReadyEngineer</div>
+            <div style="font-family:{FONT};font-size:11px;font-weight:600;line-height:1.4;letter-spacing:0.16em;text-transform:uppercase;color:{EYEBROW};padding-top:5px;">{eyebrow}</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px;">
+            <h1 style="margin:0 0 18px;font-family:{FONT};font-size:22px;font-weight:700;line-height:1.3;color:{HEADING};">{heading}</h1>
+{body_html}
+            {_p(f'Questions? Reply to this email or write to {_link("mailto:" + SUPPORT_EMAIL, SUPPORT_EMAIL)}.', size=13, color=MUTED, margin="24px 0 0")}
+          </td>
+        </tr>
+        <tr>
+          <td bgcolor="{FOOTER_BG}" style="background-color:{FOOTER_BG};border-top:1px solid {CARD_BORDER};padding:14px 28px;border-radius:0 0 12px 12px;font-family:{FONT};font-size:12px;line-height:1.5;color:{MUTED};">
+            ProReadyEngineer &middot; Thermal Fluid Sciences &amp; AI
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>"""
+
 
 def applicant_confirmation_html(
     full_name: str,
@@ -302,45 +497,24 @@ def applicant_confirmation_html(
     price_display: str,
     payment_instructions: str,
 ) -> str:
-    price_block = (
-        f"<p style='margin:0 0 16px;font-size:15px;'>"
-        f"<strong>Course fee:</strong> {price_display}</p>"
-        if price_display
-        else ""
+    body = _p(
+        f"We've received your registration for the <strong>{course_title}</strong> "
+        f"cohort starting <strong>{cohort}</strong>."
     )
-    return f"""\
-<!doctype html>
-<html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0b1220;padding:32px;color:#e2e8f0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#0f172a;border:1px solid #1e293b;border-radius:16px;overflow:hidden;">
-    <tr><td style="padding:32px;">
-      <div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#22d3ee;margin-bottom:8px;">
-        Registration received
-      </div>
-      <h1 style="margin:0 0 16px;font-size:22px;color:#f1f5f9;">
-        Thanks, {full_name} — your seat is pending
-      </h1>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
-        We've received your registration for the
-        <strong>{course_title}</strong> cohort starting
-        <strong>{cohort}</strong>.
-      </p>
-      {price_block}
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
-        <strong>Next step:</strong> {payment_instructions}
-      </p>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
-        Your seat is <strong>pending</strong> and counts toward the cohort
-        only once payment clears. If the cohort fills before your payment
-        arrives, we'll move you to the waitlist and refund any overlap.
-      </p>
-      <p style="margin:24px 0 0;font-size:13px;color:#64748b;">
-        Questions? Reply to this email or write to
-        <a href="mailto:info@proreadyengineer.com" style="color:#22d3ee;">info@proreadyengineer.com</a>.
-      </p>
-    </td></tr>
-  </table>
-</body></html>
-"""
+    if price_display:
+        body += _kv_table([("Course fee", f"<strong>{price_display}</strong>")])
+    body += _p(f"<strong>Next step:</strong> {payment_instructions}")
+    body += _p(
+        "Your seat is <strong>pending</strong> and counts toward the cohort only "
+        "once payment clears. If the cohort fills before your payment arrives, "
+        "we'll move you to the waitlist and refund any overlap."
+    )
+    heading = (
+        f"Thanks, {full_name} — your seat is pending"
+        if full_name
+        else "Your seat is pending"
+    )
+    return _shell("Registration received", heading, body)
 
 
 def _fmt_date(d: date) -> str:
@@ -352,147 +526,76 @@ def start_date_updated_html(
     course_title: str, old_start_date: date, new_start_date: date
 ) -> str:
     """Stock template auto-sent when an admin changes a course's start date."""
-    return f"""\
-<!doctype html>
-<html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0b1220;padding:32px;color:#e2e8f0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#0f172a;border:1px solid #1e293b;border-radius:16px;overflow:hidden;">
-    <tr><td style="padding:32px;">
-      <div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#22d3ee;margin-bottom:8px;">
-        Start date updated
-      </div>
-      <h1 style="margin:0 0 16px;font-size:22px;color:#f1f5f9;">
-        {course_title} — new start date
-      </h1>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
-        The start date for your cohort has been updated.
-      </p>
-      <table style="margin:0 0 16px;font-size:15px;">
-        <tr>
-          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Previous start</td>
-          <td style="padding:4px 0;color:#f1f5f9;">{_fmt_date(old_start_date)}</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 16px 4px 0;color:#94a3b8;">New start</td>
-          <td style="padding:4px 0;color:#22d3ee;"><strong>{_fmt_date(new_start_date)}</strong></td>
-        </tr>
-      </table>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
-        No action is required from your side — your registration remains active. If
-        the new schedule doesn't work for you, reply to this email and we'll sort it out.
-      </p>
-      <p style="margin:24px 0 0;font-size:13px;color:#64748b;">
-        Questions? Reply here or write to
-        <a href="mailto:info@proreadyengineer.com" style="color:#22d3ee;">info@proreadyengineer.com</a>.
-      </p>
-    </td></tr>
-  </table>
-</body></html>
-"""
+    body = _p("The start date for your cohort has been updated.")
+    body += _kv_table(
+        [
+            ("Previous start", _fmt_date(old_start_date)),
+            ("New start", f"<strong>{_fmt_date(new_start_date)}</strong>"),
+        ]
+    )
+    body += _p(
+        "No action is required from your side — your registration remains active. "
+        "If the new schedule doesn't work for you, reply to this email and we'll "
+        "sort it out."
+    )
+    return _shell("Start date updated", f"{course_title} — new start date", body)
 
 
 def broadcast_html(course_title: str, body_html: str) -> str:
-    """Wrap admin-composed HTML in a branded shell for course broadcasts."""
-    return f"""\
-<!doctype html>
-<html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0b1220;padding:32px;color:#e2e8f0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#0f172a;border:1px solid #1e293b;border-radius:16px;overflow:hidden;">
-    <tr><td style="padding:32px;">
-      <div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#22d3ee;margin-bottom:8px;">
-        Course update
-      </div>
-      <h1 style="margin:0 0 20px;font-size:20px;color:#f1f5f9;">
-        {course_title}
-      </h1>
-      <div style="font-size:15px;line-height:1.6;color:#e2e8f0;">
-        {body_html}
-      </div>
-      <p style="margin:24px 0 0;font-size:13px;color:#64748b;">
-        Questions? Reply here or write to
-        <a href="mailto:info@proreadyengineer.com" style="color:#22d3ee;">info@proreadyengineer.com</a>.
-      </p>
-    </td></tr>
-  </table>
-</body></html>
-"""
+    """Wrap admin-composed HTML in a branded shell for course broadcasts.
+
+    The colour is set on the wrapping div AND by the composer that produced
+    body_html, because either one alone would leave some clients rendering the
+    admin's own words in their default colour.
+    """
+    wrapped = (
+        f'<div style="font-family:{FONT};font-size:15px;line-height:1.6;'
+        f'color:{INK};">{body_html}</div>'
+    )
+    return _shell("Course update", course_title, wrapped, width=600)
 
 
 def admin_notification_html(reg: dict, taken_after: int, capacity: int) -> str:
-    rows = "".join(
-        f"<tr><td style='padding:4px 12px 4px 0;color:#94a3b8;'>{k}</td>"
-        f"<td style='padding:4px 0;color:#f1f5f9;'>{v}</td></tr>"
-        for k, v in reg.items()
+    body = _p(
+        f"Pending count unchanged ({taken_after}/{capacity} paid). Mark the row "
+        "paid from the Registrations tab once the invoice clears.",
+        size=13,
+        color=MUTED,
     )
-    return f"""\
-<!doctype html>
-<html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0b1220;padding:32px;color:#e2e8f0;">
-  <table style="max-width:560px;margin:0 auto;background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:24px;">
-    <tr><td>
-      <h2 style="margin:0 0 16px;font-size:18px;color:#f1f5f9;">New registration (pending)</h2>
-      <p style="margin:0 0 12px;color:#94a3b8;font-size:13px;">
-        Pending count unchanged ({taken_after}/{capacity} paid). Mark paid via admin endpoint once the invoice clears.
-      </p>
-      <table style="font-size:13px;border-collapse:collapse;">{rows}</table>
-    </td></tr>
-  </table>
-</body></html>
-"""
+    body += _kv_table([(str(k), str(v)) for k, v in reg.items()], size=14)
+    return _shell("New registration", "New registration (pending)", body)
 
 
 # -----------------------------------------------------------------------------
 # Academy templates
 # -----------------------------------------------------------------------------
-# Same dark-navy + cyan shell as the cohort emails above, so a buyer who has
-# also registered for a live course sees one consistent sender identity.
-
-def _academy_shell(eyebrow: str, heading: str, body_html: str) -> str:
-    return f"""\
-<!doctype html>
-<html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0b1220;padding:32px;color:#e2e8f0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#0f172a;border:1px solid #1e293b;border-radius:16px;overflow:hidden;">
-    <tr><td style="padding:32px;">
-      <div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#22d3ee;margin-bottom:8px;">
-        {eyebrow}
-      </div>
-      <h1 style="margin:0 0 16px;font-size:22px;color:#f1f5f9;">{heading}</h1>
-      {body_html}
-      <p style="margin:24px 0 0;font-size:13px;color:#64748b;">
-        Questions? Reply to this email or write to
-        <a href="mailto:info@proreadyengineer.com" style="color:#22d3ee;">info@proreadyengineer.com</a>.
-      </p>
-    </td></tr>
-    <tr><td style="padding:16px 32px;background:#0b1220;border-top:1px solid #1e293b;font-size:12px;color:#475569;">
-      ProReadyEngineer &middot; Thermal Fluid Sciences &amp; AI
-    </td></tr>
-  </table>
-</body></html>"""
-
-
-def _cta_button(label: str, url: str) -> str:
-    return f"""\
-      <p style="margin:0 0 24px;">
-        <a href="{url}" style="display:inline-block;background:linear-gradient(90deg,#22d3ee,#3b82f6);color:#04121f;
-           font-weight:700;font-size:15px;text-decoration:none;padding:13px 26px;border-radius:10px;">{label}</a>
-      </p>"""
+# Same shell as the cohort emails above, so a buyer who has also registered for
+# a live course sees one consistent sender identity.
 
 
 def login_link_html(full_name: str, link: str, minutes: int) -> str:
     greeting = f"Hi {full_name}," if full_name else "Hi,"
-    body = f"""\
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
-      <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">
-        Here's your sign-in link. It works once and expires in
-        <strong>{minutes} minutes</strong>.
-      </p>
-{_cta_button("Sign in to your courses", link)}
-      <p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:#94a3b8;">
-        If the button doesn't work, paste this into your browser:<br>
-        <span style="color:#22d3ee;word-break:break-all;">{link}</span>
-      </p>
-      <p style="margin:0;font-size:13px;line-height:1.55;color:#94a3b8;">
-        Didn't ask for this? You can ignore this email — nobody can sign in
-        without the link above.
-      </p>"""
-    return _academy_shell("Sign in", "Your sign-in link", body)
+    body = _p(greeting)
+    body += _p(
+        "Here's your sign-in link. It works once and expires in "
+        f"<strong>{minutes} minutes</strong>.",
+        margin="0 0 22px",
+    )
+    body += _cta_button("Sign in to your courses", link)
+    body += _p(
+        "If the button doesn't work, paste this into your browser:<br>"
+        f"{_link(link)}",
+        size=13,
+        color=MUTED,
+    )
+    body += _p(
+        "Didn't ask for this? You can ignore this email — nobody can sign in "
+        "without the link above.",
+        size=13,
+        color=MUTED,
+        margin="0",
+    )
+    return _shell("Sign in", "Your sign-in link", body)
 
 
 def purchase_welcome_html(
@@ -500,38 +603,45 @@ def purchase_welcome_html(
     bank_pending: bool = False,
 ) -> str:
     greeting = f"Welcome aboard, {full_name}." if full_name else "Welcome aboard."
-    body = f"""\
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
-      <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">
-        Your payment for <strong>{course_title}</strong> went through and your
-        access is live. It's yours for good — there's no subscription and no
-        expiry date.
-      </p>
-{_cta_button("Start the course", link)}
-      <p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:#94a3b8;">
-        That link signs you in and expires in {minutes} minutes. After that,
-        request a fresh one any time from the sign-in page — same email address,
-        no password to remember.
-      </p>
-      <p style="margin:0 0 8px;font-size:15px;line-height:1.55;">What's inside:</p>
-      <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#cbd5e1;">
-        Recorded sessions you can work through at your own pace, the slide decks
-        and design spreadsheets, the interactive labs, and the module quizzes.
-        Each module unlocks the next once you clear its check, and your progress
-        is saved as you go.
-      </p>"""
+    body = _p(greeting)
+    body += _p(
+        f"Your payment for <strong>{course_title}</strong> went through and your "
+        "access is live. It's yours for good — there's no subscription and no "
+        "expiry date.",
+        margin="0 0 22px",
+    )
+    body += _cta_button("Start the course", link)
+    body += _p(
+        f"That link signs you in and expires in {minutes} minutes. After that, "
+        "request a fresh one any time from the sign-in page — same email "
+        "address, no password to remember.",
+        size=13,
+        color=MUTED,
+    )
+    body += _p("What's inside:", weight=700, margin="0 0 8px")
+    body += _p(
+        "Recorded sessions you can work through at your own pace, the slide decks "
+        "and design spreadsheets, the interactive labs, and the module quizzes. "
+        "Each module unlocks the next once you clear its check, and your progress "
+        "is saved as you go.",
+        size=14,
+    )
     if bank_pending:
         # ACH: the debit is initiated but unconfirmed for a few business days.
         # Access is provisional; academy.settlement_ok pulls it if the payment
         # never clears, and _payment_failed emails them if the bank says no.
-        body += """
-      <p style="margin:0 0 16px;padding:12px 14px;border:1px solid rgba(245,158,11,0.4);border-radius:10px;background:rgba(245,158,11,0.08);font-size:13px;line-height:1.6;color:#fcd34d;">
-        One note: you paid by bank transfer, which takes a few business days to
-        clear. Your access is active now and will be fully confirmed once the
-        payment clears — nothing more for you to do. If it doesn't go through,
-        we'll email you right away.
-      </p>"""
-    return _academy_shell(
+        body += f"""\
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 16px;">
+        <tr>
+          <td bgcolor="#fffbeb" style="background-color:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px 14px;font-family:{FONT};font-size:13px;line-height:1.6;color:#92400e;">
+            One note: you paid by bank transfer, which takes a few business days
+            to clear. Your access is active now and will be fully confirmed once
+            the payment clears — nothing more for you to do. If it doesn't go
+            through, we'll email you right away.
+          </td>
+        </tr>
+      </table>"""
+    return _shell(
         "Bank payment processing" if bank_pending else "Payment confirmed",
         "You're in",
         body,
@@ -541,18 +651,21 @@ def purchase_welcome_html(
 def enrollment_granted_html(full_name: str, course_title: str, link: str) -> str:
     """Manual/comp grant — an admin added this learner by hand."""
     greeting = f"Hi {full_name}," if full_name else "Hi,"
-    body = f"""\
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
-      <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">
-        You've been given access to <strong>{course_title}</strong> on the
-        ProReadyEngineer training platform.
-      </p>
-{_cta_button("Open the course", link)}
-      <p style="margin:0;font-size:13px;line-height:1.55;color:#94a3b8;">
-        This link signs you in once. After that, request a new one any time from
-        the sign-in page using this same email address.
-      </p>"""
-    return _academy_shell("Access granted", "Your course is ready", body)
+    body = _p(greeting)
+    body += _p(
+        f"You've been given access to <strong>{course_title}</strong> on the "
+        "ProReadyEngineer training platform.",
+        margin="0 0 22px",
+    )
+    body += _cta_button("Open the course", link)
+    body += _p(
+        "This link signs you in once. After that, request a new one any time "
+        "from the sign-in page using this same email address.",
+        size=13,
+        color=MUTED,
+        margin="0",
+    )
+    return _shell("Access granted", "Your course is ready", body)
 
 
 def payment_receipt_html(
@@ -560,41 +673,24 @@ def payment_receipt_html(
 ) -> str:
     """Receipt for a live-cohort seat paid online (PayPal or Stripe)."""
     greeting = f"Hi {full_name}," if full_name else "Hi,"
-    amount_row = (
-        f"""<tr>
-          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Amount</td>
-          <td style="padding:4px 0;color:#f1f5f9;"><strong>{amount_display}</strong></td>
-        </tr>"""
-        if amount_display
-        else ""
+    rows = [("Course", course_title)]
+    if amount_display:
+        rows.append(("Amount", f"<strong>{amount_display}</strong>"))
+    if reference:
+        rows.append(("Reference", reference))
+
+    body = _p(greeting)
+    body += _p(
+        f"Your payment for <strong>{course_title}</strong> went through and your "
+        "seat is now <strong>confirmed</strong>."
     )
-    reference_row = (
-        f"""<tr>
-          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Reference</td>
-          <td style="padding:4px 0;color:#f1f5f9;">{reference}</td>
-        </tr>"""
-        if reference
-        else ""
+    body += _kv_table(rows)
+    body += _p(
+        "Keep this email as your receipt. We'll follow up with the joining "
+        "details and schedule before the course begins.",
+        margin="0",
     )
-    body = f"""\
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
-        Your payment for <strong>{course_title}</strong> went through and your
-        seat is now <strong>confirmed</strong>.
-      </p>
-      <table style="margin:0 0 16px;font-size:15px;">
-        <tr>
-          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Course</td>
-          <td style="padding:4px 0;color:#f1f5f9;">{course_title}</td>
-        </tr>
-{amount_row}
-{reference_row}
-      </table>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
-        Keep this email as your receipt. We'll follow up with the joining
-        details and schedule before the course begins.
-      </p>"""
-    return _academy_shell("Payment received", "Your seat is confirmed", body)
+    return _shell("Payment received", "Your seat is confirmed", body)
 
 
 def settlement_failed_html(
@@ -602,24 +698,23 @@ def settlement_failed_html(
 ) -> str:
     """Recorded product: the bank debit never cleared — access is paused."""
     greeting = f"Hi {full_name}," if full_name else "Hi,"
-    body = f"""\
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
-        Your bank payment for <strong>{course_title}</strong> didn't clear, so
-        your course access is paused for now. Your progress is saved — nothing
-        is lost.
-      </p>
-      <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">
-        To get back in, pay by card from the course page (it takes a minute and
-        access is restored instantly), or simply reply to this email and we'll
-        sort it out and reinstate you.
-      </p>
-{_cta_button("Pay by card", course_url)}
-      <p style="margin:0;font-size:13px;line-height:1.55;color:#94a3b8;">
-        Course page:
-        <a href="{course_url}" style="color:#22d3ee;word-break:break-all;">{course_url}</a>
-      </p>"""
-    return _academy_shell("Payment issue", "Your bank payment didn't clear", body)
+    body = _p(greeting)
+    body += _p(
+        f"Your bank payment for <strong>{course_title}</strong> didn't clear, so "
+        "your course access is paused for now. Your progress is saved — nothing "
+        "is lost."
+    )
+    body += _p(
+        "To get back in, pay by card from the course page (it takes a minute and "
+        "access is restored instantly), or simply reply to this email and we'll "
+        "sort it out and reinstate you.",
+        margin="0 0 22px",
+    )
+    body += _cta_button("Pay by card", course_url)
+    body += _p(
+        f"Course page: {_link(course_url)}", size=13, color=MUTED, margin="0"
+    )
+    return _shell("Payment issue", "Your bank payment didn't clear", body)
 
 
 def live_bank_failed_html(
@@ -627,47 +722,36 @@ def live_bank_failed_html(
 ) -> str:
     """Live cohort seat: the bank debit never cleared — the seat is still held."""
     greeting = f"Hi {full_name}," if full_name else "Hi,"
-    body = f"""\
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">{greeting}</p>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
-        Your bank payment for <strong>{course_title}</strong> didn't clear.
-        Don't worry — <strong>your seat is still held</strong> for you.
-      </p>
-      <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">
-        To confirm it, pay by card from the course page, or reply to this email
-        and we'll arrange another way to settle it.
-      </p>
-{_cta_button("Pay by card", course_url)}
-      <p style="margin:0;font-size:13px;line-height:1.55;color:#94a3b8;">
-        Course page:
-        <a href="{course_url}" style="color:#22d3ee;word-break:break-all;">{course_url}</a>
-      </p>"""
-    return _academy_shell("Payment issue", "Your bank payment didn't clear", body)
+    body = _p(greeting)
+    body += _p(
+        f"Your bank payment for <strong>{course_title}</strong> didn't clear. "
+        "Don't worry — <strong>your seat is still held</strong> for you."
+    )
+    body += _p(
+        "To confirm it, pay by card from the course page, or reply to this email "
+        "and we'll arrange another way to settle it.",
+        margin="0 0 22px",
+    )
+    body += _cta_button("Pay by card", course_url)
+    body += _p(
+        f"Course page: {_link(course_url)}", size=13, color=MUTED, margin="0"
+    )
+    return _shell("Payment issue", "Your bank payment didn't clear", body)
 
 
 def settlement_failed_admin_html(
     buyer_email: str, course_title: str, detail: str
 ) -> str:
     """Owner heads-up when a bank payment fails or times out unconfirmed."""
-    body = f"""\
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
-        A bank (ACH) payment did not clear.
-      </p>
-      <table style="margin:0 0 16px;font-size:14px;">
-        <tr>
-          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Buyer</td>
-          <td style="padding:4px 0;color:#f1f5f9;">{buyer_email}</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Course</td>
-          <td style="padding:4px 0;color:#f1f5f9;">{course_title}</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 16px 4px 0;color:#94a3b8;">Outcome</td>
-          <td style="padding:4px 0;color:#f1f5f9;">{detail}</td>
-        </tr>
-      </table>
-      <p style="margin:0;font-size:13px;line-height:1.55;color:#94a3b8;">
-        The buyer has been emailed with card-payment and contact options.
-      </p>"""
-    return _academy_shell("Payments", "Bank payment failed", body)
+    body = _p("A bank (ACH) payment did not clear.")
+    body += _kv_table(
+        [("Buyer", buyer_email), ("Course", course_title), ("Outcome", detail)],
+        size=14,
+    )
+    body += _p(
+        "The buyer has been emailed with card-payment and contact options.",
+        size=13,
+        color=MUTED,
+        margin="0",
+    )
+    return _shell("Payments", "Bank payment failed", body)
