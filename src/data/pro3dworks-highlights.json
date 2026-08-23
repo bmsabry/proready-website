@@ -1,10 +1,12 @@
 {
-  "version": "2.56.0",
-  "name": "Engineering Change Review",
+  "version": "2.64.0",
+  "name": "Narrated Live CAD Tutorials",
   "highlights": [
-    "Resumable project files preserve model geometry, names, classifications, appearance and review work",
-    "Deterministic similar-part finding and two-revision engineering change comparison",
-    "Geometry Quality now records kernel versus Float32 provenance and safely omits proven unusable triangles",
-    "Automatic exploded sequences include review controls plus CSV, JSON and WebM exports"
+    "Eight narrated live tutorials and 83 verified steps drive the real application with an animated cursor, synchronized captions and browser speech",
+    "Tutorial 1 prepares the full owner-approved Hino FM EURO5 with real AI auto-orient, local presentation coloring, AI classification, rename, BOM, design review and Chat actions",
+    "Tutorials 2 through 4 continue from that same prepared Hino; review evidence is shown progressively, cleaned from the viewport and retained in Review Memory and the generated report",
+    "Purpose-fit CAX-IF, Autodesk FDM, Zenodo CNC and NIST AP242 benchmarks operate revision, repair, print, machining, drawing, PMI and tolerance workflows",
+    "The running player provides step position, safe Previous and Next, 0.75x–2x synchronized pacing, natural-voice selection, pause, mute, stop and Escape",
+    "A persistent completion navigator provides Next, Replay, All tutorials and Close, with idempotent replay and save-before-replace protection"
   ]
 }
