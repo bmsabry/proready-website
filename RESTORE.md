@@ -815,3 +815,42 @@ tab. Attendance column between Status and Payment; a **Confirmed** KPI tile; an
 **mark confirmed / undo** per row (`POST /api/admin/attendance`). The admin is a
 single-page app — a tab left open across a deploy keeps running the old bundle,
 so reload the page before concluding a new column is missing.
+
+---
+
+## The whole site was blank until Google Fonts answered (fixed 2026-08-23)
+
+**Symptom, as reported:** "when I enter proreadyengineer.com/products, I need to
+do two clicks on the page so it loads."
+
+**Cause:** `index.html` loaded the Google Fonts stylesheet with a plain
+`<link rel="stylesheet">` — under a comment that claimed it was "non-blocking".
+It is not. A stylesheet on another origin blocks first paint until that origin
+answers, so the browser painted *nothing* — not even the fully prerendered
+HTML — while it waited. Every route was affected; `/products` is simply the one
+he opens most, since the in-app update check links there.
+
+**Measured**, with `fonts.googleapis.com` unreachable (a stand-in for a slow
+link, a filtering network or a blocker):
+
+| Route | Before | After |
+|---|---|---|
+| `/` | 12,636 ms | 236 ms |
+| `/products` | 12,660 ms | 200 ms |
+| `/training` | 12,576 ms | 200 ms |
+| `/about` | 12,604 ms | 224 ms |
+| `/contact` | 12,492 ms | 160 ms |
+
+**Fix:** `rel="preload" as="style"` plus `media="print" onload="this.media='all'"`,
+with a `<noscript>` copy. The browser fetches the font CSS without blocking
+paint; `display=swap` (already in the URL) renders text in the fallback stack
+immediately and swaps when the webfont lands.
+
+**Guard:** `scripts/prerender.mjs` now fails the build if any emitted page
+carries a cross-origin `<link rel="stylesheet">` that is not `media="print"` or
+inside `<noscript>`. Prerendering every route is worth nothing if the browser
+refuses to paint the result.
+
+**Watch for this elsewhere:** any third-party CSS, and any self-hosted CSS added
+to `<head>` outside the Vite bundle. If Google Fonts ever needs to go away
+entirely, self-hosting the three families removes the dependency.

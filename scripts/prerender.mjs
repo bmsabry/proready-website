@@ -96,6 +96,43 @@ writeFileSync(
 console.log(`  ✓ sitemap.xml (${PRERENDER_ROUTES.length} URLs)`);
 
 // -----------------------------------------------------------------------------
+// Render-blocking check
+// -----------------------------------------------------------------------------
+// Every page is prerendered to complete HTML, which is worth nothing if the
+// browser refuses to paint it. A plain <link rel="stylesheet"> pointing at
+// another origin blocks first paint until that origin answers — and the
+// Google Fonts link did exactly that under a comment claiming it did not.
+// Measured with fonts.googleapis.com unreachable, first contentful paint was
+// 12.5 SECONDS on every route; a visitor on a slow or filtered link to Google
+// just sees a blank page and leaves. With the link made non-blocking the same
+// measurement is ~200 ms.
+//
+// A third-party stylesheet is allowed only when it cannot block paint:
+// media="print" (flipped to all on load) or inside <noscript>.
+const blockingSheet = /<link\b(?![^>]*\bmedia\s*=\s*["']print["'])[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\bhref\s*=\s*["']https?:\/\/[^"']+["'][^>]*>/i;
+
+for (const route of PRERENDER_ROUTES) {
+  const file = route.path === '/' ? 'dist/index.html' : join('dist', `${route.path}.html`);
+  let html;
+  try {
+    html = readFileSync(file, 'utf8');
+  } catch {
+    continue;
+  }
+  // <noscript> copies are fine — they only apply when scripts are off.
+  const withoutNoscript = html.replace(/<noscript>[\s\S]*?<\/noscript>/gi, '');
+  const hit = withoutNoscript.match(blockingSheet);
+  if (hit) {
+    failures++;
+    console.error(
+      `  ✗ ${route.path}: a third-party stylesheet blocks first paint:\n      ${hit[0].slice(0, 160)}\n` +
+        `      Add media="print" onload="this.media='all'" so the page paints without waiting on it.`,
+    );
+  }
+}
+if (failures === 0) console.log('  ✓ no render-blocking third-party stylesheets');
+
+// -----------------------------------------------------------------------------
 // Schedule check
 // -----------------------------------------------------------------------------
 // The prerendered HTML is what crawlers and no-JS visitors read; the live API

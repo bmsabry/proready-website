@@ -23,10 +23,37 @@
     <meta name="theme-color" content="#020617" />
     <link rel="icon" type="image/jpeg" href="/Logo-small.jpg" />
 
-    <!-- Fonts: preconnect + swap, non-blocking -->
+    <!-- Fonts. The comment here used to claim "non-blocking" while the markup
+         did the opposite: a plain <link rel="stylesheet"> is RENDER-BLOCKING,
+         so the browser painted nothing at all — not even the prerendered
+         HTML — until fonts.googleapis.com answered. Measured with that host
+         unreachable, first contentful paint was 12.5 SECONDS on every page.
+         Anyone on a slow link to Google, behind a filtering network, or with
+         a blocker gets a blank page and assumes the site is broken.
+
+         media="print" makes the browser fetch it at low priority without
+         blocking paint; onload flips it to all once it lands. display=swap
+         then renders text in the fallback stack immediately and swaps when
+         the webfont is ready, so the only cost is a brief font shift. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      media="print"
+      onload="this.media='all';this.onload=null"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      />
+    </noscript>
 
     <!-- Organization (site-wide) -->
     <script type="application/ld+json">

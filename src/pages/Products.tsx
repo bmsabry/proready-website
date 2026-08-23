@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Download, CheckCircle2, ShieldCheck, Sparkles, Boxes, Camera, Ruler, Heart, CircleDollarSign, ClipboardCheck,
+  PlayCircle, Factory, FileText,
 } from 'lucide-react';
 import highlights from '../data/pro3dworks-highlights.json';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
@@ -10,6 +11,11 @@ const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ||
   'https://proreadyengineer-training-api-jd9a.onrender.com';
 
+// Every claim below maps to a capability documented in the Pro3DWorks release
+// guides (docs/RELEASE_*.md in the product repo) and shipped in the current
+// build. Order is a reader's path, not a changelog: what it opens, how you
+// learn it, what you can measure, review, manufacture and document, then the
+// AI, the value and the privacy promise.
 const features: { icon: React.ReactElement; title: string; text: string }[] = [
   {
     icon: <Boxes aria-hidden="true" className="w-5 h-5" />,
@@ -17,19 +23,34 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
     text: 'STEP, IGES, STL, Parasolid (.x_t), 3MF, GLB, OBJ and more — including large assemblies, with an instant reopen cache.',
   },
   {
+    icon: <PlayCircle aria-hidden="true" className="w-5 h-5" />,
+    title: 'Learn it by watching it work',
+    text: 'Eight narrated tutorials, 83 steps, built into the app. These are not videos: an animated cursor drives the real interface, runs the real functions and speaks along, then leaves the finished work live for you to poke at. It starts on a full truck assembly and moves through CAX-IF, Autodesk FDM, Zenodo CNC and NIST AP242 benchmark parts. Pause, replay, skip, or run at 0.75× to 2× speed.',
+  },
+  {
+    icon: <Ruler aria-hidden="true" className="w-5 h-5" />,
+    title: 'Real inspection tools',
+    text: 'Measure vertices, edges and faces; section views; mass properties; interference checks; model scaling; exploded views with automatic, collision-screened disassembly sequences you can play back or export. A persistent Object Inspector, deterministic health and geometry-quality checks, and evidence-gated recognition of standard hardware — click a finding to frame the affected parts.',
+  },
+  {
     icon: <ClipboardCheck aria-hidden="true" className="w-5 h-5" />,
     title: 'The whole design review, start to finish',
     text: 'Mark up the model like a real review: named view bookmarks, issue pins tied to the exact camera view, redlines with captured measurements. Compare two revisions into a deterministic change map — modified, moved, added, removed — and find duplicate or similar parts by geometric fingerprint. Export it as CSV or a self-contained HTML/PDF review package, and save everything as one .p3dproject file: reopen it tomorrow, without the original CAD, exactly where you stopped.',
   },
   {
-    icon: <Ruler aria-hidden="true" className="w-5 h-5" />,
-    title: 'Real inspection tools',
-    text: 'Measure vertices, edges and faces; section views; mass properties; interference checks; model scaling; exploded views with automatic, collision-screened disassembly sequences you can play back or export. Plus a persistent Object Inspector and deterministic health and geometry-quality checks — click a finding to frame the affected parts.',
+    icon: <Factory aria-hidden="true" className="w-5 h-5" />,
+    title: 'Manufacturing checks before you cut or print',
+    text: 'Repair meshes non-destructively — sanitation, normals, bounded hole filling, decimation — with deviation evidence and full undo. Audit a part for 3D printing against a printer profile you declare: build envelope, contact area, overhangs, thin walls, and a six-orientation comparison. Screen it for three-axis machining against your stated stock, travel and cutter: clearance, reach and access evidence across six setups. All of it runs locally and sits upstream of your slicer or CAM — it flags what needs attention, it does not pretend to be either.',
+  },
+  {
+    icon: <FileText aria-hidden="true" className="w-5 h-5" />,
+    title: 'Drawings, PMI and tolerance stacks',
+    text: 'Generate a conventional four-view drawing sheet — A4/A3/A2, ASME third-angle or ISO first-angle, hidden lines, envelope dimensions, title block — and export it as SVG, printable HTML or PDF. Read the GD&T the CAD author actually wrote into a STEP AP242 file: semantic dimensions, geometric tolerances, datums and graphical PMI, with integrity checks and a CSV audit trail. Then build a signed 1-D tolerance loop and solve it exactly — worst case, RSS and Monte Carlo, with contributors ranked by how much each one costs you.',
   },
   {
     icon: <Sparkles aria-hidden="true" className="w-5 h-5" />,
     title: 'AI Engineer built in — you stay in command',
-    text: 'Identify components, color by function, generate a BOM with cost estimates (formatted Excel export), review the design, or chat with your model — through any OpenAI-compatible endpoint, or fully local and private with LM Studio. An assistant takes plain-language commands too: every proposed step is previewed with evidence and match counts, runs only after you approve it, and stays audited and restorable.',
+    text: 'Identify components, color by function, generate a BOM with cost estimates (formatted Excel export), review the design, or chat with your model — through any OpenAI-compatible endpoint, or fully local and private with LM Studio. It can also drive the deterministic tools above: BOM, viewer commands, machining comparison, drawing generation, tolerance actions. Every proposed step is previewed with evidence and match counts, runs only after you approve it, and stays audited and restorable. The AI chooses which allow-listed action to run; the geometry and the engineering maths stay deterministic, and nothing invents design intent that was not in your model.',
   },
   {
     icon: <CircleDollarSign aria-hidden="true" className="w-5 h-5" />,
@@ -51,7 +72,7 @@ const features: { icon: React.ReactElement; title: string; text: string }[] = [
 export default function Products() {
   usePageMeta(
     'Products — Free Engineering Software',
-    'Free engineering software by ProReadyEngineer LLC. Pro3DWorks: browser CAD viewer — measure, section, photoreal render, AI-assisted BOM, and estimated cost savings of AI vs manual work.',
+    'Free engineering software by ProReadyEngineer LLC. Pro3DWorks: browser CAD viewer and inspection suite — measure, section, design review, mesh repair, 3D-print and CNC checks, drawings, PMI/GD&T, tolerance stack-ups, photoreal rendering and a built-in AI Engineer.',
   );
 
   const [downloads, setDownloads] = useState<number | null>(null);
@@ -101,8 +122,10 @@ export default function Products() {
                 </h2>
                 <p className="text-slate-300 leading-relaxed mb-6">
                   Open any CAD model. Free. Straight in your browser. Pro3DWorks is a complete
-                  viewer and inspection suite in a single HTML file — drop in a STEP, Parasolid
-                  or STL and you are measuring, sectioning and rendering in seconds.
+                  viewer, inspection and review suite in a single HTML file — drop in a STEP,
+                  Parasolid or STL and you are measuring, sectioning and rendering in seconds,
+                  then keep going: design review, manufacturing checks, drawings, GD&amp;T and
+                  tolerance stacks. Every calculation runs on your machine.
                 </p>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-3">
                   <a
