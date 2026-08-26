@@ -363,6 +363,11 @@
           "kind": "deck",
           "label": "Full slide deck (PDF)",
           "filename": "GT-15_Combustor_Analysis.pdf"
+        },
+        {
+          "kind": "calculator",
+          "label": "Compressor, combustor and turbine design calculator (Excel)",
+          "filename": "centrifugal_compressor_design_calculator_with_combustor_and_turbine.xlsx"
         }
       ]
     }
