@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.db import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
 from app.config import get_settings  # noqa: E402
-from app.models import Learner, LoginToken, Module, QuizItem  # noqa: E402
+from app.models import Learner, Lesson, LoginToken, Module, QuizItem  # noqa: E402
 
 PRODUCT = "micro-gas-turbine-design"
 ADMIN = {"Authorization": f"Bearer {conftest.ADMIN_TOKEN}"}
@@ -70,6 +70,63 @@ def test_seed_is_idempotent():
     assert db.query(Module).count() == before_modules
     assert db.query(QuizItem).count() == before_items
     db.close()
+
+
+def test_seed_does_not_resurrect_collapsed_parts():
+    """A module collapsed to one master must survive the next boot.
+
+    Recording "parts" are upload-size splits of one lecture; the ingest endpoint
+    replaces them with a single master. The seeder used to see the -V** codes
+    missing and create them all again on the next deploy, which put an empty
+    "Part 1" ahead of the real lecture. That shipped twice before anyone noticed,
+    so it is pinned here.
+    """
+    from app.academy_seed import seed_academy
+
+    db = SessionLocal()
+    module = db.query(Module).filter(Module.code == "GT-06").one()
+    videos = (
+        db.query(Lesson)
+        .filter(Lesson.module_id == module.id, Lesson.kind == "video")
+        .order_by(Lesson.position)
+        .all()
+    )
+    assert len(videos) > 1, "GT-06 should seed as parts before the collapse"
+    master = videos[0]
+    master.code = "GT-06-LECTURE"
+    master.title = "GT-06 — full lecture"
+    master.video_uid = "uid-for-the-master"
+    for surplus in videos[1:]:
+        db.delete(surplus)
+    db.commit()
+    db.close()
+
+    seed_academy()
+
+    db = SessionLocal()
+    module = db.query(Module).filter(Module.code == "GT-06").one()
+    lessons = (
+        db.query(Lesson)
+        .filter(Lesson.module_id == module.id)
+        .order_by(Lesson.position)
+        .all()
+    )
+    codes = [l.code for l in lessons]
+    positions = [l.position for l in lessons]
+    db.close()
+
+    assert [c for c in codes if "-V" in c] == [], "the parts came back"
+    assert codes[0] == "GT-06-LECTURE"
+    assert positions[0] == 1
+    # extras follow the master immediately instead of starting at 15
+    assert positions == list(range(1, len(lessons) + 1))
+
+    # Put the module back as the other test modules expect to find it.
+    db = SessionLocal()
+    db.delete(db.query(Lesson).filter(Lesson.code == "GT-06-LECTURE").one())
+    db.commit()
+    db.close()
+    seed_academy()
 
 
 # -----------------------------------------------------------------------------
