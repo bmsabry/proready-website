@@ -113,22 +113,43 @@ def _seed_lessons(db: Session, module: Module, spec: dict) -> None:
     }
     position = 0
 
-    for index, filename in enumerate(spec.get("video_parts") or []):
-        position += 1
-        code = f"{module.code}-V{index:02d}"
-        lesson = existing.get(code)
-        if lesson is None:
-            lesson = Lesson(module_id=module.id, code=code)
-            db.add(lesson)
-        lesson.title = f"{module.code} — Part {index + 1}"
-        lesson.kind = "video"
-        lesson.position = position
-        lesson.source_file = filename
-        # First part of the first video-bearing module is the free sample.
-        # `is_preview` is otherwise operator-owned, so only ever set it, and
-        # only on this one lesson.
-        if module.position == 2 and index == 0 and lesson.id is None:
-            lesson.is_preview = True
+    # A module's "parts" are upload-size splits of one continuous lecture, and
+    # the upload pipeline collapses them into a single master once the video is
+    # on Stream. From that point the manifest's part list is history: seeding it
+    # again creates empty rows a learner can click and puts "Part 1" ahead of the
+    # real lecture. That is not hypothetical — it happened to this course twice,
+    # the second time silently, on the next deploy after the rows were cleared.
+    # So if a master exists, leave the parts alone and give it position 1, which
+    # also makes the extras number 2, 3, 4 instead of 12, 13, 14.
+    master = next(
+        (
+            lesson
+            for lesson in existing.values()
+            if lesson.code.endswith("-LECTURE")
+            or (lesson.kind == "video" and lesson.video_uid)
+        ),
+        None,
+    )
+    if master is not None:
+        master.position = 1
+        position = 1
+    else:
+        for index, filename in enumerate(spec.get("video_parts") or []):
+            position += 1
+            code = f"{module.code}-V{index:02d}"
+            lesson = existing.get(code)
+            if lesson is None:
+                lesson = Lesson(module_id=module.id, code=code)
+                db.add(lesson)
+            lesson.title = f"{module.code} — Part {index + 1}"
+            lesson.kind = "video"
+            lesson.position = position
+            lesson.source_file = filename
+            # First part of the first video-bearing module is the free sample.
+            # `is_preview` is otherwise operator-owned, so only ever set it, and
+            # only on this one lesson.
+            if module.position == 2 and index == 0 and lesson.id is None:
+                lesson.is_preview = True
 
     _KIND_LABEL = {
         "deck": "Slide deck",
