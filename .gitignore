@@ -22,4 +22,10 @@ Thumbs.db
 # Local env
 .env
 .env.local
-dist-ssr
+
+# Build output. Cloudflare Pages runs `npm run build` and publishes the dist/
+# it produces, so committed build artifacts are never served — they only go
+# stale and mislead. Keep them out of the repo.
+dist/
+dist-ssr/
+
