@@ -54,6 +54,149 @@ const Watermark = ({ text }: { text: string }) =>
     </div>
   ) : null;
 
+const fmt = (s: number) => {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  return h
+    ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+    : `${m}:${String(sec).padStart(2, '0')}`;
+};
+
+/* Chapter navigation over the Stream iframe.
+ *
+ * A three-and-a-half-hour lecture is unusable without it: the chapters come
+ * from matching what was on screen to the deck's own section structure, so
+ * they mark where a topic is genuinely taught rather than where a file
+ * happened to be cut.
+ *
+ * Seeking uses Cloudflare's player SDK, which drives the existing iframe in
+ * place. If the script is blocked — corporate proxy, offline, an adblocker
+ * that dislikes the domain — the click falls back to reloading the iframe at
+ * ?startTime=, which is slower but always works. Never leave the learner with
+ * a chapter list that silently does nothing. */
+const STREAM_SDK = 'https://embed.cloudflarestream.com/embed/sdk.latest.js';
+
+const useStreamPlayer = (
+  iframeRef: React.RefObject<HTMLIFrameElement>,
+  enabled: boolean
+) => {
+  const playerRef = useRef<any>(null);
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+
+    const attach = () => {
+      const w = window as any;
+      const el = iframeRef.current;
+      if (cancelled || !w.Stream || !el || playerRef.current) return;
+      try {
+        const player = w.Stream(el);
+        playerRef.current = player;
+        player.addEventListener('timeupdate', () =>
+          setCurrent(player.currentTime || 0)
+        );
+      } catch {
+        playerRef.current = null;
+      }
+    };
+
+    if ((window as any).Stream) {
+      attach();
+      return () => {
+        cancelled = true;
+      };
+    }
+    let tag = document.querySelector<HTMLScriptElement>(`script[src="${STREAM_SDK}"]`);
+    if (!tag) {
+      tag = document.createElement('script');
+      tag.src = STREAM_SDK;
+      tag.async = true;
+      document.head.appendChild(tag);
+    }
+    tag.addEventListener('load', attach);
+    return () => {
+      cancelled = true;
+      tag?.removeEventListener('load', attach);
+    };
+  }, [iframeRef, enabled]);
+
+  const seek = useCallback(
+    (seconds: number) => {
+      const player = playerRef.current;
+      if (player) {
+        try {
+          player.currentTime = seconds;
+          player.play?.();
+          setCurrent(seconds);
+          return;
+        } catch {
+          /* fall through to the reload path */
+        }
+      }
+      const el = iframeRef.current;
+      if (!el) return;
+      const base = el.src.split('?')[0];
+      el.src = `${base}?startTime=${Math.floor(seconds)}s&autoplay=true`;
+      setCurrent(seconds);
+    },
+    [iframeRef]
+  );
+
+  return { seek, current };
+};
+
+const ChapterList = ({
+  chapters,
+  current,
+  onSeek,
+}: {
+  chapters: LessonDetail['chapters'];
+  current: number;
+  onSeek: (s: number) => void;
+}) => {
+  const activeIndex = chapters.reduce(
+    (acc, c, i) => (current >= c.start_s ? i : acc),
+    -1
+  );
+  return (
+    <div className="card p-0 mb-6 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-800 flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold tracking-tight">Chapters</h2>
+        <span className="text-[11px] font-mono text-slate-500">
+          {chapters.length} sections
+        </span>
+      </div>
+      <ol className="max-h-[22rem] overflow-y-auto divide-y divide-slate-800/70">
+        {chapters.map((c, i) => (
+          <li key={`${c.start_s}-${c.title}`}>
+            <button
+              type="button"
+              onClick={() => onSeek(c.start_s)}
+              aria-current={i === activeIndex ? 'true' : undefined}
+              className={`w-full text-left px-4 py-2.5 flex items-baseline gap-3 transition-colors ${
+                i === activeIndex
+                  ? 'bg-cyan-500/10 text-cyan-200'
+                  : 'hover:bg-slate-800/50 text-slate-300'
+              }`}
+            >
+              <span className="font-mono text-xs text-slate-500 tabular-nums shrink-0 w-16">
+                {fmt(c.start_s)}
+              </span>
+              <span className="flex-1 text-sm leading-snug">{c.title}</span>
+              <span className="font-mono text-[11px] text-slate-600 shrink-0">
+                {fmt(Math.max(0, c.end_s - c.start_s))}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+};
+
 /* In-browser deck viewer. The pixels come from the entitlement-checked,
  * per-learner-watermarked endpoint — there is no file to download, which is
  * the whole protection model for course materials. crossOrigin with
@@ -396,6 +539,14 @@ const Lesson: React.FC = () => {
   // when the LAST slide has actually been reached.
   const maxSlideRef = useRef<number>(0);
 
+  // Chapter navigation drives the Stream iframe in place; the hook only
+  // attaches once a video lesson is actually on screen.
+  const videoFrame = useRef<HTMLIFrameElement>(null);
+  const { seek, current: playhead } = useStreamPlayer(
+    videoFrame,
+    lesson?.kind === 'video' && !!lesson.playback
+  );
+
   usePageMeta(lesson?.title || 'Lesson', 'ProReadyEngineer course lesson.', {
     noindex: true,
   });
@@ -540,6 +691,7 @@ const Lesson: React.FC = () => {
             {lesson.playback ? (
               <>
                 <iframe
+                  ref={videoFrame}
                   src={lesson.playback.iframe}
                   title={lesson.title}
                   allow="accelerometer; gyroscope; encrypted-media; picture-in-picture;"
@@ -559,6 +711,14 @@ const Lesson: React.FC = () => {
               </div>
             )}
           </div>
+        )}
+
+        {lesson.kind === 'video' && lesson.playback && lesson.chapters.length > 0 && (
+          <ChapterList
+            chapters={lesson.chapters}
+            current={playhead}
+            onSeek={seek}
+          />
         )}
 
         {lesson.kind === 'slides' &&
