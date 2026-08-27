@@ -429,6 +429,22 @@ export type NotifyResult = {
   failed_addresses?: string[];
 };
 
+/** One upcoming-course waitlist, from GET /api/admin/interest/summary. */
+export type InterestSummary = {
+  course_slug: string;
+  count: number;
+  latest_at: string | null;
+};
+
+/** One waitlist signup, from GET /api/admin/interest. */
+export type InterestRow = {
+  id: number;
+  course_slug: string;
+  email: string;
+  full_name: string;
+  created_at: string;
+};
+
 // ----- View state <-> URL hash ----------------------------------------------
 
 export type CourseTab =

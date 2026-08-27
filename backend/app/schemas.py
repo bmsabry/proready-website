@@ -183,6 +183,47 @@ class NotifyOut(BaseModel):
     failed_addresses: List[str] = Field(default_factory=list)
 
 
+# ----- Interest waitlist ------------------------------------------------------
+
+class InterestIn(BaseModel):
+    """Public waitlist signup for an upcoming (not yet built) course."""
+
+    course_slug: str = Field(pattern=r"^[a-z0-9-]{3,64}$")
+    email: EmailStr
+    full_name: str = Field(default="", max_length=255)
+    # Honeypot — same trap as RegisterIn: bots fill it, humans never see it.
+    website: str = Field(default="", max_length=500)
+
+
+class InterestOut(BaseModel):
+    ok: bool = True
+    # True when this (course_slug, email) pair had already signed up.
+    already: bool = False
+
+
+class InterestRowOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    course_slug: str
+    email: EmailStr
+    full_name: str
+    created_at: datetime
+
+
+class InterestSummaryOut(BaseModel):
+    course_slug: str
+    count: int
+    latest_at: Optional[datetime] = None
+
+
+class InterestNotifyIn(BaseModel):
+    """Broadcast to one slug's waitlist. Response reuses NotifyOut."""
+
+    subject: str = Field(min_length=1, max_length=200)
+    body_html: str = Field(min_length=1, max_length=100_000)
+
+
 # ----- AI assistant ----------------------------------------------------------
 
 class AISettingsOut(BaseModel):

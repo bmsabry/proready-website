@@ -47,6 +47,7 @@ from .routes import academy_admin as academy_admin_routes
 from .routes import admin as admin_routes
 from .routes import comms as comms_routes
 from .routes import courses as courses_routes
+from .routes import interest as interest_routes
 from .routes import software as software_routes
 from .schemas import NotifyIn
 from .seats import count_active, count_paid
@@ -1128,6 +1129,21 @@ def session_local_times(db: Session, course_code: str, **_: Any) -> Dict[str, An
     return out
 
 
+def get_interest_summary(db: Session, **_: Any) -> Dict[str, Any]:
+    rows = interest_routes.summary_rows(db)
+    return {
+        "ok": True,
+        "waitlists": [
+            {
+                "course_slug": r.course_slug,
+                "count": r.count,
+                "latest_signup_at": _iso(r.latest_at),
+            }
+            for r in rows
+        ],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Tool registry
 # ---------------------------------------------------------------------------
@@ -1169,6 +1185,7 @@ TOOL_HANDLERS = {
     "read_site_page": read_site_page,
     "search_site": search_site,
     "session_local_times": session_local_times,
+    "get_interest_summary": get_interest_summary,
 }
 
 
@@ -1582,6 +1599,11 @@ TOOL_SPECS = [
             "properties": {"course_code": {"type": "string", "description": "Course code from list_courses."}},
             "required": ["course_code"],
         },
+    ),
+    _fn(
+        "get_interest_summary",
+        "Waitlist signups for upcoming (not yet built) courses — one row per course slug with the signup count and latest signup time. Read-only; use freely.",
+        {"type": "object", "properties": {}, "required": []},
     ),
 ]
 

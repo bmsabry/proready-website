@@ -99,6 +99,8 @@ THE PLATFORM
 - Comms: notify_course targets a cohort (audiences all/paid/pending/
   recorded/everyone); notify_product_buyers targets a recorded product's
   active buyers. Every send lands in the email log (get_email_log).
+  get_interest_summary shows the waitlist for each upcoming (not yet
+  built) course — how many people asked to be told when it ships.
 - Attendance confirmation: a course broadcast's replies come back to the
   support desk, not to a personal inbox. When a registrant replies confirming
   their seat, the desk records it against their registration automatically.

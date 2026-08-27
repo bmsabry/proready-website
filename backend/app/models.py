@@ -135,6 +135,35 @@ Index(
 )
 
 
+class CourseInterest(Base):
+    """A public "notify me" signup for an upcoming course that does not
+    exist yet as a Course row. No auth, no email on signup — just a named
+    counter the admin can review and broadcast to once the course ships.
+
+    course_slug is free-form (validated ^[a-z0-9-]{3,64}$ at the API edge)
+    precisely so interest can be collected BEFORE anything else about the
+    course is built.
+    """
+
+    __tablename__ = "course_interest"
+    __table_args__ = (
+        Index(
+            "ix_course_interest_unique",
+            "course_slug",
+            "email",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    course_slug: Mapped[str] = mapped_column(String(64), index=True)
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    full_name: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class AISettings(Base):
     """LLM credentials + model preference for the admin AI assistant.
 
