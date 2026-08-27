@@ -57,66 +57,6 @@ const courses = [
     code: FLAGSHIP_CODE,
     featured: true
   },
-  {
-    id: 2,
-    title: "Advanced Combustion Fundamentals",
-    category: "Thermal Fluids",
-    duration: "3 Days",
-    level: "Intermediate",
-    attendees: "20 Max",
-    description: "Core combustion theory with practical applications for modern energy systems.",
-    nextDate: "By request"
-  },
-  {
-    id: 3,
-    title: "Fundamentals of Turbomachinery",
-    category: "Thermal Fluids",
-    duration: "2 Days",
-    level: "Foundational",
-    attendees: "25 Max",
-    description: "Fundamental principles of compressors, turbines, and overall cycle performance.",
-    nextDate: "By request"
-  },
-  {
-    id: 4,
-    title: "Data Visualization & Advanced Analytics",
-    category: "AI & Data",
-    duration: "2 Days",
-    level: "Intermediate",
-    attendees: "20 Max",
-    description: "Turn complex data into clear, decision-ready engineering insights.",
-    nextDate: "By request"
-  },
-  {
-    id: 5,
-    title: "Applied Machine Learning & AI for Engineers",
-    category: "AI & Data",
-    duration: "4 Days",
-    level: "Intermediate",
-    attendees: "20 Max",
-    description: "Practical ML workflows tailored to engineering datasets and constraints.",
-    nextDate: "By request"
-  },
-  {
-    id: 6,
-    title: "CFD Best Practices & Simulation",
-    category: "Thermal Fluids",
-    duration: "2 Days",
-    level: "Intermediate",
-    attendees: "15 Max",
-    description: "Mesh generation, turbulence modeling, and solver strategy for robust CFD.",
-    nextDate: "By request"
-  },
-  {
-    id: 7,
-    title: "Custom Corporate Training Programs",
-    category: "Thermal Fluids",
-    duration: "Custom",
-    level: "All Levels",
-    attendees: "Team-based",
-    description: "Tailored programs aligned to your systems, data, and business goals.",
-    nextDate: "Schedule with us"
-  }
 ];
 
 type LiveCourseInfo = {
@@ -148,10 +88,317 @@ const WHY_TRAIN = [
   },
 ];
 
+
+/* ---------------- Upcoming catalog (waitlist) ----------------
+   Seven programs in development, built from real course material.
+   Grouped in two tracks; each card captures interest via /api/interest. */
+
+type UpcomingCourse = {
+  slug: string;
+  title: string;
+  pitch: string;
+  audience: string;
+  learn: string[];
+  outline: string[];
+};
+
+type Track = { name: string; intro: string; courses: UpcomingCourse[] };
+
+const TRACKS: Track[] = [
+  {
+    name: 'Rotating Equipment Series',
+    intro:
+      'Four courses that build on each other: start with pumps, add compressors, then go deep on the seals and valves that keep both running.',
+    courses: [
+      {
+        slug: 'pumps',
+        title: 'Pump Selection, Operation and Troubleshooting',
+        pitch:
+          'Every major pump type, its curves, its failure modes, and how to select, install, and troubleshoot it.',
+        audience: 'Plant, process, operations, and maintenance engineers who specify or run pumps.',
+        learn: [
+          'Map the full pump family tree and shortlist the right type for a service',
+          'Choose between centrifugal and positive displacement using flow, pressure, viscosity, and solids criteria',
+          'Read performance curves (head, capacity, power, efficiency) and predict behavior off the design point',
+          'Recognize, predict, and prevent cavitation',
+          'Install pumps properly and lay out pumping stations',
+          'Troubleshoot common pump problems and structure the maintenance response',
+        ],
+        outline: [
+          'Pump families and how to choose',
+          'Terminology, curves, and basic theory',
+          'Construction and materials',
+          'Cavitation',
+          'Installation and pumping station design',
+          'Troubleshooting and maintenance',
+        ],
+      },
+      {
+        slug: 'compressors',
+        title: 'Compressor Selection, Operation and Troubleshooting',
+        pitch:
+          'Reciprocating, rotary, and centrifugal compressors: how they work, how they fail, and how to select the right one.',
+        audience:
+          'Plant and process engineers in gas processing, refining, petrochemical, and utilities.',
+        learn: [
+          'Compression fundamentals and the compressor family map',
+          'Rotary positive displacement machines and where they fit',
+          'Reciprocating compressors in depth: construction, operation, and capacity control',
+          'Maintenance and troubleshooting of reciprocating machines',
+          'Dynamic compressor behavior, performance, and operating limits',
+          'A structured selection method for matching compressor type to service',
+        ],
+        outline: [
+          'Introduction and compression basics',
+          'Rotary positive displacement compressors',
+          'Reciprocating compressors: design, operation, troubleshooting',
+          'Turbocompressors',
+          'Compressor seals',
+          'Compressor selection',
+        ],
+      },
+      {
+        slug: 'mechanical-seals',
+        title: 'Mechanical Seals',
+        pitch:
+          'From packing and lip seals to dry gas seals: select, install, and troubleshoot the seals that keep rotating machines running.',
+        audience:
+          'Rotating equipment, maintenance, and reliability engineers who own pumps and compressors.',
+        learn: [
+          'Classify seal families and pick the right one for a duty',
+          'Read a mechanical seal assembly: pusher and metal-bellows designs',
+          'Select seal support piping plans for flush, quench, and barrier service',
+          'Understand dry gas seals on process compressors, with field case studies',
+          'Install and commission seals to avoid early failure',
+          'Diagnose seal failures from the evidence and apply proven corrections',
+        ],
+        outline: [
+          'Sealing fundamentals and seal families',
+          'Packing and mechanical seals',
+          'Seal support systems and piping plans',
+          'Dry gas seals and case studies',
+          'Installation and operation',
+          'Troubleshooting, failure causes and corrections',
+        ],
+      },
+      {
+        slug: 'valves',
+        title: 'Valve Selection, Operation and Overpressure Protection',
+        pitch:
+          'Valve types, actuators, and code-compliant overpressure protection, from API practice down to installation and maintenance.',
+        audience:
+          'Plant, piping, and process engineers responsible for relief devices and valve integrity.',
+        learn: [
+          'Classify valves by function and construction, and match type to application',
+          'Specify valve actuators and their selection considerations',
+          'Apply ASME and API overpressure protection requirements: MAWP, accumulation, set pressure, blowdown',
+          'Select among spring-loaded, balanced bellows, and pilot-operated relief valves',
+          'Apply pressure sustaining valves in liquid systems',
+          'Install and maintain valves for long service life',
+        ],
+        outline: [
+          'Valve fundamentals, classification and application',
+          'Valve actuators',
+          'Pressure relief valves',
+          'Safety valves',
+          'Pressure sustaining valves',
+          'Installation and maintenance',
+        ],
+      },
+    ],
+  },
+  {
+    name: 'Gas Turbine & Digitalization Series',
+    intro:
+      'A clean arc across three courses: design the combustor, test and evaluate it, then monitor the whole engine in service with a digital twin.',
+    courses: [
+      {
+        slug: 'gt-combustor-design',
+        title: 'Gas Turbine Combustor Design',
+        pitch:
+          'Size a combustor and design its diffuser, swirler, fuel injection, and cooling, using the Lefebvre method end to end.',
+        audience:
+          'Gas turbine, propulsion, and energy engineers who design, modify, or evaluate combustors.',
+        learn: [
+          'Compare can, turboannular, and annular architectures and state full design requirements',
+          'Size the casing and liner and distribute air among primary, intermediate, and dilution zones',
+          'Design the diffuser, air swirler, and primary-zone aerodynamics that anchor the flame',
+          'Select and size fuel injection, accounting for spray evaporation and fuel properties',
+          'Calculate liner heat transfer and design film cooling within a metal temperature budget',
+          'Predict performance and emissions, carrying a complete design through a working workbook',
+        ],
+        outline: [
+          'Architecture, requirements, and preliminary sizing',
+          'Diffuser design and air distribution',
+          'Swirler aerodynamics and flame stabilization',
+          'Fuel injection and spray evaporation',
+          'Liner heat transfer and cooling',
+          'Dilution zone, performance, and emissions',
+        ],
+      },
+      {
+        slug: 'combustion-testing-evaluation',
+        title: 'Combustion Systems Testing and Evaluation',
+        pitch:
+          'Measure what actually happens in a combustor: laser diagnostics, spray characterization, emissions, and disciplined test cell practice.',
+        audience:
+          'Test engineers, combustion R&D engineers, and lab leads who run or interpret rig tests.',
+        learn: [
+          'Choose the right measurement for the job, and know when optical diagnostics are worth the cost',
+          'Set up and run laser Doppler anemometry: fringe model, seeding, signal processing',
+          'Characterize sprays with phase Doppler: droplet size and velocity distributions, error sources',
+          'Visualize flows with shadowgraphy and PIV, including image processing',
+          'Instrument a combustion test: emissions sampling, gas analysis probes, and data acquisition',
+          'Plan, execute, and report a complete test campaign',
+        ],
+        outline: [
+          'Measurement fundamentals, turbulence, and uncertainty',
+          'Point velocimetry: LDA principles and practice',
+          'Spray and particle characterization',
+          'Flow imaging: shadowgraphy, PIV, image processing',
+          'Combustion test cell practice: emissions, probes, DAQ',
+          'Planning, running, and reporting a campaign',
+        ],
+      },
+      {
+        slug: 'digital-twin',
+        title: 'Building a Digital Twin',
+        pitch:
+          'Build a working gas turbine digital twin from plant data: physics core, health tracking, wash economics, early warning.',
+        audience:
+          'Performance, asset management, and digitalization engineers building a condition-monitoring twin.',
+        learn: [
+          'What a digital twin actually is and the one idea the whole system rests on',
+          'Prepare real plant historian data and fix what is wrong with it before modelling',
+          'Validate instruments first: tell a lying sensor from a failing machine',
+          'Build a thermodynamic model of a specific engine without OEM data',
+          'Track unit condition through health parameters, and know when the system should not trust itself',
+          'Ship capabilities in order: degradation and wash economics, early warning, then diagnosis',
+        ],
+        outline: [
+          'The twin concept and architecture',
+          'Plant data and trusting the instruments',
+          'The physics core: modelling without OEM data',
+          'Health parameter estimation and uncertainty',
+          'Degradation, wash economics, early warning, diagnosis',
+          'Life accounting and fleet decisions',
+        ],
+      },
+    ],
+  },
+];
+
+/* ---------- Waitlist capture for an upcoming course ---------- */
+const WaitlistForm = ({ slug }: { slug: string }) => {
+  const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState(''); // honeypot
+  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setState('error');
+      return;
+    }
+    setState('busy');
+    try {
+      const res = await fetch(`${API_BASE}/api/interest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ course_slug: slug, email: email.trim(), website }),
+      });
+      setState(res.ok ? 'done' : 'error');
+    } catch {
+      setState('error');
+    }
+  };
+
+  if (state === 'done') {
+    return (
+      <p className="text-sm text-cyan-300 mt-auto pt-2">
+        You're on the list. We'll email you when this course opens.
+      </p>
+    );
+  }
+  return (
+    <form onSubmit={submit} className="mt-auto pt-2 flex gap-2">
+      <label className="sr-only" htmlFor={`wl-${slug}`}>
+        Email for the {slug} waitlist
+      </label>
+      <input
+        id={`wl-${slug}`}
+        type="email"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="you@company.com"
+        className="flex-1 min-w-0 bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
+      />
+      <input
+        type="text"
+        value={website}
+        onChange={(e) => setWebsite(e.target.value)}
+        className="hidden"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+      />
+      <button type="submit" disabled={state === 'busy'} className="btn-secondary px-4 py-2 text-sm whitespace-nowrap disabled:opacity-60">
+        {state === 'busy' ? 'Adding…' : 'Notify me'}
+      </button>
+      {state === 'error' && (
+        <span className="sr-only" role="alert">Could not join the waitlist, please retry.</span>
+      )}
+    </form>
+  );
+};
+
+const UpcomingCard = ({ course, index }: { course: UpcomingCourse; index: number }) => (
+  <Reveal delay={(index % 2) * 0.07} className="h-full">
+    <div className="card card-hover p-7 h-full flex flex-col">
+      <h3 className="text-lg font-bold mb-2 leading-snug">{course.title}</h3>
+      <p className="text-slate-300 text-sm leading-relaxed mb-3">{course.pitch}</p>
+      <p className="text-xs text-slate-400 mb-4">
+        <span className="text-slate-300 font-medium">For:</span> {course.audience}
+      </p>
+      <details className="group mb-5">
+        <summary className="cursor-pointer list-none inline-flex items-center gap-2 text-cyan-400 text-sm font-medium hover:text-cyan-300 transition-colors">
+          <BookOpen className="w-4 h-4" aria-hidden="true" />
+          What you'll learn
+          <span className="text-slate-500 group-open:hidden">+</span>
+          <span className="text-slate-500 hidden group-open:inline">−</span>
+        </summary>
+        <div className="mt-4 grid gap-6 md:grid-cols-2">
+          <ul className="space-y-2">
+            {course.learn.map((t) => (
+              <li key={t} className="flex gap-2.5 text-sm text-slate-300 leading-relaxed">
+                <span className="text-cyan-400 mt-0.5" aria-hidden="true">›</span>
+                {t}
+              </li>
+            ))}
+          </ul>
+          <div>
+            <p className="text-xs font-mono uppercase tracking-widest text-slate-400 mb-2">Outline</p>
+            <ol className="space-y-1.5">
+              {course.outline.map((m, i) => (
+                <li key={m} className="text-sm text-slate-300">
+                  <span className="font-mono text-xs text-slate-500 mr-2">{String(i + 1).padStart(2, '0')}</span>
+                  {m}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      </details>
+      <WaitlistForm slug={course.slug} />
+    </div>
+  </Reveal>
+);
+
 const Training = () => {
   usePageMeta(
     'Professional Training',
-    'Specialized gas turbine, combustion, and industrial AI training taught by the engineers who design and test these systems. Live cohorts with real test-cell data and direct Q&A.',
+    'Gas turbine, combustion, rotating equipment, and digital twin training taught by the engineers who design and test these systems. Live cohorts, on-demand programs, and a growing catalog: pumps, compressors, mechanical seals, valves, combustor design, combustion testing, digital twins.',
   );
 
   const [liveByCode, setLiveByCode] = useState<Record<string, LiveCourseInfo>>({});
@@ -211,7 +458,6 @@ const Training = () => {
   }, []);
 
   const flagship = courses.find((c) => c.featured)!;
-  const upcoming = courses.filter((c) => !c.featured);
 
   const flagshipLive = flagship.code ? liveByCode[flagship.code] : undefined;
   const flagshipSeatsLabel = flagshipLive
@@ -247,7 +493,40 @@ const Training = () => {
         subtitle="Specialized courses taught by the engineers who design and test gas turbines, combustion systems, and industrial AI. Ex-GE, PhD-led, field-proven."
       />
 
-      {/* FLAGSHIP COURSE */}
+      {/* WHY TRAIN WITH US */}
+      <section className="pt-2 pb-16">
+        <div className="container-site">
+          <SectionHeading
+            eyebrow="Why Train With Us"
+            title="Field-Grade Knowledge, Transferred Directly"
+            subtitle="Every course below is built around the decisions you actually face in the test cell and the field, not slides recycled from a textbook."
+          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {WHY_TRAIN.map((item, i) => (
+              <Reveal key={item.title} delay={i * 0.08}>
+                <div className="card card-hover p-8 h-full">
+                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-5">
+                    {item.icon}
+                  </div>
+                  <h3 className="text-lg font-bold mb-3">{item.title}</h3>
+                  <p className="text-slate-300 text-sm leading-relaxed">{item.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* AVAILABLE NOW */}
+      <section className="pb-8">
+        <div className="container-site">
+          <SectionHeading
+            eyebrow="Available Now"
+            title="Open for Enrollment"
+            subtitle="A live cohort you can join today and a self-paced program you can start tonight."
+          />
+        </div>
+      </section>
       <section className="container-site pb-8">
         <Reveal>
           <div className="relative card overflow-hidden p-8 md:p-12">
@@ -328,38 +607,9 @@ const Training = () => {
         </Reveal>
       </section>
 
-      {/* WHY TRAIN WITH US */}
-      <section className="section-pad">
-        <div className="container-site">
-          <SectionHeading
-            eyebrow="Why Train With Us"
-            title="Field-Grade Knowledge, Transferred Directly"
-            subtitle="Every course is built around the decisions you actually face in the test cell and the field, not slides recycled from a textbook."
-          />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {WHY_TRAIN.map((item, i) => (
-              <Reveal key={item.title} delay={i * 0.08}>
-                <div className="card card-hover p-8 h-full">
-                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-5">
-                    {item.icon}
-                  </div>
-                  <h3 className="text-lg font-bold mb-3">{item.title}</h3>
-                  <p className="text-slate-300 text-sm leading-relaxed">{item.body}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ON-DEMAND — self-paced, buy once, keep forever */}
       <section className="pb-20">
         <div className="container-site">
-          <SectionHeading
-            eyebrow="On-Demand"
-            title="Learn at Your Own Pace"
-            subtitle="Recorded programmes you buy once and keep. Same material as the live cohorts, without waiting for a start date."
-          />
           <Reveal>
             <div className="card card-hover p-7 md:p-10">
               <div className="grid lg:grid-cols-[1.6fr_1fr] gap-8 items-center">
@@ -428,55 +678,29 @@ const Training = () => {
         </div>
       </section>
 
-      {/* UPCOMING / COMING SOON */}
-      <section className="pb-20">
+      {/* COMING NEXT — waitlist catalog */}
+      <section className="section-pad bg-slate-900/30">
         <div className="container-site">
           <SectionHeading
-            eyebrow="More Programs"
-            title="Coming Soon & By Request"
-            subtitle="These programs run as scheduled public cohorts or tailored corporate deliveries. Contact us to schedule one for your team."
+            eyebrow="Coming Next"
+            title="Seven Programs in Development"
+            subtitle="Built from complete course material and decades of field practice. Join a waitlist and we'll email you when a course opens for enrollment; strong waitlists get scheduled first."
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {upcoming.map((course, i) => (
-              <Reveal key={course.id} delay={(i % 3) * 0.07}>
-                <div className="card card-hover p-7 h-full flex flex-col">
-                  <div className="flex items-center justify-between gap-3 mb-5">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20">
-                      {course.category}
-                    </span>
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-slate-300 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
-                      Coming Soon
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-bold mb-3 leading-snug">{course.title}</h3>
-                  <p className="text-slate-300 text-sm leading-relaxed mb-6 flex-grow">
-                    {course.description}
-                  </p>
-                  <div className="grid grid-cols-2 gap-3 text-xs font-mono text-slate-300 mb-6">
-                    <span className="flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                      {course.duration}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <BookOpen className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                      {course.level}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <Users className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                      {course.attendees}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                      {course.nextDate}
-                    </span>
-                  </div>
-                  <Link to="/contact" className="btn-ghost mt-auto">
-                    Request This Course <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                  </Link>
+          {TRACKS.map((track) => (
+            <div key={track.name} className="mb-14 last:mb-0">
+              <Reveal>
+                <div className="mb-7 max-w-3xl">
+                  <span className="eyebrow">{track.name}</span>
+                  <p className="text-slate-400 text-sm leading-relaxed mt-3">{track.intro}</p>
                 </div>
               </Reveal>
-            ))}
-          </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {track.courses.map((course, i) => (
+                  <UpcomingCard key={course.slug} course={course} index={i} />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
