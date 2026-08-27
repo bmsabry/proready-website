@@ -173,28 +173,56 @@ def test_course_requires_sign_in(anon):
     assert anon.get(f"/api/academy/course/{PRODUCT}").status_code == 401
 
 
-def test_preview_lesson_is_open_to_anonymous_visitors(anon, client):
+def test_no_lesson_is_published_by_seeding(client):
+    """Seeding must not be able to make paid content free.
+
+    This replaces a test that asserted the opposite — that exactly one free
+    sample existed and opened to anonymous visitors. That was true and safe
+    while a lecture seeded as 11 upload-sized parts and the sample was part 1,
+    about fifteen minutes. Production then collapsed each lecture into a single
+    master lesson, the flag stayed on the row that became the whole recording,
+    and `lesson_accessible` short-circuits on `is_preview` — so GET
+    /api/academy/lesson/{id} handed a signed Cloudflare Stream token for the
+    full 175-minute GT-05 lecture to anyone, with no account and no purchase.
+
+    The test could not catch it: it seeded parts, so it kept checking a world
+    production had already left. The property is therefore asserted directly —
+    nothing is published — instead of counting samples.
+    """
     content = client.get(
         f"/api/admin/academy/products/{PRODUCT}/content", headers=ADMIN
     ).json()
-    preview = [
-        l for m in content["modules"] for l in m["lessons"] if l["is_preview"]
+    published = [
+        f"{m['code']}/{l['kind']} (id {l['id']})"
+        for m in content["modules"]
+        for l in m["lessons"]
+        if l["is_preview"]
     ]
-    assert len(preview) == 1, "exactly one free sample lesson should exist"
-    r = anon.get(f"/api/academy/lesson/{preview[0]['id']}")
-    assert r.status_code == 200
-    assert r.json()["is_preview"] is True
+    assert published == [], f"seeding published {', '.join(published)}"
 
 
-def test_non_preview_lesson_is_denied_to_anonymous_visitors(anon, client):
+def test_every_lesson_is_denied_to_anonymous_visitors(anon, client):
+    """No lesson id is readable without an entitlement — checked exhaustively.
+
+    Written as a sweep rather than a spot check because the live leak was found
+    by sweeping ids anonymously, and a single-lesson assertion would have
+    walked straight past it.
+    """
     content = client.get(
         f"/api/admin/academy/products/{PRODUCT}/content", headers=ADMIN
     ).json()
-    locked = [
-        l for m in content["modules"] for l in m["lessons"] if not l["is_preview"]
-    ][0]
-    r = anon.get(f"/api/academy/lesson/{locked['id']}")
-    assert r.status_code == 403
+    ids = [l["id"] for m in content["modules"] for l in m["lessons"]]
+    assert ids, "the product should have lessons to check"
+    for lesson_id in ids:
+        r = anon.get(f"/api/academy/lesson/{lesson_id}")
+        assert r.status_code == 403, (
+            f"lesson {lesson_id} answered {r.status_code} to an anonymous "
+            "visitor; paid content must require an enrollment"
+        )
+        assert "cloudflarestream" not in r.text, (
+            f"lesson {lesson_id} leaked a signed video token to an anonymous "
+            "visitor"
+        )
 
 
 # -----------------------------------------------------------------------------
