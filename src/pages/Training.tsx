@@ -78,8 +78,8 @@ const WHY_TRAIN = [
   },
   {
     icon: <FlaskConical className="w-6 h-6" aria-hidden="true" />,
-    title: 'Real Test-Cell Data & Field Experience',
-    body: 'Lessons built on thousands of live mapping tests and real field events, not idealized textbook cases.',
+    title: 'Field Experience, Not Textbook Theory',
+    body: 'Courses distilled from decades of hands-on test-cell and field practice. You learn how these machines actually behave, not how the textbook says they should.',
   },
   {
     icon: <MessagesSquare className="w-6 h-6" aria-hidden="true" />,
