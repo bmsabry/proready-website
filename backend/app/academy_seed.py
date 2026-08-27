@@ -145,11 +145,14 @@ def _seed_lessons(db: Session, module: Module, spec: dict) -> None:
             lesson.kind = "video"
             lesson.position = position
             lesson.source_file = filename
-            # First part of the first video-bearing module is the free sample.
-            # `is_preview` is otherwise operator-owned, so only ever set it, and
-            # only on this one lesson.
-            if module.position == 2 and index == 0 and lesson.id is None:
-                lesson.is_preview = True
+            # No lesson is ever published by seeding. This used to flag
+            # "part 1 of module 2" as a free sample, which was safe only while
+            # a lecture was 11 upload-sized parts and part 1 ran ~15 minutes.
+            # Once the parts were collapsed into one master per module the same
+            # flag sat on a full 175-minute lecture, and because
+            # `lesson_accessible` short-circuits on `is_preview`, the API handed
+            # a signed video token to anyone who asked for that lesson by id.
+            # The course now has no free sample at all, by the owner's decision.
 
     _KIND_LABEL = {
         "deck": "Slide deck",
