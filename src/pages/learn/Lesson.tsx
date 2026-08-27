@@ -88,10 +88,12 @@ const useStreamPlayer = (
     if (!enabled) return;
     let cancelled = false;
 
+    const frame = iframeRef.current;
+
     const attach = () => {
       const w = window as any;
       const el = iframeRef.current;
-      if (cancelled || !w.Stream || !el || playerRef.current) return;
+      if (cancelled || !w.Stream || !el) return;
       try {
         const player = w.Stream(el);
         playerRef.current = player;
@@ -103,22 +105,26 @@ const useStreamPlayer = (
       }
     };
 
+    // Seeking a not-yet-started video reloads the embed with ?startTime,
+    // which swaps the iframe's document and orphans the old player handle.
+    // Re-attaching on every load keeps the handle pointing at a live player.
+    frame?.addEventListener('load', attach);
+
+    let tag = document.querySelector<HTMLScriptElement>(`script[src="${STREAM_SDK}"]`);
     if ((window as any).Stream) {
       attach();
-      return () => {
-        cancelled = true;
-      };
+    } else {
+      if (!tag) {
+        tag = document.createElement('script');
+        tag.src = STREAM_SDK;
+        tag.async = true;
+        document.head.appendChild(tag);
+      }
+      tag.addEventListener('load', attach);
     }
-    let tag = document.querySelector<HTMLScriptElement>(`script[src="${STREAM_SDK}"]`);
-    if (!tag) {
-      tag = document.createElement('script');
-      tag.src = STREAM_SDK;
-      tag.async = true;
-      document.head.appendChild(tag);
-    }
-    tag.addEventListener('load', attach);
     return () => {
       cancelled = true;
+      frame?.removeEventListener('load', attach);
       tag?.removeEventListener('load', attach);
     };
   }, [iframeRef, enabled]);
@@ -126,7 +132,14 @@ const useStreamPlayer = (
   const seek = useCallback(
     (seconds: number) => {
       const player = playerRef.current;
-      if (player) {
+      // A player that has not loaded its metadata yet reports duration 0,
+      // and assigning currentTime on it is silently dropped — the chapter
+      // click would look dead until the learner pressed play first. Only
+      // the reload path can open a cold video at an offset, so require a
+      // real duration before trusting the in-place seek.
+      const ready =
+        player && Number.isFinite(player.duration) && player.duration > 0;
+      if (ready) {
         try {
           player.currentTime = seconds;
           player.play?.();
@@ -139,6 +152,7 @@ const useStreamPlayer = (
       const el = iframeRef.current;
       if (!el) return;
       const base = el.src.split('?')[0];
+      playerRef.current = null;
       el.src = `${base}?startTime=${Math.floor(seconds)}s&autoplay=true`;
       setCurrent(seconds);
     },
