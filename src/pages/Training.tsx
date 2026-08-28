@@ -659,7 +659,18 @@ const Training = () => {
                   </div>
                 </div>
 
-                <ul className="space-y-3 text-sm lg:border-l lg:border-slate-800 lg:pl-8">
+                <div className="lg:border-l lg:border-slate-800 lg:pl-8">
+                <Link to="/training/micro-gas-turbine-design" className="block mb-6 rounded-xl overflow-hidden border border-slate-800 hover:border-cyan-500/40 transition-colors">
+                  <img
+                    src="/Micro_Gas_Turbine_Design_Infographic.jpg"
+                    alt="Micro Gas Turbine Design course overview: architecture, compressor, combustor, turbine, CFD and combustor analysis."
+                    className="w-full h-auto block"
+                    width={1200}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </Link>
+                <ul className="space-y-3 text-sm">
                   {[
                     'Recorded sessions, streamed on any device',
                     'Slide decks, four design calculators, two interactive tools',
@@ -672,6 +683,7 @@ const Training = () => {
                     </li>
                   ))}
                 </ul>
+                </div>
               </div>
             </div>
           </Reveal>

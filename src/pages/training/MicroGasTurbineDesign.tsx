@@ -454,11 +454,13 @@ const MicroGasTurbineDesign: React.FC = () => {
     'Micro Gas Turbine Design — On-Demand Course',
     `${TOTAL_HOURS} hours across 7 modules on designing a ${REFERENCE_ENGINE} single-shaft turbojet: architecture, centrifugal compressor, combustor, axial turbine, compressor maps, CFD and combustor analysis. Lifetime access.`,
     {
+      image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic.jpg',
       jsonLd: [
         {
           '@context': 'https://schema.org',
           '@type': 'Course',
           name: 'Micro Gas Turbine Design',
+          image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic.jpg',
           description: COURSE_SUBTITLE,
           provider: {
             '@type': 'Organization',
@@ -667,6 +669,22 @@ const MicroGasTurbineDesign: React.FC = () => {
               </div>
             </Reveal>
           </div>
+        </div>
+      </section>
+
+      {/* ---------------- Infographic showcase ---------------- */}
+      <section className="pb-4">
+        <div className="container-site">
+          <Reveal>
+            <img
+              src="/Micro_Gas_Turbine_Design_Infographic.jpg"
+              alt="Micro Gas Turbine Design: design a 700 N single-shaft turbojet end to end — engine architecture and gas path, centrifugal compressor, evaporative combustor, axial turbine, compressor maps and surge, turbomachinery CFD, and combustor analysis. Seven modules, 28.5 hours, 16 hours of video, lifetime access."
+              className="w-full max-w-2xl mx-auto rounded-2xl border border-slate-800"
+              width={1200}
+              loading="lazy"
+              decoding="async"
+            />
+          </Reveal>
         </div>
       </section>
 
