@@ -159,6 +159,7 @@ const labelFor = (iso) => {
 // day-by-day timeline had silently reverted to a hardcoded list.
 const SCHEDULE_PAGES = {
   '/training/gas-turbine-emissions-mapping': { code: 'gas-turbine-emissions-mapping-2026-05', days: 'all' },
+  '/training/micro-gas-turbine-design-live': { code: 'micro-gas-turbine-design-2026-10', days: 'all' },
   '/training': { code: 'gas-turbine-emissions-mapping-2026-05', days: 'start' },
 };
 

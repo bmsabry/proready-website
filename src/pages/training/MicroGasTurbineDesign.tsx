@@ -43,7 +43,7 @@ const CATALOG_ENDPOINT = API_BASE ? `${API_BASE}/api/academy/catalog/${PRODUCT_C
 const CHECKOUT_ENDPOINT = API_BASE ? `${API_BASE}/api/academy/checkout` : '';
 
 // Shown until the API answers, and in the prerendered HTML.
-const FALLBACK_PRICE_CENTS = 99900;
+const FALLBACK_PRICE_CENTS = 100000;
 
 const VIDEO_HOURS = 16;
 const REFERENCE_ENGINE = '700 N';
