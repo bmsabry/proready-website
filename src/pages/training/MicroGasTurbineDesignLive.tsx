@@ -44,7 +44,7 @@ const DEFAULT_CAPACITY = 15;
 const DEFAULT_PRICE_CENTS = 300000;
 // The recorded on-demand edition this cohort includes (and cross-sells).
 const RECORDED_PRODUCT_CODE = 'micro-gas-turbine-design';
-const DEFAULT_RECORDED_PRICE_CENTS = 99900;
+const DEFAULT_RECORDED_PRICE_CENTS = 100000;
 // Prerender fallback for the cohort start, taken from the build-time snapshot
 // of the live course record (see data/courseSnapshot). The literal is only a
 // last resort for a course the build has never been able to reach.
