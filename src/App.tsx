@@ -16,6 +16,7 @@ const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const GasTurbineEmissionsMapping = lazy(() => import('./pages/training/GasTurbineEmissionsMapping'));
 const MicroGasTurbineDesign = lazy(() => import('./pages/training/MicroGasTurbineDesign'));
+const MicroGasTurbineDesignLive = lazy(() => import('./pages/training/MicroGasTurbineDesignLive'));
 // Learner portal — auth-gated, deliberately NOT in routes.ts so the
 // prerenderer never tries to build these.
 const LearnSignIn = lazy(() => import('./pages/learn/SignIn'));
@@ -66,6 +67,14 @@ const EmissionsCohortRedirect = () => {
   return <Navigate to={`/training/gas-turbine-emissions-mapping${search}`} replace />;
 };
 
+/** Same forwarding for the Micro Gas Turbine Design live cohort: Stripe
+    returns buyers to /training/micro-gas-turbine-design-2026-10, while the
+    live cohort page lives at the -live slug. */
+const MgtCohortRedirect = () => {
+  const { search } = useLocation();
+  return <Navigate to={`/training/micro-gas-turbine-design-live${search}`} replace />;
+};
+
 function App() {
   return (
     <>
@@ -86,6 +95,8 @@ function App() {
               <Route path="/training/gas-turbine-emissions-mapping" element={<GasTurbineEmissionsMapping />} />
               <Route path="/training/gas-turbine-emissions-mapping-2026-05" element={<EmissionsCohortRedirect />} />
               <Route path="/training/micro-gas-turbine-design" element={<MicroGasTurbineDesign />} />
+              <Route path="/training/micro-gas-turbine-design-live" element={<MicroGasTurbineDesignLive />} />
+              <Route path="/training/micro-gas-turbine-design-2026-10" element={<MgtCohortRedirect />} />
               <Route path="/learn" element={<LearnDashboard />} />
               <Route path="/learn/signin" element={<LearnSignIn />} />
               <Route path="/learn/welcome" element={<LearnWelcome />} />

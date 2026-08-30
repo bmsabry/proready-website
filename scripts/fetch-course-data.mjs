@@ -33,7 +33,10 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 // Course codes whose pages are prerendered. Add a code here when a new live
 // cohort gets its own public page.
-const COURSE_CODES = ['gas-turbine-emissions-mapping-2026-05'];
+const COURSE_CODES = [
+  'gas-turbine-emissions-mapping-2026-05',
+  'micro-gas-turbine-design-2026-10',
+];
 
 const SNAPSHOT_PATH = new URL('../src/data/course-snapshot.json', import.meta.url);
 
