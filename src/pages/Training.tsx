@@ -11,7 +11,6 @@ import {
   MessagesSquare,
   Infinity as InfinityIcon,
   PlayCircle,
-  Layers,
   Tag,
 } from 'lucide-react';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
@@ -40,6 +39,10 @@ const FLAGSHIP_SNAPSHOT = courseSnapshot(FLAGSHIP_CODE);
 // flagship cohort.
 const MGT_LIVE_CODE = 'micro-gas-turbine-design-2026-10';
 const MGT_LIVE_SNAPSHOT = courseSnapshot(MGT_LIVE_CODE);
+// The recorded (self-paced) edition of the same course. Its live price is
+// fetched from the academy catalog; the constant is the prerender fallback.
+const MGT_RECORDED_CODE = 'micro-gas-turbine-design';
+const DEFAULT_RECORDED_PRICE_CENTS = 100000;
 
 const courses = [
   {
@@ -425,6 +428,31 @@ const Training = () => {
   );
 
   const [liveByCode, setLiveByCode] = useState<Record<string, LiveCourseInfo>>({});
+  const [recordedPriceCents, setRecordedPriceCents] = useState<number>(
+    DEFAULT_RECORDED_PRICE_CENTS,
+  );
+
+  // Live price of the recorded edition, so the format chooser never quotes a
+  // stale number. Falls back silently to the compiled-in default.
+  useEffect(() => {
+    if (!API_BASE) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/academy/catalog/${MGT_RECORDED_CODE}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && typeof data.price_cents === 'number' && data.price_cents > 0) {
+          setRecordedPriceCents(data.price_cents);
+        }
+      } catch {
+        /* keep the default */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Fetch live course data for any course that has a `code`. Falls back
   // silently to the hardcoded values when the API is unreachable.
@@ -524,6 +552,11 @@ const Training = () => {
       : null;
   const mgtDurationLabel =
     mgtLive && mgtLive.numDays > 0 ? `${mgtLive.numDays} Days × 4 Hrs` : mgtCourse.duration;
+  const recordedPriceLabel = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: recordedPriceCents % 100 === 0 ? 0 : 2,
+  }).format(recordedPriceCents / 100);
 
   return (
     <div className="pb-4">
@@ -568,7 +601,7 @@ const Training = () => {
           <SectionHeading
             eyebrow="Available Now"
             title="Open for Enrollment"
-            subtitle="Two live cohorts you can join today and a self-paced program you can start tonight."
+            subtitle="A flagship live cohort, and a design program offered two ways — join its live cohort or start on-demand tonight."
           />
         </div>
       </section>
@@ -652,169 +685,163 @@ const Training = () => {
         </Reveal>
       </section>
 
-      {/* MICRO GAS TURBINE DESIGN — LIVE COHORT. Same card format as the
-          flagship above: live data badges, register CTA, infographic, and a
-          cross-link to the on-demand edition it includes. */}
-      <section className="container-site pb-8">
-        <Reveal>
-          <div className="relative card overflow-hidden p-8 md:p-12">
-            <div
-              className="absolute -top-32 -right-24 w-96 h-96 bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none"
-              aria-hidden="true"
-            />
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-center relative">
-              <div className="lg:col-span-3">
-                <div className="flex flex-wrap items-center gap-3 mb-5">
-                  <span className="eyebrow">New Live Cohort</span>
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20">
-                    Live online cohort
-                  </span>
-                </div>
-                <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-4">
-                  {mgtCourse.title}
-                </h2>
-                <p className="text-slate-300 leading-relaxed mb-8">{mgtCourse.description}</p>
-
-                <div className="flex flex-wrap gap-3 mb-8">
-                  <MonoBadge icon={<Calendar className="w-3.5 h-3.5" aria-hidden="true" />}>
-                    Next: {mgtDateLabel}
-                  </MonoBadge>
-                  <MonoBadge icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />}>
-                    {mgtSeatsLabel}
-                  </MonoBadge>
-                  <MonoBadge icon={<Clock className="w-3.5 h-3.5" aria-hidden="true" />}>
-                    {mgtDurationLabel}
-                  </MonoBadge>
-                  <MonoBadge icon={<BookOpen className="w-3.5 h-3.5" aria-hidden="true" />}>
-                    {mgtCourse.level}
-                  </MonoBadge>
-                  {mgtPriceLabel && (
-                    <MonoBadge icon={<Tag className="w-3.5 h-3.5" aria-hidden="true" />}>
-                      {mgtPriceLabel} per seat
-                    </MonoBadge>
-                  )}
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <Link to={`/training/${mgtCourse.slug}`} className="btn-primary">
-                    View Course & Register{' '}
-                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                  </Link>
-                  <Link to="/contact" className="btn-secondary">
-                    Ask a Question
-                  </Link>
-                </div>
-                <Link
-                  to="/training/micro-gas-turbine-design"
-                  className="btn-ghost mt-4"
-                >
-                  <PlayCircle className="w-4 h-4" aria-hidden="true" />
-                  Also available on-demand
-                </Link>
-              </div>
-
-              <div className="lg:col-span-2">
-                <Link
-                  to={`/training/${mgtCourse.slug}`}
-                  className="block rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/50 hover:border-cyan-500/40 transition-colors"
-                >
-                  <img
-                    src="/Micro_Gas_Turbine_Design_Infographic.jpg"
-                    alt="Micro Gas Turbine Design — live online cohort: design a 700 N single-shaft turbojet end to end over seven live days of four hours each, covering engine architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis."
-                    className="w-full h-auto block"
-                    width={1200}
-                    loading="lazy"
-                  />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* ON-DEMAND — self-paced, buy once, keep forever */}
+      {/* MICRO GAS TURBINE DESIGN — ONE offering, TWO delivery formats.
+          The course is identical in both (same seven-module curriculum, same
+          materials, same certificate); only the delivery differs. So it gets
+          ONE advertisement with a side-by-side format chooser — the standard
+          pattern for multi-format courses — instead of two separate cards
+          that read as two different products. */}
       <section className="pb-20">
         <div className="container-site">
           <Reveal>
-            <div className="card card-hover p-7 md:p-10">
-              <div className="grid lg:grid-cols-[1.6fr_1fr] gap-8 items-center">
-                <div>
+            <div className="relative card overflow-hidden p-8 md:p-12">
+              <div
+                className="absolute -top-32 -right-24 w-96 h-96 bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none"
+                aria-hidden="true"
+              />
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-center relative">
+                <div className="lg:col-span-3">
                   <div className="flex flex-wrap items-center gap-3 mb-5">
+                    <span className="eyebrow">Turbomachinery</span>
                     <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20">
-                      Turbomachinery
-                    </span>
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-slate-300 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
-                      Available Now
+                      Live cohort or self-paced
                     </span>
                   </div>
-                  <h3 className="text-2xl md:text-3xl font-bold mb-4 leading-snug">
+                  <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-4">
                     Micro Gas Turbine Design
-                  </h3>
-                  <p className="text-slate-300 leading-relaxed mb-6">
+                  </h2>
+                  <p className="text-slate-300 leading-relaxed mb-8">
                     Design a 700 N single-shaft turbojet end to end — architecture, centrifugal
                     compressor, evaporative combustor, axial turbine, compressor maps, CFD and
-                    combustor analysis. Seven modules, 28.5 hours, with the design spreadsheets and
-                    interactive tools used in the sessions.
+                    combustor analysis. One curriculum, one set of materials, one certificate —
+                    offered two ways. Pick the delivery that fits you.
                   </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono text-slate-300 mb-7">
-                    <span className="flex items-center gap-2">
-                      <Layers className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                      7 modules
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                      28.5 hrs
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <PlayCircle className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                      16 h video
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <InfinityIcon className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                      Lifetime
-                    </span>
+
+                  {/* Format chooser — the two ways to take the same course */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    {/* Live cohort */}
+                    <div className="rounded-2xl border border-cyan-500/40 bg-gradient-to-br from-cyan-900/20 via-slate-900/60 to-blue-900/20 p-5 flex flex-col">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Users className="w-4 h-4 text-cyan-400" aria-hidden="true" />
+                        <span className="text-xs font-mono uppercase tracking-widest text-cyan-300">
+                          Live Online Cohort
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-2 mb-3">
+                        <span className="text-2xl font-bold text-white tabular-nums">
+                          {mgtPriceLabel ?? '$3,000'}
+                        </span>
+                        <span className="text-xs text-slate-400">per seat</span>
+                      </div>
+                      <ul className="space-y-1.5 text-xs font-mono text-slate-300 mb-4">
+                        <li className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
+                          Next cohort: {mgtDateLabel}
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
+                          {mgtDurationLabel} · live with the instructor
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Users className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
+                          {mgtSeatsLabel}
+                        </li>
+                      </ul>
+                      <p className="text-xs text-slate-300 leading-relaxed mb-4">
+                        Everything in on-demand, plus 28 live hours with the instructor and
+                        direct Q&amp;A as the design unfolds.
+                      </p>
+                      <Link
+                        to="/training/micro-gas-turbine-design-live"
+                        className="btn-primary w-full mt-auto"
+                      >
+                        Join the Live Cohort{' '}
+                        <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                      </Link>
+                    </div>
+
+                    {/* Self-paced on-demand */}
+                    <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-5 flex flex-col">
+                      <div className="flex items-center gap-2 mb-3">
+                        <PlayCircle className="w-4 h-4 text-cyan-400" aria-hidden="true" />
+                        <span className="text-xs font-mono uppercase tracking-widest text-slate-300">
+                          Self-Paced On-Demand
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-2 mb-3">
+                        <span className="text-2xl font-bold text-white tabular-nums">
+                          {recordedPriceLabel}
+                        </span>
+                        <span className="text-xs text-slate-400">one time</span>
+                      </div>
+                      <ul className="space-y-1.5 text-xs font-mono text-slate-300 mb-4">
+                        <li className="flex items-center gap-2">
+                          <PlayCircle className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
+                          Start today, at your own pace
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
+                          28.5 hrs · 16 h recorded video
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <InfinityIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
+                          Lifetime access, including updates
+                        </li>
+                      </ul>
+                      <p className="text-xs text-slate-300 leading-relaxed mb-4">
+                        The complete course at your own pace — every module, tool and quiz,
+                        recorded as delivered.
+                      </p>
+                      <Link
+                        to="/training/micro-gas-turbine-design"
+                        className="btn-secondary w-full mt-auto"
+                      >
+                        Start On-Demand{' '}
+                        <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                      </Link>
+                    </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Link to="/training/micro-gas-turbine-design" className="btn-primary">
-                      View Course <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                    </Link>
-                    <Link to="/contact" className="btn-secondary">
-                      Team Licences
-                    </Link>
-                  </div>
-                  <Link
-                    to="/training/micro-gas-turbine-design-live"
-                    className="btn-ghost mt-4"
-                  >
-                    <Users className="w-4 h-4" aria-hidden="true" />
-                    Also running as a live cohort
-                  </Link>
+
+                  <p className="text-sm text-slate-400 leading-relaxed">
+                    Same topics, same depth, same certificate in both formats — only the
+                    delivery differs. For teams,{' '}
+                    <Link to="/contact" className="text-cyan-400 hover:text-cyan-300 underline">
+                      contact us
+                    </Link>{' '}
+                    for group registration and licences.
+                  </p>
                 </div>
 
-                <div className="lg:border-l lg:border-slate-800 lg:pl-8">
-                <Link to="/training/micro-gas-turbine-design" className="block mb-6 rounded-xl overflow-hidden border border-slate-800 hover:border-cyan-500/40 transition-colors">
-                  <img
-                    src="/Micro_Gas_Turbine_Design_Infographic.jpg"
-                    alt="Micro Gas Turbine Design course overview: architecture, compressor, combustor, turbine, CFD and combustor analysis."
-                    className="w-full h-auto block"
-                    width={1200}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </Link>
-                <ul className="space-y-3 text-sm">
-                  {[
-                    'Recorded sessions, streamed on any device',
-                    'Slide decks, four design calculators, two interactive tools',
-                    'Module quizzes that gate the next module',
-                    'Certificate with public verification',
-                  ].map((t) => (
-                    <li key={t} className="flex gap-2.5 text-slate-300">
-                      <Award className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" aria-hidden="true" />
-                      <span>{t}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="lg:col-span-2">
+                  <Link
+                    to="/training/micro-gas-turbine-design-live"
+                    className="block mb-6 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/50 hover:border-cyan-500/40 transition-colors"
+                  >
+                    <img
+                      src="/Micro_Gas_Turbine_Design_Infographic.jpg"
+                      alt="Micro Gas Turbine Design — design a 700 N single-shaft turbojet end to end: engine architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Offered as a live online cohort or self-paced on-demand, with the same curriculum and materials in both."
+                      className="w-full h-auto block"
+                      width={1200}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </Link>
+                  <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-3">
+                    Included in both formats
+                  </div>
+                  <ul className="space-y-3 text-sm">
+                    {[
+                      'Complete seven-module curriculum and slide decks',
+                      'Four design calculators and two interactive tools',
+                      'Module quizzes that gate the next module',
+                      'Certificate with public verification',
+                    ].map((t) => (
+                      <li key={t} className="flex gap-2.5 text-slate-300">
+                        <Award className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" aria-hidden="true" />
+                        <span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             </div>

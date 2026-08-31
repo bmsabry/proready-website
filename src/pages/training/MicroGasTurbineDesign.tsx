@@ -27,6 +27,8 @@ import {
   TOTAL_HOURS,
   TOTAL_VIDEO_PARTS,
 } from './microGasTurbineCurriculum';
+import FormatSwitcher from './FormatSwitcher';
+import { formatIsoDate, snapshotStartLabel } from '../../data/courseSnapshot';
 
 /* ---------------------------------------------------------------------------
    Micro Gas Turbine Design — on-demand course sales page.
@@ -44,6 +46,14 @@ const CHECKOUT_ENDPOINT = API_BASE ? `${API_BASE}/api/academy/checkout` : '';
 
 // Shown until the API answers, and in the prerendered HTML.
 const FALLBACK_PRICE_CENTS = 100000;
+
+// The live-cohort edition of the same course, for the format chooser.
+// Date fallback comes from the build-time snapshot; price fallback is the
+// compiled-in list price until the runtime fetch lands.
+const LIVE_COURSE_CODE = 'micro-gas-turbine-design-2026-10';
+const LIVE_COURSE_ENDPOINT = API_BASE ? `${API_BASE}/api/courses/${LIVE_COURSE_CODE}` : '';
+const FALLBACK_LIVE_PRICE_CENTS = 300000;
+const DEFAULT_LIVE_COHORT_DATE = snapshotStartLabel(LIVE_COURSE_CODE, 'October 1, 2026');
 
 const VIDEO_HOURS = 16;
 const REFERENCE_ENGINE = '700 N';
@@ -447,8 +457,12 @@ const MicroGasTurbineDesign: React.FC = () => {
   const [owned, setOwned] = useState(false);
   const [checkoutState, setCheckoutState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [paypalEnabled, setPaypalEnabled] = useState(false);
+  // Live-cohort facts for the format chooser (price + next start date).
+  const [livePriceCents, setLivePriceCents] = useState<number>(FALLBACK_LIVE_PRICE_CENTS);
+  const [liveCohortDate, setLiveCohortDate] = useState<string>(DEFAULT_LIVE_COHORT_DATE);
 
   const price = formatPrice(priceCents, currency);
+  const livePrice = formatPrice(livePriceCents);
 
   usePageMeta(
     'Micro Gas Turbine Design — On-Demand Course',
@@ -515,6 +529,36 @@ const MicroGasTurbineDesign: React.FC = () => {
         if (data.owned === true) setOwned(true);
       } catch {
         /* keep the compiled-in defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Live-cohort price and next start date for the format chooser. Falls back
+  // silently to the snapshot date + compiled-in price.
+  useEffect(() => {
+    if (!LIVE_COURSE_ENDPOINT) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(LIVE_COURSE_ENDPOINT, { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (typeof data.price_cents === 'number' && data.price_cents > 0) {
+          setLivePriceCents(data.price_cents);
+        }
+        const startIso =
+          Array.isArray(data.day_dates) && data.day_dates.length > 0
+            ? data.day_dates[0]
+            : data.start_date;
+        if (typeof startIso === 'string' && startIso) {
+          setLiveCohortDate(formatIsoDate(startIso));
+        }
+      } catch {
+        /* keep the fallbacks */
       }
     })();
     return () => {
@@ -589,6 +633,29 @@ const MicroGasTurbineDesign: React.FC = () => {
                 through every module, so the compressor you size in module two is the compressor the
                 turbine has to match in module four.
               </p>
+
+              {/* One course, two delivery formats — let the visitor switch */}
+              <div className="mt-8 -mb-4">
+                <FormatSwitcher
+                  current="ondemand"
+                  options={[
+                    {
+                      key: 'live',
+                      title: 'Live Online Cohort',
+                      price: `${livePrice} per seat`,
+                      meta: `Next cohort ${liveCohortDate} · 7 days × 4 hours`,
+                      to: '/training/micro-gas-turbine-design-live',
+                    },
+                    {
+                      key: 'ondemand',
+                      title: 'Self-Paced On-Demand',
+                      price: `${price} one time`,
+                      meta: 'Start today · lifetime access',
+                      to: '/training/micro-gas-turbine-design',
+                    },
+                  ]}
+                />
+              </div>
 
               <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-10 max-w-2xl">
                 {[

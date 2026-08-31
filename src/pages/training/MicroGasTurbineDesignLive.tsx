@@ -30,6 +30,7 @@ import {
   snapshotStartLabel,
 } from '../../data/courseSnapshot';
 import { MODULES, COURSE_SUBTITLE } from './microGasTurbineCurriculum';
+import FormatSwitcher from './FormatSwitcher';
 
 // -----------------------------------------------------------------------------
 // Course constants
@@ -482,6 +483,27 @@ const MicroGasTurbineDesignLive = () => {
                 Recorded course included
               </FactChip>
             </div>
+
+            {/* One course, two delivery formats — let the visitor switch */}
+            <FormatSwitcher
+              current="live"
+              options={[
+                {
+                  key: 'live',
+                  title: 'Live Online Cohort',
+                  price: `${priceLabel} per seat`,
+                  meta: `Next cohort ${cohortDate} · ${dayDates.length || 7} days × 4 hours`,
+                  to: '/training/micro-gas-turbine-design-live',
+                },
+                {
+                  key: 'ondemand',
+                  title: 'Self-Paced On-Demand',
+                  price: `${recordedPriceLabel} one time`,
+                  meta: 'Start today · lifetime access',
+                  to: '/training/micro-gas-turbine-design',
+                },
+              ]}
+            />
 
             <div className="flex flex-wrap items-center gap-4 mb-12">
               <a
