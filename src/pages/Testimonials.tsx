@@ -179,7 +179,7 @@ const Testimonials = () => {
     },
     {
       name: "Daniele Sassi",
-      role: "Baker Hughes – Site Lead",
+      role: "Baker Hughes – LNGC Site Lead",
       statement: "I can only reiterate how much I appreciate your work. Your technical skills and professionalism are outstanding, and you have my full respect both as an engineer and as a person.",
       category: "Professional Respect"
     },
@@ -249,7 +249,7 @@ const Testimonials = () => {
     },
     {
       name: "Daniele Sassi",
-      role: "Baker Hughes – Site Lead",
+      role: "Baker Hughes – LNGC Site Lead",
       statement: "Your technical skills and professionalism are outstanding, and you have my full respect both as an engineer and as a person. That's exactly why I continue to rely on your support more and more.",
       highlight: "Professional Excellence"
     },
