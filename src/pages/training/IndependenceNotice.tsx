@@ -13,8 +13,8 @@ const IndependenceNotice = () => (
       <span className="font-semibold text-slate-300">Independence notice:</span>{' '}
       This independent ProReadyEngineer course is based on established public
       engineering and regulatory sources, original ProReadyEngineer teaching
-      tools, and the instructor’s professional experience. It contains no GE or
-      other third-party confidential or proprietary information and is not
+      tools, and the instructor’s professional experience. It contains no OEM
+      or other third-party confidential or proprietary information and is not
       affiliated with or endorsed by any OEM.
     </p>
   </div>
