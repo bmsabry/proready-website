@@ -175,7 +175,7 @@ const CURRICULUM: Day[] = [
       'Inlet temperature, pressure, humidity and altitude effects on NOx, stability and output',
       'Ambient correction strategies and seasonal remapping',
       'Wobbe Index and Modified Wobbe Index: the ±3% alarm, ±5% action and ±10% trip bands',
-      'Acoustic response to fuel-composition change; LNG-C strategies and measurement time delay',
+      'Acoustic response to fuel-composition change, and measurement time delay',
       'Hydrogen blending: flame speed, flame position, convective delay and flashback risk',
       'Sensor failures — dynamic pressure, thermocouple and emissions — and their signatures',
       'Acoustic spikes, system freeze, wrong-circuit wiring, and calibration error propagation',
