@@ -366,6 +366,70 @@ class LoginToken(Base):
     next_path: Mapped[str] = mapped_column(String(300), default="/learn")
 
 
+class LearnerDevice(Base):
+    """One browser/device that has carried a learner's session.
+
+    Learner sessions are stateless signed cookies, so without this table the
+    server has no idea how many devices are using one account — exactly the
+    blind spot account sharing hides in. A random `learner_device` cookie
+    identifies the browser; every authenticated request refreshes the row's
+    `last_seen_at` (throttled, see device_tracking.py). Detect-and-alert
+    only: nothing here blocks anyone.
+    """
+
+    __tablename__ = "academy_learner_devices"
+    __table_args__ = (
+        Index(
+            "ix_learner_device_unique",
+            "learner_id",
+            "device_id",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    learner_id: Mapped[int] = mapped_column(Integer, index=True)
+    # Random 32-hex id minted into the `learner_device` cookie.
+    device_id: Mapped[str] = mapped_column(String(32), index=True)
+
+    user_agent: Mapped[str] = mapped_column(String(400), default="")
+    # Most recent IP seen from this device (client addr behind the proxy).
+    ip: Mapped[str] = mapped_column(String(64), default="")
+
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    # Throttled touches — a rough activity-volume proxy, not a request count.
+    seen_count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class LearnerOverlapEvent(Base):
+    """Two different devices used one learner account at the same time.
+
+    The strongest single account-sharing signal: one human is rarely on two
+    devices in the same ten-minute window, a group always is. Recorded at
+    most once per learner per dedup window so a long shared session doesn't
+    flood the table. Append-only evidence for the admin Integrity tab.
+    """
+
+    __tablename__ = "academy_learner_overlap_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    learner_id: Mapped[int] = mapped_column(Integer, index=True)
+
+    device_a: Mapped[str] = mapped_column(String(32), default="")
+    device_b: Mapped[str] = mapped_column(String(32), default="")
+    ip_a: Mapped[str] = mapped_column(String(64), default="")
+    ip_b: Mapped[str] = mapped_column(String(64), default="")
+
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
 class Product(Base):
     """A sellable course. One row per thing a visitor can buy."""
 

@@ -28,6 +28,8 @@ from ..models import (
     Chapter,
     Enrollment,
     Learner,
+    LearnerDevice,
+    LearnerOverlapEvent,
     Lesson,
     LessonProgress,
     Module,
@@ -1127,6 +1129,135 @@ def integrity_trace(
     }
 
 
+def _sharing_rows(db: Session, product_code: str) -> tuple[list[dict], int]:
+    """Account-sharing signals from the learner device registry.
+
+    Complements the download-based watch list below: that one catches
+    redistributed FILES, this one catches shared LOGINS — one purchased
+    email quietly serving several people. Detect-and-alert only; the
+    thresholds are deliberately simple enough to explain to the flagged
+    customer ("your account was on two devices at the same time, five
+    times this month").
+
+    Returns (flagged rows worst-first, number of accounts tracked).
+    """
+    now = datetime.now(timezone.utc)
+    d30 = now - timedelta(days=30)
+    d7 = now - timedelta(days=7)
+
+    # Scope: learners enrolled in this product (or every tracked learner
+    # when no product filter is set).
+    learner_ids: set[int] | None = None
+    if product_code:
+        learner_ids = {
+            r[0]
+            for r in db.execute(
+                select(Enrollment.learner_id).where(
+                    Enrollment.product_code == product_code,
+                    Enrollment.status == "active",
+                )
+            ).all()
+        }
+        if not learner_ids:
+            return [], 0
+
+    dq = select(LearnerDevice)
+    if learner_ids is not None:
+        dq = dq.where(LearnerDevice.learner_id.in_(learner_ids))
+    devices = db.execute(dq).scalars().all()
+    if not devices:
+        return [], 0
+
+    per: dict[int, dict] = {}
+    for dev in devices:
+        row = per.setdefault(dev.learner_id, {
+            "devices_total": 0, "devices_30d": 0, "ips_30d": set(),
+            "last_seen": None, "devices": [],
+        })
+        row["devices_total"] += 1
+        last_seen = dev.last_seen_at
+        if last_seen is not None and last_seen.tzinfo is None:
+            last_seen = last_seen.replace(tzinfo=timezone.utc)
+        if last_seen is not None and last_seen >= d30:
+            row["devices_30d"] += 1
+            if dev.ip:
+                row["ips_30d"].add(dev.ip)
+        if last_seen is not None and (
+            row["last_seen"] is None or last_seen > row["last_seen"]
+        ):
+            row["last_seen"] = last_seen
+        row["devices"].append({
+            "user_agent": (dev.user_agent or "")[:120],
+            "ip": dev.ip or "",
+            "first_seen_at": dev.first_seen_at.isoformat() if dev.first_seen_at else None,
+            "last_seen_at": dev.last_seen_at.isoformat() if dev.last_seen_at else None,
+        })
+
+    oq = select(LearnerOverlapEvent).where(LearnerOverlapEvent.at >= d30)
+    if learner_ids is not None:
+        oq = oq.where(LearnerOverlapEvent.learner_id.in_(learner_ids))
+    for ev in db.execute(oq).scalars().all():
+        row = per.get(ev.learner_id)
+        if row is None:
+            continue
+        at = ev.at
+        if at is not None and at.tzinfo is None:
+            at = at.replace(tzinfo=timezone.utc)
+        row["overlap_30d"] = row.get("overlap_30d", 0) + 1
+        if at is not None and at >= d7:
+            row["overlap_7d"] = row.get("overlap_7d", 0) + 1
+        if at is not None and (
+            row.get("last_overlap") is None or at > row["last_overlap"]
+        ):
+            row["last_overlap"] = at
+
+    emails = dict(
+        db.execute(
+            select(Learner.id, Learner.email).where(Learner.id.in_(list(per)))
+        ).all()
+    )
+
+    rows = []
+    for lid, r in per.items():
+        overlap_30d = r.get("overlap_30d", 0)
+        devices_30d = r["devices_30d"]
+        ips_30d = len(r["ips_30d"])
+        reasons = []
+        if overlap_30d:
+            reasons.append(
+                f"active on 2 devices at the same time ×{overlap_30d} in 30 days"
+            )
+        if devices_30d >= 4:
+            reasons.append(f"{devices_30d} devices in 30 days")
+        if ips_30d >= 4:
+            reasons.append(f"{ips_30d} IP addresses in 30 days")
+        if not reasons:
+            continue
+        severity = (
+            "high" if overlap_30d >= 3 or devices_30d >= 6 else "warn"
+        )
+        r["devices"].sort(key=lambda d: d["last_seen_at"] or "", reverse=True)
+        rows.append({
+            "learner_id": lid,
+            "email": emails.get(lid, ""),
+            "severity": severity,
+            "reasons": reasons,
+            "devices_30d": devices_30d,
+            "devices_total": r["devices_total"],
+            "distinct_ips_30d": ips_30d,
+            "overlap_7d": r.get("overlap_7d", 0),
+            "overlap_30d": overlap_30d,
+            "last_overlap_at": r["last_overlap"].isoformat() if r.get("last_overlap") else None,
+            "last_seen_at": r["last_seen"].isoformat() if r["last_seen"] else None,
+            "devices": r["devices"][:8],
+        })
+    rows.sort(
+        key=lambda x: (x["severity"] == "high", x["overlap_30d"], x["devices_30d"]),
+        reverse=True,
+    )
+    return rows[:50], len(per)
+
+
 @router.get("/integrity")
 def integrity_report(
     product_code: str = "",
@@ -1228,6 +1359,8 @@ def integrity_report(
     watch_rows.sort(key=lambda r: (r["alerts"], r["distinct_ips"],
                                    r["downloads"]), reverse=True)
 
+    sharing_rows, sharing_tracked = _sharing_rows(db, product_code)
+
     return {
         "since": since.isoformat(),
         "product_code": product_code,
@@ -1235,9 +1368,12 @@ def integrity_report(
             "downloads": len(deliveries),
             "accounts": len(watch),
             "alerts": len(alert_rows),
+            "sharing_flagged": len(sharing_rows),
+            "sharing_tracked": sharing_tracked,
         },
         "alerts": alert_rows,
         "watch": watch_rows[:50],
+        "sharing": sharing_rows,
         "recent": [_delivery_out(db, d) for d in deliveries[:100]],
     }
 

@@ -24,13 +24,14 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import Cookie, Depends, HTTPException, Response, status
+from fastapi import Cookie, Depends, HTTPException, Request, Response, status
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .db import get_db
+from .device_tracking import DEVICE_COOKIE_NAME, track_device
 from .models import Learner, LoginToken
 
 LEARNER_COOKIE_NAME = "learner_session"
@@ -178,13 +179,19 @@ def recent_link_count(db: Session, learner_id: int, *, within_seconds: int = 360
 # -----------------------------------------------------------------------------
 
 def optional_learner(
+    request: Request,
+    response: Response,
     learner_session: str = Cookie(default=""),
+    learner_device: str = Cookie(default=""),
     db: Session = Depends(get_db),
 ) -> Learner | None:
     """Resolve the signed-in learner, or None. Never raises.
 
     Used by endpoints that serve both anonymous visitors (preview lessons,
-    catalog) and signed-in learners.
+    catalog) and signed-in learners. Every successful resolution also feeds
+    the per-device registry (device_tracking.py) — the account-sharing
+    detection is only as good as this single funnel, and tracking failures
+    are swallowed there so auth itself can never break.
     """
     if not learner_session:
         return None
@@ -197,6 +204,7 @@ def optional_learner(
     learner = db.get(Learner, learner_id)
     if learner is None or learner.status != "active":
         return None
+    track_device(db, learner, request, response, learner_device)
     return learner
 
 

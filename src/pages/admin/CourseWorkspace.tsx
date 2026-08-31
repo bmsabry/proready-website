@@ -2358,8 +2358,36 @@ type Ping = {
   reviewed_at?: string | null;
 };
 
+type SharingDevice = {
+  user_agent: string;
+  ip: string;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
+};
+
+type SharingRow = {
+  learner_id: number;
+  email: string;
+  severity: 'high' | 'warn';
+  reasons: string[];
+  devices_30d: number;
+  devices_total: number;
+  distinct_ips_30d: number;
+  overlap_7d: number;
+  overlap_30d: number;
+  last_overlap_at: string | null;
+  last_seen_at: string | null;
+  devices: SharingDevice[];
+};
+
 type IntegrityReport = {
-  totals: { downloads: number; accounts: number; alerts: number };
+  totals: {
+    downloads: number;
+    accounts: number;
+    alerts: number;
+    sharing_flagged?: number;
+    sharing_tracked?: number;
+  };
   alerts: Ping[];
   watch: {
     learner_id: number;
@@ -2371,6 +2399,7 @@ type IntegrityReport = {
     last_at: string | null;
     reasons: string[];
   }[];
+  sharing?: SharingRow[];
   recent: Delivery[];
 };
 
@@ -2538,6 +2567,7 @@ function IntegrityTab({
   }
 
   const alerts = report?.alerts ?? [];
+  const sharing = report?.sharing ?? [];
 
   return (
     <div className="space-y-6">
@@ -2670,6 +2700,89 @@ function IntegrityTab({
                 </li>
               );
             })}
+          </ul>
+        )}
+      </section>
+
+      {/* ---- Account sharing ------------------------------------------- */}
+      <section className="rounded-xl border border-slate-800 bg-slate-900/40">
+        <header className="border-b border-slate-800 px-4 py-3">
+          <h3 className="flex items-center gap-2 font-semibold text-white">
+            {sharing.length ? (
+              <Users className="h-4 w-4 text-amber-400" />
+            ) : (
+              <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            )}
+            One login, several people?
+          </h3>
+          <p className="mt-1 text-xs text-slate-400">
+            Every sign-in and every visit is tied to the browser it came from.
+            One person is a phone and a laptop; a shared account is many
+            devices — or two at the same moment, again and again. Signals
+            only: nothing is blocked automatically.
+          </p>
+        </header>
+
+        {!sharing.length ? (
+          <p className="px-4 py-6 text-sm text-slate-400">
+            No shared-login signals.{' '}
+            <span className="text-slate-500">
+              {report?.totals.sharing_tracked ?? 0} account
+              {(report?.totals.sharing_tracked ?? 0) === 1 ? '' : 's'} being
+              tracked; devices are recorded from each sign-in onward.
+            </span>
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-800">
+            {sharing.map((s) => (
+              <li key={s.learner_id} className="px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                      s.severity === 'high'
+                        ? 'text-rose-300 border-rose-500/40 bg-rose-500/10'
+                        : 'text-amber-300 border-amber-500/40 bg-amber-500/10'
+                    }`}
+                  >
+                    {s.severity === 'high' ? 'Likely shared' : 'Worth a look'}
+                  </span>
+                  <span className="text-sm font-semibold text-white">{s.email}</span>
+                  <span className="text-xs text-slate-500">
+                    last active {when(s.last_seen_at)}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-amber-200/90">
+                  {s.reasons.join(' · ')}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-400">
+                  <span>
+                    <span className="text-slate-500">Devices (30d): </span>
+                    <span className="text-slate-300">{s.devices_30d}</span>
+                  </span>
+                  <span>
+                    <span className="text-slate-500">IP addresses (30d): </span>
+                    <span className="text-slate-300">{s.distinct_ips_30d}</span>
+                  </span>
+                  <span>
+                    <span className="text-slate-500">Simultaneous use: </span>
+                    <span className="text-slate-300">
+                      {s.overlap_30d} in 30d
+                      {s.last_overlap_at ? ` (last ${when(s.last_overlap_at)})` : ''}
+                    </span>
+                  </span>
+                </div>
+                {s.devices.length > 0 && (
+                  <ul className="mt-2 space-y-0.5">
+                    {s.devices.map((d, i) => (
+                      <li key={i} className="text-[11px] font-mono text-slate-500">
+                        {browserOf(d.user_agent)} · {d.ip || 'ip unknown'} · last{' '}
+                        {when(d.last_seen_at)}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
           </ul>
         )}
       </section>
