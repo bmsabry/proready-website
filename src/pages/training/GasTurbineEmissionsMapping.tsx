@@ -37,7 +37,7 @@ const DEFAULT_CAPACITY = 15;
 // The live price comes from the course record at runtime; this default keeps
 // the prerendered HTML honest until that fetch lands.
 const DEFAULT_PRICE_CENTS = 150000;
-const REGULAR_PRICE_CENTS = 300000;
+const REGULAR_PRICE_CENTS = 450000;
 // Prerender fallback for the cohort start, taken from the build-time snapshot
 // of the live course record (see data/courseSnapshot). The literal is only a
 // last resort for a course the build has never been able to reach.
@@ -519,7 +519,7 @@ const GasTurbineEmissionsMapping = () => {
                       : `${seatsRemaining}/${capacity} seats left`}
               </FactChip>
               <FactChip icon={<Sparkles className="w-3.5 h-3.5" aria-hidden="true" />}>
-                {formatAmount(priceCents, currency)} per seat · 50% off
+                {formatAmount(priceCents, currency)} per seat · over 60% off
               </FactChip>
             </div>
 
@@ -803,7 +803,7 @@ const GasTurbineEmissionsMapping = () => {
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs font-mono uppercase tracking-wider mb-4">
                   <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
-                  50% Founding Cohort discount
+                  Over 60% Founding Cohort discount
                 </div>
                 <div className="flex items-baseline gap-3 flex-wrap mb-2">
                   <span className="text-3xl md:text-4xl font-bold text-white tabular-nums">
@@ -815,7 +815,7 @@ const GasTurbineEmissionsMapping = () => {
                   <span className="text-lg font-normal text-slate-300">per seat</span>
                 </div>
                 <p className="text-slate-300 text-sm leading-relaxed max-w-xl">
-                  The Founding Cohort price is 50% off the regular{' '}
+                  The Founding Cohort price is over 60% off the regular{' '}
                   {formatAmount(REGULAR_PRICE_CENTS, currency)} per-seat rate. Register with
                   no payment to hold your seat, then pay online or by invoice.
                 </p>
@@ -913,7 +913,7 @@ const GasTurbineEmissionsMapping = () => {
             <div className="text-sm leading-relaxed">
               <div className="text-amber-200 font-semibold mb-1">First offering only</div>
               <p className="text-amber-100/90">
-                The 50% Founding Cohort discount is available only for the first live offering.
+                The Founding Cohort discount of over 60% is available only for the first live offering.
                 Future offerings will return to the regular{' '}
                 {formatAmount(REGULAR_PRICE_CENTS, 'usd')} per-seat price.
               </p>
