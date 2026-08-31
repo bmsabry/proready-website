@@ -28,6 +28,7 @@ import {
   TOTAL_VIDEO_PARTS,
 } from './microGasTurbineCurriculum';
 import FormatSwitcher from './FormatSwitcher';
+import IndependenceNotice from './IndependenceNotice';
 import { formatIsoDate, snapshotStartLabel } from '../../data/courseSnapshot';
 
 /* ---------------------------------------------------------------------------
@@ -935,6 +936,13 @@ const MicroGasTurbineDesign: React.FC = () => {
               </Link>
             </div>
           </Reveal>
+        </div>
+      </section>
+
+      {/* Legal independence notice — shown on every course page */}
+      <section className="pb-10">
+        <div className="container-site">
+          <IndependenceNotice />
         </div>
       </section>
 

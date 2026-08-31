@@ -24,6 +24,7 @@ import {
   snapshotDayLabels,
   snapshotStartLabel,
 } from '../../data/courseSnapshot';
+import IndependenceNotice from './IndependenceNotice';
 
 // -----------------------------------------------------------------------------
 // Course constants
@@ -1238,6 +1239,11 @@ const GasTurbineEmissionsMapping = () => {
             </form>
           )}
         </Reveal>
+
+        {/* Legal independence notice — shown on every course page */}
+        <div className="mt-8">
+          <IndependenceNotice />
+        </div>
       </div>
     </div>
   );

@@ -31,6 +31,7 @@ import {
 } from '../../data/courseSnapshot';
 import { MODULES, COURSE_SUBTITLE } from './microGasTurbineCurriculum';
 import FormatSwitcher from './FormatSwitcher';
+import IndependenceNotice from './IndependenceNotice';
 
 // -----------------------------------------------------------------------------
 // Course constants
@@ -1191,6 +1192,11 @@ const MicroGasTurbineDesignLive = () => {
             </form>
           )}
         </Reveal>
+
+        {/* Legal independence notice — shown on every course page */}
+        <div className="mt-8">
+          <IndependenceNotice />
+        </div>
       </div>
     </div>
   );
