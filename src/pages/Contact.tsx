@@ -108,7 +108,7 @@ const Contact = () => {
             Let&rsquo;s Solve It <span className="text-gradient">Together</span>
           </>
         }
-        subtitle="Whether you need a deep-dive combustion analysis, a custom AI model, or specialized training for your team, we're ready to help."
+        subtitle="Combustion analysis, a custom AI model, or specialized training for your team: tell us what you are working on."
       />
 
       <section className="pb-20 lg:pb-28">

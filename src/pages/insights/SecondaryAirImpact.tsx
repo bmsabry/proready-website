@@ -64,7 +64,7 @@ const SecondaryAirImpact = () => {
             <section>
               <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">Introduction: The Overlooked Variable in Emissions Control</h2>
               <p>
-                The central challenge in modern Dry Low Emissions (DLE) combustion systems is the continuous drive to reduce Nitric Oxide (NOx) emissions while simultaneously managing critical operational constraints, such as the hardware cooling required for system durability. A key component of this balance is the use of "secondary air"—the portion of the total combustor airflow used for cooling, dilution, and managing leakage, which is distinct from the primary air that flows through the fuel-air premixer.
+                The central challenge in modern Dry Low Emissions (DLE) combustion systems is the continuous drive to reduce Nitric Oxide (NOx) emissions while simultaneously managing critical operational constraints, such as the hardware cooling required for system durability. A key component of this balance is the use of "secondary air", the portion of the total combustor airflow used for cooling, dilution, and managing leakage, which is distinct from the primary air that flows through the fuel-air premixer.
               </p>
               <p>
                 While common engineering practice relates emissions performance to the theoretical mixer flame temperature (Tflame), the direct influence of this secondary air is not well-quantified in published literature. This represents a significant knowledge gap for designers aiming for single-digit NOx levels.

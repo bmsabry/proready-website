@@ -47,7 +47,7 @@ const NewHighperformanceDataAcquisitionSystem = () => {
 
               <p><strong>Industry:</strong> Aerospace / Combustion Testing<br/>
               <strong>Challenge:</strong> Legacy data acquisition system created delays, data‑loss risks, and dependency on one specialist, costing tens of thousands weekly in lost productivity.<br/>
-              <strong>Result:</strong> A modern, customizable GUI platform with auto‑saving, Excel integration, and on‑the‑fly configuration—delivered as a minimum viable product in 3 weeks, fully functional in 12 weeks.</p>
+              <strong>Result:</strong> A modern, customizable GUI platform with auto‑saving, Excel integration, and on‑the‑fly configuration, delivered as a minimum viable product in 3 weeks, fully functional in 12 weeks.</p>
             </section>
 
             <hr className="border-slate-800 my-12" />

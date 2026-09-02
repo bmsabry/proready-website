@@ -95,7 +95,7 @@ const SignIn: React.FC = () => {
               <span className="eyebrow mb-5">Learner sign-in</span>
               <h1 className="text-2xl font-bold mt-3 mb-2">Welcome back</h1>
               <p className="text-slate-300 mb-6 leading-relaxed">
-                Enter the email you bought with. We'll send a sign-in link —
+                Enter the email you bought with. We'll send a sign-in link;
                 there's no password to remember.
               </p>
 

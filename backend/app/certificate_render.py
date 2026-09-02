@@ -585,7 +585,7 @@ def render_certificate(spec: CertificateSpec) -> bytes:
     c = canvas.Canvas(buf, pagesize=(PAGE_W, PAGE_H))
     title = ("Certificate of Completion" if spec.tier == "completion"
              else "Certificate of Verified Competency")
-    c.setTitle(f"{title} — {spec.learner_name} — {spec.course_title}")
+    c.setTitle(f"{title}: {spec.learner_name}, {spec.course_title}")
     c.setAuthor(spec.issuer.legal_name)
     c.setSubject(f"{spec.course_title} · Credential {spec.credential_id}")
     c.setCreator("ProReadyEngineer learning platform")

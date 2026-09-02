@@ -67,7 +67,7 @@ const CombustorFlowEvolution = () => {
             <section>
               <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">1. Introduction: The Aerodynamics of Combustion</h2>
               <p>
-                In the design of Gas Turbine Combustors (GTC), aerodynamics—specifically the structure of the internal flow field—plays a critical role in ensuring flame stability and managing pollutant emissions. The primary mechanism for flame anchoring is the establishment of a Central Recirculation Zone (CRZ), a region of reverse flow that continuously ignites the incoming fuel-air mixture.
+                In the design of Gas Turbine Combustors (GTC), aerodynamics, and specifically the structure of the internal flow field, plays a critical role in ensuring flame stability and managing pollutant emissions. The primary mechanism for flame anchoring is the establishment of a Central Recirculation Zone (CRZ), a region of reverse flow that continuously ignites the incoming fuel-air mixture.
               </p>
               <p>
                 This study presents an experimental investigation into how modifications to the combustion chamber geometry can be used to control the flow field structure. The analysis of the resulting aerodynamic changes was conducted using two-component Laser Doppler Velocimetry (LDV).

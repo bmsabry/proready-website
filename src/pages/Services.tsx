@@ -62,7 +62,7 @@ const practices: Practice[] = [
     accent: 'text-cyan-400',
     glow: 'from-cyan-500/10',
     description:
-      'Bridging the gap between physics-based engineering and modern machine learning to unlock hidden insights in your data. Unlike generic data science firms, we understand the underlying physics of your systems, so models are not just accurate but physically consistent and explainable.',
+      'Bridging the gap between physics-based engineering and modern machine learning to find the patterns hidden in your data. Unlike generic data science firms, we understand the underlying physics of your systems, so models are accurate, physically consistent and explainable.',
     capabilities: [
       'Physics-informed machine learning & neural networks grounded in governing equations',
       'Computer vision for automated inspection and defect detection',
@@ -90,7 +90,7 @@ const practices: Practice[] = [
     accent: 'text-blue-400',
     glow: 'from-blue-500/10',
     description:
-      'Instructor-led courses taught by industry veterans who have designed, tested, and fielded the systems they teach. We empower engineering teams with the latest tools and methodologies through hands-on technical training — on-site, online, or hybrid.',
+      'Instructor-led courses taught by industry veterans who have designed, tested, and fielded the systems they teach. We equip engineering teams with current tools and methods through hands-on technical training, on-site, online, or hybrid.',
     capabilities: [
       'Gas Turbine Emissions Mapping: our flagship 4-day weekend course, from first principles to expert level',
       'Advanced Combustion Fundamentals',
@@ -138,7 +138,7 @@ const engagementModels = [
   {
     icon: <Briefcase aria-hidden="true" />,
     title: 'Project-Based Consulting',
-    desc: 'Scoped engagements with clear deliverables — a troubleshooting campaign, a test cell specification, a deployed model.',
+    desc: 'Scoped engagements with clear deliverables: a troubleshooting campaign, a test cell specification, a deployed model.',
   },
   {
     icon: <UserCheck aria-hidden="true" />,
@@ -226,7 +226,7 @@ const Services = () => {
             Specialized <span className="text-gradient">Engineering Services</span>
           </>
         }
-        subtitle="Three deeply integrated practices — Thermal Fluid Sciences, Industrial AI, and expert-led Training — combining decades of gas turbine and thermal systems experience with advanced computational capability to solve the most complex engineering challenges."
+        subtitle="Three deeply integrated practices (Thermal Fluid Sciences, Industrial AI, and expert-led Training) combining decades of gas turbine and thermal systems experience with advanced computational capability to solve the most complex engineering challenges."
       >
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           {practices.map((p) => (

@@ -434,7 +434,7 @@ const SlideViewer = ({
               <Play className="w-9 h-9 text-cyan-300 translate-x-0.5" aria-hidden="true" />
             </span>
             <span className="absolute bottom-4 px-3 py-1 rounded-full bg-slate-950/80 border border-slate-700 text-xs font-mono uppercase tracking-widest text-cyan-300">
-              This slide has a video — click to play
+              This slide has a video. Click to play
             </span>
           </button>
         )}
@@ -695,7 +695,7 @@ const Lesson: React.FC = () => {
           className="btn-ghost mb-6"
         >
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-          {lesson.module.code} — {lesson.module.title}
+          {lesson.module.code}: {lesson.module.title}
         </Link>
 
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-6">{lesson.title}</h1>
@@ -787,7 +787,7 @@ const Lesson: React.FC = () => {
               This interactive tool runs in its own window so it has room to work.
             </p>
             <p className="text-xs text-slate-500 mb-4">
-              Training simulation only — generic behavior, not any specific
+              Training simulation only: generic behavior, not any specific
               engine. Never apply values from it to real equipment. Your access
               is personal and watermarked with your account email.
             </p>
@@ -810,7 +810,7 @@ const Lesson: React.FC = () => {
           <div className="card p-6 mb-6">
             <p className="text-slate-300 leading-relaxed mb-4">
               The interactive assessment for this module opens in a new tab. Your
-              account carries across — no separate sign-in.
+              account carries across, with no separate sign-in.
             </p>
             <a
               href={lesson.asset_path}
@@ -856,7 +856,7 @@ const Lesson: React.FC = () => {
         <p className="mt-8 text-xs text-slate-600 flex items-center gap-2">
           <Download className="w-3.5 h-3.5" aria-hidden="true" />
           Course materials are view-only and are not downloadable. This copy is
-          registered to {lesson.watermark || 'your account'} — for training use
+          registered to {lesson.watermark || 'your account'} for training use
           only, never for operation of real equipment.
         </p>
       </div>

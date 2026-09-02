@@ -55,10 +55,10 @@ const ImprovingGaseousFuelSupplySystemResponse = () => {
                 A combustion‑test client needed its <strong>gaseous‑fuel delivery system</strong> to react more quickly and consistently during fuel‑flow transitions.
               </p>
               <p className="mt-4">
-                The system comprised a <strong>family of about ten control valves</strong> operating together to stage and meter gaseous fuel to the combustor. Each valve’s slow response created a cascading delay through the entire manifold—limiting fine control and increasing setup time between tests.
+                The system comprised a <strong>family of about ten control valves</strong> operating together to stage and meter gaseous fuel to the combustor. Each valve’s slow response created a cascading delay through the entire manifold, limiting fine control and increasing setup time between tests.
               </p>
               <p className="mt-4">
-                Technicians also faced frequent <strong>manual calibration and trim maintenance</strong>, extending downtime. While overall safety systems performed reliably, <strong>the main performance bottleneck was valve actuation speed</strong>—the ability to quickly, accurately adjust fuel flow during dynamic testing.
+                Technicians also faced frequent <strong>manual calibration and trim maintenance</strong>, extending downtime. While overall safety systems performed reliably, <strong>the main performance bottleneck was valve actuation speed</strong>, the ability to quickly, accurately adjust fuel flow during dynamic testing.
               </p>
             </section>
           </div>

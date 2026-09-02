@@ -26,7 +26,7 @@ const fmtDate = (iso: string | null | undefined) =>
         month: 'long',
         day: 'numeric',
       })
-    : '—';
+    : 'n/a';
 
 const Verify: React.FC = () => {
   const { code = '' } = useParams();
@@ -35,7 +35,7 @@ const Verify: React.FC = () => {
   const isSample = code.toUpperCase() === 'SAMPLE';
 
   const title = data?.valid
-    ? `${data.title} — ${data.learner_name}`
+    ? `${data.title}: ${data.learner_name}`
     : 'Credential verification';
   usePageMeta(
     title,
@@ -126,8 +126,8 @@ const Verify: React.FC = () => {
         </div>
         <p className="text-slate-300 mt-3 max-w-2xl">
           <span className="font-mono text-white">{data.code}</span> does not match any credential
-          issued by ProReadyEngineer LLC. Check the ID on the certificate — it has the form
-          PRE-C-XXXX-XXXX or PRE-V-XXXX-XXXX — or contact info@proreadyengineer.com.
+          issued by ProReadyEngineer LLC. Check the ID on the certificate (it has the form
+          PRE-C-XXXX-XXXX or PRE-V-XXXX-XXXX) or contact info@proreadyengineer.com.
         </p>
       </Shell>
     );
@@ -226,7 +226,7 @@ const Verify: React.FC = () => {
                   <div className="grid grid-cols-[110px_1fr] gap-2">
                     <dt className="text-slate-400">Examined</dt>
                     <dd className="text-white">
-                      {fmtDate(data.exam_date)} — live, one-on-one oral examination of{' '}
+                      {fmtDate(data.exam_date)}, in a live, one-on-one oral examination of{' '}
                       {data.exam_minutes} minutes by video conference
                     </dd>
                   </div>

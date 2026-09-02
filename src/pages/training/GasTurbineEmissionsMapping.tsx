@@ -102,13 +102,13 @@ const CURRICULUM: Day[] = [
     title: 'Combustion & Gas Turbine Fundamentals',
     chapters: 'Chapters 1–2 · 55 slides',
     summary:
-      'The physics you need before you can tune anything: how flames behave, what sets flame temperature and NOx, and how a DLE machine is actually built — from premixer to metering valve.',
+      'The physics you need before you can tune anything: how flames behave, what sets flame temperature and NOx, and how a DLE machine is actually built, from premixer to metering valve.',
     topics: [
-      'Premixed, diffusion and partially-premixed flames — and why DLE chose premixed',
+      'Premixed, diffusion and partially-premixed flames, and why DLE chose premixed',
       'Equivalence ratio φ, the lean operating window, and adiabatic flame temperature',
       'Thermal NOx (Zeldovich) and its exponential sensitivity to flame temperature',
       'Laminar flame speed compared: methane, heavier hydrocarbons, hydrogen',
-      'Flashback, lean blowout and flame lift-off — mechanisms, precursors, protection',
+      'Flashback, lean blowout and flame lift-off: mechanisms, precursors, protection',
       'Brayton cycle, gas turbine architectures, and DLE vs diffusion (SAC) philosophy',
       'Hardware: swirler, premixer, liner, transition piece, fuel nozzle',
       'Fuel supply chain: staging valves, metering valves and the float circuit',
@@ -116,7 +116,7 @@ const CURRICULUM: Day[] = [
     outcomes: [
       'Classify any flame and predict its temperature, NOx and stability signature',
       'Read a fuel-composition change and infer the flashback and NOx consequence',
-      'Say what each valve and sensor does — and what happens in the combustor when it degrades',
+      'Say what each valve and sensor does, and what happens in the combustor when it degrades',
     ],
     icon: <Flame className="w-6 h-6" />,
   },
@@ -126,20 +126,20 @@ const CURRICULUM: Day[] = [
     summary:
       'Why premixed flames sing, what the amplitude limits actually oblige you to do, and how a combustion system is staged and controlled.',
     topics: [
-      'Thermoacoustic instability and the Rayleigh criterion — when an oscillation grows',
+      'Thermoacoustic instability and the Rayleigh criterion: when an oscillation grows',
       'LFD and HFD amplitude bands, and the action each band requires',
       'Protection hierarchy: E-ABAL → BRNUL → stage down → trip',
-      'High-cycle fatigue — what dynamics does to hardware, and how fast',
+      'High-cycle fatigue: what dynamics does to hardware, and how fast',
       'Dynamic pressure sensors, sampling rate, signal processing and damping',
       'Combustion system fuel circuits, burner modes and mode-transition risks',
       'The key limiting tones: where each appears and the correct first action',
-      'Fuel orifices — what they fix, how they are identified, when to swap',
+      'Fuel orifices: what they fix, how they are identified, when to swap',
       'Control schedules, operating-window boundaries and remapping triggers',
     ],
     outcomes: [
       'Decide from a described oscillation whether it will grow or decay',
       'Place a measured amplitude in the right band and take the right protective action',
-      'Move pilot split, ELBO and TFlame the correct direction — and state the NOx cost',
+      'Move pilot split, ELBO and TFlame the correct direction, and state the NOx cost',
     ],
     icon: <Activity className="w-6 h-6" />,
   },
@@ -147,7 +147,7 @@ const CURRICULUM: Day[] = [
     title: 'Emissions, CEMS & Combustion Mapping',
     chapters: 'Chapters 5–6 · 47 slides + simulator',
     summary:
-      'Where NOx and CO come from, how they are legally measured, and then the mapping procedure itself — worked step by step on a simulated combustion system.',
+      'Where NOx and CO come from, how they are legally measured, and then the mapping procedure itself, worked step by step on a simulated combustion system.',
     topics: [
       'NOx pathways (thermal, prompt, fuel-bound, N₂O); CO formation, quench and LBO proximity',
       'Extractive vs in-situ CEMS, and the EPA Method 7E sampling train',
@@ -172,14 +172,14 @@ const CURRICULUM: Day[] = [
     title: 'Ambient, Flex Fuel & Troubleshooting',
     chapters: 'Chapters 7–10 · 47 slides',
     summary:
-      'What moves your map after you have set it — weather, fuel and failing instruments — and how to tell a real combustion event from a sensor lying to you.',
+      'What moves your map after you have set it (weather, fuel and failing instruments), and how to tell a real combustion event from a sensor lying to you.',
     topics: [
       'Inlet temperature, pressure, humidity and altitude effects on NOx, stability and output',
       'Ambient correction strategies and seasonal remapping',
       'Wobbe Index and Modified Wobbe Index: the ±3% alarm, ±5% action and ±10% trip bands',
       'Acoustic response to fuel-composition change, and measurement time delay',
       'Hydrogen blending: flame speed, flame position, convective delay and flashback risk',
-      'Sensor failures — dynamic pressure, thermocouple and emissions — and their signatures',
+      'Sensor failures (dynamic pressure, thermocouple and emissions) and their signatures',
       'Acoustic spikes, system freeze, wrong-circuit wiring, and calibration error propagation',
       'Root-cause analysis for LBO, flashback and stage-down events',
       'Field case studies: LBO during load rejection, and a commissioning wiring error',
@@ -538,7 +538,7 @@ const GasTurbineEmissionsMapping = () => {
             <div className="card overflow-hidden mb-10 shadow-2xl shadow-cyan-900/10">
               <img
                 src="/Mapping_Course_Advertisement.png"
-                alt="Gas Turbine Emissions Mapping — flagship live online course: from zero to field-ready in 4 live days. Day 1 combustion and gas turbine fundamentals, Day 2 combustion dynamics and DLE operation, Day 3 emissions, CEMS and the live mapping simulator, Day 4 ambient, flex fuel and troubleshooting. 194 slides, mapping simulator, daily mastery checks, quiz and interview for certification. Led by Bassam Abdelnabi. Next cohort August 29, 2026."
+                alt="Gas Turbine Emissions Mapping, flagship live online course: from zero to field-ready in 4 live days. Day 1 combustion and gas turbine fundamentals, Day 2 combustion dynamics and DLE operation, Day 3 emissions, CEMS and the live mapping simulator, Day 4 ambient, flex fuel and troubleshooting. 194 slides, mapping simulator, daily mastery checks, quiz and interview for certification. Led by Bassam Abdelnabi. Next cohort August 29, 2026."
                 className="w-full h-auto block"
                 width={1671}
                 height={941}
@@ -754,7 +754,7 @@ const GasTurbineEmissionsMapping = () => {
         <Reveal className="mb-16 card overflow-hidden">
           <img
             src="/Mapping_Course_Advertisement.png"
-            alt="Course overview — the four live days, what each covers, and what is included: 194 slides, the mapping simulator, daily mastery checks, and the certification quiz and interview."
+            alt="Course overview: the four live days, what each covers, and what is included: 194 slides, the mapping simulator, daily mastery checks, and the certification quiz and interview."
             className="w-full h-auto block"
             width={1671}
             height={941}
@@ -831,9 +831,9 @@ const GasTurbineEmissionsMapping = () => {
               operating windows, and practical mapping decisions.
             </p>
             <p className="text-slate-300">
-              You are not just attending a class. You are building practical mapping
-              understanding through expert instruction, realistic simulator-based learning,
-              and direct interaction with the instructor.
+              This is not a lecture series. You build practical mapping understanding on a
+              realistic simulator, with the instructor in the room to question and correct
+              your decisions.
             </p>
           </div>
 
@@ -869,7 +869,7 @@ const GasTurbineEmissionsMapping = () => {
               {
                 icon: <CheckCircle2 className="w-5 h-5" aria-hidden="true" />,
                 title: 'Daily Evaluation and Mastery Check',
-                body: 'Each day closes with a graded evaluation that teaches as it marks — every answer is explained — plus a mastery check built on scenarios you have not seen. 80% to pass, retakes allowed.',
+                body: 'Each day closes with a graded evaluation that teaches as it marks (every answer is explained), plus a mastery check built on scenarios you have not seen. 80% to pass, retakes allowed.',
               },
             ].map((item) => (
               <div
@@ -956,7 +956,7 @@ const GasTurbineEmissionsMapping = () => {
             <div className="mb-8 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-200 text-sm flex items-start gap-3">
               <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
               <span>
-                Payment received — your seat is confirmed. A receipt is on its way to your
+                Payment received. Your seat is confirmed, and a receipt is on its way to your
                 email.
               </span>
             </div>
@@ -965,7 +965,7 @@ const GasTurbineEmissionsMapping = () => {
             <div className="mb-8 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm flex items-start gap-3">
               <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
               <span>
-                Checkout was cancelled — nothing was charged. Your seat is still held; we'll
+                Checkout was cancelled and nothing was charged. Your seat is still held; we'll
                 email payment instructions, or write to{' '}
                 <a className="underline" href="mailto:info@proreadyengineer.com">
                   info@proreadyengineer.com
@@ -976,7 +976,7 @@ const GasTurbineEmissionsMapping = () => {
           )}
           <span className="eyebrow mb-4">Register</span>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-2">
-            Reserve your seat — {cohortDate} cohort
+            Reserve your seat for the {cohortDate} cohort
           </h2>
           <p className="text-slate-300 mb-8 font-mono text-sm">
             {courseStatus === 'closed'
@@ -994,7 +994,7 @@ const GasTurbineEmissionsMapping = () => {
               {paidNow ? (
                 <>
                   <h3 className="text-2xl font-bold mb-4">
-                    Payment received — your seat is confirmed
+                    Payment received. Your seat is confirmed
                   </h3>
                   <p className="text-slate-300 mb-8 max-w-md mx-auto">
                     A receipt is on its way to your inbox, and the pre-read material follows
@@ -1012,7 +1012,7 @@ const GasTurbineEmissionsMapping = () => {
                 <>
                   <h3 className="text-2xl font-bold mb-4">Registration received</h3>
                   <p className="text-slate-300 mb-8 max-w-md mx-auto">
-                    Thanks — we'll send a confirmation email with payment details and pre-read
+                    Thanks. We'll send a confirmation email with payment details and pre-read
                     material within 24 hours. If you don't see it, check spam or email{' '}
                     <a
                       className="text-cyan-400 underline"
@@ -1026,7 +1026,7 @@ const GasTurbineEmissionsMapping = () => {
                     <div className="max-w-md mx-auto text-left rounded-2xl border border-cyan-500/30 bg-slate-900/60 p-6">
                       <h4 className="text-lg font-bold text-white mb-1">Secure your seat now</h4>
                       <p className="text-sm text-slate-300 mb-5">
-                        Founding Cohort seat —{' '}
+                        Founding Cohort seat:{' '}
                         <span className="text-white font-semibold">
                           {formatAmount(priceCents, currency)}
                         </span>
@@ -1081,7 +1081,7 @@ const GasTurbineEmissionsMapping = () => {
               <h3 className="text-2xl font-bold mb-4">You're already registered</h3>
               <p className="text-slate-300 mb-8 max-w-md mx-auto">
                 We already have a registration for this email address. Watch your inbox for
-                payment details — or email{' '}
+                payment details, or email{' '}
                 <a
                   className="text-cyan-400 underline"
                   href="mailto:info@proreadyengineer.com"
@@ -1106,7 +1106,7 @@ const GasTurbineEmissionsMapping = () => {
                 Email{' '}
                 <a
                   className="text-cyan-400 underline"
-                  href="mailto:info@proreadyengineer.com?subject=Waitlist — Gas Turbine Emissions Mapping"
+                  href="mailto:info@proreadyengineer.com?subject=Waitlist: Gas Turbine Emissions Mapping"
                 >
                   info@proreadyengineer.com
                 </a>{' '}

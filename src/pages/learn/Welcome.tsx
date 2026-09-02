@@ -72,13 +72,13 @@ const Welcome: React.FC = () => {
               <h1 className="text-2xl font-bold mb-3">You're in</h1>
               <p className="text-slate-300 leading-relaxed mb-6">
                 Your access is live and it's yours for good. We've sent a sign-in
-                link to <strong className="text-white">{email}</strong> — no password
+                link to <strong className="text-white">{email}</strong>, with no password
                 to invent.
               </p>
               {bankPending && (
                 <p className="text-amber-300/90 text-xs leading-relaxed -mt-3 mb-6">
                   You paid by bank transfer, which takes a few business days to
-                  clear. Your access is active in the meantime — we'll email you
+                  clear. Your access is active in the meantime, and we'll email you
                   if anything needs attention.
                 </p>
               )}
@@ -94,7 +94,7 @@ const Welcome: React.FC = () => {
               <h1 className="text-2xl font-bold mb-3">Check your email</h1>
               <p className="text-slate-300 leading-relaxed mb-6">
                 Your payment is being confirmed. As soon as it clears, a sign-in
-                link lands in your inbox — usually within a minute. Nothing else
+                link lands in your inbox, usually within a minute. Nothing else
                 is needed from you.
               </p>
               <Link to="/learn/signin" className="btn-secondary w-full">

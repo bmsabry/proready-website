@@ -11,7 +11,7 @@ const caseStudies = [
   {
     id: 14,
     title: "Recovery Reactor Feed Cooler Heat Exchanger",
-    excerpt: "Precision thermal design for a critical process stream — a code-compliant TEMA BFU shell and tube heat exchanger in SS TP316L for a chemically aggressive petrochemical environment.",
+    excerpt: "Precision thermal design for a critical process stream: a code-compliant TEMA BFU shell and tube heat exchanger in SS TP316L for a chemically aggressive petrochemical environment.",
     category: "Operational Excellence",
     group: "Oil & Gas / Process",
     date: "Mar 17, 2026",
@@ -77,7 +77,7 @@ const caseStudies = [
   {
     id: 3,
     title: "Optimizing Test Cell Assembly",
-    excerpt: "A major engine test facility faced long hardware assembly times that slowed every test campaign. Each program required roughly two weeks of setup before testing could begin—burning valuable schedule and resources.",
+    excerpt: "A major engine test facility faced long hardware assembly times that slowed every test campaign. Each program required roughly two weeks of setup before testing could begin, burning schedule and resources.",
     category: "Operational Excellence",
     group: "Test Infrastructure",
     date: "Feb 05, 2026",

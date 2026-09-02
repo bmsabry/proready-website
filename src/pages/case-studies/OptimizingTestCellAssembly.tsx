@@ -55,7 +55,7 @@ const OptimizingTestCellAssembly = () => {
             <section>
               <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">1. Opening Hook – The Challenge</h2>
 
-              <p>A major engine test facility faced long hardware assembly times that slowed every test campaign. Each program required roughly <strong>two weeks</strong> of setup before testing could begin—burning valuable schedule and resources. The customer's target was simple but ambitious: <strong>cut assembly time noticeably without compromising quality or safety</strong>.</p>
+              <p>A major engine test facility faced long hardware assembly times that slowed every test campaign. Each program required roughly <strong>two weeks</strong> of setup before testing could begin, burning schedule and resources. The customer's target was simple but ambitious: <strong>cut assembly time noticeably without compromising quality or safety</strong>.</p>
             </section>
           </div>
         </div>

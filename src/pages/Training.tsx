@@ -73,7 +73,7 @@ const courses = [
       : "7 Days",
     level: "Design-Focused",
     attendees: "Registration open",
-    description: "Design a 700 N single-shaft turbojet end to end, live with the instructor: architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Seven sessions of four hours over consecutive business days — with lifetime access to the complete recorded course included.",
+    description: "Design a 700 N single-shaft turbojet end to end, live with the instructor: architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Seven sessions of four hours over consecutive business days, with lifetime access to the complete recorded course included.",
     nextDate: snapshotStartLabel(MGT_LIVE_CODE, "October 1, 2026"),
     slug: "micro-gas-turbine-design-live",
     code: MGT_LIVE_CODE,
@@ -597,7 +597,7 @@ const Training = () => {
           <SectionHeading
             eyebrow="Available Now"
             title="Open for Enrollment"
-            subtitle="A flagship live cohort, and a design program offered two ways — join its live cohort or start on-demand tonight."
+            subtitle="A flagship live cohort, and a design program offered two ways: join its live cohort or start on-demand tonight."
           />
         </div>
       </section>
@@ -668,7 +668,7 @@ const Training = () => {
                 >
                   <img
                     src="/Mapping_Course_Advertisement.png"
-                    alt="Gas Turbine Emissions Mapping — flagship live online course, four live days covering combustion fundamentals, dynamics and DLE operation, emissions and mapping on a simulator, then ambient, flex fuel and troubleshooting."
+                    alt="Gas Turbine Emissions Mapping, flagship live online course, four live days covering combustion fundamentals, dynamics and DLE operation, emissions and mapping on a simulator, then ambient, flex fuel and troubleshooting."
                     className="w-full h-auto block"
                     width={1671}
                     height={941}
@@ -707,9 +707,9 @@ const Training = () => {
                     Micro Gas Turbine Design
                   </h2>
                   <p className="text-slate-300 leading-relaxed mb-8">
-                    Design a 700 N single-shaft turbojet end to end — architecture, centrifugal
+                    Design a 700 N single-shaft turbojet end to end: architecture, centrifugal
                     compressor, evaporative combustor, axial turbine, compressor maps, CFD and
-                    combustor analysis. One curriculum, one set of materials, one certificate —
+                    combustor analysis. One curriculum, one set of materials, one certificate,
                     offered two ways. Pick the delivery that fits you.
                   </p>
 
@@ -785,7 +785,7 @@ const Training = () => {
                         </li>
                       </ul>
                       <p className="text-xs text-slate-300 leading-relaxed mb-4">
-                        The complete course at your own pace — every module, tool and quiz,
+                        The complete course at your own pace: every module, tool and quiz,
                         recorded as delivered.
                       </p>
                       <Link
@@ -799,7 +799,7 @@ const Training = () => {
                   </div>
 
                   <p className="text-sm text-slate-400 leading-relaxed">
-                    Same topics, same depth, same certificate in both formats — only the
+                    Same topics, same depth, same certificate in both formats. Only the
                     delivery differs. For teams,{' '}
                     <Link to="/contact" className="text-cyan-400 hover:text-cyan-300 underline">
                       contact us
@@ -815,7 +815,7 @@ const Training = () => {
                   >
                     <img
                       src="/Micro_Gas_Turbine_Design_Infographic.jpg"
-                      alt="Micro Gas Turbine Design — design a 700 N single-shaft turbojet end to end: engine architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Offered as a live online cohort or self-paced on-demand, with the same curriculum and materials in both."
+                      alt="Micro Gas Turbine Design: design a 700 N single-shaft turbojet end to end, engine architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Offered as a live online cohort or self-paced on-demand, with the same curriculum and materials in both."
                       className="w-full h-auto block"
                       width={1200}
                       loading="lazy"

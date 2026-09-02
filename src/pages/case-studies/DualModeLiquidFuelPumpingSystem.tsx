@@ -44,7 +44,7 @@ const DualModeLiquidFuelPumpingSystem = () => {
               <h3 className="text-xl font-bold mb-4 text-white">Project Snapshot</h3>
               <p><strong>Industry:</strong> Aerospace / Combustion Systems Integration</p>
               <p><strong>Challenge:</strong> Deliver a high‑pressure liquid‑fuel pumping system capable of both dry‑fuel and fuel‑water emulsion operation.</p>
-              <p><strong>Result:</strong> Fully integrated three‑stage skid designed, procured, and commissioned with advanced control, redundancy, and purge safety—meeting precise duty targets while ensuring safe emergency response.</p>
+              <p><strong>Result:</strong> Fully integrated three‑stage skid designed, procured, and commissioned with advanced control, redundancy, and purge safety, meeting precise duty targets while ensuring safe emergency response.</p>
             </section>
 
             <hr className="border-slate-800 my-12" />
@@ -52,10 +52,10 @@ const DualModeLiquidFuelPumpingSystem = () => {
             <section>
               <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">1. Opening Hook – The Mission</h2>
               <p>
-                This project didn’t begin with a failure to fix—it began with a <strong>capability to enable</strong>. The client required a new <strong>liquid‑fuel pumping system</strong> that could operate in both <strong>dry</strong> and <strong>emulsified fuel modes</strong> to expand their combustion‑test flexibility.
+                This project didn’t begin with a failure to fix. It began with a <strong>capability to enable</strong>. The client required a new <strong>liquid‑fuel pumping system</strong> that could operate in both <strong>dry</strong> and <strong>emulsified fuel modes</strong> to expand their combustion‑test flexibility.
               </p>
               <p className="mt-4">
-                The target duty parameters were challenging—pressures exceeding <strong>3,000 psi</strong>, at a flow rate of <strong>1500 lb/hr</strong>, feeding six independently staged fuel circuits, and the ability to run cleanly in standard liquid‑fuel mode or mix fuel with water to form a controlled emulsion for emissions control testing.
+                The target duty parameters were challenging: pressures exceeding <strong>3,000 psi</strong>, at a flow rate of <strong>1500 lb/hr</strong>, feeding six independently staged fuel circuits, and the ability to run cleanly in standard liquid‑fuel mode or mix fuel with water to form a controlled emulsion for emissions control testing.
               </p>
               <p className="mt-4">
                 Equally important, the system needed to perform <strong>safely and predictably under emergency conditions</strong>, where loss of control could mean damage worth hundreds of thousands of dollars.

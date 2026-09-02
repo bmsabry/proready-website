@@ -33,7 +33,7 @@ const CertificationSection: React.FC<Props> = ({
         <p className="text-slate-300 leading-relaxed mt-4">
           Both are issued in your name, digitally signed, publicly verifiable by QR code or
           credential ID, and ready to add to your LinkedIn profile in one click. They differ in
-          what they attest — and in who did the attesting.
+          what they attest, and in who did the attesting.
         </p>
       </Reveal>
 
@@ -65,7 +65,7 @@ const CertificationSection: React.FC<Props> = ({
               </span>
             </div>
             <p className="text-slate-300 leading-relaxed mt-3">
-              Issued automatically — no request, no wait — the moment you have completed every
+              Issued automatically, with no request and no wait, the moment you have completed every
               lesson and passed every module evaluation and mastery check at the 80% threshold.
               It states exactly that, so it means something.
             </p>
@@ -114,7 +114,7 @@ const CertificationSection: React.FC<Props> = ({
             <p className="text-slate-300 leading-relaxed mt-3">
               The credential a hiring manager can trust. After the course, you sit an advanced
               written examination and then a 60-minute live, one-on-one oral examination with
-              the instructor — questions without notice, design cases not covered in the
+              the instructor: questions without notice, design cases not covered in the
               material, reasoning out loud. A pass issues a certificate{' '}
               <span className="text-white">signed by the instructor</span>, attesting that you
               were examined in person and demonstrated a verified command of every key

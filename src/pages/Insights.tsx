@@ -8,7 +8,7 @@ const posts = [
   {
     id: 8,
     title: "The Critical Impact of Operational Modes on Gas Turbine Combustor Performance",
-    excerpt: "In the pursuit of increased power density and thermal efficiency, liner durability has solidified as the primary technical bottleneck for gas turbine longevity. The mechanical integrity of the combustor hardware is dictated by the synergy between absolute maximum metal temperatures and steep temperature gradients.",
+    excerpt: "In the pursuit of increased power density and thermal efficiency, liner durability has solidified as the primary technical bottleneck for gas turbine longevity. The mechanical integrity of the combustor hardware is dictated by the combination of absolute maximum metal temperatures and steep temperature gradients.",
     date: "Mar 5, 2026",
     author: "Dr. Bassam Abdelnabi",
     category: "Technical Analysis",
@@ -18,7 +18,7 @@ const posts = [
   {
     id: 7,
     title: "Transitioning DLE Combustion Systems to 100% Hydrogen Operation",
-    excerpt: "As the global energy landscape pivots toward a hydrogen economy, the aerospace and power generation sectors face a fundamental strategic necessity: redefining the kinetic boundaries of existing gas turbine hardware. Central to this transition is the understanding of laminar flame speed and flashback propensity in hydrogen combustion.",
+    excerpt: "As the energy sector moves toward a hydrogen economy, the aerospace and power generation sectors face a fundamental strategic necessity: redefining the kinetic boundaries of existing gas turbine hardware. Central to this transition is the understanding of laminar flame speed and flashback propensity in hydrogen combustion.",
     date: "Feb 20, 2026",
     author: "Dr. Bassam Abdelnabi",
     category: "Technical Analysis",
@@ -48,7 +48,7 @@ const posts = [
   {
     id: 2,
     title: "An Experimental Analysis of Combustor Flow Structure Evolution",
-    excerpt: "In the design of Gas Turbine Combustors (GTC), aerodynamics—specifically the structure of the internal flow field—plays a critical role in ensuring flame stability and managing pollutant emissions. This study presents an experimental investigation into how modifications to the combustion chamber geometry can be used to control the flow field structure.",
+    excerpt: "In the design of Gas Turbine Combustors (GTC), aerodynamics, and specifically the structure of the internal flow field, plays a critical role in ensuring flame stability and managing pollutant emissions. This study presents an experimental investigation into how modifications to the combustion chamber geometry can be used to control the flow field structure.",
     category: "Technical Analysis",
     author: "Dr. Bassam Abdelnabi",
     date: "Jan 26, 2026",

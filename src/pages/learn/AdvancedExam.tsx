@@ -114,7 +114,7 @@ const AdvancedExam: React.FC = () => {
           <p className="text-slate-300 mt-2">
             {total} questions at analysis level. Pass mark {exam.threshold}%. Attempt{' '}
             {Math.min(exam.attempts_used + 1, exam.attempts_max)} of {exam.attempts_max}. Answers
-            are graded on submission; no explanations are shown — the bank stays examinable for
+            are graded on submission; no explanations are shown, so the bank stays examinable for
             the oral examination.
           </p>
         </div>
@@ -132,8 +132,8 @@ const AdvancedExam: React.FC = () => {
               <div className="flex-1">
                 <h2 className="font-semibold text-white">
                   {result.passed
-                    ? `Passed — ${result.score_pct}%`
-                    : `Not yet — ${result.score_pct}% (pass mark ${result.threshold}%)`}
+                    ? `Passed with ${result.score_pct}%`
+                    : `Not yet: ${result.score_pct}% (pass mark ${result.threshold}%)`}
                 </h2>
                 <p className="text-sm text-slate-300 mt-1">
                   {result.auto_correct} of {result.auto_total} correct.{' '}
@@ -214,7 +214,7 @@ const AdvancedExam: React.FC = () => {
                       placeholder="Your value"
                       className="w-full max-w-xs px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
                     />
-                    <p className="text-xs text-slate-500 mt-2">Units are fine — we read the number.</p>
+                    <p className="text-xs text-slate-500 mt-2">Units are fine; we read the number.</p>
                   </div>
                 )}
               </div>
@@ -226,7 +226,7 @@ const AdvancedExam: React.FC = () => {
           <div className="card p-6 mt-8 flex flex-wrap items-center justify-between gap-4">
             <div className="text-sm text-slate-300">
               {answered} of {total} answered
-              {answered < total && ' — unanswered questions count as incorrect.'}
+              {answered < total && '. Unanswered questions count as incorrect.'}
             </div>
             {!confirm ? (
               <button type="button" className="btn-primary" onClick={() => setConfirm(true)}>

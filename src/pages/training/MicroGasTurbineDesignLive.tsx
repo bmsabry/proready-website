@@ -75,7 +75,7 @@ const formatAmount = (cents: number, currency: string): string =>
 const COURSE_JSONLD = JSON.stringify({
   '@context': 'https://schema.org',
   '@type': 'Course',
-  name: 'Micro Gas Turbine Design — Live Online Cohort',
+  name: 'Micro Gas Turbine Design: Live Online Cohort',
   description:
     'Seven-day live online cohort on designing a 700 N single-shaft turbojet end to end: engine architecture and materials, centrifugal compressor aerodynamics, the evaporative tube combustor, the axial turbine, compressor maps and surge margin, turbomachinery CFD, and combustor design analysis. Four live hours per day over consecutive business days, with lifetime access to the complete recorded course included.',
   provider: {
@@ -162,14 +162,14 @@ const DEFAULT_DAY_DATES: string[] = snapshotDayLabels(COURSE_CODE, [
 
 const MicroGasTurbineDesignLive = () => {
   usePageMeta(
-    'Micro Gas Turbine Design — Live Online Cohort',
+    'Micro Gas Turbine Design: Live Online Cohort',
     'Seven-day live online cohort, four hours per day over consecutive business days, on designing a 700 N single-shaft turbojet end to end: architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Includes lifetime access to the complete recorded course.',
     {
       image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic.jpg',
       jsonLd: {
         '@context': 'https://schema.org',
         '@type': 'Course',
-        name: 'Micro Gas Turbine Design — Live Online Cohort',
+        name: 'Micro Gas Turbine Design: Live Online Cohort',
         image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic.jpg',
         description: COURSE_SUBTITLE,
         provider: { '@id': 'https://proreadyengineer.com/#org' },
@@ -452,7 +452,7 @@ const MicroGasTurbineDesignLive = () => {
               Micro Gas Turbine <span className="text-gradient">Design</span>
             </h1>
             <p className="text-xl md:text-2xl font-light text-slate-300 mb-8 max-w-3xl">
-              Design a 700 N single-shaft turbojet end to end — live with the instructor,
+              Design a 700 N single-shaft turbojet end to end, live with the instructor,
               over seven half-day sessions.
             </p>
 
@@ -520,7 +520,7 @@ const MicroGasTurbineDesignLive = () => {
             <div className="card overflow-hidden mb-10 shadow-2xl shadow-cyan-900/10">
               <img
                 src="/Micro_Gas_Turbine_Design_Infographic.jpg"
-                alt="Micro Gas Turbine Design — live online cohort: design a 700 N single-shaft turbojet end to end. Engine architecture and gas path, centrifugal compressor, evaporative combustor, axial turbine, compressor maps and surge, turbomachinery CFD, and combustor analysis. Seven live days of four hours each, with the complete recorded course included."
+                alt="Micro Gas Turbine Design live online cohort: design a 700 N single-shaft turbojet end to end. Engine architecture and gas path, centrifugal compressor, evaporative combustor, axial turbine, compressor maps and surge, turbomachinery CFD, and combustor analysis. Seven live days of four hours each, with the complete recorded course included."
                 className="w-full h-auto block"
                 width={1200}
                 loading="eager"
@@ -529,7 +529,7 @@ const MicroGasTurbineDesignLive = () => {
             </div>
 
             <p className="text-slate-300 text-lg mb-10 leading-relaxed max-w-4xl">
-              This is the live edition of our Micro Gas Turbine Design programme — the same
+              This is the live edition of our Micro Gas Turbine Design programme: the same
               curriculum delivered to a national jet-engine development team, taught in real
               time over seven consecutive business days. One 700 N class reference engine runs
               through every session, so the compressor you size on day two is the compressor
@@ -738,7 +738,7 @@ const MicroGasTurbineDesignLive = () => {
             Live Cohort Pricing
           </h2>
           <p className="text-slate-300 text-base mb-8 max-w-2xl leading-relaxed">
-            One price per seat, and the complete recorded course is included — the material
+            One price per seat, and the complete recorded course is included, so the material
             stays with you for good after the live days end.
           </p>
 
@@ -760,7 +760,7 @@ const MicroGasTurbineDesignLive = () => {
                 </div>
                 <p className="text-slate-300 text-sm leading-relaxed max-w-xl">
                   Your seat covers all seven live sessions plus lifetime access to the
-                  complete recorded course — every video, design calculator, interactive tool
+                  complete recorded course: every video, design calculator, interactive tool
                   and quiz. Register with no payment to hold your seat, then pay online or by
                   invoice.
                 </p>
@@ -777,7 +777,7 @@ const MicroGasTurbineDesignLive = () => {
                   to="/training/micro-gas-turbine-design"
                   className="text-center text-sm text-cyan-300 hover:text-cyan-200 underline"
                 >
-                  Prefer self-paced? Recorded edition — {recordedPriceLabel}
+                  Prefer self-paced? Recorded edition, {recordedPriceLabel}
                 </Link>
               </div>
             </div>
@@ -793,12 +793,12 @@ const MicroGasTurbineDesignLive = () => {
             <p>
               This cohort is designed to take you through a real design sequence: the
               architecture and materials on day one become the compressor you size on day
-              two, the combustor you analyse on day seven — one 700 N engine, carried end to
+              two, the combustor you analyse on day seven: one 700 N engine, carried end to
               end.
             </p>
             <p className="text-slate-300">
-              You are not just attending a class. You are working a complete engine design
-              with an instructor who has delivered this programme to a national jet-engine
+              This is not a lecture series. You work a complete engine design with an
+              instructor who has delivered this programme to a national jet-engine
               development team.
             </p>
           </div>
@@ -820,7 +820,7 @@ const MicroGasTurbineDesignLive = () => {
               {
                 icon: <InfinityIcon className="w-5 h-5" aria-hidden="true" />,
                 title: 'Full Recorded Course Included',
-                body: 'Lifetime access to the complete on-demand edition — all seven modules, 16 hours of recorded video, slide decks and updates — in your own browser account.',
+                body: 'Lifetime access to the complete on-demand edition (all seven modules, 16 hours of recorded video, slide decks and updates) in your own browser account.',
               },
               {
                 icon: <Wrench className="w-5 h-5" aria-hidden="true" />,
@@ -882,7 +882,7 @@ const MicroGasTurbineDesignLive = () => {
             <p className="text-slate-300 text-sm leading-relaxed">
               The course is built around field-grade design decisions, not textbook theory.
               Every session answers "what do you size, check and verify next" on a machine
-              that has to run — not "what does the textbook say."
+              that has to run, not "what does the textbook say."
             </p>
           </div>
           <div className="p-8 card">
@@ -909,7 +909,7 @@ const MicroGasTurbineDesignLive = () => {
             <div className="mb-8 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-200 text-sm flex items-start gap-3">
               <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
               <span>
-                Payment received — your seat is confirmed. A receipt is on its way to your
+                Payment received. Your seat is confirmed, and a receipt is on its way to your
                 email.
               </span>
             </div>
@@ -918,7 +918,7 @@ const MicroGasTurbineDesignLive = () => {
             <div className="mb-8 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm flex items-start gap-3">
               <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
               <span>
-                Checkout was cancelled — nothing was charged. Your seat is still held; we'll
+                Checkout was cancelled and nothing was charged. Your seat is still held; we'll
                 email payment instructions, or write to{' '}
                 <a className="underline" href="mailto:info@proreadyengineer.com">
                   info@proreadyengineer.com
@@ -929,7 +929,7 @@ const MicroGasTurbineDesignLive = () => {
           )}
           <span className="eyebrow mb-4">Register</span>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-2">
-            Reserve your seat — {cohortDate} cohort
+            Reserve your seat for the {cohortDate} cohort
           </h2>
           <p className="text-slate-300 mb-8 font-mono text-sm">
             {courseStatus === 'closed'
@@ -947,7 +947,7 @@ const MicroGasTurbineDesignLive = () => {
               {paidNow ? (
                 <>
                   <h3 className="text-2xl font-bold mb-4">
-                    Payment received — your seat is confirmed
+                    Payment received. Your seat is confirmed
                   </h3>
                   <p className="text-slate-300 mb-8 max-w-md mx-auto">
                     A receipt is on its way to your inbox, and the pre-read material follows
@@ -965,7 +965,7 @@ const MicroGasTurbineDesignLive = () => {
                 <>
                   <h3 className="text-2xl font-bold mb-4">Registration received</h3>
                   <p className="text-slate-300 mb-8 max-w-md mx-auto">
-                    Thanks — we'll send a confirmation email with payment details and pre-read
+                    Thanks. We'll send a confirmation email with payment details and pre-read
                     material within 24 hours. If you don't see it, check spam or email{' '}
                     <a
                       className="text-cyan-400 underline"
@@ -979,7 +979,7 @@ const MicroGasTurbineDesignLive = () => {
                     <div className="max-w-md mx-auto text-left rounded-2xl border border-cyan-500/30 bg-slate-900/60 p-6">
                       <h4 className="text-lg font-bold text-white mb-1">Secure your seat now</h4>
                       <p className="text-sm text-slate-300 mb-5">
-                        Live cohort seat —{' '}
+                        Live cohort seat:{' '}
                         <span className="text-white font-semibold">
                           {formatAmount(priceCents, currency)}
                         </span>
@@ -1034,7 +1034,7 @@ const MicroGasTurbineDesignLive = () => {
               <h3 className="text-2xl font-bold mb-4">You're already registered</h3>
               <p className="text-slate-300 mb-8 max-w-md mx-auto">
                 We already have a registration for this email address. Watch your inbox for
-                payment details — or email{' '}
+                payment details, or email{' '}
                 <a
                   className="text-cyan-400 underline"
                   href="mailto:info@proreadyengineer.com"
@@ -1059,7 +1059,7 @@ const MicroGasTurbineDesignLive = () => {
                 Email{' '}
                 <a
                   className="text-cyan-400 underline"
-                  href="mailto:info@proreadyengineer.com?subject=Waitlist — Micro Gas Turbine Design Live Cohort"
+                  href="mailto:info@proreadyengineer.com?subject=Waitlist: Micro Gas Turbine Design Live Cohort"
                 >
                   info@proreadyengineer.com
                 </a>{' '}

@@ -515,7 +515,7 @@ def applicant_confirmation_html(
         "we'll move you to the waitlist and refund any overlap."
     )
     heading = (
-        f"Thanks, {full_name} — your seat is pending"
+        f"Thanks, {full_name}. Your seat is pending"
         if full_name
         else "Your seat is pending"
     )
@@ -539,11 +539,11 @@ def start_date_updated_html(
         ]
     )
     body += _p(
-        "No action is required from your side — your registration remains active. "
+        "No action is required from your side; your registration remains active. "
         "If the new schedule doesn't work for you, reply to this email and we'll "
         "sort it out."
     )
-    return _shell("Start date updated", f"{course_title} — new start date", body)
+    return _shell("Start date updated", f"{course_title}: new start date", body)
 
 
 def broadcast_html(course_title: str, body_html: str) -> str:
@@ -594,7 +594,7 @@ def login_link_html(full_name: str, link: str, minutes: int) -> str:
         color=MUTED,
     )
     body += _p(
-        "Didn't ask for this? You can ignore this email — nobody can sign in "
+        "Didn't ask for this? You can ignore this email; nobody can sign in "
         "without the link above.",
         size=13,
         color=MUTED,
@@ -611,14 +611,14 @@ def purchase_welcome_html(
     body = _p(greeting)
     body += _p(
         f"Your payment for <strong>{course_title}</strong> went through and your "
-        "access is live. It's yours for good — there's no subscription and no "
+        "access is live. It's yours for good; there's no subscription and no "
         "expiry date.",
         margin="0 0 22px",
     )
     body += _cta_button("Start the course", link)
     body += _p(
         f"That link signs you in and expires in {minutes} minutes. After that, "
-        "request a fresh one any time from the sign-in page — same email "
+        "request a fresh one any time from the sign-in page, same email "
         "address, no password to remember.",
         size=13,
         color=MUTED,
@@ -641,7 +641,7 @@ def purchase_welcome_html(
           <td bgcolor="#fffbeb" style="background-color:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px 14px;font-family:{FONT};font-size:13px;line-height:1.6;color:#92400e;">
             One note: you paid by bank transfer, which takes a few business days
             to clear. Your access is active now and will be fully confirmed once
-            the payment clears — nothing more for you to do. If it doesn't go
+            the payment clears, and there is nothing more for you to do. If it doesn't go
             through, we'll email you right away.
           </td>
         </tr>
@@ -706,7 +706,7 @@ def settlement_failed_html(
     body = _p(greeting)
     body += _p(
         f"Your bank payment for <strong>{course_title}</strong> didn't clear, so "
-        "your course access is paused for now. Your progress is saved — nothing "
+        "your course access is paused for now. Your progress is saved; nothing "
         "is lost."
     )
     body += _p(
@@ -730,7 +730,7 @@ def live_bank_failed_html(
     body = _p(greeting)
     body += _p(
         f"Your bank payment for <strong>{course_title}</strong> didn't clear. "
-        "Don't worry — <strong>your seat is still held</strong> for you."
+        "Don't worry: <strong>your seat is still held</strong> for you."
     )
     body += _p(
         "To confirm it, pay by card from the course page, or reply to this email "
@@ -793,7 +793,7 @@ def certificate_issued_html(
         )
     else:
         body += _p(
-            f"Congratulations — you have completed <strong>{course_title}</strong>. "
+            f"Congratulations. You have completed <strong>{course_title}</strong>. "
             f"Your <strong>{title}</strong> is attached as a PDF."
         )
     body += _kv_table(
@@ -803,7 +803,7 @@ def certificate_issued_html(
         ]
     )
     body += _p(
-        "Anyone can confirm this credential at the link above — it checks the "
+        "Anyone can confirm this credential at the link above. It checks the "
         "digital signature and shows exactly what was attested. From your course "
         "page you can download the PDF again, add the credential to your LinkedIn "
         "profile, or share it.",
@@ -818,7 +818,7 @@ def advanced_purchased_html(
     greeting = f"Hi {full_name}," if full_name else "Hi,"
     body = _p(greeting)
     body += _p(
-        f"Thank you — your payment for the <strong>instructor-examined "
+        f"Thank you. Your payment for the <strong>instructor-examined "
         f"certification</strong> in <strong>{course_title}</strong> went through."
     )
     body += _p("<strong>What happens next</strong>", margin="0 0 8px")
@@ -893,7 +893,7 @@ def advanced_scheduled_html(
     body += _p(
         "Please join from a quiet place with your camera on. You will be asked to "
         "show a photo ID at the start. Questions are asked without notice and you "
-        "may be given design cases not covered in the course; think aloud — the "
+        "may be given design cases not covered in the course. Think aloud; the "
         "reasoning is what is being examined.",
     )
     if meeting_url:
@@ -919,7 +919,7 @@ def advanced_outcome_retake_html(
         margin="0 0 22px",
     )
     body += _cta_button("Open your course page", dashboard_url)
-    return _shell("Oral examination", "Not yet — a re-examination is available", body)
+    return _shell("Oral examination", "Not yet: a re-examination is available", body)
 
 
 def advanced_outcome_failed_html(full_name: str, course_title: str) -> str:

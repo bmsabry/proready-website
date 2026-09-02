@@ -46,7 +46,7 @@ const CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissio
               <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">Project Snapshot</h2>
 
               <p><strong>Industry:</strong> Aerospace / Combustion Test Facilities<br/>
-              <strong>Challenge:</strong> The test site needed higher natural‑gas flow than the utility could supply, plus new capabilities for nitrogen doping and propane blending—none of which the existing infrastructure could support.<br/>
+              <strong>Challenge:</strong> The test site needed higher natural‑gas flow than the utility could supply, plus new capabilities for nitrogen doping and propane blending, none of which the existing infrastructure could support.<br/>
               <strong>Result:</strong> A fully <strong>specified, procured, and commissioned</strong> multi‑fuel supply solution (CNG + nitrogen + propane) that safely delivers the required flows and mixtures, after correcting critical sizing and specification gaps.</p>
             </section>
 

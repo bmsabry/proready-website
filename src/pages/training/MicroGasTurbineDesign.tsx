@@ -73,7 +73,7 @@ const OUTCOMES: { icon: React.ElementType; title: string; body: string }[] = [
   {
     icon: Gauge,
     title: 'Size a compressor stage from a thrust target',
-    body: `Work from a ${REFERENCE_ENGINE} spec to impeller diameter, tip speed, blade count and backsweep — then check the slip factor and the pressure ratio you actually get, not the one you hoped for.`,
+    body: `Work from a ${REFERENCE_ENGINE} spec to impeller diameter, tip speed, blade count and backsweep, then check the slip factor and the pressure ratio you actually get, not the one you hoped for.`,
   },
   {
     icon: CircuitBoard,
@@ -97,7 +97,7 @@ const INCLUDED: { icon: React.ElementType; title: string; body: string }[] = [
   {
     icon: PlayCircle,
     title: `${VIDEO_HOURS} hours of recorded sessions`,
-    body: `${TOTAL_VIDEO_PARTS} lecture segments across five of the seven modules, delivered as taught — working through the derivations and the judgment calls, not a scripted read.`,
+    body: `${TOTAL_VIDEO_PARTS} lecture segments across five of the seven modules, delivered as taught: the derivations and the judgment calls, not a scripted read.`,
   },
   {
     icon: BookOpen,
@@ -107,7 +107,7 @@ const INCLUDED: { icon: React.ElementType; title: string; body: string }[] = [
   {
     icon: FileSpreadsheet,
     title: 'Four design calculators',
-    body: 'The same progressive spreadsheets used in the sessions — compressor, then compressor plus combustor, then the full engine including the turbine.',
+    body: 'The same progressive spreadsheets used in the sessions: compressor, then compressor plus combustor, then the full engine including the turbine.',
   },
   {
     icon: Sparkles,
@@ -117,7 +117,7 @@ const INCLUDED: { icon: React.ElementType; title: string; body: string }[] = [
   {
     icon: GraduationCap,
     title: 'Module quizzes with real gates',
-    body: 'Interactive assessments on five modules. Clear a module to unlock the next — the structure that makes the material stick instead of washing over you.',
+    body: 'Interactive assessments on five modules. Clear a module to open the next. That structure is what makes the material stick instead of washing over you.',
   },
   {
     icon: Award,
@@ -129,7 +129,7 @@ const INCLUDED: { icon: React.ElementType; title: string; body: string }[] = [
 const FAQ: { q: string; a: string }[] = [
   {
     q: 'How long do I have access?',
-    a: 'For as long as the platform exists. This is a one-time purchase, not a subscription — there is no renewal date and nothing expires. You can come back to any module years later.',
+    a: 'For as long as the platform exists. This is a one-time purchase, not a subscription. There is no renewal date and nothing expires. You can come back to any module years later.',
   },
   {
     q: 'Can I download the videos?',
@@ -137,7 +137,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'What background do I need?',
-    a: 'Undergraduate thermodynamics and fluid mechanics. The course starts from engine architecture and station numbering, so you do not need prior turbomachinery experience — but you do need to be comfortable with a control volume and an energy balance.',
+    a: 'Undergraduate thermodynamics and fluid mechanics. The course starts from engine architecture and station numbering, so you do not need prior turbomachinery experience, but you do need to be comfortable with a control volume and an energy balance.',
   },
   {
     q: 'Is this theory or practice?',
@@ -145,7 +145,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'Do I have to take the modules in order?',
-    a: 'Yes. Each module unlocks when you clear the one before it. That is deliberate — the compressor work feeds the combustor, which feeds the turbine, and skipping ahead means solving for numbers you have not derived yet.',
+    a: 'Yes. Each module unlocks when you clear the one before it. That is deliberate: the compressor work feeds the combustor, which feeds the turbine, and skipping ahead means solving for numbers you have not derived yet.',
   },
   {
     q: 'What if it is not for me?',
@@ -370,7 +370,7 @@ const BuyFlow = ({
         disabled={checkoutState === 'loading'}
         className={`btn-primary disabled:opacity-70 disabled:cursor-wait ${full ? 'w-full' : ''}`}
       >
-        {checkoutState === 'loading' ? 'Opening checkout…' : `Get lifetime access — ${price}`}
+        {checkoutState === 'loading' ? 'Opening checkout…' : `Get lifetime access for ${price}`}
         {checkoutState !== 'loading' && <ArrowRight className="w-4 h-4" aria-hidden="true" />}
       </button>
     );
@@ -384,7 +384,7 @@ const BuyFlow = ({
           Payment received
         </p>
         <p className="text-sm text-slate-300 mt-1.5">
-          Taking you to your course — a sign-in link is also on its way to {email.trim()}.
+          Taking you to your course. A sign-in link is also on its way to {email.trim()}.
         </p>
       </div>
     );
@@ -467,7 +467,7 @@ const MicroGasTurbineDesign: React.FC = () => {
   const livePrice = formatPrice(livePriceCents);
 
   usePageMeta(
-    'Micro Gas Turbine Design — On-Demand Course',
+    'Micro Gas Turbine Design: On-Demand Course',
     `${TOTAL_HOURS} hours across 7 modules on designing a ${REFERENCE_ENGINE} single-shaft turbojet: architecture, centrifugal compressor, combustor, axial turbine, compressor maps, CFD and combustor analysis. Lifetime access.`,
     {
       image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic.jpg',
@@ -747,7 +747,7 @@ const MicroGasTurbineDesign: React.FC = () => {
           <Reveal>
             <img
               src="/Micro_Gas_Turbine_Design_Infographic.jpg"
-              alt="Micro Gas Turbine Design: design a 700 N single-shaft turbojet end to end — engine architecture and gas path, centrifugal compressor, evaporative combustor, axial turbine, compressor maps and surge, turbomachinery CFD, and combustor analysis. Seven modules, 28.5 hours, 16 hours of video, lifetime access."
+              alt="Micro Gas Turbine Design: design a 700 N single-shaft turbojet end to end: engine architecture and gas path, centrifugal compressor, evaporative combustor, axial turbine, compressor maps and surge, turbomachinery CFD, and combustor analysis. Seven modules, 28.5 hours, 16 hours of video, lifetime access."
               className="w-full max-w-2xl mx-auto rounded-2xl border border-slate-800"
               width={1200}
               loading="lazy"
@@ -828,7 +828,7 @@ const MicroGasTurbineDesign: React.FC = () => {
           <SectionHeading
             eyebrow="What's included"
             title="Everything from the room, on your schedule"
-            subtitle="The recordings are the sessions as they were taught — including the questions asked and the tangents worth keeping."
+            subtitle="The recordings are the sessions as they were taught, including the questions asked and the tangents worth keeping."
           />
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {INCLUDED.map((f, i) => (
@@ -855,7 +855,7 @@ const MicroGasTurbineDesign: React.FC = () => {
             <p className="text-slate-300 leading-relaxed mb-4">
               Bassam Abdelnabi spent nineteen years in gas turbine combustion and test engineering,
               including at GE, with patents and published research behind him. The material here is
-              the programme he delivered to a national jet-engine development team — the same decks,
+              the programme he delivered to a national jet-engine development team: the same decks,
               the same worked examples, the same reference engine.
             </p>
             <p className="text-slate-300 leading-relaxed">

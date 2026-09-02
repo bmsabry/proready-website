@@ -170,13 +170,13 @@ const Quiz: React.FC = () => {
               </div>
               <div className="flex-1">
                 <h2 className="font-semibold text-white">
-                  {result.passed ? 'Passed — next module unlocked' : 'Not quite yet'}
+                  {result.passed ? 'Passed. Next module unlocked' : 'Not quite yet'}
                 </h2>
                 <p className="text-sm text-slate-300 mt-1">
                   {result.auto_correct} of {result.auto_total} correct
                   {result.passed
                     ? '. Your progress is saved.'
-                    : `. You need ${result.threshold}% — review the explanations below and try again.`}
+                    : `. You need ${result.threshold}%. Review the explanations below and try again.`}
                 </p>
               </div>
               {result.passed ? (
@@ -271,7 +271,7 @@ const Quiz: React.FC = () => {
                           className="w-full max-w-xs px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
                         />
                         <p className="text-xs text-slate-500 mt-2">
-                          Units are fine — we read the number.
+                          Units are fine; we read the number.
                         </p>
                       </div>
                     )}
@@ -304,7 +304,7 @@ const Quiz: React.FC = () => {
                       <div className="mt-4 ml-7 pl-4 border-l-2 border-slate-700">
                         {v.needs_review ? (
                           <p className="text-sm text-slate-400">
-                            Held for review — written answers are marked against the
+                            Held for review. Written answers are marked against the
                             rubric and don't count against your score.
                           </p>
                         ) : (

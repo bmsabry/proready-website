@@ -56,8 +56,8 @@ const RecoveryReactorFeedCoolerHeatExchanger = () => {
             <hr className="border-slate-800 my-12" />
 
             <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">1. Opening Hook &#8211; The Challenge</h2>
-            <p>In petrochemical processing, the condition of a reactor feed stream is critical. Feed temperature directly influences <strong>reaction selectivity, yield, and catalyst life</strong>. Delivering feed at the wrong temperature&#8212;even temporarily&#8212;can cause runaway reactions, catalyst degradation, or unsafe operating conditions.</p>
-            <p className="mt-4">This project required the engineering and fabrication of a <strong>Recovery Reactor Feed Cooler</strong>, a heat exchanger tasked with precisely conditioning the process stream before it enters the reactor. The challenge was not just thermal performance&#8212;it was delivering that performance <strong>reliably, safely, and durably</strong> in a chemically aggressive environment where material selection, code compliance, and mechanical integrity were non-negotiable.</p>
+            <p>In petrochemical processing, the condition of a reactor feed stream is critical. Feed temperature directly influences <strong>reaction selectivity, yield, and catalyst life</strong>. Delivering feed at the wrong temperature, even temporarily, can cause runaway reactions, catalyst degradation, or unsafe operating conditions.</p>
+            <p className="mt-4">This project required the engineering and fabrication of a <strong>Recovery Reactor Feed Cooler</strong>, a heat exchanger tasked with precisely conditioning the process stream before it enters the reactor. The challenge went beyond thermal performance: it was delivering that performance <strong>reliably, safely, and durably</strong> in a chemically aggressive environment where material selection, code compliance, and mechanical integrity were non-negotiable.</p>
           </div>
         </div>
       </div>

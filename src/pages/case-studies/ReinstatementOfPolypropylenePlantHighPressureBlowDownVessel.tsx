@@ -62,7 +62,7 @@ const ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel = () => {
                 In 2018, a significant explosion at NATPET's polypropylene facility in Yanbu, KSA forced a <strong>complete plant shutdown</strong>, halting production and creating enormous financial and operational pressure to restore operations as quickly as possible.
               </p>
               <p>
-                Three critical pressure vessels were damaged beyond repair and needed to be <strong>replaced with newly fabricated equipment</strong>. All three—<strong>D-601, D-602, and D-603</strong>—were awarded to <strong>Hidada Ltd.</strong>, with D-601 representing the most complex and demanding fabrication challenge in the program.
+                Three critical pressure vessels were damaged beyond repair and needed to be <strong>replaced with newly fabricated equipment</strong>. All three (<strong>D-601, D-602, and D-603</strong>) were awarded to <strong>Hidada Ltd.</strong>, with D-601 representing the most complex and demanding fabrication challenge in the program.
               </p>
             </section>
           </div>

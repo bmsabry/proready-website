@@ -120,7 +120,7 @@ const ModuleCard = ({
               {module.entitled
                 ? module.blocked_by?.message ||
                   'Clear the previous module to unlock this one.'
-                : 'Not part of your current access — contact info@proreadyengineer.com to add it.'}
+                : 'Not part of your current access. Contact info@proreadyengineer.com to add it.'}
             </span>
           )}
         </span>
@@ -146,7 +146,7 @@ const ModuleCard = ({
           </Link>
           {module.blocked_by.best_score !== null && (
             <span className="ml-3 text-xs text-amber-300/90">
-              Best so far {module.blocked_by.best_score}% — {module.blocked_by.threshold}% to pass.
+              Best so far {module.blocked_by.best_score}%; {module.blocked_by.threshold}% to pass.
             </span>
           )}
         </div>
@@ -193,7 +193,7 @@ const ModuleCard = ({
               <GraduationCap className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden="true" />
               <span className="flex-1 text-sm font-medium text-white">
                 {module.formative_passed
-                  ? 'Evaluation — passed'
+                  ? 'Evaluation passed'
                   : sequential
                     ? 'Take the module assessment'
                     : 'Take the evaluation for this day'}
@@ -224,7 +224,7 @@ const ModuleCard = ({
               <Award className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden="true" />
               <span className="flex-1 text-sm font-medium text-white">
                 {module.summative_passed
-                  ? 'Mastery check — passed'
+                  ? 'Mastery check passed'
                   : 'Mastery check'}
               </span>
               <span className="text-xs text-slate-400">
@@ -293,7 +293,7 @@ const SetPasswordCard: React.FC<{ onDone: () => void }> = ({ onDone }) => {
           <h2 className="font-semibold text-white">Set a password for the interactive modules</h2>
           <p className="text-sm text-slate-300 mt-1 mb-4">
             The GT-05 to GT-15 tools open in their own apps and ask for an email
-            and password. Choose one here and they'll let you straight in — the
+            and password. Choose one here and they'll let you straight in. The
             rest of the course stays link-based.
           </p>
           <form onSubmit={save} className="flex flex-wrap items-start gap-3">
@@ -354,7 +354,7 @@ const TermsGate = ({
   return (
     <div className="card p-6 md:p-8 border-amber-500/30">
       <h2 className="text-xl font-bold text-white mb-1">
-        Training Terms — read and accept before starting
+        Training Terms: read and accept before starting
       </h2>
       <p className="text-sm text-slate-400 mb-4">
         Version {version}. Your acceptance is recorded with your account and a
@@ -373,7 +373,7 @@ const TermsGate = ({
         <p>
           <strong className="text-white">No operational use.</strong> Do not
           apply values, fuel splits, schedules, limits, tables, or procedures
-          from this training to any real engine or plant — all numbers are
+          from this training to any real engine or plant; all numbers are
           illustrative examples. OEM manuals, control-system documentation, site
           procedures, applicable law and permits, and the direction of
           qualified, authorized personnel always take precedence.
@@ -398,8 +398,8 @@ const TermsGate = ({
           the maximum extent permitted by law, ProReadyEngineer LLC, its owner,
           employees, and instructors shall not be liable for any direct,
           indirect, incidental, consequential, special, exemplary, or punitive
-          damages — including equipment damage, loss of production, business
-          interruption, personal injury, or death — arising from or related to
+          damages (including equipment damage, loss of production, business
+          interruption, personal injury, or death) arising from or related to
           the use or misuse of these materials or the simulator, even if advised
           of the possibility of such damages.
         </p>
@@ -416,7 +416,7 @@ const TermsGate = ({
           <strong className="text-white">Copy tracking.</strong> Each download of
           the simulator and any interactive material carries an identifier
           unique to that download, and reports back to ProReadyEngineer LLC when
-          it is opened — recording the time, the address it was opened from, and
+          it is opened, recording the time, the address it was opened from, and
           the network address of the device. This is used solely to detect and
           attribute unauthorized redistribution of licensed material. By
           accepting, you consent to this.
@@ -560,7 +560,7 @@ const Dashboard: React.FC = () => {
         } else {
           setError(
             "This account doesn't have course access yet. If you recently " +
-              'registered or paid, access arrives with your sign-in email — or ' +
+              'registered or paid, access arrives with your sign-in email, or ' +
               'contact info@proreadyengineer.com.'
           );
         }
@@ -707,7 +707,7 @@ const Dashboard: React.FC = () => {
 
           {!course.video_ready && (
             <p className="mt-4 text-sm text-amber-300/90">
-              Video hosting is still being set up — lesson recordings will appear
+              Video hosting is still being set up. Lesson recordings will appear
               here shortly. Everything else is available now.
             </p>
           )}

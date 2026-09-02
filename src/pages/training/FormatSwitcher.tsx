@@ -29,7 +29,7 @@ const FormatSwitcher = ({
 }) => (
   <div className="mb-10">
     <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-3">
-      Offered two ways — same curriculum, same materials, same certificate
+      Offered two ways: same curriculum, same materials, same certificate
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
       {options.map((o) => {

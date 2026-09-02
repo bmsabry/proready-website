@@ -1,243 +1,603 @@
 [
   {
-    "code": "ADV-01", "module_position": 1, "position": 1, "kind": "mcq", "cognitive_level": "Analyze", "outcome_id": "M1.O3",
+    "code": "ADV-01",
+    "module_position": 1,
+    "position": 1,
+    "kind": "mcq",
+    "cognitive_level": "Analyze",
+    "outcome_id": "M1.O3",
     "stem": "A single-shaft micro turbojet is to be re-rated with a 60 K higher turbine inlet temperature to raise specific thrust. Which component change is the most direct consequence of that decision, and why?",
     "options": [
-      {"key": "A", "text": "Replace the Ti-6Al-4V impeller with an aluminium alloy to offset the extra weight of the hotter turbine."},
-      {"key": "B", "text": "Re-select the turbine wheel material (or add cooling), because rotor creep life is set by metal temperature combined with centrifugal stress at the rim and blade root."},
-      {"key": "C", "text": "Replace the Hastelloy X liner with an austenitic stainless steel, which tolerates the higher flame temperature better."},
-      {"key": "D", "text": "Replace the Si3N4 ceramic bearings with steel bearings, since the ceramic cannot carry the higher thrust load."}
+      {
+        "key": "A",
+        "text": "Replace the Ti-6Al-4V impeller with an aluminium alloy to offset the extra weight of the hotter turbine."
+      },
+      {
+        "key": "B",
+        "text": "Re-select the turbine wheel material (or add cooling), because rotor creep life is set by metal temperature combined with centrifugal stress at the rim and blade root."
+      },
+      {
+        "key": "C",
+        "text": "Replace the Hastelloy X liner with an austenitic stainless steel, which tolerates the higher flame temperature better."
+      },
+      {
+        "key": "D",
+        "text": "Replace the Si3N4 ceramic bearings with steel bearings, since the ceramic cannot carry the higher thrust load."
+      }
     ],
-    "answer": {"key": "B"},
+    "answer": {
+      "key": "B"
+    },
     "explanation": "The turbine wheel runs at the highest combination of temperature and stress in the engine; a higher TIT eats directly into its creep life. Aluminium impellers lose strength at the compressor exit temperatures of a PR~4 machine (A is backwards), stainless steel is a downgrade from Hastelloy X (C), and ceramic bearings are chosen precisely for high speed and temperature (D)."
   },
   {
-    "code": "ADV-02", "module_position": 1, "position": 2, "kind": "mcq", "cognitive_level": "Apply", "outcome_id": "M1.O2",
+    "code": "ADV-02",
+    "module_position": 1,
+    "position": 2,
+    "kind": "mcq",
+    "cognitive_level": "Apply",
+    "outcome_id": "M1.O2",
     "stem": "Using the 0-1-2-3-4-5-8 station convention, and setting aside the deliberate pressure changes produced by compressor and turbine work, between which two stations does the largest total-pressure LOSS occur in a healthy micro turbojet at design point?",
     "options": [
-      {"key": "A", "text": "Stations 0 to 1 — the inlet."},
-      {"key": "B", "text": "Stations 3 to 4 — the combustor."},
-      {"key": "C", "text": "Stations 5 to 8 — the jet pipe and nozzle."},
-      {"key": "D", "text": "Stations 1 to 2 — the impeller eye."}
+      {
+        "key": "A",
+        "text": "Stations 0 to 1: the inlet."
+      },
+      {
+        "key": "B",
+        "text": "Stations 3 to 4: the combustor."
+      },
+      {
+        "key": "C",
+        "text": "Stations 5 to 8: the jet pipe and nozzle."
+      },
+      {
+        "key": "D",
+        "text": "Stations 1 to 2: the impeller eye."
+      }
     ],
-    "answer": {"key": "B"},
+    "answer": {
+      "key": "B"
+    },
     "explanation": "The combustor's cold loss (liner and hole pressure drop) plus its fundamental (Rayleigh) loss is typically several percent of P3, an order of magnitude larger than a well-designed inlet or short jet pipe."
   },
   {
-    "code": "ADV-03", "module_position": 1, "position": 3, "kind": "mcq", "cognitive_level": "Evaluate", "outcome_id": "M1.O3",
+    "code": "ADV-03",
+    "module_position": 1,
+    "position": 3,
+    "kind": "mcq",
+    "cognitive_level": "Evaluate",
+    "outcome_id": "M1.O3",
     "stem": "A design review proposes machining the impeller of a PR 4.0, 110,000 rpm micro turbojet from an aluminium alloy instead of Ti-6Al-4V to cut cost. Which objection is the decisive one?",
     "options": [
-      {"key": "A", "text": "Aluminium cannot be machined to the required surface finish."},
-      {"key": "B", "text": "At PR 4 the impeller exit air is already around 200 °C and the tip speed approaches 500 m/s; aluminium alloys lose a large share of their strength in that temperature range, so the disc and blade stresses no longer have the margin titanium gives."},
-      {"key": "C", "text": "Aluminium is non-magnetic, which prevents the use of an inductive speed sensor."},
-      {"key": "D", "text": "Aluminium has a lower density, which would raise the impeller tip speed for the same rpm."}
+      {
+        "key": "A",
+        "text": "Aluminium cannot be machined to the required surface finish."
+      },
+      {
+        "key": "B",
+        "text": "At PR 4 the impeller exit air is already around 200 °C and the tip speed approaches 500 m/s; aluminium alloys lose a large share of their strength in that temperature range, so the disc and blade stresses no longer have the margin titanium gives."
+      },
+      {
+        "key": "C",
+        "text": "Aluminium is non-magnetic, which prevents the use of an inductive speed sensor."
+      },
+      {
+        "key": "D",
+        "text": "Aluminium has a lower density, which would raise the impeller tip speed for the same rpm."
+      }
     ],
-    "answer": {"key": "B"},
+    "answer": {
+      "key": "B"
+    },
     "explanation": "Compressor exit temperature at PR 4 with a realistic efficiency is roughly 470–480 K, where aluminium alloys' allowable stress falls steeply; combined with near-500 m/s tip speed the disc stresses leave no margin. Density does not change tip speed (D), and A and C are irrelevant."
   },
   {
-    "code": "ADV-04", "module_position": 2, "position": 1, "kind": "numeric", "cognitive_level": "Apply", "outcome_id": "M2.O1",
+    "code": "ADV-04",
+    "module_position": 2,
+    "position": 1,
+    "kind": "numeric",
+    "cognitive_level": "Apply",
+    "outcome_id": "M2.O1",
     "stem": "A radial-bladed impeller (no backsweep) runs at a tip speed of 480 m/s with no inlet prewhirl. The slip factor is 0.88. Using the Euler work equation, what is the specific work input to the air, in kJ/kg?",
     "options": [],
-    "answer": {"value": 202.8, "tolerance": 3.0},
+    "answer": {
+      "value": 202.8,
+      "tolerance": 3.0
+    },
     "explanation": "With no prewhirl, w = σ·U2² = 0.88 × 480² = 202.8 kJ/kg."
   },
   {
-    "code": "ADV-05", "module_position": 2, "position": 2, "kind": "numeric", "cognitive_level": "Apply", "outcome_id": "M2.O1",
+    "code": "ADV-05",
+    "module_position": 2,
+    "position": 2,
+    "kind": "numeric",
+    "cognitive_level": "Apply",
+    "outcome_id": "M2.O1",
     "stem": "Estimate the Wiesner slip factor for a radial-bladed impeller with 12 blades, using σ = 1 − √(sin β2b) / Z^0.7 with the blade angle β2b measured from the tangential direction. Give three decimal places.",
     "options": [],
-    "answer": {"value": 0.824, "tolerance": 0.01},
+    "answer": {
+      "value": 0.824,
+      "tolerance": 0.01
+    },
     "explanation": "For radial blades β2b = 90°, so sin β2b = 1 and σ = 1 − 1/12^0.7 = 1 − 1/5.69 = 0.824."
   },
   {
-    "code": "ADV-06", "module_position": 2, "position": 3, "kind": "mcq", "cognitive_level": "Analyze", "outcome_id": "M2.O1",
+    "code": "ADV-06",
+    "module_position": 2,
+    "position": 3,
+    "kind": "mcq",
+    "cognitive_level": "Analyze",
+    "outcome_id": "M2.O1",
     "stem": "An impeller is redesigned with 30° of backsweep while the tip speed and blade count are unchanged. Which set of consequences follows?",
     "options": [
-      {"key": "A", "text": "Higher pressure ratio at the same speed, narrower stable range, higher diffuser inlet Mach number."},
-      {"key": "B", "text": "Lower pressure ratio at the same speed, a wider surge-free range and a lower diffuser inlet Mach number, usually with a gain in efficiency."},
-      {"key": "C", "text": "No change in pressure ratio; only the blade stress distribution changes."},
-      {"key": "D", "text": "Higher pressure ratio and a wider stable range, at the cost of impeller stress."}
+      {
+        "key": "A",
+        "text": "Higher pressure ratio at the same speed, narrower stable range, higher diffuser inlet Mach number."
+      },
+      {
+        "key": "B",
+        "text": "Lower pressure ratio at the same speed, a wider surge-free range and a lower diffuser inlet Mach number, usually with a gain in efficiency."
+      },
+      {
+        "key": "C",
+        "text": "No change in pressure ratio; only the blade stress distribution changes."
+      },
+      {
+        "key": "D",
+        "text": "Higher pressure ratio and a wider stable range, at the cost of impeller stress."
+      }
     ],
-    "answer": {"key": "B"},
+    "answer": {
+      "key": "B"
+    },
     "explanation": "Backsweep reduces the tangential exit velocity (less work, so less pressure ratio per unit tip speed) but gives a negatively sloped work-versus-flow characteristic, which stabilises the stage, and it lowers the absolute velocity into the diffuser."
   },
   {
-    "code": "ADV-07", "module_position": 2, "position": 4, "kind": "mcq", "cognitive_level": "Evaluate", "outcome_id": "M2.O2",
+    "code": "ADV-07",
+    "module_position": 2,
+    "position": 4,
+    "kind": "mcq",
+    "cognitive_level": "Evaluate",
+    "outcome_id": "M2.O2",
     "stem": "Which statement correctly weighs a vaned diffuser against a vaneless diffuser for a micro turbojet compressor?",
     "options": [
-      {"key": "A", "text": "A vaned diffuser recovers more static pressure within a shorter radial extent but tolerates a narrower range of incidence before stall or choke; a vaneless diffuser is more forgiving but needs a larger radius for the same recovery."},
-      {"key": "B", "text": "A vaneless diffuser always gives the higher pressure recovery, which is why it is used in racing turbochargers."},
-      {"key": "C", "text": "A vaned diffuser has no effect on the surge line; only the impeller sets it."},
-      {"key": "D", "text": "The two types are interchangeable at design point; the choice is purely a manufacturing cost decision."}
+      {
+        "key": "A",
+        "text": "A vaned diffuser recovers more static pressure within a shorter radial extent but tolerates a narrower range of incidence before stall or choke; a vaneless diffuser is more forgiving but needs a larger radius for the same recovery."
+      },
+      {
+        "key": "B",
+        "text": "A vaneless diffuser always gives the higher pressure recovery, which is why it is used in racing turbochargers."
+      },
+      {
+        "key": "C",
+        "text": "A vaned diffuser has no effect on the surge line; only the impeller sets it."
+      },
+      {
+        "key": "D",
+        "text": "The two types are interchangeable at design point; the choice is purely a manufacturing cost decision."
+      }
     ],
-    "answer": {"key": "A"},
-    "explanation": "Vanes force the flow to turn and diffuse over a short path — efficient at design incidence, intolerant away from it. The vaneless space diffuses by conservation of angular momentum, which is slow (large radius) but incidence-free."
+    "answer": {
+      "key": "A"
+    },
+    "explanation": "Vanes force the flow to turn and diffuse over a short path: efficient at design incidence, intolerant away from it. The vaneless space diffuses by conservation of angular momentum, which is slow (large radius) but incidence-free."
   },
   {
-    "code": "ADV-08", "module_position": 3, "position": 1, "kind": "numeric", "cognitive_level": "Apply", "outcome_id": "M3.O2",
+    "code": "ADV-08",
+    "module_position": 3,
+    "position": 1,
+    "kind": "numeric",
+    "cognitive_level": "Apply",
+    "outcome_id": "M3.O2",
     "stem": "A micro turbojet burns kerosene (stoichiometric fuel-air ratio 0.068) at an overall fuel-air ratio of 0.020. The primary zone receives 25% of the combustor air. What is the primary-zone equivalence ratio? Give two decimal places.",
     "options": [],
-    "answer": {"value": 1.18, "tolerance": 0.03},
-    "explanation": "Primary-zone FAR = 0.020 / 0.25 = 0.080; φ = 0.080 / 0.068 = 1.18 — slightly rich, which is what a stable, well-anchored primary zone needs."
+    "answer": {
+      "value": 1.18,
+      "tolerance": 0.03
+    },
+    "explanation": "Primary-zone FAR = 0.020 / 0.25 = 0.080; φ = 0.080 / 0.068 = 1.18, slightly rich, which is what a stable, well-anchored primary zone needs."
   },
   {
-    "code": "ADV-09", "module_position": 3, "position": 2, "kind": "mcq", "cognitive_level": "Analyze", "outcome_id": "M3.O1",
+    "code": "ADV-09",
+    "module_position": 3,
+    "position": 2,
+    "kind": "mcq",
+    "cognitive_level": "Analyze",
+    "outcome_id": "M3.O1",
     "stem": "The overall equivalence ratio of a micro turbojet combustor at design point is about 0.3, yet the primary zone is designed near stoichiometric. Why is this split necessary?",
     "options": [
-      {"key": "A", "text": "A mixture at φ ≈ 0.3 is far below the lean flammability limit of kerosene vapour in air, so a flame could not be held at all; the primary zone is kept near stoichiometric to anchor a hot, stable flame and evaporate the fuel, and the remaining air is added downstream to bring the exit temperature down to what the turbine can accept."},
-      {"key": "B", "text": "The primary zone is kept rich purely to lower NOx, which forms only in lean mixtures."},
-      {"key": "C", "text": "The split exists so that the compressor sees a constant back-pressure regardless of fuel flow."},
-      {"key": "D", "text": "The dilution air is needed to cool the fuel before it enters the vaporiser tubes."}
+      {
+        "key": "A",
+        "text": "A mixture at φ ≈ 0.3 is far below the lean flammability limit of kerosene vapour in air, so a flame could not be held at all; the primary zone is kept near stoichiometric to anchor a hot, stable flame and evaporate the fuel, and the remaining air is added downstream to bring the exit temperature down to what the turbine can accept."
+      },
+      {
+        "key": "B",
+        "text": "The primary zone is kept rich purely to lower NOx, which forms only in lean mixtures."
+      },
+      {
+        "key": "C",
+        "text": "The split exists so that the compressor sees a constant back-pressure regardless of fuel flow."
+      },
+      {
+        "key": "D",
+        "text": "The dilution air is needed to cool the fuel before it enters the vaporiser tubes."
+      }
     ],
-    "answer": {"key": "A"},
+    "answer": {
+      "key": "A"
+    },
     "explanation": "Kerosene-air mixtures burn only within roughly φ 0.5–3; the overall mixture is far too lean. Staging the air lets the primary zone burn hot and stable while dilution sets T4. NOx forms fastest near stoichiometric, so B is backwards."
   },
   {
-    "code": "ADV-10", "module_position": 3, "position": 3, "kind": "mcq", "cognitive_level": "Evaluate", "outcome_id": "M3.O1",
+    "code": "ADV-10",
+    "module_position": 3,
+    "position": 3,
+    "kind": "mcq",
+    "cognitive_level": "Evaluate",
+    "outcome_id": "M3.O1",
     "stem": "A newly built evaporative-tube combustor starts slowly, idles with a long visible flame at the nozzle and shows a higher exhaust temperature than predicted at idle, but behaves normally once the engine is warm. What is the most probable cause?",
     "options": [
-      {"key": "A", "text": "Too much dilution air, which quenches the primary zone."},
-      {"key": "B", "text": "The vaporiser tubes are still cold at start and idle, so liquid fuel passes through them incompletely evaporated and burns late — in the dilution zone and jet pipe — instead of in the primary zone."},
-      {"key": "C", "text": "Excessive turbine tip clearance, which lets hot gas bypass the rotor."},
-      {"key": "D", "text": "Inlet prewhirl that reduces the compressor work at low speed."}
+      {
+        "key": "A",
+        "text": "Too much dilution air, which quenches the primary zone."
+      },
+      {
+        "key": "B",
+        "text": "The vaporiser tubes are still cold at start and idle, so liquid fuel passes through them incompletely evaporated and burns late, in the dilution zone and jet pipe: instead of in the primary zone."
+      },
+      {
+        "key": "C",
+        "text": "Excessive turbine tip clearance, which lets hot gas bypass the rotor."
+      },
+      {
+        "key": "D",
+        "text": "Inlet prewhirl that reduces the compressor work at low speed."
+      }
     ],
-    "answer": {"key": "B"},
+    "answer": {
+      "key": "B"
+    },
     "explanation": "An evaporative tube relies on heat soaked back from the flame; until it is hot, evaporation is incomplete and combustion migrates downstream, which is exactly a warm-up-dependent symptom. A, C and D would not disappear once the engine is warm."
   },
   {
-    "code": "ADV-11", "module_position": 4, "position": 1, "kind": "numeric", "cognitive_level": "Apply", "outcome_id": "M4.O3",
+    "code": "ADV-11",
+    "module_position": 4,
+    "position": 1,
+    "kind": "numeric",
+    "cognitive_level": "Apply",
+    "outcome_id": "M4.O3",
     "stem": "In a single-stage axial turbine the mean blade speed is 350 m/s and the velocity triangles give a change in tangential absolute velocity across the rotor of 520 m/s. What is the stage loading coefficient ψ = Δh0 / U²? Give two decimal places.",
     "options": [],
-    "answer": {"value": 1.49, "tolerance": 0.03},
-    "explanation": "Δh0 = U·ΔCθ = 350 × 520 = 182 kJ/kg; ψ = 182 000 / 350² = 1.49 — a heavily loaded stage, typical of a single-stage micro turbojet turbine that must supply all the compressor work."
+    "answer": {
+      "value": 1.49,
+      "tolerance": 0.03
+    },
+    "explanation": "Δh0 = U·ΔCθ = 350 × 520 = 182 kJ/kg; ψ = 182 000 / 350² = 1.49, a heavily loaded stage, typical of a single-stage micro turbojet turbine that must supply all the compressor work."
   },
   {
-    "code": "ADV-12", "module_position": 4, "position": 2, "kind": "mcq", "cognitive_level": "Analyze", "outcome_id": "M4.O1",
+    "code": "ADV-12",
+    "module_position": 4,
+    "position": 2,
+    "kind": "mcq",
+    "cognitive_level": "Analyze",
+    "outcome_id": "M4.O1",
     "stem": "A micro turbojet turbine must deliver about 200 kJ/kg to drive its compressor from a single stage. Compared with spreading that work over two stages, what does the single-stage choice imply?",
     "options": [
-      {"key": "A", "text": "A higher stage loading coefficient and more flow turning in the blades, which costs stage efficiency, accepted in exchange for simplicity, weight and cost."},
-      {"key": "B", "text": "A lower stage loading coefficient, since one stage sees the full pressure ratio."},
-      {"key": "C", "text": "No efficiency penalty, because turbine efficiency is independent of loading."},
-      {"key": "D", "text": "A lower rotor speed is required to keep the blade stresses down."}
+      {
+        "key": "A",
+        "text": "A higher stage loading coefficient and more flow turning in the blades, which costs stage efficiency, accepted in exchange for simplicity, weight and cost."
+      },
+      {
+        "key": "B",
+        "text": "A lower stage loading coefficient, since one stage sees the full pressure ratio."
+      },
+      {
+        "key": "C",
+        "text": "No efficiency penalty, because turbine efficiency is independent of loading."
+      },
+      {
+        "key": "D",
+        "text": "A lower rotor speed is required to keep the blade stresses down."
+      }
     ],
-    "answer": {"key": "A"},
+    "answer": {
+      "key": "A"
+    },
     "explanation": "Stage efficiency falls as loading rises (the Smith chart trend): high ψ means high turning and high exit swirl or velocity. Small engines accept that penalty for a one-piece wheel."
   },
   {
-    "code": "ADV-13", "module_position": 4, "position": 3, "kind": "mcq", "cognitive_level": "Evaluate", "outcome_id": "M4.O3",
+    "code": "ADV-13",
+    "module_position": 4,
+    "position": 3,
+    "kind": "mcq",
+    "cognitive_level": "Evaluate",
+    "outcome_id": "M4.O3",
     "stem": "After many hours of otherwise normal running, a turbine blade fractures at roughly one-third span. The fracture surface shows beach marks progressing from the trailing edge, and the rest of the wheel is undamaged. Which failure mode is indicated and what is the first design check?",
     "options": [
-      {"key": "A", "text": "Creep rupture — check the metal temperature margin at the blade root."},
-      {"key": "B", "text": "Overspeed burst — check the disc bore stress at 120% speed."},
-      {"key": "C", "text": "High-cycle fatigue from nozzle-guide-vane wake excitation — check the Campbell diagram for a blade natural frequency crossing the vane-passing frequency in the running range."},
-      {"key": "D", "text": "Sulphidation — check the fuel sulphur content."}
+      {
+        "key": "A",
+        "text": "Creep rupture: check the metal temperature margin at the blade root."
+      },
+      {
+        "key": "B",
+        "text": "Overspeed burst: check the disc bore stress at 120% speed."
+      },
+      {
+        "key": "C",
+        "text": "High-cycle fatigue from nozzle-guide-vane wake excitation: check the Campbell diagram for a blade natural frequency crossing the vane-passing frequency in the running range."
+      },
+      {
+        "key": "D",
+        "text": "Sulphidation: check the fuel sulphur content."
+      }
     ],
-    "answer": {"key": "C"},
+    "answer": {
+      "key": "C"
+    },
     "explanation": "Beach marks are the signature of progressive fatigue cracking; a single blade failing at part span after long service points to a resonant excitation, of which the vane-passing frequency is the usual source. Creep and burst present very differently."
   },
   {
-    "code": "ADV-14", "module_position": 5, "position": 1, "kind": "numeric", "cognitive_level": "Apply", "outcome_id": "M5.O2",
+    "code": "ADV-14",
+    "module_position": 5,
+    "position": 1,
+    "kind": "numeric",
+    "cognitive_level": "Apply",
+    "outcome_id": "M5.O2",
     "stem": "On one corrected-speed line, the surge line is at a pressure ratio of 4.40 and the steady operating point is at a pressure ratio of 3.80. Using the definition SM = (PR_surge − PR_operating) / PR_operating × 100 at constant corrected speed, what is the surge margin in percent? Give one decimal place.",
     "options": [],
-    "answer": {"value": 15.8, "tolerance": 0.3},
+    "answer": {
+      "value": 15.8,
+      "tolerance": 0.3
+    },
     "explanation": "SM = (4.40 − 3.80) / 3.80 × 100 = 15.8%."
   },
   {
-    "code": "ADV-15", "module_position": 5, "position": 2, "kind": "mcq", "cognitive_level": "Analyze", "outcome_id": "M5.O3",
+    "code": "ADV-15",
+    "module_position": 5,
+    "position": 2,
+    "kind": "mcq",
+    "cognitive_level": "Analyze",
+    "outcome_id": "M5.O3",
     "stem": "Which single change moves the steady running line of a single-shaft turbojet closer to the compressor surge line?",
     "options": [
-      {"key": "A", "text": "Increasing the propelling nozzle exit area."},
-      {"key": "B", "text": "Reducing the propelling nozzle exit area."},
-      {"key": "C", "text": "Opening a compressor bleed valve."},
-      {"key": "D", "text": "Enlarging the turbine nozzle-guide-vane throat area."}
+      {
+        "key": "A",
+        "text": "Increasing the propelling nozzle exit area."
+      },
+      {
+        "key": "B",
+        "text": "Reducing the propelling nozzle exit area."
+      },
+      {
+        "key": "C",
+        "text": "Opening a compressor bleed valve."
+      },
+      {
+        "key": "D",
+        "text": "Enlarging the turbine nozzle-guide-vane throat area."
+      }
     ],
-    "answer": {"key": "B"},
-    "explanation": "A smaller nozzle raises the back-pressure on the turbine and compressor for a given speed, so the running line shifts to higher pressure ratio at lower flow — toward surge. A, C and D all move it away."
+    "answer": {
+      "key": "B"
+    },
+    "explanation": "A smaller nozzle raises the back-pressure on the turbine and compressor for a given speed, so the running line shifts to higher pressure ratio at lower flow, toward surge. A, C and D all move it away."
   },
   {
-    "code": "ADV-16", "module_position": 5, "position": 3, "kind": "mcq", "cognitive_level": "Evaluate", "outcome_id": "M5.O3",
+    "code": "ADV-16",
+    "module_position": 5,
+    "position": 3,
+    "kind": "mcq",
+    "cognitive_level": "Evaluate",
+    "outcome_id": "M5.O3",
     "stem": "During a rapid throttle-up the compressor of a micro turbojet surges even though the steady running line has a 15% surge margin everywhere. What is happening, and what is the correct remedy?",
     "options": [
-      {"key": "A", "text": "The fuel step raises turbine inlet temperature faster than the rotor can accelerate, so the transient operating point rises above the steady running line into the surge region; the remedy is an acceleration fuel schedule that limits fuel flow as a function of rotor speed."},
-      {"key": "B", "text": "The surge margin was measured incorrectly; re-measure the map at higher ambient temperature."},
-      {"key": "C", "text": "The turbine is over-expanding; fit a smaller nozzle."},
-      {"key": "D", "text": "The bearings are overheating and slowing the rotor; improve bearing cooling."}
+      {
+        "key": "A",
+        "text": "The fuel step raises turbine inlet temperature faster than the rotor can accelerate, so the transient operating point rises above the steady running line into the surge region; the remedy is an acceleration fuel schedule that limits fuel flow as a function of rotor speed."
+      },
+      {
+        "key": "B",
+        "text": "The surge margin was measured incorrectly; re-measure the map at higher ambient temperature."
+      },
+      {
+        "key": "C",
+        "text": "The turbine is over-expanding; fit a smaller nozzle."
+      },
+      {
+        "key": "D",
+        "text": "The bearings are overheating and slowing the rotor; improve bearing cooling."
+      }
     ],
-    "answer": {"key": "A"},
+    "answer": {
+      "key": "A"
+    },
     "explanation": "The transient path lies above the steady line because the extra fuel raises T4 (and turbine back-pressure) before speed and flow catch up. Fuel scheduling against speed keeps the excursion inside the margin; a smaller nozzle (C) would make it worse."
   },
   {
-    "code": "ADV-17", "module_position": 6, "position": 1, "kind": "mcq", "cognitive_level": "Analyze", "outcome_id": "M6.O2",
+    "code": "ADV-17",
+    "module_position": 6,
+    "position": 1,
+    "kind": "mcq",
+    "cognitive_level": "Analyze",
+    "outcome_id": "M6.O2",
     "stem": "A RANS simulation of the impeller uses the standard k-ε model with wall functions, but the mesh report shows y+ ≈ 0.8 over the blade surfaces. What is the correct response?",
     "options": [
-      {"key": "A", "text": "Nothing — a lower y+ is always better."},
-      {"key": "B", "text": "Either coarsen the first cell so y+ falls in the range the wall functions assume (about 30–300), or switch to a low-Reynolds model such as k-ω SST that resolves the viscous sublayer at y+ ≈ 1. Running wall functions at y+ ≈ 1 applies the log law where it is not valid."},
-      {"key": "C", "text": "Increase the turbulence intensity at the inlet to compensate."},
-      {"key": "D", "text": "Switch to an inviscid (Euler) solver, since the boundary layer is already resolved."}
+      {
+        "key": "A",
+        "text": "Nothing, because a lower y+ is always better."
+      },
+      {
+        "key": "B",
+        "text": "Either coarsen the first cell so y+ falls in the range the wall functions assume (about 30–300), or switch to a low-Reynolds model such as k-ω SST that resolves the viscous sublayer at y+ ≈ 1. Running wall functions at y+ ≈ 1 applies the log law where it is not valid."
+      },
+      {
+        "key": "C",
+        "text": "Increase the turbulence intensity at the inlet to compensate."
+      },
+      {
+        "key": "D",
+        "text": "Switch to an inviscid (Euler) solver, since the boundary layer is already resolved."
+      }
     ],
-    "answer": {"key": "B"},
+    "answer": {
+      "key": "B"
+    },
     "explanation": "Wall-function models bridge the near-wall region with the log law and expect the first cell centre in it; placing it in the viscous sublayer is a modelling inconsistency, not extra accuracy."
   },
   {
-    "code": "ADV-18", "module_position": 6, "position": 2, "kind": "mcq", "cognitive_level": "Evaluate", "outcome_id": "M6.O3",
+    "code": "ADV-18",
+    "module_position": 6,
+    "position": 2,
+    "kind": "mcq",
+    "cognitive_level": "Evaluate",
+    "outcome_id": "M6.O3",
     "stem": "A grid study of the compressor stage gives a design-point pressure ratio of 3.62 on the coarse mesh, 3.77 on the medium mesh and 3.78 on the fine mesh. What should the engineer conclude and report?",
     "options": [
-      {"key": "A", "text": "The coarse result is the safest because it is the most conservative."},
-      {"key": "B", "text": "The solution is effectively grid-independent between the medium and fine meshes (0.3% change against 4% from coarse to medium); report the fine-mesh result (or the medium with that uncertainty stated) and never the coarse one."},
-      {"key": "C", "text": "The results are inconsistent and the turbulence model must be changed."},
-      {"key": "D", "text": "Average the three values and report 3.72."}
+      {
+        "key": "A",
+        "text": "The coarse result is the safest because it is the most conservative."
+      },
+      {
+        "key": "B",
+        "text": "The solution is effectively grid-independent between the medium and fine meshes (0.3% change against 4% from coarse to medium); report the fine-mesh result (or the medium with that uncertainty stated) and never the coarse one."
+      },
+      {
+        "key": "C",
+        "text": "The results are inconsistent and the turbulence model must be changed."
+      },
+      {
+        "key": "D",
+        "text": "Average the three values and report 3.72."
+      }
     ],
-    "answer": {"key": "B"},
+    "answer": {
+      "key": "B"
+    },
     "explanation": "A grid study looks for the point where refinement stops changing the answer; here it is reached at the medium mesh. Averaging in an unconverged coarse result (D) is meaningless."
   },
   {
-    "code": "ADV-19", "module_position": 6, "position": 3, "kind": "mcq", "cognitive_level": "Apply", "outcome_id": "M6.O2",
+    "code": "ADV-19",
+    "module_position": 6,
+    "position": 3,
+    "kind": "mcq",
+    "cognitive_level": "Apply",
+    "outcome_id": "M6.O2",
     "stem": "You need a steady RANS prediction of the compressor performance map for an impeller followed by a vaned diffuser. Which rotor–stator interface treatment is appropriate, and why?",
     "options": [
-      {"key": "A", "text": "A mixing-plane interface, which circumferentially averages the impeller exit flow so a single blade passage of each row can be solved steadily without depending on their relative position."},
-      {"key": "B", "text": "A frozen-rotor interface, because it is the only steady option that conserves mass."},
-      {"key": "C", "text": "A sliding-mesh interface, which is steady and therefore the cheapest."},
-      {"key": "D", "text": "No interface — model the impeller alone and apply the measured diffuser loss as a boundary condition."}
+      {
+        "key": "A",
+        "text": "A mixing-plane interface, which circumferentially averages the impeller exit flow so a single blade passage of each row can be solved steadily without depending on their relative position."
+      },
+      {
+        "key": "B",
+        "text": "A frozen-rotor interface, because it is the only steady option that conserves mass."
+      },
+      {
+        "key": "C",
+        "text": "A sliding-mesh interface, which is steady and therefore the cheapest."
+      },
+      {
+        "key": "D",
+        "text": "No interface: model the impeller alone and apply the measured diffuser loss as a boundary condition."
+      }
     ],
-    "answer": {"key": "A"},
+    "answer": {
+      "key": "A"
+    },
     "explanation": "The mixing plane is the standard steady treatment for performance-map work. Frozen rotor is steady but freezes one relative position (wake orientation becomes an artefact); sliding mesh is transient and costly."
   },
   {
-    "code": "ADV-20", "module_position": 7, "position": 1, "kind": "numeric", "cognitive_level": "Apply", "outcome_id": "M7.O2",
+    "code": "ADV-20",
+    "module_position": 7,
+    "position": 1,
+    "kind": "numeric",
+    "cognitive_level": "Apply",
+    "outcome_id": "M7.O2",
     "stem": "A combustor exit traverse gives a peak temperature of 1280 K and a mean of 1150 K, with a compressor delivery temperature of 470 K. What is the pattern factor (T4,max − T4,mean) / (T4,mean − T3)? Give two decimal places.",
     "options": [],
-    "answer": {"value": 0.19, "tolerance": 0.01},
+    "answer": {
+      "value": 0.19,
+      "tolerance": 0.01
+    },
     "explanation": "PF = (1280 − 1150) / (1150 − 470) = 130 / 680 = 0.19."
   },
   {
-    "code": "ADV-21", "module_position": 7, "position": 2, "kind": "numeric", "cognitive_level": "Apply", "outcome_id": "M7.O2",
+    "code": "ADV-21",
+    "module_position": 7,
+    "position": 2,
+    "kind": "numeric",
+    "cognitive_level": "Apply",
+    "outcome_id": "M7.O2",
     "stem": "Fuel flow is 0.012 kg/s of kerosene with a lower heating value of 43 MJ/kg, and the combustion efficiency is 98%. What is the heat release rate in kW? Give the nearest whole number.",
     "options": [],
-    "answer": {"value": 506, "tolerance": 3},
+    "answer": {
+      "value": 506,
+      "tolerance": 3
+    },
     "explanation": "Q = 0.012 × 43 000 kJ/kg × 0.98 = 505.7 kW."
   },
   {
-    "code": "ADV-22", "module_position": 7, "position": 3, "kind": "mcq", "cognitive_level": "Analyze", "outcome_id": "M7.O1",
+    "code": "ADV-22",
+    "module_position": 7,
+    "position": 3,
+    "kind": "mcq",
+    "cognitive_level": "Analyze",
+    "outcome_id": "M7.O1",
     "stem": "The exit pattern factor of a combustor is too high for the turbine's life target. Which change attacks the cause, and what is its unavoidable cost?",
     "options": [
-      {"key": "A", "text": "Redistribute the dilution holes into more, deeper-penetrating jets with a higher liner pressure drop to mix the core hot streak; the cost is a larger combustor total-pressure loss."},
-      {"key": "B", "text": "Increase the overall fuel-air ratio so that the mean temperature rises toward the peak."},
-      {"key": "C", "text": "Move the film-cooling slots further upstream, which lowers the peak temperature by cooling the gas."},
-      {"key": "D", "text": "Reduce the primary-zone air so the flame burns cooler."}
+      {
+        "key": "A",
+        "text": "Redistribute the dilution holes into more, deeper-penetrating jets with a higher liner pressure drop to mix the core hot streak; the cost is a larger combustor total-pressure loss."
+      },
+      {
+        "key": "B",
+        "text": "Increase the overall fuel-air ratio so that the mean temperature rises toward the peak."
+      },
+      {
+        "key": "C",
+        "text": "Move the film-cooling slots further upstream, which lowers the peak temperature by cooling the gas."
+      },
+      {
+        "key": "D",
+        "text": "Reduce the primary-zone air so the flame burns cooler."
+      }
     ],
-    "answer": {"key": "A"},
+    "answer": {
+      "key": "A"
+    },
     "explanation": "Pattern factor is a mixing problem at the dilution zone; jet penetration and momentum (i.e. pressure drop) are the levers. Raising FAR (B) raises the mean but the peak too, film cooling protects the liner not the gas (C), and a richer primary zone (D) makes the core hotter."
   },
   {
-    "code": "ADV-23", "module_position": 7, "position": 4, "kind": "mcq", "cognitive_level": "Evaluate", "outcome_id": "M7.O3",
+    "code": "ADV-23",
+    "module_position": 7,
+    "position": 4,
+    "kind": "mcq",
+    "cognitive_level": "Evaluate",
+    "outcome_id": "M7.O3",
     "stem": "You are designing the fuel schedule for the start sequence of a micro turbojet. Which principle must the schedule respect from light-off to idle?",
     "options": [
-      {"key": "A", "text": "Fuel flow should rise with rotor speed on a schedule that stays below the over-temperature and surge limits, since at low speed the airflow is small: too much fuel gives a hot start or rich blow-out, too little gives a hung start."},
-      {"key": "B", "text": "Fuel flow should be held constant at the idle value from the moment of ignition, because the combustor efficiency is independent of speed."},
-      {"key": "C", "text": "Maximum fuel flow should be applied immediately after ignition to reach idle as fast as possible and minimise starter energy."},
-      {"key": "D", "text": "Fuel should be scheduled against exhaust temperature only, ignoring rotor speed."}
+      {
+        "key": "A",
+        "text": "Fuel flow should rise with rotor speed on a schedule that stays below the over-temperature and surge limits, since at low speed the airflow is small: too much fuel gives a hot start or rich blow-out, too little gives a hung start."
+      },
+      {
+        "key": "B",
+        "text": "Fuel flow should be held constant at the idle value from the moment of ignition, because the combustor efficiency is independent of speed."
+      },
+      {
+        "key": "C",
+        "text": "Maximum fuel flow should be applied immediately after ignition to reach idle as fast as possible and minimise starter energy."
+      },
+      {
+        "key": "D",
+        "text": "Fuel should be scheduled against exhaust temperature only, ignoring rotor speed."
+      }
     ],
-    "answer": {"key": "A"},
+    "answer": {
+      "key": "A"
+    },
     "explanation": "During the start, airflow grows with speed, so the fuel the combustor can burn without exceeding T4 limits or surging grows with it. A speed-based schedule with a temperature limit is the standard structure."
   }
 ]

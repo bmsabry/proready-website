@@ -87,7 +87,7 @@ const CertificateCard = ({ cert }: { cert: IssuedCertificate }) => (
         />
       ) : (
         <div className="aspect-[11/8.5] flex items-center justify-center text-slate-500 text-sm">
-          Preview unavailable — open the PDF
+          Preview unavailable. Open the PDF
         </div>
       )}
     </a>
@@ -403,7 +403,7 @@ const CertificationPanel: React.FC<{ code: string; paidReturn?: boolean }> = ({
                 {!data.full_name && (
                   <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
                     <p className="text-sm text-amber-200">
-                      No name on file yet — add it now so the certificate can be issued the
+                      No name on file yet. Add it now so the certificate can be issued the
                       instant you finish.
                     </p>
                     <NameForm initial="" onSaved={() => void load()} />
@@ -503,7 +503,7 @@ const CertificationPanel: React.FC<{ code: string; paidReturn?: boolean }> = ({
                             <ShieldCheck className="w-4 h-4" aria-hidden="true" />
                             {busy
                               ? 'Opening checkout…'
-                              : `Register for the examination — ${money(advanced.price_cents, advanced.currency)}`}
+                              : `Register for the examination, ${money(advanced.price_cents, advanced.currency)}`}
                           </button>
                         ) : (
                           <p className="text-sm text-amber-200">{advanced.purchase_blocked_reason}</p>
@@ -552,7 +552,7 @@ const CertificationPanel: React.FC<{ code: string; paidReturn?: boolean }> = ({
                             <>Your complimentary re-examination can be proposed on or after {fmtDate(state.retake_after)}. </>
                           )}
                           {state.status === 'slots_proposed' && (
-                            <>Sent — waiting for your examiner to confirm one of your windows. You will receive the meeting link by email.</>
+                            <>Sent. Waiting for your examiner to confirm one of your windows. You will receive the meeting link by email.</>
                           )}
                         </Step>
                         {state.status === 'slots_proposed' && (
@@ -594,7 +594,7 @@ const CertificationPanel: React.FC<{ code: string; paidReturn?: boolean }> = ({
                         <p className="mt-2">
                           {advanced.interview_minutes} minutes, one-on-one by video. Join from a quiet
                           place with your camera on and have a photo ID ready. Questions are asked
-                          without notice — think aloud; the reasoning is what is examined.
+                          without notice. Think aloud; the reasoning is what is examined.
                         </p>
                       </Step>
                       {state.meeting_url && (
