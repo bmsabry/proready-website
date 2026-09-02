@@ -455,6 +455,7 @@ export type CourseTab =
   | 'comms'
   | 'stats'
   | 'materials'
+  | 'certification'
   | 'settings';
 
 export const COURSE_TABS: CourseTab[] = [
@@ -465,6 +466,7 @@ export const COURSE_TABS: CourseTab[] = [
   'comms',
   'stats',
   'materials',
+  'certification',
   'settings',
 ];
 

@@ -361,6 +361,20 @@ def _revoke_for_payment(db: Session, payment_intent: str, reason: str) -> None:
     if order is None or order.learner_id is None:
         return
     order.status = "refunded"
+    if order.kind == "advanced_cert":
+        # The examined tier was refunded: close the examination, leave the
+        # course enrollment and any completion certificate untouched.
+        from .. import advanced_cert as adv  # noqa: PLC0415
+        from ..models import AdvancedCertification  # noqa: PLC0415
+
+        row = db.execute(
+            select(AdvancedCertification).where(AdvancedCertification.order_id == order.id)
+        ).scalar_one_or_none()
+        if row is not None and row.status not in adv.TERMINAL:
+            adv.cancel(db, row, reason)
+        db.commit()
+        log.info("Advanced certification cancelled for order %s (%s)", order.id, reason)
+        return
     from ..models import Enrollment
 
     enrollment = db.execute(
@@ -374,6 +388,61 @@ def _revoke_for_payment(db: Session, payment_intent: str, reason: str) -> None:
         enrollment.note = reason
     db.commit()
     log.info("Revoked access for order %s (%s)", order.id, reason)
+
+
+def fulfil_advanced_cert(db: Session, session_obj: dict) -> None:
+    """Turn a paid examined-tier Checkout Session into an open examination.
+
+    Idempotent through Order.status and AdvancedCertification.order_id.
+    """
+    from .. import advanced_cert as adv  # noqa: PLC0415
+
+    session_id, email, product_code = _session_identity(session_obj)
+    order = db.execute(
+        select(Order).where(Order.provider_ref == session_id)
+    ).scalar_one_or_none()
+    if order is not None and order.status == "paid":
+        log.info("Replay of fulfilled advanced-cert session %s — ignoring", session_id)
+        return
+    product = db.get(Product, product_code)
+    if product is None:
+        log.error("Advanced-cert webhook references unknown product %r", product_code)
+        return
+    learner = None
+    learner_id = (session_obj.get("metadata") or {}).get("learner_id")
+    if learner_id:
+        learner = db.get(Learner, int(learner_id))
+    if learner is None and email:
+        learner = svc.upsert_learner(
+            db, email, (session_obj.get("customer_details") or {}).get("name") or ""
+        )
+    if learner is None:
+        log.error("Advanced-cert webhook %s has no learner", session_id)
+        return
+    if order is None:
+        order = Order(
+            learner_id=learner.id, product_code=product_code, email=learner.email,
+            provider="stripe", provider_ref=session_id, currency=product.currency,
+            kind="advanced_cert",
+        )
+        db.add(order)
+    from datetime import datetime, timezone as _tz
+
+    order.kind = "advanced_cert"
+    order.learner_id = learner.id
+    order.amount_cents = int(session_obj.get("amount_total") or product.advanced_cert_price_cents)
+    order.currency = (session_obj.get("currency") or product.currency).lower()
+    order.payment_ref = str(session_obj.get("payment_intent") or "")
+    order.status = "paid"
+    order.paid_at = datetime.now(_tz.utc)
+    db.commit()
+    db.refresh(order)
+    adv.create(
+        db, learner, product,
+        source="stripe", order_id=order.id,
+        amount_cents=order.amount_cents, currency=order.currency,
+    )
+    log.info("Advanced certification opened for %s (%s), order %s", learner.email, product_code, order.id)
 
 
 @router.post("/webhook/stripe")
@@ -416,7 +485,27 @@ async def stripe_webhook(
     def _is_live_course(session_obj: dict) -> bool:
         return (session_obj.get("metadata") or {}).get("kind") == "live_course"
 
-    if kind == "checkout.session.completed":
+    def _is_advanced_cert(session_obj: dict) -> bool:
+        return (session_obj.get("metadata") or {}).get("kind") == "advanced_cert"
+
+    if kind == "checkout.session.completed" and _is_advanced_cert(obj):
+        # Examined-tier purchase: no enrollment to grant — open the written
+        # examination. Card only in practice; an unpaid (ACH) completion is
+        # held until async_payment_succeeded.
+        if obj.get("payment_status") == "paid":
+            fulfil_advanced_cert(db, dict(obj))
+        else:
+            log.info("Advanced-cert checkout %s completed unpaid — waiting", obj.get("id"))
+    elif kind == "checkout.session.async_payment_succeeded" and _is_advanced_cert(obj):
+        fulfil_advanced_cert(db, dict(obj))
+    elif kind == "checkout.session.async_payment_failed" and _is_advanced_cert(obj):
+        order = db.execute(
+            select(Order).where(Order.provider_ref == obj.get("id"))
+        ).scalar_one_or_none()
+        if order is not None and order.status != "paid":
+            order.status = "failed"
+            db.commit()
+    elif kind == "checkout.session.completed":
         if _is_live_course(obj):
             # fulfil_live_session inspects payment_status itself: paid (card)
             # settles the seat now; unpaid (ACH pending) holds it with a note.

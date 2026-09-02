@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Award,
   BookOpen,
@@ -24,6 +24,8 @@ import {
   ModuleState,
   MyCourse,
 } from '../../lib/academyApi';
+
+import CertificationPanel from './CertificationPanel';
 
 const DEFAULT_PRODUCT = 'micro-gas-turbine-design';
 
@@ -501,6 +503,8 @@ const CourseChooser = ({ courses }: { courses: MyCourse[] }) => (
 const Dashboard: React.FC = () => {
   const { productCode } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const paidReturn = new URLSearchParams(location.search).get('advanced') === 'paid';
 
   const [code, setCode] = useState(productCode || '');
   const [course, setCourse] = useState<CourseState | null>(null);
@@ -709,37 +713,7 @@ const Dashboard: React.FC = () => {
           )}
         </div>
 
-        {course.complete && (
-          <div className="card p-6 mb-8 border-cyan-500/30">
-            <div className="flex items-center gap-4">
-              <Award className="w-8 h-8 text-cyan-400 shrink-0" aria-hidden="true" />
-              <div className="flex-1">
-                <h2 className="font-semibold text-white">You've finished the course</h2>
-                <p className="text-sm text-slate-300 mt-1">
-                  {course.certificate_code
-                    ? `Certificate ${course.certificate_code} — verifiable at /verify/${course.certificate_code}`
-                    : 'Claim your certificate.'}
-                </p>
-              </div>
-              {!course.certificate_code && (
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={async () => {
-                    try {
-                      const cert = await academy.certificate(code);
-                      setCourse({ ...course, certificate_code: cert.code });
-                    } catch {
-                      /* the dashboard already shows completion state */
-                    }
-                  }}
-                >
-                  Get certificate
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+        <CertificationPanel code={code} paidReturn={paidReturn} />
 
         <div className="space-y-4">
           {course.modules.map((m, i) => (

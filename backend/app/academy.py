@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import math
 import re
-import secrets
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
@@ -967,44 +966,20 @@ def grade_submission(
 # -----------------------------------------------------------------------------
 
 def course_complete(db: Session, learner: Learner, product_code: str) -> bool:
-    """Every module gate cleared, and every summative set that exists passed."""
-    modules = db.execute(
-        select(Module).where(Module.product_code == product_code)
-    ).scalars().all()
-    if not modules:
-        return False
-    for module in modules:
-        if not module_gate_passed(db, learner, module):
-            return False
-        if module_has_items(db, module.id, "summative"):
-            attempt = best_attempt(db, learner, module.id, "summative")
-            if not (attempt and attempt.passed):
-                return False
-    return True
+    """The owner's rule for the free certificate: every lesson of every
+    module complete AND every formative and summative set passed.
+
+    Itemised in certificates.completion_status; this is the boolean the
+    course endpoint, stats and the auto-issue hook all share. Lazy import —
+    certificates.py builds on this module.
+    """
+    from .certificates import completion_status  # noqa: PLC0415
+
+    return completion_status(db, learner, product_code)["complete"]
 
 
-def issue_certificate(
-    db: Session, learner: Learner, product_code: str
-) -> Certificate | None:
-    """Issue once, then return the existing row on every later call."""
-    existing = db.execute(
-        select(Certificate).where(
-            Certificate.learner_id == learner.id,
-            Certificate.product_code == product_code,
-        )
-    ).scalar_one_or_none()
-    if existing is not None:
-        return existing
-    if not course_complete(db, learner, product_code):
-        return None
+def issue_certificate(db: Session, learner: Learner, product_code: str) -> Certificate | None:
+    """Kept for older call sites: the completion tier, auto-issue semantics."""
+    from .certificates import maybe_issue_completion  # noqa: PLC0415
 
-    row = Certificate(
-        learner_id=learner.id,
-        product_code=product_code,
-        code=f"PRE-{secrets.token_hex(5).upper()}",
-        learner_name=learner.full_name or learner.email,
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return row
+    return maybe_issue_completion(db, learner, product_code)

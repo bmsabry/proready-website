@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
+  Award,
   Ban,
   BarChart3,
   Briefcase,
@@ -80,6 +81,7 @@ import {
   SettlementBadge,
   StatusBadge,
 } from './ui';
+import CertificationTab from './CertificationTab';
 
 type Props = {
   code: string;
@@ -97,6 +99,7 @@ const TAB_DEFS: { key: CourseTab; label: string; icon: React.ReactNode }[] = [
   { key: 'comms', label: 'Comms', icon: <Mail className="w-4 h-4" /> },
   { key: 'stats', label: 'Stats', icon: <BarChart3 className="w-4 h-4" /> },
   { key: 'materials', label: 'Materials', icon: <PlayCircle className="w-4 h-4" /> },
+  { key: 'certification', label: 'Certification', icon: <Award className="w-4 h-4" /> },
   { key: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" /> },
 ];
 
@@ -218,6 +221,13 @@ export default function CourseWorkspace({ code, tab, onTab, onBack, onAuthError 
       {course && tab === 'stats' && <StatsTab course={course} stats={stats} />}
       {course && tab === 'materials' && (
         <MaterialsTab
+          course={course}
+          onAuthError={onAuthError}
+          gotoSettings={() => onTab('settings')}
+        />
+      )}
+      {course && tab === 'certification' && (
+        <CertificationTab
           course={course}
           onAuthError={onAuthError}
           gotoSettings={() => onTab('settings')}

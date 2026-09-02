@@ -76,6 +76,11 @@ class ProductPatch(BaseModel):
     status: str | None = None
     sequential_gate: bool | None = None
     total_hours: float | None = Field(default=None, ge=0)
+    # Certification copy + the examined tier's switch and price.
+    certificate_descriptor: str | None = Field(default=None, max_length=600)
+    certificate_competencies: list[str] | None = None
+    advanced_cert_enabled: bool | None = None
+    advanced_cert_price_cents: int | None = Field(default=None, ge=0)
 
 
 class LessonPatch(BaseModel):
@@ -175,6 +180,10 @@ def patch_product(
                 detail="Set a price (or a Stripe price id) before going live.",
             )
 
+    if body.certificate_competencies is not None:
+        body.certificate_competencies = [
+            " ".join(str(x).split()) for x in body.certificate_competencies if str(x).strip()
+        ][:12]
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(product, field, value)
     db.commit()
