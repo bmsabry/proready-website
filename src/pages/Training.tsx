@@ -57,9 +57,7 @@ const courses = [
       ? `${FLAGSHIP_SNAPSHOT.dayDates.length} Days`
       : "4 Days",
     level: "Beginner to Expert",
-    attendees: FLAGSHIP_SNAPSHOT?.totalSeats
-      ? `${FLAGSHIP_SNAPSHOT.totalSeats} Seats`
-      : "15 Seats",
+    attendees: "Registration open",
     description: "De-mystify DLE combustion. Master the dynamics corridor, emissions mapping strategy, and flex-fuel troubleshooting from first principles to expert level. No prior gas turbine knowledge required.",
     nextDate: snapshotStartLabel(FLAGSHIP_CODE, "August 29, 2026"),
     slug: "gas-turbine-emissions-mapping",
@@ -74,9 +72,7 @@ const courses = [
       ? `${MGT_LIVE_SNAPSHOT.dayDates.length} Days`
       : "7 Days",
     level: "Design-Focused",
-    attendees: MGT_LIVE_SNAPSHOT?.totalSeats
-      ? `${MGT_LIVE_SNAPSHOT.totalSeats} Seats`
-      : "15 Seats",
+    attendees: "Registration open",
     description: "Design a 700 N single-shaft turbojet end to end, live with the instructor: architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Seven sessions of four hours over consecutive business days — with lifetime access to the complete recorded course included.",
     nextDate: snapshotStartLabel(MGT_LIVE_CODE, "October 1, 2026"),
     slug: "micro-gas-turbine-design-live",
@@ -516,7 +512,7 @@ const Training = () => {
       ? 'Registration closed'
       : flagshipLive.seatsRemaining === 0
         ? `Cohort full (${flagshipLive.totalSeats} seats)`
-        : `${flagshipLive.seatsRemaining} of ${flagshipLive.totalSeats} seats left`
+        : 'Registration open'
     : flagship.attendees;
   const flagshipDateLabel = flagshipLive ? flagshipLive.startDate : flagship.nextDate;
   // Price shows only when the API reports one; the SSR fallback stays priceless.
@@ -539,7 +535,7 @@ const Training = () => {
       ? 'Registration closed'
       : mgtLive.seatsRemaining === 0
         ? `Cohort full (${mgtLive.totalSeats} seats)`
-        : `${mgtLive.seatsRemaining} of ${mgtLive.totalSeats} seats left`
+        : 'Registration open'
     : mgtCourse.attendees;
   const mgtDateLabel = mgtLive ? mgtLive.startDate : mgtCourse.nextDate;
   const mgtPriceLabel =

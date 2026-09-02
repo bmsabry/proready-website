@@ -262,7 +262,6 @@ const GasTurbineEmissionsMapping = () => {
   const [capacity, setCapacity] = useState<number>(DEFAULT_CAPACITY);
   const [cohortDate, setCohortDate] = useState<string>(DEFAULT_COHORT_DATE);
   const [courseStatus, setCourseStatus] = useState<'open' | 'closed'>('open');
-  const [seatsLoading, setSeatsLoading] = useState(true);
   // Per-day dates (formatted "May 16, 2026"). Defaults to the hardcoded
   // schedule above; replaced by the API list when day_dates is non-empty.
   const [dayDates, setDayDates] = useState<string[]>(DEFAULT_DAY_DATES);
@@ -292,7 +291,6 @@ const GasTurbineEmissionsMapping = () => {
       if (!COURSE_ENDPOINT) {
         if (!cancelled) {
           setSeatsTaken(0);
-          setSeatsLoading(false);
         }
         return;
       }
@@ -324,12 +322,10 @@ const GasTurbineEmissionsMapping = () => {
           } else {
             setCohortDate(formatStartDate(data.start_date));
           }
-          setSeatsLoading(false);
         }
       } catch {
         if (!cancelled) {
           setSeatsTaken(0);
-          setSeatsLoading(false);
         }
       }
     };
@@ -365,12 +361,8 @@ const GasTurbineEmissionsMapping = () => {
     };
   }, [formState, registrationId, priceCents]);
 
-  const seatsRemaining =
-    seatsTaken === null ? capacity : Math.max(0, capacity - seatsTaken);
   const atCapacity = seatsTaken !== null && seatsTaken >= capacity;
   const isFull = atCapacity || courseStatus === 'closed';
-  const progressPct =
-    seatsTaken === null ? 0 : Math.min(100, (seatsTaken / capacity) * 100);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -512,13 +504,11 @@ const GasTurbineEmissionsMapping = () => {
                 Next cohort: {cohortDate}
               </FactChip>
               <FactChip icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />}>
-                {seatsLoading
-                  ? 'Seats: checking…'
-                  : courseStatus === 'closed'
-                    ? 'Registration closed'
-                    : atCapacity
-                      ? 'Cohort full'
-                      : `${seatsRemaining}/${capacity} seats left`}
+                {courseStatus === 'closed'
+                  ? 'Registration closed'
+                  : atCapacity
+                    ? 'Cohort full'
+                    : 'Registration open'}
               </FactChip>
               <FactChip icon={<Sparkles className="w-3.5 h-3.5" aria-hidden="true" />}>
                 {formatAmount(priceCents, currency)} per seat · over 60% off
@@ -595,22 +585,18 @@ const GasTurbineEmissionsMapping = () => {
       <div className="container-site">
         {/* SEATS BAR */}
         <div className="anim-enter mb-16 p-6 md:p-8 card">
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-1">
-                Seat availability: {cohortDate} cohort
+                Registration: {cohortDate} cohort
               </div>
               <div className="text-2xl font-bold">
-                {seatsLoading ? (
-                  <span className="text-slate-300">Loading…</span>
-                ) : courseStatus === 'closed' ? (
+                {courseStatus === 'closed' ? (
                   <span className="text-amber-400">Registration closed</span>
                 ) : atCapacity ? (
                   <span className="text-amber-400">Cohort full, waitlist only</span>
                 ) : (
-                  <span className="font-mono tabular-nums">
-                    {seatsRemaining} of {capacity} seats remaining
-                  </span>
+                  <span className="text-cyan-400">Registration open</span>
                 )}
               </div>
             </div>
@@ -626,14 +612,6 @@ const GasTurbineEmissionsMapping = () => {
                 Reserve my seat
               </a>
             )}
-          </div>
-          <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
-            <div
-              className={`h-full transition-all duration-500 ${
-                isFull ? 'bg-amber-500' : 'bg-cyan-500'
-              }`}
-              style={{ width: `${progressPct}%` }}
-            />
           </div>
         </div>
 
@@ -1005,7 +983,7 @@ const GasTurbineEmissionsMapping = () => {
               ? 'Registration is closed for this cohort.'
               : atCapacity
                 ? `All ${capacity} seats are taken. Join the waitlist for the next cohort.`
-                : `${seatsRemaining} of ${capacity} seats remaining.`}
+                : 'Registration is open for this cohort.'}
           </p>
 
           {formState === 'success' ? (
