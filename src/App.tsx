@@ -23,6 +23,8 @@ const LearnSignIn = lazy(() => import('./pages/learn/SignIn'));
 const LearnDashboard = lazy(() => import('./pages/learn/Dashboard'));
 const LearnLesson = lazy(() => import('./pages/learn/Lesson'));
 const LearnQuiz = lazy(() => import('./pages/learn/Quiz'));
+const LearnAdvancedExam = lazy(() => import('./pages/learn/AdvancedExam'));
+const VerifyCredential = lazy(() => import('./pages/Verify'));
 const LearnWelcome = lazy(() => import('./pages/learn/Welcome'));
 
 const GasTurbineCombustionConsulting = lazy(() => import('./pages/services/GasTurbineCombustionConsulting'));
@@ -102,6 +104,8 @@ function App() {
               <Route path="/learn/welcome" element={<LearnWelcome />} />
               <Route path="/learn/lesson/:lessonId" element={<LearnLesson />} />
               <Route path="/learn/quiz/:moduleId/:itemSet" element={<LearnQuiz />} />
+              <Route path="/learn/advanced-exam/:productCode" element={<LearnAdvancedExam />} />
+              <Route path="/verify/:code" element={<VerifyCredential />} />
               <Route path="/learn/:productCode" element={<LearnDashboard />} />
               <Route path="/insights" element={<Insights />} />
               <Route path="/case-studies" element={<CaseStudies />} />

@@ -29,6 +29,7 @@ import {
 } from './microGasTurbineCurriculum';
 import FormatSwitcher from './FormatSwitcher';
 import IndependenceNotice from './IndependenceNotice';
+import CertificationSection from './CertificationSection';
 import { formatIsoDate, snapshotStartLabel } from '../../data/courseSnapshot';
 
 /* ---------------------------------------------------------------------------
@@ -874,6 +875,9 @@ const MicroGasTurbineDesign: React.FC = () => {
         </div>
       </section>
 
+      {/* ---------------- Certification ---------------- */}
+      <CertificationSection courseTitle="Micro Gas Turbine Design" examinedPrice="$300" />
+
       {/* ---------------- How it works ---------------- */}
       <section className="section-pad">
         <div className="container-site">
@@ -883,7 +887,7 @@ const MicroGasTurbineDesign: React.FC = () => {
               { n: '01', t: 'Buy', d: 'Pay by card or US bank account through Stripe. Prefer Zelle? Contact us for an invoice.' },
               { n: '02', t: 'Check your email', d: 'A sign-in link lands within seconds. No password to invent or forget.' },
               { n: '03', t: 'Work through it', d: 'Watch, read, calculate. Progress saves as you go, on any device.' },
-              { n: '04', t: 'Clear the gates', d: 'Pass each module assessment to unlock the next, and earn the certificate.' },
+              { n: '04', t: 'Clear the gates', d: 'Pass each module assessment to unlock the next. Finish everything and your Certificate of Completion issues itself; go further with the instructor-examined credential.' },
             ].map((s, i) => (
               <Reveal key={s.n} delay={i * 0.05}>
                 <div className="h-full">

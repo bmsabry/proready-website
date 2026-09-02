@@ -459,6 +459,20 @@ class Product(Base):
     # 'draft' — visible to nobody but admin; 'live' — purchasable.
     status: Mapped[str] = mapped_column(String(16), default="draft", index=True)
 
+    # --- Certification -------------------------------------------------
+    # One sentence describing the programme, printed on both certificates.
+    # Empty = derived from the product summary at issue time.
+    certificate_descriptor: Mapped[str] = mapped_column(Text, default="")
+    # The competency areas the instructor examines, printed on the
+    # Certificate of Verified Competency. Empty = derived from module titles.
+    certificate_competencies: Mapped[list] = mapped_column(
+        JSON, nullable=False, default=list
+    )
+    # The paid, instructor-examined tier. Off until the advanced exam bank
+    # exists and the owner switches it on in the admin UI.
+    advanced_cert_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    advanced_cert_price_cents: Mapped[int] = mapped_column(Integer, default=30000)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -484,6 +498,10 @@ class Order(Base):
 
     # 'stripe' | 'paypal' | 'manual'
     provider: Mapped[str] = mapped_column(String(16), default="stripe")
+    # 'course' — buys the enrollment; 'advanced_cert' — buys the examined
+    # certification for a course the learner already holds. A refund of the
+    # latter must never touch the enrollment.
+    kind: Mapped[str] = mapped_column(String(16), default="course", index=True)
     # Stripe Checkout Session id — unique so webhook replays are idempotent.
     provider_ref: Mapped[str] = mapped_column(String(200), unique=True, index=True)
     payment_ref: Mapped[str] = mapped_column(String(200), default="")
@@ -862,7 +880,10 @@ class QuizItem(Base):
     code: Mapped[str] = mapped_column(String(32), index=True)
 
     # 'formative' (gates the next module) | 'summative' (counts toward final)
+    # | 'advanced' (the product-level written examination of the paid tier;
+    #   module_id is 0 and product_code names the course)
     item_set: Mapped[str] = mapped_column(String(16), default="formative", index=True)
+    product_code: Mapped[str] = mapped_column(String(64), default="", index=True)
     # 'mcq' | 'numeric' | 'short' | 'match'
     kind: Mapped[str] = mapped_column(String(16), default="mcq")
 
@@ -886,6 +907,8 @@ class QuizAttempt(Base):
     learner_id: Mapped[int] = mapped_column(Integer, index=True)
     module_id: Mapped[int] = mapped_column(Integer, index=True)
     item_set: Mapped[str] = mapped_column(String(16), default="formative", index=True)
+    # Set for product-level sets ('advanced'), where module_id is 0.
+    product_code: Mapped[str] = mapped_column(String(64), default="", index=True)
 
     # Percentage over auto-gradable items only (mcq/numeric/match). Short
     # answers are stored for tutor review and excluded from the gate so a
@@ -905,7 +928,19 @@ class QuizAttempt(Base):
 
 
 class Certificate(Base):
-    """Issued once a learner clears every module gate plus the capstone."""
+    """One issued credential.
+
+    Two tiers share the table:
+      'completion' — issued automatically the moment every lesson is complete
+                     and every module evaluation and mastery check is passed.
+      'verified'   — the instructor-examined tier; issued ONLY by an explicit
+                     admin outcome on an AdvancedCertification, never by code.
+
+    Every row is signed: `signature_b64` is an Ed25519 signature over the
+    canonical facts (see certificate_signing.canonical_payload) and the
+    rendered PDF is stored as an AssetBlob so the file anyone downloads is
+    byte-identical to `pdf_sha256`.
+    """
 
     __tablename__ = "academy_certificates"
 
@@ -918,6 +953,93 @@ class Certificate(Base):
     learner_name: Mapped[str] = mapped_column(String(200), default="")
     issued_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+
+    tier: Mapped[str] = mapped_column(String(16), default="completion", index=True)
+    # 'issued' | 'revoked'
+    status: Mapped[str] = mapped_column(String(16), default="issued", index=True)
+    revoke_reason: Mapped[str] = mapped_column(String(300), default="")
+
+    course_title: Mapped[str] = mapped_column(String(200), default="")
+    signature_b64: Mapped[str] = mapped_column(Text, default="")
+    signature_fingerprint: Mapped[str] = mapped_column(String(24), default="")
+    pdf_sha256: Mapped[str] = mapped_column(String(64), default="")
+    # AssetBlob keys of the rendered PDF and its PNG preview.
+    pdf_key: Mapped[str] = mapped_column(String(128), default="")
+    preview_key: Mapped[str] = mapped_column(String(128), default="")
+
+    # Verified tier only.
+    exam_date: Mapped[date | None] = mapped_column(Date, default=None)
+    exam_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    competencies: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    email_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+
+class AdvancedCertification(Base):
+    """A learner's journey through the paid, instructor-examined tier.
+
+    Strict state machine; nothing here issues a certificate by itself:
+
+      purchased        paid (or comped); the advanced written exam is open
+      exam_passed      written exam passed; learner proposes interview slots
+      slots_proposed   waiting for the instructor to confirm one
+      scheduled        interview booked (scheduled_at + meeting_url)
+      retake_pending   'not yet' outcome; one complimentary re-examination
+                       may be proposed on or after retake_after
+      passed           instructor recorded a pass → Certificate(tier=verified)
+      failed           did not demonstrate mastery on the re-examination
+      exam_failed      written exam attempts exhausted; admin may reset
+      cancelled        refunded / withdrawn
+    """
+
+    __tablename__ = "academy_advanced_certifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    learner_id: Mapped[int] = mapped_column(Integer, index=True)
+    product_code: Mapped[str] = mapped_column(String(64), index=True)
+    order_id: Mapped[int | None] = mapped_column(Integer, default=None)
+    # 'stripe' | 'paypal' | 'manual'
+    source: Mapped[str] = mapped_column(String(16), default="stripe")
+    amount_cents: Mapped[int] = mapped_column(Integer, default=0)
+    currency: Mapped[str] = mapped_column(String(3), default="usd")
+
+    status: Mapped[str] = mapped_column(String(16), default="purchased", index=True)
+
+    exam_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    exam_best_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    exam_passed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+    # Learner's proposed 60-minute windows, ISO-8601 UTC, plus their IANA zone
+    # so the admin sees both clocks.
+    proposed_slots: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    learner_timezone: Mapped[str] = mapped_column(String(64), default="")
+    learner_note: Mapped[str] = mapped_column(Text, default="")
+
+    scheduled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    meeting_url: Mapped[str] = mapped_column(String(500), default="")
+    # 1 = first examination, 2 = the complimentary re-examination.
+    interview_no: Mapped[int] = mapped_column(Integer, default=1)
+    retake_after: Mapped[date | None] = mapped_column(Date, default=None)
+
+    # Instructor's private notes on the outcome; never shown to the learner.
+    outcome_note: Mapped[str] = mapped_column(Text, default="")
+    outcome_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    certificate_id: Mapped[int | None] = mapped_column(Integer, default=None)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
 

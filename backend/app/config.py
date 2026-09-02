@@ -83,6 +83,28 @@ class Settings(BaseSettings):
     # the next module unlocks. Per the GT-05 curriculum sign-off.
     MASTERY_THRESHOLD_PCT: float = 80.0
 
+    # --- Certification ----------------------------------------------------
+    # Base64 of the 32-byte Ed25519 seed every certificate is signed with.
+    # NEVER rotate casually: all issued certificates verify against it.
+    CERT_SIGNING_KEY: str = ""
+    # Printed in the signature block of the instructor-examined tier and as
+    # the course instructor on the completion tier.
+    INSTRUCTOR_NAME: str = "Dr. Bassam Abdelnabi"
+    INSTRUCTOR_CREDENTIALS: str = "Ph.D., Aerospace Engineering"
+    INSTRUCTOR_TITLE: str = "Principal Consultant & Instructor, ProReadyEngineer LLC"
+    # AssetBlob key holding the instructor's handwritten signature (PNG with
+    # alpha). Uploaded through the admin assets endpoint, never committed —
+    # the repository is public. The verified tier refuses to issue without it.
+    INSTRUCTOR_SIGNATURE_ASSET_KEY: str = "instructor-signature.png"
+    # Written examination of the paid tier: pass mark and attempt cap.
+    ADVANCED_EXAM_THRESHOLD_PCT: float = 80.0
+    ADVANCED_EXAM_MAX_ATTEMPTS: int = 2
+    ADVANCED_INTERVIEW_MINUTES: int = 60
+    # LinkedIn "Add to profile" pre-fill. The numeric Company Page id makes
+    # the issuer show with the ProReadyEngineer logo; empty falls back to the
+    # organisation name as text.
+    LINKEDIN_ORGANIZATION_ID: str = ""
+
     # Click-wrap terms document version. Bump this string when the training
     # terms/liability notice changes materially — every learner is then asked
     # to accept the new version before opening protected material again.

@@ -237,6 +237,53 @@ def _seed_quiz_items(db: Session, product_code: str) -> int:
     return count
 
 
+def _seed_certification(db: Session, product: Product, spec: dict) -> int:
+    """Certificate copy (only when the operator has not set it) and the
+    product-level advanced examination bank (idempotent by item code)."""
+    cert_spec = spec.get("certification") or {}
+    if cert_spec.get("descriptor") and not (product.certificate_descriptor or "").strip():
+        product.certificate_descriptor = cert_spec["descriptor"]
+    if cert_spec.get("competencies") and not (product.certificate_competencies or []):
+        product.certificate_competencies = list(cert_spec["competencies"])
+    db.commit()
+
+    exam_file = cert_spec.get("advanced_exam_file")
+    if not exam_file:
+        return 0
+    items = _load(DATA_DIR / exam_file)
+    if not items:
+        return 0
+    existing = {
+        i.code: i
+        for i in db.execute(
+            select(QuizItem).where(
+                QuizItem.product_code == product.code, QuizItem.item_set == "advanced"
+            )
+        ).scalars().all()
+    }
+    count = 0
+    for item_spec in items:
+        code = item_spec["code"]
+        item = existing.get(code)
+        if item is None:
+            item = QuizItem(module_id=0, product_code=product.code, code=code, item_set="advanced")
+            db.add(item)
+        item.kind = item_spec.get("kind", "mcq")
+        item.stem = item_spec.get("stem", "")
+        item.options = list(item_spec.get("options") or [])
+        item.answer = dict(item_spec.get("answer") or {})
+        item.rubric = item_spec.get("rubric", "")
+        item.explanation = item_spec.get("explanation", "")
+        item.cognitive_level = item_spec.get("cognitive_level", "")
+        item.outcome_id = item_spec.get("outcome_id", "")
+        item.position = int(item_spec.get("module_position", 0)) * 100 + int(
+            item_spec.get("position", 0)
+        )
+        count += 1
+    db.commit()
+    return count
+
+
 def seed_academy() -> None:
     """Entry point called once at app startup."""
     manifest = _load(MANIFEST_PATH)
@@ -251,6 +298,7 @@ def seed_academy() -> None:
             module = _seed_module(db, product.code, module_spec)
             _seed_lessons(db, module, module_spec)
         items = _seed_quiz_items(db, product.code)
+        _seed_certification(db, product, manifest["product"])
         log.info(
             "Academy seed complete: product=%s modules=%d quiz_items=%d status=%s",
             product.code,

@@ -5,7 +5,20 @@
     "subtitle": "Design a 700 N single-shaft turbojet end to end, from gas path stations to CFD and combustor analysis.",
     "summary": "Seven sessions and 28.5 hours on the design of a small single-shaft turbojet, starting from engine architecture and material selection and working through centrifugal compressor aerodynamics, the evaporative tube combustor and the single-stage axial turbine. The later modules turn to analysis: compressor map generation and surge margin, CFD setup and validation for turbomachinery, and combustor heat release, liner cooling and fuel scheduling. Worked examples track a 700 N class reference engine throughout, and five of the seven sessions carry recorded video, design spreadsheets and interactive tools.",
     "total_hours": 28.5,
-    "module_count": 7
+    "module_count": 7,
+    "certification": {
+      "descriptor": "A 28.5-hour, seven-module programme on the design of a small single-shaft turbojet: engine architecture and material selection, centrifugal compressor aerodynamics, the evaporative tube combustor, the single-stage axial turbine, compressor performance mapping and surge margin, CFD for turbomachinery, and combustor heat release, liner cooling and fuel scheduling.",
+      "competencies": [
+        "Single-shaft turbojet architecture: gas-path stations, component function and interfaces, and material selection",
+        "Centrifugal compressor aerodynamics: inlet velocity triangles, Euler work, slip and diffuser pressure recovery",
+        "Evaporative tube combustor: operating principle, primary-zone air split, equivalence ratio and fuel-air ratio",
+        "Axial turbine stage: NGV and rotor velocity triangles, stage loading and structural failure modes",
+        "Compressor performance maps: speed lines, surge margin and operating-line placement",
+        "CFD for turbomachinery: RANS set-up, interpretation and validation of results",
+        "Combustor design analysis: heat release, pattern factor, liner cooling and start-sequence fuel scheduling"
+      ],
+      "advanced_exam_file": "mgt_advanced_exam.json"
+    }
   },
   "modules": [
     {

@@ -14,6 +14,8 @@ from .db import Base, SessionLocal, engine
 from .models import Course, SoftwareProduct
 from .routes import academy as academy_routes
 from .routes import academy_admin as academy_admin_routes
+from .routes import certification as certification_routes
+from .routes import certification_admin as certification_admin_routes
 from .routes import admin as admin_routes
 from .routes import ai as ai_routes
 from .routes import auth as auth_routes
@@ -160,6 +162,40 @@ def _run_column_migrations() -> None:
     _ensure_column(
         "courses", "session_duration_minutes", "INTEGER NOT NULL DEFAULT 0"
     )
+    # Certification tiers (2026-09). academy_advanced_certifications is a new
+    # table (create_all builds it complete); the columns below land on tables
+    # that already exist in production.
+    json_empty_list = "'[]'::json" if engine.dialect.name == "postgresql" else "'[]'"
+    _ensure_column("academy_products", "certificate_descriptor", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(
+        "academy_products", "certificate_competencies",
+        f"JSON NOT NULL DEFAULT {json_empty_list}",
+    )
+    _ensure_column(
+        "academy_products", "advanced_cert_enabled", "BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    _ensure_column(
+        "academy_products", "advanced_cert_price_cents", "INTEGER NOT NULL DEFAULT 30000"
+    )
+    _ensure_column("academy_orders", "kind", "VARCHAR(16) NOT NULL DEFAULT 'course'")
+    _ensure_column("academy_quiz_items", "product_code", "VARCHAR(64) NOT NULL DEFAULT ''")
+    _ensure_column("academy_quiz_attempts", "product_code", "VARCHAR(64) NOT NULL DEFAULT ''")
+    for column, ddl in [
+        ("tier", "VARCHAR(16) NOT NULL DEFAULT 'completion'"),
+        ("status", "VARCHAR(16) NOT NULL DEFAULT 'issued'"),
+        ("revoke_reason", "VARCHAR(300) NOT NULL DEFAULT ''"),
+        ("course_title", "VARCHAR(200) NOT NULL DEFAULT ''"),
+        ("signature_b64", "TEXT NOT NULL DEFAULT ''"),
+        ("signature_fingerprint", "VARCHAR(24) NOT NULL DEFAULT ''"),
+        ("pdf_sha256", "VARCHAR(64) NOT NULL DEFAULT ''"),
+        ("pdf_key", "VARCHAR(128) NOT NULL DEFAULT ''"),
+        ("preview_key", "VARCHAR(128) NOT NULL DEFAULT ''"),
+        ("exam_date", "DATE"),
+        ("exam_minutes", "INTEGER NOT NULL DEFAULT 0"),
+        ("competencies", f"JSON NOT NULL DEFAULT {json_empty_list}"),
+        ("email_sent_at", "TIMESTAMP WITH TIME ZONE"),
+    ]:
+        _ensure_column("academy_certificates", column, ddl)
 
 
 _run_column_migrations()
@@ -283,6 +319,8 @@ app.include_router(software_routes.public_router)
 app.include_router(software_routes.admin_router)
 app.include_router(stats_routes.router)
 app.include_router(academy_routes.router)
+app.include_router(certification_routes.router)
+app.include_router(certification_admin_routes.router)
 app.include_router(checkout_routes.router)
 app.include_router(payments_routes.router)
 app.include_router(academy_admin_routes.router)

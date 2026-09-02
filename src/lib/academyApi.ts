@@ -291,7 +291,180 @@ export const academy = {
     }),
 
   myCourses: () => request<{ courses: MyCourse[] }>('/api/academy/my-courses'),
+
+  /* ---- certification (both tiers) ---- */
+  certification: (code: string) =>
+    request<CertificationStatus>(`/api/academy/certification/${code}`),
+
+  claimCertificate: (code: string) =>
+    request<IssuedCertificate>(`/api/academy/certificate/${code}`, { method: 'POST' }),
+
+  setName: (fullName: string) =>
+    request<{ ok: boolean; full_name: string; issued: string[] }>(
+      '/api/academy/profile/name',
+      { method: 'POST', body: JSON.stringify({ full_name: fullName }) }
+    ),
+
+  advancedCheckout: (code: string) =>
+    request<{ url: string; session_id: string }>(`/api/academy/advanced/${code}/checkout`, {
+      method: 'POST',
+    }),
+
+  advancedExam: (code: string) => request<AdvancedExamSet>(`/api/academy/advanced/${code}/exam`),
+
+  submitAdvancedExam: (code: string, responses: Record<string, unknown>) =>
+    request<AdvancedExamResult>(`/api/academy/advanced/${code}/exam`, {
+      method: 'POST',
+      body: JSON.stringify({ responses }),
+    }),
+
+  proposeSlots: (code: string, slots: string[], timezone: string, note: string) =>
+    request<CertificationStatus['advanced']>(`/api/academy/advanced/${code}/slots`, {
+      method: 'POST',
+      body: JSON.stringify({ slots, timezone, note }),
+    }),
+
+  /* Public — no session needed. */
+  verifyCertificate: (certCode: string) =>
+    request<VerifyResult>(`/api/academy/verify/${encodeURIComponent(certCode)}`),
 };
+
+/* ---------- certification types ---------- */
+
+export type IssuedCertificate = {
+  code: string;
+  tier: 'completion' | 'verified';
+  title: string;
+  status: 'issued' | 'revoked';
+  learner_name: string;
+  course_title: string;
+  issued_at: string;
+  exam_date: string | null;
+  signature_fingerprint: string;
+  pdf_sha256: string;
+  verify_url: string;
+  /* API-relative; prefix with API_BASE. */
+  pdf_url: string;
+  preview_url: string;
+  linkedin: { add_to_profile: string; share: string };
+  site_url: string;
+};
+
+export type CompletionModuleStatus = {
+  id: number;
+  code: string;
+  title: string;
+  lessons_total: number;
+  lessons_done: number;
+  formative: { passed: boolean; best_score: number | null } | null;
+  summative: { passed: boolean; best_score: number | null } | null;
+};
+
+export type AdvancedState = {
+  id: number;
+  status:
+    | 'purchased'
+    | 'exam_passed'
+    | 'slots_proposed'
+    | 'scheduled'
+    | 'retake_pending'
+    | 'passed'
+    | 'failed'
+    | 'exam_failed'
+    | 'cancelled';
+  exam_attempts: number;
+  exam_best_pct: number;
+  exam_open: boolean;
+  can_propose: boolean;
+  propose_blocked_reason: string;
+  proposed_slots: string[];
+  learner_timezone: string;
+  scheduled_at: string | null;
+  scheduled_lines: string[];
+  meeting_url: string;
+  interview_no: number;
+  retake_after: string | null;
+  created_at: string;
+};
+
+export type CertificationStatus = {
+  full_name: string;
+  name_locked: boolean;
+  completion: {
+    complete: boolean;
+    lessons_total: number;
+    lessons_done: number;
+    sets_total: number;
+    sets_passed: number;
+    modules: CompletionModuleStatus[];
+    certificate: IssuedCertificate | null;
+    awaiting_name: boolean;
+  };
+  advanced: {
+    offered: boolean;
+    price_cents: number;
+    currency: string;
+    interview_minutes: number;
+    exam_threshold: number;
+    exam_max_attempts: number;
+    exam_item_count: number;
+    can_purchase: boolean;
+    purchase_blocked_reason: string;
+    competencies: string[];
+    state: AdvancedState | null;
+    certificate: IssuedCertificate | null;
+  };
+};
+
+export type AdvancedExamSet = {
+  product: { code: string; title: string };
+  item_set: 'advanced';
+  threshold: number;
+  attempts_used: number;
+  attempts_max: number;
+  items: QuizItem[];
+};
+
+export type AdvancedExamResult = {
+  score_pct: number;
+  passed: boolean;
+  auto_correct: number;
+  auto_total: number;
+  threshold: number;
+  attempts_used: number;
+  attempts_max: number;
+  status: AdvancedState['status'];
+  feedback: { code: string; correct: boolean | null; needs_review: boolean }[];
+};
+
+export type VerifyResult = {
+  valid: boolean;
+  code: string;
+  status?: 'issued' | 'revoked';
+  revoke_reason?: string;
+  tier?: 'completion' | 'verified';
+  title?: string;
+  learner_name?: string;
+  course?: string;
+  product_code?: string;
+  issued_at?: string;
+  exam_date?: string | null;
+  exam_minutes?: number;
+  competencies?: string[];
+  signature_valid?: boolean;
+  signature_fingerprint?: string;
+  signing_key_id?: string;
+  public_key_b64?: string;
+  pdf_sha256?: string;
+  has_pdf?: boolean;
+  has_preview?: boolean;
+  instructor?: string;
+  issuer?: string;
+};
+
+export function certificateFileUrl(certCode: string, kind: 'pdf' | 'png'): string {
+  return `${API_BASE}/api/academy/verify/${encodeURIComponent(certCode)}/certificate.${kind}`;
+}
 
 export type MyCourse = {
   code: string;

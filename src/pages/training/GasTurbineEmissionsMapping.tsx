@@ -25,6 +25,7 @@ import {
   snapshotStartLabel,
 } from '../../data/courseSnapshot';
 import IndependenceNotice from './IndependenceNotice';
+import CertificationSection from './CertificationSection';
 
 // -----------------------------------------------------------------------------
 // Course constants
@@ -1239,7 +1240,12 @@ const GasTurbineEmissionsMapping = () => {
             </form>
           )}
         </Reveal>
+      </div>
 
+      {/* ---------------- Certification ---------------- */}
+      <CertificationSection courseTitle="Gas Turbine Emissions Mapping" examinedPrice="$300" examinedAvailable={false} />
+
+      <div className="container-site">
         {/* Legal independence notice — shown on every course page */}
         <div className="mt-8">
           <IndependenceNotice />

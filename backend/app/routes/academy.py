@@ -462,7 +462,9 @@ def course(
     done_lessons = sum(m["lessons_completed"] for m in modules)
     certificate = db.execute(
         select(Certificate).where(
-            Certificate.learner_id == learner.id, Certificate.product_code == code
+            Certificate.learner_id == learner.id,
+            Certificate.product_code == code,
+            Certificate.tier == "completion",
         )
     ).scalar_one_or_none()
     return {
@@ -591,9 +593,18 @@ def lesson_progress(
             raise GateLocked(reason)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=reason)
 
+    before = svc.progress_map(db, learner, [lesson.id]).get(lesson.id)
+    was_complete = before is not None and before.completed_at is not None
     row = svc.record_progress(
         db, learner, lesson, body.position_s, body.watched_delta_s
     )
+    if row.completed_at is not None and not was_complete:
+        # This heartbeat completed a lesson: it may have been the last one.
+        from .. import certificates as certs  # noqa: PLC0415
+
+        module = db.get(Module, lesson.module_id)
+        if module is not None:
+            certs.maybe_issue_completion(db, learner, module.product_code)
     return {
         "ok": True,
         "position_s": row.position_s,
@@ -664,6 +675,12 @@ def submit_quiz(
     module = _module_for_learner(db, module_id, learner)
 
     attempt = svc.grade_submission(db, learner, module, item_set, body.responses or {})
+    if attempt.passed:
+        # A pass may have been the last thing standing between the learner
+        # and the Certificate of Completion — issue it now, no button.
+        from .. import certificates as certs  # noqa: PLC0415
+
+        certs.maybe_issue_completion(db, learner, module.product_code)
 
     items = {
         i.code: i
@@ -697,48 +714,7 @@ def submit_quiz(
     }
 
 
-# -----------------------------------------------------------------------------
-# Certificates
-# -----------------------------------------------------------------------------
-
-@router.post("/certificate/{code}")
-def request_certificate(
-    code: str,
-    db: Session = Depends(get_db),
-    learner: Learner = Depends(require_learner),
-) -> dict:
-    _product_or_404(db, code)
-    if not svc.has_access(db, learner, code):
-        raise HTTPException(status_code=403, detail="You don't have access to this course.")
-    cert = svc.issue_certificate(db, learner, code)
-    if cert is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Finish every module and its assessments to earn the certificate.",
-        )
-    return {
-        "code": cert.code,
-        "learner_name": cert.learner_name,
-        "issued_at": cert.issued_at,
-    }
-
-
-@router.get("/verify/{cert_code}")
-def verify_certificate(cert_code: str, db: Session = Depends(get_db)) -> dict:
-    """Public certificate check. Returns the holder's name and course only."""
-    cert = db.execute(
-        select(Certificate).where(Certificate.code == cert_code.upper().strip())
-    ).scalar_one_or_none()
-    if cert is None:
-        return {"valid": False}
-    product = db.get(Product, cert.product_code)
-    return {
-        "valid": True,
-        "code": cert.code,
-        "learner_name": cert.learner_name,
-        "course": product.title if product else cert.product_code,
-        "issued_at": cert.issued_at,
-    }
+# Certificates: see routes/certification.py (both tiers, public verification).
 
 
 # -----------------------------------------------------------------------------

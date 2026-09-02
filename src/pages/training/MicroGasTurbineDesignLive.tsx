@@ -32,6 +32,7 @@ import {
 import { MODULES, COURSE_SUBTITLE } from './microGasTurbineCurriculum';
 import FormatSwitcher from './FormatSwitcher';
 import IndependenceNotice from './IndependenceNotice';
+import CertificationSection from './CertificationSection';
 
 // -----------------------------------------------------------------------------
 // Course constants
@@ -1192,7 +1193,12 @@ const MicroGasTurbineDesignLive = () => {
             </form>
           )}
         </Reveal>
+      </div>
 
+      {/* ---------------- Certification ---------------- */}
+      <CertificationSection courseTitle="Micro Gas Turbine Design" examinedPrice="$300" />
+
+      <div className="container-site">
         {/* Legal independence notice — shown on every course page */}
         <div className="mt-8">
           <IndependenceNotice />

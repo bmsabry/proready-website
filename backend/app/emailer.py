@@ -150,6 +150,7 @@ def send_email(
     headers: Optional[dict] = None,
     from_override: Optional[str] = None,
     text: Optional[str] = None,
+    attachments: Optional[list] = None,
 ) -> bool:
     """Send one email via Resend. Returns True on 2xx, False otherwise.
 
@@ -168,6 +169,8 @@ def send_email(
     new one; nothing else needs it. `from_override` lets the support desk
     send as its own address while the rest of the platform keeps
     EMAIL_FROM, and `text` supplies a plain-text alternative part.
+    `attachments` is a list of {"filename", "content" (base64)} dicts in
+    Resend's own shape — certificates ride along as PDFs.
     """
     settings = get_settings()
 
@@ -205,6 +208,8 @@ def send_email(
             clean = {k: v for k, v in headers.items() if v}
             if clean:
                 payload["headers"] = clean
+        if attachments:
+            payload["attachments"] = list(attachments)
 
         r = _resend_post(RESEND_URL, payload, settings.RESEND_API_KEY)
         if r is None:
@@ -755,3 +760,180 @@ def settlement_failed_admin_html(
         margin="0",
     )
     return _shell("Payments", "Bank payment failed", body)
+
+
+# -----------------------------------------------------------------------------
+# Certification
+# -----------------------------------------------------------------------------
+
+_TIER_TITLES = {
+    "completion": "Certificate of Completion",
+    "verified": "Certificate of Verified Competency",
+}
+
+
+def certificate_issued_html(
+    full_name: str,
+    course_title: str,
+    tier: str,
+    code: str,
+    verify_url: str,
+    dashboard_url: str,
+) -> str:
+    """The certificate itself is attached as a PDF; this carries the links."""
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    title = _TIER_TITLES.get(tier, "Certificate")
+    body = _p(greeting)
+    if tier == "verified":
+        body += _p(
+            f"Congratulations. Your <strong>{title}</strong> for "
+            f"<strong>{course_title}</strong> is attached. It is signed by your "
+            "examiner and records that you were examined live, one-on-one, and "
+            "demonstrated a verified command of the subject."
+        )
+    else:
+        body += _p(
+            f"Congratulations — you have completed <strong>{course_title}</strong>. "
+            f"Your <strong>{title}</strong> is attached as a PDF."
+        )
+    body += _kv_table(
+        [
+            ("Credential ID", f"<strong>{code}</strong>"),
+            ("Verify at", _link(verify_url)),
+        ]
+    )
+    body += _p(
+        "Anyone can confirm this credential at the link above — it checks the "
+        "digital signature and shows exactly what was attested. From your course "
+        "page you can download the PDF again, add the credential to your LinkedIn "
+        "profile, or share it.",
+    )
+    body += _cta_button("Open your course page", dashboard_url)
+    return _shell("Credential issued", f"Your {title}", body)
+
+
+def advanced_purchased_html(
+    full_name: str, course_title: str, exam_url: str, price_display: str
+) -> str:
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    body = _p(greeting)
+    body += _p(
+        f"Thank you — your payment for the <strong>instructor-examined "
+        f"certification</strong> in <strong>{course_title}</strong> went through."
+    )
+    body += _p("<strong>What happens next</strong>", margin="0 0 8px")
+    body += _p(
+        "1. Pass the advanced written examination from your course page.<br>"
+        "2. Propose three 60-minute windows for your live oral examination.<br>"
+        "3. Your examiner confirms one and sends the meeting link.<br>"
+        "4. After the examination, a pass issues your signed "
+        "Certificate of Verified Competency.",
+        margin="0 0 22px",
+    )
+    if price_display:
+        body += _kv_table([("Amount", price_display)])
+    body += _cta_button("Start the written examination", exam_url)
+    body += _p(
+        "The fee pays for the examination, not the outcome. If you do not "
+        "demonstrate mastery at the first session, one complimentary "
+        "re-examination is offered after a study period.",
+        size=13,
+        color=MUTED,
+        margin="0",
+    )
+    return _shell("Instructor-examined certification", "You're registered for the examination", body)
+
+
+def advanced_exam_passed_html(full_name: str, course_title: str, score: float, slots_url: str) -> str:
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    body = _p(greeting)
+    body += _p(
+        f"You passed the advanced written examination for <strong>{course_title}</strong> "
+        f"with <strong>{score:g}%</strong>. The next step is your live oral examination."
+    )
+    body += _p(
+        "From your course page, propose three 60-minute windows that suit you. "
+        "Your examiner will confirm one and you will receive the meeting link by email.",
+        margin="0 0 22px",
+    )
+    body += _cta_button("Propose your interview times", slots_url)
+    return _shell("Written examination passed", "Now book your oral examination", body)
+
+
+def advanced_slots_admin_html(
+    learner_name: str, learner_email: str, course_title: str,
+    slots_lines: "list[str]", note: str, admin_url: str,
+) -> str:
+    body = _p(
+        f"<strong>{learner_name or learner_email}</strong> ({learner_email}) passed the "
+        f"written examination for <strong>{course_title}</strong> and proposed these "
+        "windows for the live oral examination:"
+    )
+    body += _p("<br>".join(slots_lines), margin="0 0 18px")
+    if note:
+        body += _p(f"Note from the candidate: <em>{note}</em>")
+    body += _cta_button("Confirm a slot in the admin panel", admin_url)
+    return _shell("Oral examination requested", "A candidate is waiting for a time", body)
+
+
+def advanced_scheduled_html(
+    full_name: str, course_title: str, when_lines: "list[str]", meeting_url: str,
+    minutes: int, interview_no: int, dashboard_url: str,
+) -> str:
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    body = _p(greeting)
+    what = "re-examination" if interview_no > 1 else "oral examination"
+    body += _p(
+        f"Your live {what} for <strong>{course_title}</strong> is confirmed."
+    )
+    body += _kv_table(
+        [("When", "<br>".join(when_lines)), ("Duration", f"{minutes} minutes"),
+         ("Meeting link", _link(meeting_url) if meeting_url else "Sent separately")]
+    )
+    body += _p(
+        "Please join from a quiet place with your camera on. You will be asked to "
+        "show a photo ID at the start. Questions are asked without notice and you "
+        "may be given design cases not covered in the course; think aloud — the "
+        "reasoning is what is being examined.",
+    )
+    if meeting_url:
+        body += _cta_button("Join the examination", meeting_url)
+    body += _p(f"Your course page: {_link(dashboard_url)}", size=13, color=MUTED, margin="0")
+    return _shell("Oral examination confirmed", "Your examination is booked", body)
+
+
+def advanced_outcome_retake_html(
+    full_name: str, course_title: str, retake_after: str, dashboard_url: str
+) -> str:
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    body = _p(greeting)
+    body += _p(
+        f"Thank you for your oral examination in <strong>{course_title}</strong>. "
+        "Your examiner concluded that mastery was not yet demonstrated across all "
+        "of the principles examined."
+    )
+    body += _p(
+        f"One complimentary re-examination is included. Take some time with the "
+        f"material and, on or after <strong>{retake_after}</strong>, propose new "
+        "windows from your course page.",
+        margin="0 0 22px",
+    )
+    body += _cta_button("Open your course page", dashboard_url)
+    return _shell("Oral examination", "Not yet — a re-examination is available", body)
+
+
+def advanced_outcome_failed_html(full_name: str, course_title: str) -> str:
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    body = _p(greeting)
+    body += _p(
+        f"Thank you for your re-examination in <strong>{course_title}</strong>. "
+        "Your examiner concluded that mastery was not demonstrated, so no "
+        "Certificate of Verified Competency is issued at this time."
+    )
+    body += _p(
+        "Your Certificate of Completion stands, and you keep full access to the "
+        "course. If you would like to be examined again in the future, reply to "
+        "this email.",
+        margin="0",
+    )
+    return _shell("Oral examination", "Outcome of your re-examination", body)
