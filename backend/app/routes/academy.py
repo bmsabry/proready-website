@@ -1286,10 +1286,25 @@ def my_courses(
         p.code: p for p in db.execute(select(Product)).scalars().all()
     }
 
+    from .. import certificates as certs  # noqa: PLC0415
+
     def pack(p: Product, access: str) -> dict:
         module_count = db.execute(
             select(Module).where(Module.product_code == p.code)
         ).scalars().all()
+        # Progress and credentials ride along so the /learn hub can show, per
+        # course, how far the learner is and what they have already earned
+        # without opening each one.
+        status_ = certs.completion_status(db, learner, p.code)
+        issued = []
+        for tier in ("completion", "verified"):
+            cert = certs.get_certificate(db, learner, p.code, tier)
+            if cert is not None and cert.status == "issued":
+                issued.append({
+                    "tier": tier,
+                    "code": cert.code,
+                    "issued_at": cert.issued_at.isoformat() if cert.issued_at else None,
+                })
         return {
             "code": p.code,
             "title": p.title,
@@ -1299,6 +1314,14 @@ def my_courses(
             "module_count": len(module_count),
             # 'owner' | 'full' | 'partial'
             "access": access,
+            "progress": {
+                "lessons_done": status_["lessons_done"],
+                "lessons_total": status_["lessons_total"],
+                "sets_passed": status_["sets_passed"],
+                "sets_total": status_["sets_total"],
+                "complete": bool(status_["complete"]),
+            },
+            "certificates": issued,
         }
 
     out: list[dict] = []

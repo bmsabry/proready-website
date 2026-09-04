@@ -432,6 +432,11 @@ def test_my_courses_lists_partial_and_full_access(client, setup):
     )
     courses = {c["code"]: c for c in s.get("/api/academy/my-courses").json()["courses"]}
     assert courses[PRODUCT]["access"] == "full"
+    # The hub shows progress and earned credentials per course.
+    prog = courses[PRODUCT]["progress"]
+    assert set(prog) == {"lessons_done", "lessons_total", "sets_passed", "sets_total", "complete"}
+    assert prog["lessons_total"] >= 1 and prog["complete"] is False
+    assert courses[PRODUCT]["certificates"] == []
     # Cleanup so later runs start from the partial state again.
     client.post(
         "/api/admin/academy/revoke",

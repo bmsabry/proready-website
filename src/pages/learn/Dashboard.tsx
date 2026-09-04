@@ -5,6 +5,7 @@ import {
   BookOpen,
   Check,
   ChevronRight,
+  Download,
   FileSpreadsheet,
   FlaskConical,
   GraduationCap,
@@ -18,6 +19,7 @@ import { usePageMeta } from '../../lib/meta';
 import {
   academy,
   ApiError,
+  certificateFileUrl,
   CourseState,
   formatDuration,
   LessonSummary,
@@ -457,46 +459,128 @@ const TermsGate = ({
   );
 };
 
-/* The /learn landing when an account holds more than one course: pick one.
- * Students with a single course never see this — they land straight in it. */
+/* The /learn landing when an account holds more than one course: the hub.
+ * Each card says how far along the learner is and what they have earned,
+ * with the certificate one click away, so nobody has to open a course to
+ * find out whether they finished it. Students with a single course never
+ * see this — they land straight in it. */
 const CourseChooser = ({ courses }: { courses: MyCourse[] }) => (
   <div className="space-y-4">
     <p className="text-slate-300">
       Choose the course you want to open. Your progress is saved per course.
     </p>
-    {courses.map((c) => (
-      <Link
-        key={c.code}
-        to={`/learn/${c.code}`}
-        className="card p-6 flex flex-wrap items-center gap-4 hover:border-cyan-500/40 transition-colors"
-      >
-        <span className="flex-1 min-w-[16rem]">
-          <span className="block text-lg font-semibold text-white leading-snug">
-            {c.title}
-          </span>
-          {c.subtitle && (
-            <span className="block text-sm text-slate-400 mt-1">{c.subtitle}</span>
+    {courses.map((c) => {
+      const p = c.progress;
+      const total = p.lessons_total + p.sets_total;
+      const done = p.lessons_done + p.sets_passed;
+      const pct = total > 0 ? Math.round((100 * done) / total) : 0;
+      const completion = c.certificates.find((x) => x.tier === 'completion');
+      const verified = c.certificates.find((x) => x.tier === 'verified');
+      return (
+        <div
+          key={c.code}
+          className="card p-6 hover:border-cyan-500/40 transition-colors"
+        >
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="flex-1 min-w-[16rem]">
+              <Link to={`/learn/${c.code}`} className="block text-lg font-semibold text-white leading-snug hover:text-cyan-300">
+                {c.title}
+              </Link>
+              {c.subtitle && (
+                <span className="block text-sm text-slate-400 mt-1">{c.subtitle}</span>
+              )}
+              <span className="flex flex-wrap items-center gap-3 mt-3 text-xs font-mono uppercase tracking-wider text-slate-500">
+                <span>{c.module_count} modules</span>
+                {c.total_hours > 0 && <span>{c.total_hours} hrs</span>}
+                {c.access === 'partial' && (
+                  <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                    Partial access
+                  </span>
+                )}
+                {c.access === 'owner' && c.status === 'draft' && (
+                  <span className="px-1.5 py-0.5 rounded bg-slate-700/40 border border-slate-600 text-slate-400">
+                    Draft
+                  </span>
+                )}
+                {p.complete && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                    <Check className="w-3 h-3" aria-hidden="true" /> Completed
+                  </span>
+                )}
+              </span>
+            </span>
+            <Link to={`/learn/${c.code}`} className="btn-primary shrink-0">
+              {p.complete ? 'Open' : done > 0 ? 'Continue' : 'Start'}{' '}
+              <ChevronRight className="w-4 h-4" aria-hidden="true" />
+            </Link>
+          </div>
+
+          {total > 0 && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
+                <span>
+                  {p.lessons_done} of {p.lessons_total} lessons
+                  {p.sets_total > 0 ? ` · ${p.sets_passed} of ${p.sets_total} evaluations passed` : ''}
+                </span>
+                <span className="font-mono">{pct}%</span>
+              </div>
+              <div
+                className="h-1.5 rounded-full bg-slate-800 overflow-hidden"
+                role="progressbar"
+                aria-valuenow={pct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${c.title} progress`}
+              >
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-300"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
           )}
-          <span className="flex flex-wrap items-center gap-3 mt-3 text-xs font-mono uppercase tracking-wider text-slate-500">
-            <span>{c.module_count} modules</span>
-            {c.total_hours > 0 && <span>{c.total_hours} hrs</span>}
-            {c.access === 'partial' && (
-              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
-                Partial access
-              </span>
-            )}
-            {c.access === 'owner' && c.status === 'draft' && (
-              <span className="px-1.5 py-0.5 rounded bg-slate-700/40 border border-slate-600 text-slate-400">
-                Draft
-              </span>
-            )}
-          </span>
-        </span>
-        <span className="btn-primary shrink-0">
-          Open <ChevronRight className="w-4 h-4" aria-hidden="true" />
-        </span>
-      </Link>
-    ))}
+
+          {(completion || verified) && (
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              {completion && (
+                <span className="inline-flex flex-wrap items-center gap-2 text-slate-300">
+                  <Award className="w-4 h-4 text-cyan-400" aria-hidden="true" />
+                  Certificate of Completion
+                  <a
+                    href={certificateFileUrl(completion.code, 'pdf')}
+                    target="_blank"
+                    rel="noopener"
+                    className="inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300"
+                  >
+                    <Download className="w-3.5 h-3.5" aria-hidden="true" /> PDF
+                  </a>
+                  <Link to={`/verify/${completion.code}`} className="text-slate-400 hover:text-white font-mono text-xs">
+                    {completion.code}
+                  </Link>
+                </span>
+              )}
+              {verified && (
+                <span className="inline-flex flex-wrap items-center gap-2 text-slate-300">
+                  <ShieldCheck className="w-4 h-4 text-cyan-400" aria-hidden="true" />
+                  Certificate of Verified Competency
+                  <a
+                    href={certificateFileUrl(verified.code, 'pdf')}
+                    target="_blank"
+                    rel="noopener"
+                    className="inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300"
+                  >
+                    <Download className="w-3.5 h-3.5" aria-hidden="true" /> PDF
+                  </a>
+                  <Link to={`/verify/${verified.code}`} className="text-slate-400 hover:text-white font-mono text-xs">
+                    {verified.code}
+                  </Link>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    })}
   </div>
 );
 
@@ -673,9 +757,16 @@ const Dashboard: React.FC = () => {
               </p>
             )}
           </div>
-          <button type="button" onClick={signOut} className="btn-ghost">
-            Sign out
-          </button>
+          <div className="flex items-center gap-5">
+            {productCode && (
+              <Link to="/learn" className="btn-ghost">
+                <BookOpen className="w-4 h-4" aria-hidden="true" /> All my courses
+              </Link>
+            )}
+            <button type="button" onClick={signOut} className="btn-ghost">
+              Sign out
+            </button>
+          </div>
         </div>
 
         {needsTerms && termsVersion ? (

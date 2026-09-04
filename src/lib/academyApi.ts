@@ -476,6 +476,15 @@ export type MyCourse = {
   /* 'owner' — sees everything; 'full' — enrolled in the whole course;
      'partial' — holds one or more per-day/element grants. */
   access: 'owner' | 'full' | 'partial';
+  /* How far along, and what has been earned, so the hub can say so per course. */
+  progress: {
+    lessons_done: number;
+    lessons_total: number;
+    sets_passed: number;
+    sets_total: number;
+    complete: boolean;
+  };
+  certificates: { tier: 'completion' | 'verified'; code: string; issued_at: string | null }[];
 };
 
 /* Absolute URL for a protected slide image. The <img> must be rendered with
