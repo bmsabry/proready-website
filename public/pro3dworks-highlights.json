@@ -1,12 +1,11 @@
 {
-  "version": "2.64.0",
-  "name": "Narrated Live CAD Tutorials",
+  "version": "2.66.0",
+  "name": "Draft Angle Analysis + Parallel STEP Import",
   "highlights": [
-    "Eight narrated live tutorials and 83 verified steps drive the real application with an animated cursor, synchronized captions and browser speech",
-    "Tutorial 1 prepares the full owner-approved Hino FM EURO5 with real AI auto-orient, local presentation coloring, AI classification, rename, BOM, design review and Chat actions",
-    "Tutorials 2 through 4 continue from that same prepared Hino; review evidence is shown progressively, cleaned from the viewport and retained in Review Memory and the generated report",
-    "Purpose-fit CAX-IF, Autodesk FDM, Zenodo CNC and NIST AP242 benchmarks operate revision, repair, print, machining, drawing, PMI and tolerance workflows",
-    "The running player provides step position, safe Previous and Next, 0.75x–2x synchronized pacing, natural-voice selection, pause, mute, stop and Escape",
-    "A persistent completion navigator provides Next, Replay, All tutorials and Close, with idempotent replay and save-before-replace protection"
+    "Inspect \u2192 Draft Angle Analysis classifies every CAD face as positive, negative, requires-draft or straddling for one pull direction and required angle, colors them in the viewport (clipped by the section plane) and exports a full audit CSV",
+    "Every STEP assembly now imports on a pool of CAD kernels sized to your machine (up to 12) instead of one single-threaded kernel call — a 40 MB, 189-part truck opens in 13 s instead of 51 s on a 32-thread workstation; each distinct product is tessellated once and placed by transform",
+    "One model-wide deflection keeps the triangle budget identical to the whole-document import (Hino: 3,547,084 vs 3,540,844 triangles, same bounds) and the assembly tree keeps every sub-assembly level in source order",
+    "The AI Engineer and the Safe Command Palette can run the draft analysis as a validated allow-listed action",
+    "The top bar keeps the ProReadyEngineer, Support, AI Engineer and Photoreal buttons fully visible on every laptop width from 1280 px up"
   ]
 }

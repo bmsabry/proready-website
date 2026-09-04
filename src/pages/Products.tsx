@@ -147,7 +147,7 @@ export default function Products() {
                   </a>
                 </div>
                 <p className="text-sm text-slate-400">
-                  v2.64.0 · single HTML file · ~23&nbsp;MB · Windows / Mac / Linux · works offline
+                  v2.66.0 · single HTML file · ~23&nbsp;MB · Windows / Mac / Linux · works offline
                   {downloads !== null && downloads > 0 && (
                     <> · <span className="text-cyan-300">{downloads.toLocaleString()} download{downloads === 1 ? '' : 's'}</span></>
                   )}
