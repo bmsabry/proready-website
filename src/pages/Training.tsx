@@ -569,7 +569,7 @@ const Training = () => {
       >
         <p className="mt-6 text-sm text-slate-400">
           Already enrolled?{' '}
-          <Link to="/learn/signin" className="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-medium">
+          <Link to="/learn" className="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-medium">
             <GraduationCap className="w-4 h-4" aria-hidden="true" /> Sign in to your courses and certificates
           </Link>
         </p>

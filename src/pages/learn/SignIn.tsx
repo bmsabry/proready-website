@@ -25,6 +25,22 @@ const SignIn: React.FC = () => {
     noindex: true,
   });
 
+  // Someone already signed in who follows a "Sign in" link belongs in their
+  // courses, not at the email form.
+  useEffect(() => {
+    if (token) return;
+    let cancelled = false;
+    academy
+      .me()
+      .then((me) => {
+        if (!cancelled && me.signed_in) navigate('/learn', { replace: true });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [token, navigate]);
+
   useEffect(() => {
     if (!token) return;
     let cancelled = false;

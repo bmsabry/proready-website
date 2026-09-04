@@ -52,7 +52,7 @@ const Footer = () => {
               <FooterLink to="/services/industrial-ai">Industrial AI &amp; Data Analytics</FooterLink>
               <FooterLink to="/services">All Services</FooterLink>
               <FooterLink to="/training">Training &amp; Workshops</FooterLink>
-              <FooterLink to="/learn/signin">Learner Sign In</FooterLink>
+              <FooterLink to="/learn">Learner Sign In</FooterLink>
             </ul>
           </nav>
 
