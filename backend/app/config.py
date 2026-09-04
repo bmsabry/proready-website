@@ -195,6 +195,19 @@ class Settings(BaseSettings):
     # Where integrity alerts go. Empty = ADMIN_NOTIFY_EMAIL.
     INTEGRITY_ALERT_EMAIL: str = ""
 
+    # --- Server-side simulator engine (app/sim_runtime.py) ----------------
+    # The engine bundle lives in academy_asset_blobs under this key; it is
+    # never in the repository. The thin client connects over a WebSocket on
+    # the API origin and only ever receives frames.
+    SIM_ENGINE_ASSET_KEY: str = "sim-engine.js"
+    SIM_MAX_SESSIONS: int = 60
+    SIM_MAX_PER_LEARNER: int = 2
+    SIM_IDLE_SECONDS: int = 20 * 60
+    SIM_TICK_SECONDS: float = 0.25
+    SIM_MAX_SPEED: int = 30
+    # Control messages per second one session may send before it is slowed.
+    SIM_OPS_PER_SECOND: int = 40
+
     @property
     def asset_allowed_hosts_set(self) -> set:
         return {

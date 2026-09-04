@@ -16,3 +16,5 @@ tzdata==2025.2
 reportlab==4.4.10
 qrcode==8.2
 pymupdf==1.26.4
+# Embedded V8 for the server-side simulator engine (app/sim_runtime.py)
+mini-racer==0.14.1

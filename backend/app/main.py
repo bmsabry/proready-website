@@ -28,6 +28,7 @@ from .routes import interest as interest_routes
 from .routes import payments as payments_routes
 from .routes import register as register_routes
 from .routes import seats as seats_routes
+from .routes import sim as sim_routes
 from .routes import software as software_routes
 from .routes import stats as stats_routes
 from .routes import support as support_routes
@@ -325,6 +326,8 @@ app.add_middleware(
 _register_gate_handler(app)
 
 app.include_router(seats_routes.router)
+app.include_router(sim_routes.router)
+app.include_router(sim_routes.admin_router)
 app.include_router(register_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(admin_routes.router)
