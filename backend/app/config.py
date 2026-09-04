@@ -176,6 +176,25 @@ class Settings(BaseSettings):
     # environment including local dev.
     ASSET_BEACON_URL: str = ""
 
+    # --- Asset run-lock ---------------------------------------------------
+    # When on, the scripts inside an HTML asset are encrypted per copy at
+    # serve time and the copy has to fetch its key from this API before it
+    # can run (app/asset_lock.py). A saved file is inert; a copy that is
+    # revoked, expired, or opened by another account gets no key.
+    ASSET_LOCK_ENABLED: bool = True
+    # How long a served copy may keep unlocking itself before the learner
+    # has to launch a fresh one from the course page.
+    ASSET_COPY_TTL_HOURS: int = 24
+    # Reloads a single copy may perform inside its TTL. Generous for real
+    # use (a reload per minute for an hour); tight against a script that
+    # hammers the key endpoint.
+    ASSET_KEY_MAX_FETCHES: int = 60
+    # Launches per learner per 24 h beyond which an alert is sent. A person
+    # launches a simulator a handful of times a day; a harvester does not.
+    ASSET_LAUNCH_ALERT_PER_DAY: int = 8
+    # Where integrity alerts go. Empty = ADMIN_NOTIFY_EMAIL.
+    INTEGRITY_ALERT_EMAIL: str = ""
+
     @property
     def asset_allowed_hosts_set(self) -> set:
         return {

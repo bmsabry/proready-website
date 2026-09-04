@@ -34,11 +34,24 @@ connect_args = (
     {"check_same_thread": False} if db_url.startswith("sqlite") else {}
 )
 
+# Pool sized to the request threadpool (Starlette runs sync endpoints on 40
+# threads), so a burst of parallel requests waits on a thread, never on a
+# connection. The default 5 + 10 overflow was exhausted by one learner's
+# slide-thumbnail strip (≈40 simultaneous image requests over HTTP/2) and
+# answered the rest with 500s (2026-09-03). Render's Basic Postgres allows
+# ~100 connections; one web instance uses at most 40 of them.
+pool_kwargs = (
+    {}
+    if db_url.startswith("sqlite")
+    else {"pool_size": 10, "max_overflow": 30, "pool_timeout": 30, "pool_recycle": 1800}
+)
+
 engine = create_engine(
     db_url,
     connect_args=connect_args,
     pool_pre_ping=True,
     future=True,
+    **pool_kwargs,
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)

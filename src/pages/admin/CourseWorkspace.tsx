@@ -2338,6 +2338,7 @@ function DayDatesEditor({
 
 type Delivery = {
   token: string;
+  learner_id: number;
   email: string;
   full_name: string;
   asset_key: string;
@@ -2346,6 +2347,13 @@ type Delivery = {
   user_agent: string;
   ping_count: number;
   worst_status: string;
+  /* Run-lock state: locked = served with a key; alive = can still start now. */
+  locked: boolean;
+  alive: boolean;
+  revoked_at: string | null;
+  revoke_reason: string;
+  key_fetches: number;
+  key_denied: number;
   downloads_by_this_account?: number;
   pings?: Ping[];
 };
@@ -2361,11 +2369,15 @@ type Ping = {
   user_agent: string;
   timezone: string;
   session_email: string;
+  referrer?: string;
   issued_to?: string;
+  issued_learner_id?: number | null;
   issued_at?: string | null;
   issued_ip?: string;
   asset_key?: string;
   reviewed_at?: string | null;
+  copy_alive?: boolean;
+  copy_revoked?: boolean;
 };
 
 type SharingDevice = {
@@ -2538,6 +2550,22 @@ function IntegrityTab({
     }
   }
 
+  async function withdraw(target: { token?: string; learner_id?: number }, label: string) {
+    if (!window.confirm(`Withdraw ${label}? It will refuse to start wherever it is opened. The account keeps its access and can launch a fresh copy.`)) return;
+    setBusy(-1);
+    try {
+      await api('/api/admin/academy/integrity/revoke', {
+        method: 'POST',
+        body: JSON.stringify({ ...target, reason: `withdrawn from the Integrity tab` }),
+      });
+      await load();
+    } catch (err) {
+      reportError(err, onAuthError, setError);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function runTrace(content: string) {
     if (!content.trim()) return;
     setTracing(true);
@@ -2583,11 +2611,14 @@ function IntegrityTab({
     <div className="space-y-6">
       <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-300">
         <p>
-          <span className="font-semibold text-white">Every download is stamped.</span>{' '}
-          The simulator and any HTML lab carry a hidden id unique to that download —
-          not to the student, to the download. Two things follow from that: a copy
-          that turns up somewhere can be traced back to the account it came from,
-          and every copy quietly reports itself the moment it is opened.
+          <span className="font-semibold text-white">Every download is stamped and locked.</span>{' '}
+          The simulator and any HTML lab carry a hidden id unique to that download,
+          not to the student, to the download. Their code is encrypted with a key
+          that only that copy can fetch, and only while it is opened on your site by
+          the account it was issued to, within 24 hours, and not withdrawn. A saved
+          file shows a licence notice instead of a simulator. Every open, granted or
+          refused, is recorded here; anything that looks like a leak is also emailed
+          to you, once per copy per day.
         </p>
       </div>
 
@@ -2658,6 +2689,35 @@ function IntegrityTab({
                       <span className="font-semibold">{a.issued_to || 'unknown'}</span>
                     </span>
                     <span className="text-xs text-slate-500">{when(a.seen_at)}</span>
+                    {a.referrer === 'key-request' ? (
+                      <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-400">
+                        asked for its key · refused
+                      </span>
+                    ) : null}
+                    {a.copy_revoked ? (
+                      <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-400">
+                        copy withdrawn
+                      </span>
+                    ) : a.copy_alive ? (
+                      <button
+                        onClick={() => void withdraw({ token: a.token }, 'this copy')}
+                        disabled={busy !== null}
+                        className="rounded-lg border border-rose-500/40 px-2 py-0.5 text-[11px] text-rose-200 hover:bg-rose-500/10 disabled:opacity-40"
+                      >
+                        Withdraw this copy
+                      </button>
+                    ) : null}
+                    {a.issued_learner_id ? (
+                      <button
+                        onClick={() =>
+                          void withdraw({ learner_id: a.issued_learner_id! }, `every copy held by ${a.issued_to}`)
+                        }
+                        disabled={busy !== null}
+                        className="rounded-lg border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 hover:border-rose-500 hover:text-white disabled:opacity-40"
+                      >
+                        Withdraw all of this account's copies
+                      </button>
+                    ) : null}
                     {a.reviewed_at ? (
                       <span className="text-[11px] text-slate-500">
                         reviewed {when(a.reviewed_at)}
@@ -2764,6 +2824,13 @@ function IntegrityTab({
                 <p className="mt-1 text-xs text-amber-200/90">
                   {s.reasons.join(' · ')}
                 </p>
+                <button
+                  onClick={() => void withdraw({ learner_id: s.learner_id }, `every copy held by ${s.email}`)}
+                  disabled={busy !== null}
+                  className="mt-2 rounded-lg border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 hover:border-rose-500 hover:text-white disabled:opacity-40"
+                >
+                  Withdraw all of this account's copies
+                </button>
                 <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-400">
                   <span>
                     <span className="text-slate-500">Devices (30d): </span>
@@ -2990,6 +3057,7 @@ function IntegrityTab({
                   <th className="px-4 py-2 font-medium">IP</th>
                   <th className="px-4 py-2 font-medium">Browser</th>
                   <th className="px-4 py-2 font-medium">Opened</th>
+                  <th className="px-4 py-2 font-medium">Copy</th>
                   <th className="px-4 py-2 font-medium">Copy id</th>
                 </tr>
               </thead>
@@ -3019,6 +3087,34 @@ function IntegrityTab({
                         </span>
                       ) : (
                         <span className="text-slate-600">never</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-1.5">
+                      {!d.locked ? (
+                        <span className="text-slate-500" title="Served before the run-lock existed; it runs anywhere.">
+                          unlocked (old)
+                        </span>
+                      ) : d.revoked_at ? (
+                        <span className="text-slate-500" title={d.revoke_reason}>
+                          withdrawn {when(d.revoked_at)}
+                        </span>
+                      ) : d.alive ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="text-emerald-300">
+                            live · key {d.key_fetches}×{d.key_denied ? `, refused ${d.key_denied}×` : ''}
+                          </span>
+                          <button
+                            onClick={() => void withdraw({ token: d.token }, 'this copy')}
+                            disabled={busy !== null}
+                            className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300 hover:border-rose-500 hover:text-white disabled:opacity-40"
+                          >
+                            Withdraw
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">
+                          expired{d.key_denied ? ` · refused ${d.key_denied}×` : ''}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-1.5 font-mono text-slate-500">{d.token}</td>

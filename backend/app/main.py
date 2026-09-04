@@ -140,6 +140,25 @@ def _run_column_migrations() -> None:
     _ensure_column(
         "academy_asset_pings", "reviewed_note", "VARCHAR(300) NOT NULL DEFAULT ''"
     )
+    # Run-lock (2026-09): per-copy key, revocation and key-fetch counters.
+    _ensure_column(
+        "academy_asset_deliveries", "key_b64", "VARCHAR(64) NOT NULL DEFAULT ''"
+    )
+    _ensure_column(
+        "academy_asset_deliveries", "revoked_at", "TIMESTAMP WITH TIME ZONE"
+    )
+    _ensure_column(
+        "academy_asset_deliveries", "revoke_reason", "VARCHAR(200) NOT NULL DEFAULT ''"
+    )
+    _ensure_column(
+        "academy_asset_deliveries", "key_fetches", "INTEGER NOT NULL DEFAULT 0"
+    )
+    _ensure_column(
+        "academy_asset_deliveries", "key_denied", "INTEGER NOT NULL DEFAULT 0"
+    )
+    _ensure_column(
+        "academy_asset_deliveries", "last_key_at", "TIMESTAMP WITH TIME ZONE"
+    )
     # Support desk. support_tickets/_messages/_events are brand-new tables,
     # so create_all builds them complete — but ai_settings already exists in
     # production and needs the two new columns added by hand.

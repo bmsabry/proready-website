@@ -117,8 +117,13 @@ def track_device(
             )
             db.add(row)
 
-        _record_overlap(db, learner_id, device_id, row.ip, now)
+        overlapped = _record_overlap(db, learner_id, device_id, row.ip, now)
         db.commit()
+        if overlapped:
+            # Off-thread, on its own session: the auth path never waits on
+            # an email API and never shares its session with one.
+            from .integrity_alerts import sharing_signal
+            sharing_signal(learner_id, now)
     except Exception:  # pragma: no cover — tracking must never break auth
         log.exception("[devices] tracking failed for learner %s", learner_id)
         try:
@@ -129,8 +134,9 @@ def track_device(
 
 def _record_overlap(
     db: Session, learner_id: int, device_id: str, ip: str, now: datetime
-) -> None:
-    """If another device of this learner was active just now, log the pair."""
+) -> bool:
+    """If another device of this learner was active just now, log the pair.
+    Returns True when a new overlap event was added."""
     other = db.execute(
         select(LearnerDevice)
         .where(
@@ -142,7 +148,7 @@ def _record_overlap(
         .limit(1)
     ).scalar_one_or_none()
     if other is None:
-        return
+        return False
 
     recent = db.execute(
         select(LearnerOverlapEvent.id)
@@ -153,7 +159,7 @@ def _record_overlap(
         .limit(1)
     ).scalar_one_or_none()
     if recent is not None:
-        return
+        return False
 
     db.add(
         LearnerOverlapEvent(
@@ -165,3 +171,4 @@ def _record_overlap(
             at=now,
         )
     )
+    return True

@@ -148,6 +148,10 @@ def test_trace_survives_a_leaker_stripping_the_obvious_carriers(client, setup):
     tampered = re.sub(r"<!--.*?-->", "", body, flags=re.S)
     tampered = tampered.replace(f' data-pre-copy="{token}"', "")
     tampered = tampered.replace(f'__PRE_COPY__ = "{token}"', '__PRE_COPY__ = ""')
+    # ...and the run-lock loader's two mentions, which kills the copy (the id
+    # is the AAD every script was encrypted under) but a leaker may try.
+    tampered = tampered.replace(f'var T="{token}"', 'var T=""')
+    tampered = tampered.replace(f"asset-key/{token}", "asset-key/")
     assert token not in re.sub(r"[\u200b\u200c\u2060]", "", tampered)
 
     r = client.post("/api/admin/academy/integrity/trace",

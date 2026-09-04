@@ -937,3 +937,34 @@ def advanced_outcome_failed_html(full_name: str, course_title: str) -> str:
         margin="0",
     )
     return _shell("Oral examination", "Outcome of your re-examination", body)
+
+
+# -----------------------------------------------------------------------------
+# Integrity alerts (to the instructor)
+# -----------------------------------------------------------------------------
+
+def integrity_alert_html(
+    headline: str,
+    meaning: str,
+    facts: "list[tuple[str, str]]",
+    *,
+    next_steps: str,
+    integrity_url: str,
+) -> str:
+    """One shape for every alert about protected material.
+
+    The headline says what happened in plain words; the facts table is the
+    evidence as recorded; `next_steps` tells the instructor what the
+    platform already did and what is his to decide. Kept factual: an alert
+    is not a verdict, and the person named may turn out to be innocent.
+    """
+    body = _p(meaning)
+    body += _kv_table(facts, size=14)
+    body += _p(next_steps, size=14)
+    body += _cta_button("Open the Integrity tab", integrity_url)
+    body += _p(
+        "You receive one alert per copy per day; every further signal is "
+        "listed in the Integrity tab.",
+        size=13, color=MUTED, margin="0",
+    )
+    return _shell("Integrity alert", headline, body)

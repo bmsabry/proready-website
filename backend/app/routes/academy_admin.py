@@ -1065,7 +1065,30 @@ def _delivery_out(db: Session, d: AssetDelivery) -> dict:
         "bytes_sent": d.bytes_sent,
         "ping_count": d.ping_count or 0,
         "worst_status": d.worst_status or "",
+        # Run-lock state. `locked` is False only for copies served before the
+        # lock existed (those still run anywhere; nothing can be done about
+        # them but trace). `alive` is what the admin cares about: can this
+        # copy still start right now?
+        "locked": bool(d.key_b64),
+        "revoked_at": d.revoked_at.isoformat() if d.revoked_at else None,
+        "revoke_reason": d.revoke_reason or "",
+        "key_fetches": d.key_fetches or 0,
+        "key_denied": d.key_denied or 0,
+        "last_key_at": d.last_key_at.isoformat() if d.last_key_at else None,
+        "alive": _delivery_alive(d),
     }
+
+
+def _delivery_alive(d: AssetDelivery) -> bool:
+    if not d.key_b64 or d.revoked_at is not None:
+        return False
+    served = d.served_at
+    if served is None:
+        return False
+    if served.tzinfo is None:
+        served = served.replace(tzinfo=timezone.utc)
+    ttl = timedelta(hours=get_settings().ASSET_COPY_TTL_HOURS)
+    return datetime.now(timezone.utc) - served <= ttl
 
 
 def _ping_out(p: AssetPing) -> dict:
@@ -1319,10 +1342,13 @@ def integrity_report(
         alert_rows.append({
             **_ping_out(p),
             "issued_to": d.learner_email if d else "",
+            "issued_learner_id": d.learner_id if d else None,
             "issued_at": d.served_at.isoformat() if d and d.served_at else None,
             "issued_ip": d.ip if d else "",
             "asset_key": d.asset_key if d else "",
             "reviewed_at": p.reviewed_at.isoformat() if p.reviewed_at else None,
+            "copy_alive": _delivery_alive(d) if d else False,
+            "copy_revoked": bool(d and d.revoked_at),
         })
 
     # Behavioural watch list. Deliberately simple and explainable — an admin
@@ -1414,3 +1440,44 @@ def integrity_dismiss(
         row.reviewed_note = (body.note or f"reviewed by {admin}")[:300]
     db.commit()
     return {"ok": True, "reviewed": len(rows)}
+
+
+class WithdrawCopyIn(BaseModel):
+    """Withdraw one copy (by id) or every copy an account holds."""
+    token: str = ""
+    learner_id: int | None = None
+    reason: str = Field(default="", max_length=200)
+
+
+@router.post("/integrity/revoke")
+def integrity_revoke(
+    body: WithdrawCopyIn,
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin),
+) -> dict:
+    """The kill switch.
+
+    A withdrawn copy is refused its key the next time it opens, wherever it
+    is, and shows the person a licence notice instead of the simulator.
+    Withdrawing every copy an account holds does not touch the account's
+    access: the learner can launch a fresh copy from the course page a
+    second later, and that copy is tracked like any other. Removing access
+    is the Access tab's job; this is for a specific file that has gone
+    somewhere it should not have.
+    """
+    if not body.token and body.learner_id is None:
+        raise HTTPException(status_code=422, detail="Give a copy id or a learner id.")
+    q = select(AssetDelivery).where(AssetDelivery.revoked_at.is_(None))
+    if body.token:
+        q = q.where(AssetDelivery.token == body.token.strip()[:32])
+    else:
+        q = q.where(AssetDelivery.learner_id == body.learner_id)
+    rows = db.execute(q).scalars().all()
+    stamp = datetime.now(timezone.utc)
+    for row in rows:
+        row.revoked_at = stamp
+        row.revoke_reason = (body.reason or f"withdrawn by {admin}")[:200]
+    db.commit()
+    log.info("Integrity: %s withdrew %d copy(ies) (%s)", admin, len(rows),
+             body.token or f"learner {body.learner_id}")
+    return {"ok": True, "revoked": len(rows)}

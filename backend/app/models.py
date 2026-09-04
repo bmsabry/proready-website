@@ -1221,6 +1221,21 @@ class AssetDelivery(Base):
     ping_count: Mapped[int] = mapped_column(Integer, default=0)
     worst_status: Mapped[str] = mapped_column(String(16), default="")
 
+    # Run-lock (app/asset_lock.py). The copy's scripts were encrypted with
+    # this key; the copy has to come back for it every time it opens, and
+    # it only gets it while the row is live. Empty for copies served before
+    # the lock existed or with the lock switched off.
+    key_b64: Mapped[str] = mapped_column(String(64), default="")
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    revoke_reason: Mapped[str] = mapped_column(String(200), default="")
+    key_fetches: Mapped[int] = mapped_column(Integer, default=0)
+    key_denied: Mapped[int] = mapped_column(Integer, default=0)
+    last_key_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+
 
 class AssetPing(Base):
     """A stamped copy calling home when it was opened.

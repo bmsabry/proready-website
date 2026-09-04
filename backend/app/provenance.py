@@ -100,6 +100,11 @@ def extract_tokens(blob: str) -> list[str]:
     add(re.findall(r"data-pre-copy=\"([a-z2-9]{20})\"", blob))    # carrier 3
     add(re.findall(r"__PRE_COPY__\s*=\s*[\"']([a-z2-9]{20})", blob))  # carrier 4
     add(re.findall(r"pre-copy:\s*([a-z2-9]{20})", blob))          # carrier 1
+    # Carrier 5, the run-lock loader (app/asset_lock.py). Not removable
+    # without killing the copy: the id is the AAD every script was
+    # encrypted under, and it names the key endpoint.
+    add(re.findall(r"asset-key/([a-z2-9]{20})", blob))
+    add(re.findall(r"var T=\"([a-z2-9]{20})\"", blob))
 
     if not found:  # a bare token pasted on its own, or an unknown carrier
         stripped = blob.strip()

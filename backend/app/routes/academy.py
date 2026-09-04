@@ -46,6 +46,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import academy as svc
+from .. import asset_lock as lock
+from .. import integrity_alerts as alerts
 from .. import provenance as prov
 from ..config import get_settings
 from ..db import get_db
@@ -732,6 +734,18 @@ _NO_STORE = {
 }
 
 
+def _carry_cookies(dep_response: Response, out: Response) -> Response:
+    """Endpoints that build their own Response lose the Set-Cookie headers
+    a dependency queued (FastAPI merges those only onto returned data). The
+    device cookie is minted in `optional_learner`; without this, a learner
+    whose first authenticated request is the simulator would look like a
+    new device on every launch."""
+    for name, value in dep_response.headers.items():
+        if name.lower() == "set-cookie":
+            out.headers.append(name, value)
+    return out
+
+
 def _watermark_image(data: bytes, text: str) -> bytes:
     """Burn a per-learner watermark into slide pixels, server-side.
 
@@ -845,6 +859,7 @@ def slide_image(
 def lesson_asset(
     lesson_id: int,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     learner: Learner = Depends(require_learner),
 ) -> Response:
@@ -877,25 +892,45 @@ def lesson_asset(
     data = blob.data
 
     if blob.content_type.startswith("text/html"):
+        # Lock first, stamp second: the loader and the beacon must stay in
+        # the clear, and the licence banner must be readable on a copy that
+        # never manages to unlock itself.
         try:
             html = data.decode("utf-8", errors="replace")
             token = prov.new_token()
+            key_b64 = ""
+            if get_settings().ASSET_LOCK_ENABLED:
+                key = lock.new_key()
+                html = lock.lock_html(
+                    html, token=token, key=key, key_url=_key_url(request, token),
+                )
+                key_b64 = lock.key_to_b64(key)
             html = prov.stamp_html(
                 html,
                 email=learner.email,
                 token=token,
                 beacon_url=_beacon_url(request),
             )
-            data = html.encode("utf-8")
-            _record_delivery(
-                db, request, learner=learner, lesson=lesson,
-                token=token, asset_key=path[len("blob:"):], size=len(data),
-            )
         except Exception:  # pragma: no cover
-            log.exception("Asset stamping failed; serving unstamped copy")
+            # Never fall back to the plain file: a lock that fails open is
+            # no lock. Fail closed with a message a learner can act on.
+            log.exception("Asset lock/stamp failed for lesson %s", lesson_id)
+            raise HTTPException(
+                status_code=503,
+                detail="The material could not be prepared. Try again in a moment.",
+            )
+        data = html.encode("utf-8")
+        delivery = _record_delivery(
+            db, request, learner=learner, lesson=lesson,
+            token=token, asset_key=path[len("blob:"):], size=len(data),
+            key_b64=key_b64,
+        )
+        _launch_cap_check(db, request, learner=learner, lesson=lesson, delivery=delivery)
 
     log.info("Asset %s served to %s", path, learner.email)
-    return Response(content=data, media_type=blob.content_type, headers=headers)
+    return _carry_cookies(
+        response, Response(content=data, media_type=blob.content_type, headers=headers)
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -925,13 +960,21 @@ def _beacon_url(request: Request) -> str:
     return f"{base}/api/academy/beacon"
 
 
+def _key_url(request: Request, token: str) -> str:
+    """Absolute URL the locked copy fetches its key from: same origin as
+    the copy itself, so the session cookie rides along and nothing else
+    does."""
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/api/academy/asset-key/{token}"
+
+
 def _record_delivery(
     db: Session, request: Request, *, learner: Learner, lesson: Lesson,
-    token: str, asset_key: str, size: int,
-) -> None:
-    """Write the row that makes a stamped copy traceable."""
+    token: str, asset_key: str, size: int, key_b64: str = "",
+) -> AssetDelivery:
+    """Write the row that makes a stamped copy traceable (and unlockable)."""
     module = db.get(Module, lesson.module_id) if lesson.module_id else None
-    db.add(AssetDelivery(
+    row = AssetDelivery(
         token=token,
         learner_id=learner.id,
         learner_email=learner.email,
@@ -943,8 +986,201 @@ def _record_delivery(
         user_agent=request.headers.get("user-agent", "")[:400],
         bytes_sent=size,
         origin_host=(request.url.hostname or "").lower()[:200],
-    ))
+        key_b64=key_b64,
+    )
+    db.add(row)
     db.commit()
+    return row
+
+
+def _launch_cap_check(
+    db: Session, request: Request, *, learner: Learner, lesson: Lesson,
+    delivery: AssetDelivery,
+) -> None:
+    """Count this learner's launches in the last day and raise the alert
+    exactly when the threshold is crossed. Owners are exempt: the
+    instructor opening his own simulator twenty times is not a signal."""
+    try:
+        if svc.is_owner(learner):
+            return
+        from datetime import datetime, timedelta, timezone
+        since = datetime.now(timezone.utc) - timedelta(hours=24)
+        n = len(db.execute(
+            select(AssetDelivery.id).where(
+                AssetDelivery.learner_id == learner.id,
+                AssetDelivery.served_at >= since,
+            )
+        ).all())
+        alerts.launch_cap(
+            db, learner=learner, lesson=lesson,
+            product_code=delivery.product_code, launches_24h=n,
+        )
+    except Exception:  # pragma: no cover
+        log.exception("Launch-cap check failed")
+
+
+def _classify_key_request(request: Request, delivery: AssetDelivery,
+                          learner: Learner | None) -> tuple[str, str, str]:
+    """Where is the copy asking from? -> (status, page_url, origin).
+
+    Same vocabulary as the beacon so the Integrity tab reads both the same
+    way. The loader fetches with `credentials: same-origin` from the page
+    the copy is on; a browser then sends `Sec-Fetch-Site: same-origin` and
+    a Referer naming our host. A copy on disk sends neither (file pages
+    carry no Referer and an opaque origin); a copy re-hosted elsewhere
+    names the other host. Older browsers without Sec-Fetch-* fall back to
+    the Referer alone.
+    """
+    referer = request.headers.get("referer", "")[:500]
+    origin_hdr = request.headers.get("origin", "")[:300]
+    sec_site = request.headers.get("sec-fetch-site", "").lower()
+
+    allowed = set(get_settings().asset_allowed_hosts_set)
+    if delivery.origin_host:
+        allowed.add(delivery.origin_host)
+    allowed.add((request.url.hostname or "").lower())
+
+    if sec_site and sec_site != "same-origin":
+        return prov.PING_OFFSITE, referer or "(no page address)", origin_hdr or "null"
+    status_ = prov.classify_ping(
+        page_url=referer,
+        origin=origin_hdr,
+        allowed_hosts=allowed,
+        issued_to_learner_id=delivery.learner_id,
+        session_learner_id=learner.id if learner else None,
+    )
+    return status_, referer or "(no page address)", origin_hdr
+
+
+@router.get("/asset-key/{token}", include_in_schema=False)
+def asset_key(
+    token: str,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    learner: Learner | None = Depends(optional_learner),
+) -> Response:
+    """A locked copy asking for the key that lets it run.
+
+    Answered only while the copy is live: it exists, was issued to the
+    account asking, is being opened on our own origin, is inside its
+    time-to-live, has not been withdrawn, and the account still holds the
+    lesson. Every ask — granted or refused — is recorded as a ping so the
+    Integrity tab shows it, and a refusal that looks like a leak raises the
+    same alert the beacon would. Refusals carry a sentence the loader shows
+    to the person in front of the screen.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    settings = get_settings()
+    headers = dict(_NO_STORE)
+    token = (token or "")[:32]
+    delivery = db.execute(
+        select(AssetDelivery).where(AssetDelivery.token == token)
+    ).scalar_one_or_none()
+
+    def _ping(status_: str, page_url: str, origin: str) -> AssetPing:
+        p = AssetPing(
+            token=token,
+            delivery_id=delivery.id if delivery else None,
+            status=status_,
+            page_url=page_url[:500],
+            origin=origin[:300],
+            referrer="key-request",
+            ip=_client_ip(request),
+            user_agent=request.headers.get("user-agent", "")[:400],
+            timezone="",
+            session_learner_id=learner.id if learner else None,
+            session_email=(learner.email if learner else "")[:320],
+        )
+        db.add(p)
+        if delivery is not None:
+            delivery.ping_count = (delivery.ping_count or 0) + 1
+            order = {
+                prov.PING_OFFSITE: 4, prov.PING_OTHER_ACCOUNT: 3,
+                prov.PING_UNKNOWN: 2, prov.PING_ANONYMOUS: 1, prov.PING_OK: 0,
+            }
+            if order.get(status_, 0) > order.get(delivery.worst_status or "", -1):
+                delivery.worst_status = status_
+        db.commit()
+        return p
+
+    def _deny(code: int, detail: str, status_: str, page_url: str = "",
+              origin: str = "", alert: bool = False) -> Response:
+        if delivery is not None:
+            delivery.key_denied = (delivery.key_denied or 0) + 1
+        p = _ping(status_, page_url, origin)
+        if alert:
+            alerts.leak_signal(db, ping=p, delivery=delivery, via="key request")
+        log.warning("ASSET KEY DENIED %s token=%s issued_to=%s ip=%s",
+                    status_, token, delivery.learner_email if delivery else "?",
+                    _client_ip(request))
+        return _carry_cookies(response, Response(
+            content=json.dumps({"detail": detail}), status_code=code,
+            media_type="application/json", headers=headers,
+        ))
+
+    if delivery is None:
+        return _deny(404, "This copy carries an id this platform never issued. "
+                          "Launch the simulator from your course page.",
+                     prov.PING_UNKNOWN, request.headers.get("referer", ""),
+                     request.headers.get("origin", ""), alert=True)
+
+    status_, page_url, origin = _classify_key_request(request, delivery, learner)
+
+    if delivery.revoked_at is not None:
+        return _deny(403, "This copy has been withdrawn by the instructor. "
+                          "Launch a fresh one from your course page.",
+                     status_, page_url, origin,
+                     alert=status_ in prov.ALERT_STATUSES)
+    if status_ == prov.PING_OFFSITE:
+        return _deny(403, "This copy is not on proreadyengineer.com, so it cannot run. "
+                          "Launch the simulator from your course page.",
+                     status_, page_url, origin, alert=True)
+    if status_ == prov.PING_UNKNOWN:  # pragma: no cover — delivery exists here
+        return _deny(404, "Unknown copy.", status_, page_url, origin, alert=True)
+    if learner is None:
+        return _deny(401, "Your sign-in has expired. Sign in on proreadyengineer.com, "
+                          "then launch the simulator from your course page.",
+                     prov.PING_ANONYMOUS, page_url, origin)
+    if status_ == prov.PING_OTHER_ACCOUNT:
+        return _deny(403, "This copy was issued to a different account and cannot run "
+                          "under yours. Launch your own from your course page.",
+                     status_, page_url, origin, alert=True)
+
+    served_at = delivery.served_at
+    if served_at is not None and served_at.tzinfo is None:
+        served_at = served_at.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - (served_at or datetime.now(timezone.utc))
+    if age > timedelta(hours=settings.ASSET_COPY_TTL_HOURS):
+        return _deny(410, "This copy has expired. Launch a fresh one from your "
+                          "course page; it takes a second.",
+                     prov.PING_OK, page_url, origin)
+    if (delivery.key_fetches or 0) >= settings.ASSET_KEY_MAX_FETCHES:
+        return _deny(429, "This copy has been reloaded too many times. Launch a fresh "
+                          "one from your course page.",
+                     prov.PING_OK, page_url, origin)
+
+    lesson = db.get(Lesson, delivery.lesson_id)
+    if lesson is None:
+        return _deny(404, "This material is no longer available.",
+                     prov.PING_OK, page_url, origin)
+    ok, _reason = svc.lesson_accessible(db, learner, lesson)
+    if not ok:
+        return _deny(403, "Your access to this material has ended.",
+                     prov.PING_OK, page_url, origin)
+    if not delivery.key_b64:
+        return _deny(410, "This copy predates the current release. Launch a fresh "
+                          "one from your course page.",
+                     prov.PING_OK, page_url, origin)
+
+    delivery.key_fetches = (delivery.key_fetches or 0) + 1
+    delivery.last_key_at = datetime.now(timezone.utc)
+    _ping(prov.PING_OK, page_url, origin)
+    return _carry_cookies(response, Response(
+        content=json.dumps({"k": delivery.key_b64}),
+        media_type="application/json", headers=headers,
+    ))
 
 
 @router.post("/beacon", include_in_schema=False)
@@ -989,7 +1225,7 @@ async def asset_beacon(
             session_learner_id=learner.id if learner else None,
         )
 
-        db.add(AssetPing(
+        ping = AssetPing(
             token=token,
             delivery_id=delivery.id if delivery else None,
             status=status_,
@@ -1002,7 +1238,8 @@ async def asset_beacon(
             timezone=str(payload.get("z", ""))[:64],
             session_learner_id=learner.id if learner else None,
             session_email=(learner.email if learner else "")[:320],
-        ))
+        )
+        db.add(ping)
 
         if delivery is not None:
             delivery.ping_count = (delivery.ping_count or 0) + 1
@@ -1021,6 +1258,7 @@ async def asset_beacon(
                 delivery.learner_email if delivery else "?",
                 str(payload.get("u", ""))[:200], _client_ip(request),
             )
+            alerts.leak_signal(db, ping=ping, delivery=delivery, via="beacon")
     except Exception:  # pragma: no cover — a beacon must never 500
         log.exception("Beacon handling failed")
     return Response(status_code=204)
