@@ -63,6 +63,7 @@ class SimSession:
     want_margin_until: float = 0.0
     ops: int = 0                  # total ops, for the admin view
     run_task: Optional[asyncio.Task] = None
+    ws: Any = None                # the socket, so a withdrawal can close it
 
 
 class SimHost:
@@ -74,6 +75,7 @@ class SimHost:
         self.loaded_at: float = 0.0
         self.sessions: dict[str, SimSession] = {}
         self._load_lock = asyncio.Lock()
+        self._checked_at: float = 0.0
 
     # ------------------------------------------------------------ engine --
     def _read_engine(self, db: Session) -> tuple[bytes, str]:
@@ -100,9 +102,15 @@ class SimHost:
 
         Existing sessions keep the isolate they started in; only new
         sessions get the new engine. That is what makes an engine upgrade
-        safe while learners are mid-run."""
+        safe while learners are mid-run. The blob is re-read at most once
+        a minute unless forced (the admin reload endpoint), so a class
+        connecting at once does not read 160 KB per socket."""
         async with self._load_lock:
+            now = time.time()
+            if self.ctx is not None and not force and now - self._checked_at < 60:
+                return
             data, sha = await asyncio.to_thread(self._read_engine, db)
+            self._checked_at = now
             if self.ctx is not None and sha == self.sha and not force:
                 return
             ctx = await asyncio.to_thread(self._build_isolate, data)
@@ -165,6 +173,27 @@ class SimHost:
     async def consts(self, ctx: Any) -> dict:
         return json.loads(await self._eval(ctx, "__consts()"))
 
+    async def kill(self, *, copy_token: str = "", learner_id: int | None = None,
+                   reason: str = "") -> int:
+        """End live sessions for a withdrawn copy or a whole account. The
+        socket is told why, then closed; the engine is dropped."""
+        victims = [
+            s for s in list(self.sessions.values())
+            if (copy_token and s.copy_token == copy_token)
+            or (learner_id is not None and s.learner_id == learner_id)
+        ]
+        for s in victims:
+            ws = s.ws
+            try:
+                if ws is not None:
+                    await ws.send_text(json.dumps({"op": "bye", "code": 4410, "reason": reason or
+                        "This copy has been withdrawn by the instructor. Launch a fresh one from your course page."}))
+                    await ws.close(code=4410)
+            except Exception:  # pragma: no cover — socket may already be gone
+                pass
+            await self.drop(s)
+        return len(victims)
+
     def status(self) -> dict:
         now = time.time()
         return {
@@ -174,9 +203,10 @@ class SimHost:
             "sessions": [
                 {
                     "id": s.id[:6], "email": s.learner_email, "lesson_id": s.lesson_id,
+                    "copy_token": s.copy_token,
                     "age_s": int(now - s.created), "idle_s": int(now - s.last_seen),
                     "running": s.running, "speed": s.speed, "ops": s.ops,
-                    "engine_sha": (hashlib.sha256(str(id(s.ctx)).encode()).hexdigest()[:6]),
+                    "current_engine": s.ctx is self.ctx,
                 }
                 for s in self.sessions.values()
             ],

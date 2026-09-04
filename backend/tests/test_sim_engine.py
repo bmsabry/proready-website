@@ -351,7 +351,50 @@ def test_admin_status_and_reload(client, setup):
 
 def test_missing_engine_blob_refuses_cleanly(client, setup, monkeypatch):
     monkeypatch.setattr(get_settings(), "SIM_ENGINE_ASSET_KEY", "no-such-engine.js", raising=False)
+    monkeypatch.setattr(host, "_checked_at", 0.0)   # the blob is re-read at most once a minute
     s = _sign_in(LEARNER_A)
     copy = _copy(s, setup["lesson_id"])
     reason = _expect_refusal(s, _ws_url(setup["lesson_id"], copy), 4503)
     assert "being updated" in reason
+
+
+def test_withdrawing_a_copy_ends_its_live_session(client, setup):
+    s = _sign_in(LEARNER_A)
+    copy = _copy(s, setup["lesson_id"])
+    with s.websocket_connect(_ws_url(setup["lesson_id"], copy), headers=_hdrs(s)) as ws:
+        ws.receive_json()
+        ws.send_json({"op": "new", "id": 1, "key": "9FA"})
+        _recv_until(ws, "reply", id=1)
+        ws.send_json({"op": "run", "id": 2, "speed": 4})
+        _recv_until(ws, "reply", id=2)
+        assert host.count_for(_learner_id(LEARNER_A)) == 1
+
+        r = client.post("/api/admin/academy/integrity/revoke",
+                        json={"token": copy, "reason": "seen elsewhere"}, headers=ADMIN)
+        assert r.json()["revoked"] == 1 and r.json()["sessions_ended"] == 1
+
+        # the running client is told why, then the socket closes
+        bye = _recv_until(ws, "bye")
+        assert bye["code"] == 4410 and "withdrawn" in bye["reason"]
+    assert host.count_for(_learner_id(LEARNER_A)) == 0
+    # and the withdrawn copy cannot come back
+    _expect_refusal(s, _ws_url(setup["lesson_id"], copy), 4410)
+
+
+def test_withdrawing_an_account_ends_all_its_sessions(client, setup):
+    s = _sign_in(LEARNER_B)
+    c1 = _copy(s, setup["lesson_id"])
+    c2 = _copy(s, setup["lesson_id"])
+    with s.websocket_connect(_ws_url(setup["lesson_id"], c1), headers=_hdrs(s)) as w1, \
+         s.websocket_connect(_ws_url(setup["lesson_id"], c2), headers=_hdrs(s)) as w2:
+        for w in (w1, w2):
+            w.receive_json()
+            w.send_json({"op": "new", "id": 1, "key": "9FA"})
+            _recv_until(w, "reply", id=1)
+        assert host.count_for(_learner_id(LEARNER_B)) == 2
+        r = client.post("/api/admin/academy/integrity/revoke",
+                        json={"learner_id": _learner_id(LEARNER_B)}, headers=ADMIN)
+        assert r.json()["sessions_ended"] == 2
+        assert _recv_until(w1, "bye")["code"] == 4410
+        assert _recv_until(w2, "bye")["code"] == 4410
+    assert host.count_for(_learner_id(LEARNER_B)) == 0

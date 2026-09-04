@@ -394,7 +394,7 @@ def test_admin_can_withdraw_one_copy(client, setup, outbox):
     r = client.post("/api/admin/academy/integrity/revoke",
                     json={"token": token, "reason": "seen on a file-sharing site"},
                     headers=ADMIN)
-    assert r.json() == {"ok": True, "revoked": 1}
+    assert r.json() == {"ok": True, "revoked": 1, "sessions_ended": 0}
 
     r = s.get(f"/api/academy/asset-key/{token}", headers=ON_SITE)
     assert r.status_code == 403 and "withdrawn" in r.json()["detail"]

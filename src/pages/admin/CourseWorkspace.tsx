@@ -2425,6 +2425,23 @@ type IntegrityReport = {
   recent: Delivery[];
 };
 
+type SimStatus = {
+  engine_loaded: boolean;
+  engine_sha: string;
+  sessions: {
+    id: string;
+    email: string;
+    lesson_id: number;
+    copy_token: string;
+    age_s: number;
+    idle_s: number;
+    running: boolean;
+    speed: number;
+    ops: number;
+    current_engine: boolean;
+  }[];
+};
+
 type TraceResult = {
   verdict: 'traced' | 'no-id-found' | 'id-not-issued-by-us';
   tokens_found: string[];
@@ -2504,6 +2521,7 @@ function IntegrityTab({
 }) {
   const productCode = course.recorded_product_code;
   const [report, setReport] = useState<IntegrityReport | null>(null);
+  const [sim, setSim] = useState<SimStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paste, setPaste] = useState('');
@@ -2524,6 +2542,11 @@ function IntegrityTab({
             (showReviewed ? '&include_reviewed=true' : ''),
         ),
       );
+      try {
+        setSim(await api<SimStatus>('/api/admin/academy/sim/status'));
+      } catch {
+        setSim(null);
+      }
     } catch (err) {
       reportError(err, onAuthError, setError);
     } finally {
@@ -2770,6 +2793,51 @@ function IntegrityTab({
                 </li>
               );
             })}
+          </ul>
+        )}
+      </section>
+
+      {/* ---- Simulator sessions ---------------------------------------- */}
+      <section className="rounded-xl border border-slate-800 bg-slate-900/40">
+        <header className="border-b border-slate-800 px-4 py-3">
+          <h3 className="flex items-center gap-2 font-semibold text-white">
+            <ShieldCheck className={`h-4 w-4 ${sim?.engine_loaded ? 'text-emerald-400' : 'text-amber-400'}`} />
+            Simulator running on the server
+          </h3>
+          <p className="mt-1 text-xs text-slate-400">
+            The simulator's physics runs here, not in the learner's browser; their page only
+            receives frames. This is who has a live session right now. Withdrawing a copy or an
+            account's copies above ends its session on the spot.
+            {sim ? (
+              <span className="text-slate-500">
+                {' '}Engine {sim.engine_loaded ? `loaded (${sim.engine_sha})` : 'NOT loaded'}.
+              </span>
+            ) : null}
+          </p>
+        </header>
+        {!sim?.sessions.length ? (
+          <p className="px-4 py-4 text-sm text-slate-400">No live simulator sessions.</p>
+        ) : (
+          <ul className="divide-y divide-slate-800">
+            {sim.sessions.map((s) => (
+              <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-sm">
+                <span className="font-medium text-white">{s.email}</span>
+                <span className={s.running ? 'text-emerald-300' : 'text-slate-400'}>
+                  {s.running ? `running at ${s.speed}×` : 'paused'}
+                </span>
+                <span className="text-xs text-slate-500">
+                  open {Math.round(s.age_s / 60)} min · idle {Math.round(s.idle_s / 60)} min · {s.ops} controls
+                  {s.current_engine ? '' : ' · older engine'}
+                </span>
+                <button
+                  onClick={() => void withdraw({ token: s.copy_token }, 'this copy (and end its session)')}
+                  disabled={busy !== null}
+                  className="ml-auto rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300 hover:border-rose-500 hover:text-white disabled:opacity-40"
+                >
+                  End session
+                </button>
+              </li>
+            ))}
           </ul>
         )}
       </section>

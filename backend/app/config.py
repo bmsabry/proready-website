@@ -201,7 +201,7 @@ class Settings(BaseSettings):
     # the API origin and only ever receives frames.
     SIM_ENGINE_ASSET_KEY: str = "sim-engine.js"
     SIM_MAX_SESSIONS: int = 60
-    SIM_MAX_PER_LEARNER: int = 2
+    SIM_MAX_PER_LEARNER: int = 3
     SIM_IDLE_SECONDS: int = 20 * 60
     SIM_TICK_SECONDS: float = 0.25
     SIM_MAX_SPEED: int = 30

@@ -1450,7 +1450,7 @@ class WithdrawCopyIn(BaseModel):
 
 
 @router.post("/integrity/revoke")
-def integrity_revoke(
+async def integrity_revoke(
     body: WithdrawCopyIn,
     db: Session = Depends(get_db),
     admin: str = Depends(require_admin),
@@ -1478,6 +1478,12 @@ def integrity_revoke(
         row.revoked_at = stamp
         row.revoke_reason = (body.reason or f"withdrawn by {admin}")[:200]
     db.commit()
-    log.info("Integrity: %s withdrew %d copy(ies) (%s)", admin, len(rows),
-             body.token or f"learner {body.learner_id}")
-    return {"ok": True, "revoked": len(rows)}
+    # A withdrawn copy may be running a simulator session right now: end it.
+    from ..sim_runtime import host as sim_host
+    ended = await sim_host.kill(
+        copy_token=body.token.strip()[:32] if body.token else "",
+        learner_id=None if body.token else body.learner_id,
+    )
+    log.info("Integrity: %s withdrew %d copy(ies) (%s), ended %d live session(s)",
+             admin, len(rows), body.token or f"learner {body.learner_id}", ended)
+    return {"ok": True, "revoked": len(rows), "sessions_ended": ended}

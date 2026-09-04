@@ -789,10 +789,11 @@ const Lesson: React.FC = () => {
             <p className="text-xs text-slate-500 mb-4">
               Training simulation only: generic behavior, not any specific
               engine. Never apply values from it to real equipment. Your access
-              is personal and watermarked with your account email. The tool runs
-              only from this site while you are signed in; a saved copy will not
-              start, and each launch stays valid for 24 hours, so simply launch
-              it again when you come back.
+              is personal and watermarked with your account email. The
+              simulation itself runs on our servers and your browser shows the
+              results, so it works only from this site while you are signed in;
+              a saved copy will not start, and each launch stays valid for 24
+              hours, so simply launch it again when you come back.
             </p>
             <a
               href={

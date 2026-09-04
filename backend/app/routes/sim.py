@@ -248,6 +248,7 @@ async def _serve(ws: WebSocket, learner: Learner, lesson: Lesson, delivery: Asse
                         lesson_id=lesson.id, copy_token=delivery.token,
                         key=key, shaft=shaft, limit_set=limit_set,
                     )
+                    session.ws = ws
                     holder["session"] = session
                 else:
                     await _stop(session)
