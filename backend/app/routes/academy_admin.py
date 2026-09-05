@@ -7,6 +7,7 @@ none of it is reachable with a learner session.
 from __future__ import annotations
 
 import base64
+import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,6 +19,7 @@ from .. import academy as svc
 from .. import provenance as prov
 from ..config import get_settings
 from ..db import get_db
+from ..deploy_auth import DEPLOYER, deployer_may_write, require_admin_or_deployer
 from ..deps import require_admin
 from ..emailer import enrollment_granted_html, login_link_html, send_email
 from ..learner_auth import issue_login_token
@@ -903,10 +905,15 @@ class AssetIn(BaseModel):
 
 @router.post("/assets")
 def upload_asset(
-    body: AssetIn, db: Session = Depends(get_db), _: str = Depends(require_admin)
+    body: AssetIn, db: Session = Depends(get_db), who: str = Depends(require_admin_or_deployer)
 ) -> dict:
     """Store (or replace) a protected blob — the simulator, a lab, a handout.
-    Lessons point at it with asset_path='blob:{key}'."""
+    Lessons point at it with asset_path='blob:{key}'.
+
+    The deployer (a verified GitHub Actions run of the simulator repository)
+    may only write the simulator's own two keys."""
+    if who == DEPLOYER and not deployer_may_write(body.key):
+        raise HTTPException(status_code=403, detail="The deployer may not write this asset key.")
     try:
         blob = base64.b64decode(body.data_b64, validate=True)
     except Exception:
@@ -924,9 +931,10 @@ def upload_asset(
     row.content_type = body.content_type
     row.data = blob
     db.commit()
-    log.info("Asset %s %s (%d bytes)", body.key,
-             "created" if created else "replaced", len(blob))
-    return {"ok": True, "created": created, "key": body.key, "bytes": len(blob)}
+    log.info("Asset %s %s (%d bytes) by %s", body.key,
+             "created" if created else "replaced", len(blob), who)
+    return {"ok": True, "created": created, "key": body.key, "bytes": len(blob),
+            "sha256": hashlib.sha256(blob).hexdigest()}
 
 
 # -----------------------------------------------------------------------------

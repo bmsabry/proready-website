@@ -46,7 +46,7 @@ from sqlalchemy.orm import Session
 from .. import academy as svc
 from ..config import get_settings
 from ..db import SessionLocal, get_db
-from ..deps import require_admin
+from ..deploy_auth import require_admin_or_deployer
 from ..learner_auth import LEARNER_COOKIE_NAME, verify_learner_token
 from ..models import AssetDelivery, Learner, Lesson
 from ..sim_runtime import EngineUnavailable, SimSession, host
@@ -378,12 +378,12 @@ admin_router = APIRouter(prefix="/api/admin/academy/sim", tags=["academy-sim-adm
 
 
 @admin_router.get("/status")
-def sim_status(_: str = Depends(require_admin)) -> dict:
+def sim_status(_: str = Depends(require_admin_or_deployer)) -> dict:
     return host.status()
 
 
 @admin_router.post("/reload")
-async def sim_reload(db: Session = Depends(get_db), _: str = Depends(require_admin)) -> dict:
+async def sim_reload(db: Session = Depends(get_db), _: str = Depends(require_admin_or_deployer)) -> dict:
     """Pick up a newly uploaded engine blob. Running sessions keep the old
     engine until they end; new sessions get the new one."""
     try:

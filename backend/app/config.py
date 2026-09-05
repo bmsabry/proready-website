@@ -208,6 +208,20 @@ class Settings(BaseSettings):
     # Control messages per second one session may send before it is slowed.
     SIM_OPS_PER_SECOND: int = 40
 
+    # --- Automatic simulator deployment (app/deploy_auth.py) ---------------
+    # A GitHub Actions run in the simulator's PRIVATE repository may upload
+    # the two simulator blobs and reload the engine. It proves who it is with
+    # GitHub's OIDC token (no shared secret anywhere): the token must be
+    # issued for this repository and branch and for our audience. Empty repo
+    # = the deployer identity is switched off. SIM_DEPLOY_TOKEN is an optional
+    # static fallback for a machine that cannot mint OIDC tokens.
+    SIM_DEPLOY_GITHUB_REPO: str = ""
+    SIM_DEPLOY_GITHUB_REF: str = "refs/heads/main"
+    SIM_DEPLOY_AUDIENCE: str = "proreadyengineer-sim-deploy"
+    SIM_DEPLOY_TOKEN: str = ""
+    # The only blob keys the deployer may write.
+    SIM_DEPLOY_ASSET_KEYS: str = "prodlemappingsim-thin.html,sim-engine.js"
+
     @property
     def asset_allowed_hosts_set(self) -> set:
         return {
