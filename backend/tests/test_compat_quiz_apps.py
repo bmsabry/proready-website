@@ -416,3 +416,52 @@ def test_a_paid_account_without_a_password_cannot_be_claimed_by_a_stranger(c):
         "/auth/login",
         json={"email": "paid-no-password@example.com", "password": "stolen-account"},
     ).status_code == 401
+
+
+# -----------------------------------------------------------------------------
+# Password recovery — the apps have no reset screen, so the route rides in the
+# refusal text they display
+# -----------------------------------------------------------------------------
+
+RESET_PATH = "/learn/signin?reason=password"
+
+
+def test_wrong_password_refusal_carries_the_reset_route(c):
+    r = c.post("/auth/login", json={"email": STRANGER, "password": "nope-nope-nope"})
+    assert r.status_code == 401
+    assert RESET_PATH in r.json()["detail"]
+    assert "Forgot it?" in r.json()["detail"]
+
+
+def test_paid_account_without_a_password_is_told_how_to_set_one(c):
+    db = SessionLocal()
+    db.add(Learner(email="paid-forgot@example.com", full_name="Buyer"))
+    db.commit()
+    db.close()
+    assert c.post(
+        "/api/admin/academy/grant", headers=ADMIN,
+        json={"email": "paid-forgot@example.com", "product_code": PRODUCT, "send_email_invite": False},
+    ).status_code == 200
+
+    r = c.post("/auth/login", json={"email": "paid-forgot@example.com", "password": "anything-at-all"})
+    assert r.status_code == 401
+    assert "no password yet" in r.json()["detail"]
+    assert RESET_PATH in r.json()["detail"]
+
+    r = c.post("/auth/signup", json={"email": "paid-forgot@example.com", "password": "anything-at-all"})
+    assert r.status_code == 403
+    assert RESET_PATH in r.json()["detail"]
+
+
+def test_set_password_replaces_a_forgotten_one(c):
+    """The recovery path end to end: a learner who set a password and lost it
+    signs in by email link and sets a new one; the old one stops working."""
+    email = "forgetful@example.com"
+    assert c.post(
+        "/api/admin/academy/grant", headers=ADMIN,
+        json={"email": email, "product_code": PRODUCT, "send_email_invite": False},
+    ).status_code == 200
+    set_password_then_login(c, email, "first-password-1")
+    set_password_then_login(c, email, "second-password-2")
+    assert c.post("/auth/login", json={"email": email, "password": "first-password-1"}).status_code == 401
+    assert c.post("/auth/login", json={"email": email, "password": "second-password-2"}).status_code == 200

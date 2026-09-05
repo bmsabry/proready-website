@@ -15,6 +15,10 @@ const SignIn: React.FC = () => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const token = params.get('token');
+  // ?reason=password: someone locked out of the GT-05 … GT-15 module apps.
+  // Same passwordless sign-in, but the copy says why they are here and the
+  // link lands them on the course page with the change-password form open.
+  const resetting = params.get('reason') === 'password';
 
   const [email, setEmail] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
@@ -69,7 +73,7 @@ const SignIn: React.FC = () => {
     setState('sending');
     setError('');
     try {
-      await academy.requestLink(email.trim());
+      await academy.requestLink(email.trim(), resetting ? '/learn?password=1' : '/learn');
       setState('sent');
     } catch (err) {
       setState('error');
@@ -97,6 +101,13 @@ const SignIn: React.FC = () => {
                 If <strong className="text-white">{email}</strong> has access to a
                 course, a sign-in link is on its way. It works once and expires in
                 30 minutes.
+                {resetting && (
+                  <>
+                    {' '}
+                    Open it and your course page will ask for the new password for
+                    the interactive modules.
+                  </>
+                )}
               </p>
               <button
                 type="button"
@@ -108,14 +119,28 @@ const SignIn: React.FC = () => {
             </div>
           ) : (
             <>
-              <span className="eyebrow mb-5">Learner sign-in</span>
-              <h1 className="text-2xl font-bold mt-3 mb-2">Welcome back</h1>
-              <p className="text-slate-300 mb-6 leading-relaxed">
-                Enter the email you registered or purchased with. We'll send a
-                sign-in link; there's no password to remember. Inside you will
-                find every course you have access to, your progress, and your
-                certificates.
-              </p>
+              <span className="eyebrow mb-5">
+                {resetting ? 'Password reset' : 'Learner sign-in'}
+              </span>
+              <h1 className="text-2xl font-bold mt-3 mb-2">
+                {resetting ? 'Set a new password for the interactive modules' : 'Welcome back'}
+              </h1>
+              {resetting ? (
+                <p className="text-slate-300 mb-6 leading-relaxed">
+                  The GT-05 to GT-15 interactive modules ask for an email and a
+                  password. You don't need the old one: enter the email you
+                  purchased with, open the one-time link we send, and your course
+                  page will offer to save a new password. The old one stops
+                  working the moment you do.
+                </p>
+              ) : (
+                <p className="text-slate-300 mb-6 leading-relaxed">
+                  Enter the email you registered or purchased with. We'll send a
+                  sign-in link; there's no password to remember. Inside you will
+                  find every course you have access to, your progress, and your
+                  certificates.
+                </p>
+              )}
 
               {error && (
                 <p className="mb-4 text-sm text-amber-300" role="alert">
@@ -153,7 +178,16 @@ const SignIn: React.FC = () => {
                 </button>
               </form>
 
-              <p className="mt-6 text-sm text-slate-400">
+              {!resetting && (
+                <p className="mt-6 text-sm text-slate-400">
+                  Forgot the password for the GT-05 to GT-15 interactive modules?{' '}
+                  <Link to="/learn/signin?reason=password" className="text-cyan-400 hover:text-cyan-300">
+                    Reset it here
+                  </Link>{' '}
+                  — sign in by email link and choose a new one on your course page.
+                </p>
+              )}
+              <p className="mt-3 text-sm text-slate-400">
                 Don't have a course yet?{' '}
                 <Link to="/training/micro-gas-turbine-design" className="text-cyan-400 hover:text-cyan-300">
                   See what's available

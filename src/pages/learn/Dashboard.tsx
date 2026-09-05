@@ -257,17 +257,26 @@ const ModuleCard = ({
   );
 };
 
-/* One-time setup for the credentials the five interactive modules use.
+/* The credentials the five interactive modules (GT-05 … GT-15) sign in with.
  *
- * Those apps predate this platform and sign in with email + password, so a
- * buyer who arrived by magic link has no password to give them. Setting it
- * here rather than letting the apps offer "sign up" is deliberate: this page
- * is behind a session, which means the mailbox has already been proven, so
- * nobody can adopt a paid account by typing someone else's address. */
-const SetPasswordCard: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+ * Those apps predate this platform and ask for an email + password, so a
+ * buyer who arrived by magic link has no password to give them. It is set —
+ * and RESET — here rather than inside the apps, deliberately: this page is
+ * behind a session, which means the mailbox has already been proven, so a
+ * forgotten password is recovered by signing in with the email link and
+ * choosing a new one. The section is always present, not only when no
+ * password exists yet; `?password=1` (the link the apps and the sign-in page
+ * send people to) opens the form straight away. */
+const PasswordSection: React.FC<{
+  hasPassword: boolean;
+  open: boolean;
+  onOpen: () => void;
+  onDone: () => void;
+}> = ({ hasPassword, open, onOpen, onDone }) => {
   const [value, setValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const [saved, setSaved] = useState(false);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -279,6 +288,8 @@ const SetPasswordCard: React.FC<{ onDone: () => void }> = ({ onDone }) => {
     setErr('');
     try {
       await academy.setPassword(value);
+      setValue('');
+      setSaved(true);
       onDone();
     } catch (e2) {
       setErr(e2 instanceof ApiError ? e2.message : 'Could not save that.');
@@ -287,33 +298,61 @@ const SetPasswordCard: React.FC<{ onDone: () => void }> = ({ onDone }) => {
     }
   };
 
+  const showForm = open || !hasPassword;
+
   return (
-    <div className="card p-6 mb-8 border-cyan-500/30">
+    <div
+      id="password"
+      className={`card p-6 mb-8 ${!hasPassword ? 'border-cyan-500/30' : ''}`}
+    >
       <div className="flex items-start gap-4">
         <KeyRound className="w-6 h-6 text-cyan-400 shrink-0 mt-0.5" aria-hidden="true" />
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-white">Set a password for the interactive modules</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-semibold text-white">
+              {hasPassword
+                ? 'Password for the interactive modules'
+                : 'Set a password for the interactive modules'}
+            </h2>
+            {hasPassword && !showForm && (
+              <button type="button" onClick={onOpen} className="btn-ghost text-sm">
+                Change password
+              </button>
+            )}
+          </div>
           <p className="text-sm text-slate-300 mt-1 mb-4">
-            The GT-05 to GT-15 tools open in their own apps and ask for an email
-            and password. Choose one here and they'll let you straight in. The
-            rest of the course stays link-based.
+            The GT-05 to GT-15 tools open in their own apps and ask for your email
+            and a password.{' '}
+            {hasPassword
+              ? 'Yours is set. Forgot it? Choose a new one here — the old one stops working the moment you save.'
+              : "Choose one here and they'll let you straight in. The rest of the course stays link-based."}
           </p>
-          <form onSubmit={save} className="flex flex-wrap items-start gap-3">
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={value}
-              onChange={(ev) => setValue(ev.target.value)}
-              placeholder="At least 8 characters"
-              className="flex-1 min-w-[16rem] px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
-            />
-            <button type="submit" disabled={saving} className="btn-primary disabled:opacity-60">
-              {saving ? 'Saving…' : 'Save password'}
-            </button>
-            <button type="button" onClick={onDone} className="btn-ghost">
-              Later
-            </button>
-          </form>
+          {saved && !showForm && (
+            <p className="text-sm text-emerald-300 mb-2" role="status">
+              Password saved. Use it with your email on any of the five module apps.
+            </p>
+          )}
+          {showForm && (
+            <form onSubmit={save} className="flex flex-wrap items-start gap-3">
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={value}
+                onChange={(ev) => setValue(ev.target.value)}
+                placeholder="At least 8 characters"
+                aria-label="New password for the interactive modules"
+                className="flex-1 min-w-[16rem] px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
+              />
+              <button type="submit" disabled={saving} className="btn-primary disabled:opacity-60">
+                {saving ? 'Saving…' : hasPassword ? 'Save new password' : 'Save password'}
+              </button>
+              {hasPassword && (
+                <button type="button" onClick={onDone} className="btn-ghost">
+                  Cancel
+                </button>
+              )}
+            </form>
+          )}
           {err && (
             <p className="text-sm text-amber-300 mt-3" role="alert">
               {err}
@@ -598,6 +637,11 @@ const Dashboard: React.FC = () => {
   const [email, setEmail] = useState('');
   const [isOwner, setIsOwner] = useState(false);
   const [needsPassword, setNeedsPassword] = useState(false);
+  // ?password=1 is where the module apps and the sign-in page send someone
+  // who forgot the modules' password: open the form without a click.
+  const [pwOpen, setPwOpen] = useState(
+    new URLSearchParams(location.search).get('password') === '1'
+  );
   const [termsVersion, setTermsVersion] = useState('');
   const [needsTerms, setNeedsTerms] = useState(false);
 
@@ -710,6 +754,19 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
           <CourseChooser courses={chooser} />
+          {chooser.some((c) => c.code === DEFAULT_PRODUCT) && (
+            <p className="mt-6 text-sm text-slate-400">
+              <KeyRound className="w-4 h-4 inline -mt-0.5 mr-1.5 text-cyan-400" aria-hidden="true" />
+              Forgot the password for the GT-05 to GT-15 interactive modules?{' '}
+              <Link
+                to={`/learn/${DEFAULT_PRODUCT}?password=1`}
+                className="text-cyan-400 hover:text-cyan-300"
+              >
+                Set a new one
+              </Link>
+              .
+            </p>
+          )}
         </div>
       </div>
     );
@@ -773,8 +830,16 @@ const Dashboard: React.FC = () => {
           <TermsGate version={termsVersion} onAccepted={() => setNeedsTerms(false)} />
         ) : (
           <>
-        {needsPassword && code === DEFAULT_PRODUCT && (
-          <SetPasswordCard onDone={() => setNeedsPassword(false)} />
+        {code === DEFAULT_PRODUCT && (
+          <PasswordSection
+            hasPassword={!needsPassword}
+            open={pwOpen}
+            onOpen={() => setPwOpen(true)}
+            onDone={() => {
+              setNeedsPassword(false);
+              setPwOpen(false);
+            }}
+          />
         )}
 
         <div className="card p-6 mb-8">

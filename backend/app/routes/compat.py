@@ -153,6 +153,23 @@ class ModuleAccessOut(BaseModel):
 # Passwords + JWT
 # -----------------------------------------------------------------------------
 
+def reset_url() -> str:
+    """Where a learner sets or replaces the password these apps use.
+
+    The apps have no 'forgot password' screen of their own — they render the
+    `detail` of every failed call in the login card — so the recovery route
+    travels inside the refusal text. It lands on the platform's sign-in page
+    in reset mode: the email link proves the mailbox, and the course page
+    then offers 'change password'."""
+    return get_settings().SITE_URL.rstrip("/") + "/learn/signin?reason=password"
+
+
+def _recovery_hint(prefix: str) -> str:
+    return (
+        f"{prefix} Go to {reset_url().split('://', 1)[-1]} — sign in with the "
+        "email link we send you and set a new password for the interactive modules."
+    )
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
 
@@ -320,10 +337,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)) -> TokenResponse:
     if learner is not None and svc.any_active_enrollment(db, learner):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "This address already has access. Open the sign-in link we "
-                "emailed you, then set a password from your dashboard."
-            ),
+            detail=_recovery_hint("This address already has course access, so there is nothing to sign up for."),
         )
     if learner is not None and learner.password_hash:
         raise HTTPException(
@@ -347,9 +361,19 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     learner = db.execute(
         select(Learner).where(Learner.email == body.email.lower().strip())
     ).scalar_one_or_none()
+    # A buyer who arrived by magic link has no password yet. Telling them so
+    # (rather than "invalid password") is what gets them into the modules
+    # without a support email; the address already carries access, so saying
+    # so reveals nothing the signup refusal above does not.
+    if learner is not None and not learner.password_hash and svc.any_active_enrollment(db, learner):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=_recovery_hint("This email has course access but no password yet."),
+        )
     if learner is None or not verify_password(body.password, learner.password_hash):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=_recovery_hint("Invalid email or password. Forgot it?"),
         )
     if learner.status != "active":
         raise HTTPException(
