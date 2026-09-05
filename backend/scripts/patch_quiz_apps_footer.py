@@ -89,6 +89,10 @@ def discover_assets(origin: str) -> dict[str, bytes]:
     return files
 
 
+def already_patched(js: str) -> bool:
+    return "Reset it by email link" in js and "combustion-toolkit" not in js
+
+
 def patch(js: str) -> str:
     hits = list(OLD_RE.finditer(js))
     if len(hits) != 1:
@@ -118,6 +122,8 @@ def deploy(name: str, files: dict[str, bytes]) -> None:
         (root / "wrangler.jsonc").write_text(json.dumps({
             "name": name,
             "compatibility_date": "2025-01-01",
+            # the apps live on their custom domains only; no workers.dev alias
+            "workers_dev": False,
             "assets": {"directory": "./dist", "not_found_handling": "single-page-application"},
         }, indent=2))
         env = dict(os.environ, CLOUDFLARE_API_TOKEN=token, CLOUDFLARE_ACCOUNT_ID=account)
@@ -129,6 +135,8 @@ def main() -> int:
     ap.add_argument("--apply", action="store_true", help="deploy the patched apps (default: dry run)")
     ap.add_argument("--backup-dir", default="./quiz-app-backup")
     ap.add_argument("--only", help="a single worker name, e.g. smallgasturbine-gt05")
+    ap.add_argument("--force-redeploy", action="store_true",
+                    help="redeploy an app that already carries the patch (e.g. to change Worker settings)")
     args = ap.parse_args()
 
     backup = Path(args.backup_dir)
@@ -154,8 +162,14 @@ def main() -> int:
             ok = False
             continue
         rel = js_files[0]
+        js = files[rel].decode("utf-8")
+        if already_patched(js):
+            print(f"  · {rel}: already carries the new footer" + (" — will redeploy as is" if args.force_redeploy else " — nothing to do"))
+            if args.force_redeploy:
+                patched_apps[name] = files
+            continue
         try:
-            patched = patch(files[rel].decode("utf-8"))
+            patched = patch(js)
         except ValueError as exc:
             print(f"  ! {rel}: {exc} — refusing")
             ok = False
