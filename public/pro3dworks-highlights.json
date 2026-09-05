@@ -1,11 +1,11 @@
 {
-  "version": "2.66.0",
-  "name": "Draft Angle Analysis + Parallel STEP Import",
+  "version": "2.67.0",
+  "name": "Studio design system + Draft Angle Analysis",
   "highlights": [
+    "A new Studio design system restyles every surface from one token set \u2014 glass top bar, hero start screen with six capability tiles, refined tree, panels, menus and navigation \u2014 with the Inter typeface embedded so the interface looks the same on Windows, macOS and Linux",
+    "Display \u2192 Dark frame (Graphite) turns the frame dark while every tool panel and evidence card stays white; the choice is remembered locally and applied before first paint",
+    "The AI Engineer, Photoreal, Support us and ProReadyEngineer buttons stay visible with text labels from 1280 px up (measured 1280\u20132560 px)",
     "Inspect \u2192 Draft Angle Analysis classifies every CAD face as positive, negative, requires-draft or straddling for one pull direction and required angle, colors them in the viewport (clipped by the section plane) and exports a full audit CSV",
-    "Every STEP assembly now imports on a pool of CAD kernels sized to your machine (up to 12) instead of one single-threaded kernel call — a 40 MB, 189-part truck opens in 13 s instead of 51 s on a 32-thread workstation; each distinct product is tessellated once and placed by transform",
-    "One model-wide deflection keeps the triangle budget identical to the whole-document import (Hino: 3,547,084 vs 3,540,844 triangles, same bounds) and the assembly tree keeps every sub-assembly level in source order",
-    "The AI Engineer and the Safe Command Palette can run the draft analysis as a validated allow-listed action",
-    "The top bar keeps the ProReadyEngineer, Support, AI Engineer and Photoreal buttons fully visible on every laptop width from 1280 px up"
+    "Every STEP assembly imports on a pool of CAD kernels sized to your machine (up to 12) \u2014 a 40 MB, 189-part truck opens in 13 s instead of 51 s on a 32-thread workstation"
   ]
 }
