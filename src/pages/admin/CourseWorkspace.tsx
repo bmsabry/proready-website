@@ -2553,9 +2553,18 @@ function LiveSessionCard({
                           <span className="text-slate-400"> · {formatDate(s.remind_at_utc)} local</span>
                         </td>
                         <td className="py-2 pr-3">
-                          <span className={`inline-block text-[11px] px-2 py-0.5 rounded border ${stateLabel[s.state].cls}`}>
-                            {stateLabel[s.state].text}
-                          </span>
+                          {!overview.armed && (s.state === 'due' || s.state === 'scheduled') ? (
+                            <span
+                              className="inline-block text-[11px] px-2 py-0.5 rounded border bg-slate-800/60 border-slate-700 text-slate-400"
+                              title={`Nothing will be sent: ${overview.blocked_by.join(', ')}`}
+                            >
+                              Off
+                            </span>
+                          ) : (
+                            <span className={`inline-block text-[11px] px-2 py-0.5 rounded border ${stateLabel[s.state].cls}`}>
+                              {stateLabel[s.state].text}
+                            </span>
+                          )}
                         </td>
                         <td className="py-2 pr-3 text-right font-mono">
                           {s.sent}/{s.sent + s.pending}
