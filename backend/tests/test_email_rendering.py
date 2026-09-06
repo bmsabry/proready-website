@@ -60,6 +60,13 @@ TEMPLATES = {
     "admin_notification": lambda: E.admin_notification_html(
         {"Name": "Ada", "Email": "ada@example.com"}, 3, 15
     ),
+    "session_reminder": lambda: E.session_reminder_html(
+        "Ada Lovelace", "Course X", 2, 4,
+        ["14:00 UTC on Saturday, March 2", "10:00 EDT in Cincinnati, OH — your local time"],
+        "To join the video meeting, click this link: https://meet.google.com/abc-defg-hij\n"
+        "Otherwise, to join by phone, dial +1 321-430-1922 and enter this PIN: 316 913 670#",
+        60,
+    ),
 }
 
 IGNORED_TEXT_TAGS = {"title", "style", "script", "head", "meta"}

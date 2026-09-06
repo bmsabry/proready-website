@@ -27,6 +27,7 @@ from .routes import downloads as downloads_routes
 from .routes import interest as interest_routes
 from .routes import payments as payments_routes
 from .routes import register as register_routes
+from .routes import reminders as reminders_routes
 from .routes import seats as seats_routes
 from .routes import sim as sim_routes
 from .routes import software as software_routes
@@ -182,6 +183,9 @@ def _run_column_migrations() -> None:
     _ensure_column(
         "courses", "session_duration_minutes", "INTEGER NOT NULL DEFAULT 0"
     )
+    # Joining instructions for the live sessions (2026-09). Empty = no
+    # meeting set, so the reminder job leaves the course alone.
+    _ensure_column("courses", "meeting_info", "TEXT NOT NULL DEFAULT ''")
     # Certification tiers (2026-09). academy_advanced_certifications is a new
     # table (create_all builds it complete); the columns below land on tables
     # that already exist in production.
@@ -333,6 +337,7 @@ app.include_router(auth_routes.router)
 app.include_router(admin_routes.router)
 app.include_router(courses_routes.public_router)
 app.include_router(courses_routes.admin_router)
+app.include_router(reminders_routes.router)
 app.include_router(interest_routes.public_router)
 app.include_router(interest_routes.admin_router)
 app.include_router(ai_routes.router)

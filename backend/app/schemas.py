@@ -162,6 +162,77 @@ class CoursePatchIn(BaseModel):
         default=None, max_length=5, pattern=r"^$|^([01]\d|2[0-3]):[0-5]\d$"
     )
     session_duration_minutes: Optional[int] = Field(default=None, ge=0, le=1440)
+    # Joining instructions for the live sessions, verbatim. Send "" to clear
+    # (which also stops the reminder emails for this course).
+    meeting_info: Optional[str] = Field(default=None, max_length=4000)
+
+
+class ReminderRecipientOut(BaseModel):
+    """A confirmed registrant, as the reminder job will see them."""
+
+    registration_id: int
+    full_name: str
+    email: str
+    status: str
+    location: str
+    # IANA zone resolved from `location`, or "" when the reminder will show
+    # the UTC time only.
+    timezone: str = ""
+
+
+class ReminderSessionOut(BaseModel):
+    day: int  # 1-based
+    date: date
+    start_utc: datetime
+    remind_at_utc: datetime
+    # 'sent'      every current recipient has an OK reminder for this day
+    # 'partial'   some have, some have not (a late confirmation, a failure)
+    # 'due'       inside the window right now — the next run sends
+    # 'scheduled' in the future
+    # 'missed'    the session started and nobody was emailed
+    state: Literal["sent", "partial", "due", "scheduled", "missed"]
+    sent: int
+    pending: int
+
+
+class ReminderLogOut(BaseModel):
+    ts: datetime
+    session_date: str
+    recipient: str
+    ok: bool
+    subject: str
+
+
+class MeetingOut(BaseModel):
+    """Admin-only view of a course's live-session setup and reminder state."""
+
+    meeting_info: str
+    session_time_utc: str
+    session_duration_minutes: int
+    lead_minutes: int
+    # False when reminders cannot run: no meeting info, no session time, or
+    # no day_dates. `blocked_by` says which.
+    armed: bool
+    blocked_by: List[str]
+    recipients: List[ReminderRecipientOut]
+    sessions: List[ReminderSessionOut]
+    log: List[ReminderLogOut]
+
+
+class MeetingTestOut(BaseModel):
+    ok: bool
+    to: str
+    subject: str
+    day: int
+
+
+class ReminderRunOut(BaseModel):
+    ran_at: datetime
+    courses_checked: int
+    sent: int
+    failed: int
+    # "course_code day=N date=YYYY-MM-DD -> email" per attempt
+    details: List[str]
 
 
 class NotifyIn(BaseModel):

@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import date
-from html import unescape
+from html import escape as escape_html, unescape
 from typing import Callable, Optional, Sequence
 
 import httpx
@@ -544,6 +544,77 @@ def start_date_updated_html(
         "sort it out."
     )
     return _shell("Start date updated", f"{course_title}: new start date", body)
+
+
+_URL_RE = re.compile(r"https?://[^\s<>\"']+")
+
+
+def _meeting_block(meeting_info: str) -> str:
+    """The admin's joining instructions, verbatim but safe and clickable.
+
+    Escaped first (the text is admin-typed, but a pasted invite can carry
+    angle brackets), then every http(s) URL becomes a link and line breaks
+    are kept, so "click this link: https://meet.google.com/..." renders as
+    the admin pasted it with the link live. A trailing ".", "," or ")" is
+    left outside the link — invites end sentences with the URL.
+    """
+    lines = []
+    for raw in meeting_info.strip().splitlines():
+        text = escape_html(raw)
+        out, pos = [], 0
+        for m in _URL_RE.finditer(text):
+            url = m.group(0)
+            trail = ""
+            while url and url[-1] in ".,;:)":
+                trail = url[-1] + trail
+                url = url[:-1]
+            out.append(text[pos:m.start()])
+            out.append(_link(url) + trail)
+            pos = m.end()
+        out.append(text[pos:])
+        lines.append("".join(out) or "&nbsp;")
+    body = "<br>".join(lines)
+    return (
+        f'<div style="margin:0 0 18px;padding:14px 16px;background-color:{FOOTER_BG};'
+        f'border:1px solid {CARD_BORDER};border-radius:8px;font-family:{FONT};'
+        f'font-size:15px;line-height:1.7;color:{HEADING};word-break:break-word;">'
+        f"{body}</div>"
+    )
+
+
+def session_reminder_html(
+    full_name: str,
+    course_title: str,
+    day: int,
+    total_days: int,
+    when_lines: "list[str]",
+    meeting_info: str,
+    lead_minutes: int,
+) -> str:
+    """Joining instructions, sent to confirmed registrants before a session.
+
+    `when_lines` is the start time in UTC followed, when the registrant's
+    location resolved to a time zone, by their own local time — the
+    arithmetic is done by local_times.py, never here.
+    """
+    greeting = f"Hi {full_name.split(' ')[0]}," if full_name.strip() else "Hi,"
+    when = f"in about {lead_minutes} minutes" if lead_minutes != 60 else "in about an hour"
+    body = _p(greeting)
+    body += _p(
+        f"<strong>{course_title}</strong> — Day {day} of {total_days} — starts {when}."
+    )
+    body += _kv_table([("Starts", "<br>".join(when_lines))])
+    body += _p("Here is how to join:", margin="0 0 10px", weight=600, color=HEADING)
+    body += _meeting_block(meeting_info)
+    body += _p(
+        "Please join a few minutes early so we can start on time. If the link "
+        "does not open for you, reply to this email straight away.",
+    )
+    return _shell(
+        f"Day {day} of {total_days} starts soon",
+        f"{course_title}: joining instructions",
+        body,
+    )
 
 
 def broadcast_html(course_title: str, body_html: str) -> str:

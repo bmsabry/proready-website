@@ -39,6 +39,7 @@ import {
   Unlock,
   UserCheck,
   Users,
+  Video,
   X,
   XCircle,
 } from 'lucide-react';
@@ -60,6 +61,7 @@ import {
   type CourseTab,
   type EmailLogRow,
   type Learner,
+  type MeetingOverview,
   type NotifyAudience,
   type NotifyResult,
   type ProductContent,
@@ -2246,8 +2248,406 @@ function SettingsTab({
           </div>
         )}
       </div>
+
+      <LiveSessionCard course={course} onSaved={onSaved} onAuthError={onAuthError} />
     </div>
   );
+}
+
+/**
+ * Live sessions — start time, joining instructions, and the automatic
+ * reminder that emails them one hour before each session day to every
+ * registrant who confirmed attendance. The reminder is on exactly when the
+ * three inputs are set (server decides: `armed`); clearing the instructions
+ * turns it off. Nothing here ever emails a registrant directly — the test
+ * button emails the signed-in admin only.
+ */
+function LiveSessionCard({
+  course,
+  onSaved,
+  onAuthError,
+}: {
+  course: Course;
+  onSaved: (c: Course) => void;
+  onAuthError: () => void;
+}) {
+  const [timeText, setTimeText] = useState(course.session_time_utc ?? '');
+  const [durationText, setDurationText] = useState(String(course.session_duration_minutes ?? 0));
+  const [meetingText, setMeetingText] = useState('');
+  const [overview, setOverview] = useState<MeetingOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const m = await api<MeetingOverview>(
+        `/api/admin/courses/${encodeURIComponent(course.code)}/meeting`,
+      );
+      setOverview(m);
+      setMeetingText(m.meeting_info);
+      setTimeText(m.session_time_utc);
+      setDurationText(String(m.session_duration_minutes));
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setLoading(false);
+    }
+  }, [course.code, onAuthError]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const savedTime = overview?.session_time_utc ?? course.session_time_utc ?? '';
+  const savedDuration = overview?.session_duration_minutes ?? course.session_duration_minutes ?? 0;
+  const savedMeeting = overview?.meeting_info ?? '';
+  const parsedDuration = parseInt(durationText, 10);
+  const timeOk = timeText === '' || /^([01]\d|2[0-3]):[0-5]\d$/.test(timeText);
+
+  const patch: CoursePatch = {};
+  if (timeText !== savedTime && timeOk) patch.session_time_utc = timeText;
+  if (!Number.isNaN(parsedDuration) && parsedDuration !== savedDuration)
+    patch.session_duration_minutes = parsedDuration;
+  if (meetingText.trim() !== savedMeeting) patch.meeting_info = meetingText.trim();
+  const dirty = Object.keys(patch).length > 0;
+
+  async function save() {
+    if (!dirty) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await api<Course>(`/api/admin/courses/${encodeURIComponent(course.code)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      });
+      onSaved(updated);
+      await load();
+      setFlash(
+        patch.meeting_info === ''
+          ? 'Saved. Joining instructions cleared — session reminders are off.'
+          : 'Saved. Reminders go out one hour before each session below.',
+      );
+      window.setTimeout(() => setFlash(null), 6000);
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function sendTest() {
+    setTesting(true);
+    setError(null);
+    try {
+      const r = await api<{ ok: boolean; to: string; subject: string; day: number }>(
+        `/api/admin/courses/${encodeURIComponent(course.code)}/meeting/test`,
+        { method: 'POST' },
+      );
+      setFlash(
+        r.ok
+          ? `Test sent to ${r.to} — "${r.subject}". Registrants were not emailed.`
+          : `The test could not be sent to ${r.to} (email provider refused). Check the comms log.`,
+      );
+      window.setTimeout(() => setFlash(null), 8000);
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  // "14:00" UTC on the next session day, in the browser's own zone, e.g.
+  // "10:00 AM EDT" — so the admin never has to do the offset in their head.
+  const nextDay = course.day_dates.find((d) => d >= new Date().toISOString().slice(0, 10)) ?? course.day_dates[0];
+  const localHint = timeOk && timeText && nextDay ? utcToLocal(nextDay, timeText) : '';
+
+  const stateLabel: Record<MeetingOverview['sessions'][number]['state'], { text: string; cls: string }> = {
+    sent: { text: 'Sent', cls: 'bg-emerald-500/10 border-emerald-500/40 text-emerald-200' },
+    partial: { text: 'Partly sent', cls: 'bg-amber-500/10 border-amber-500/40 text-amber-200' },
+    due: { text: 'Sending now', cls: 'bg-cyan-500/10 border-cyan-500/40 text-cyan-200' },
+    scheduled: { text: 'Scheduled', cls: 'bg-slate-800/60 border-slate-700 text-slate-300' },
+    missed: { text: 'Not sent', cls: 'bg-rose-500/10 border-rose-500/40 text-rose-200' },
+  };
+
+  return (
+    <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-5 mt-5">
+      {flash && <Notice kind="success">{flash}</Notice>}
+      {error && <Notice kind="error">{error}</Notice>}
+
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="text-white font-semibold flex items-center gap-2">
+            <Video className="w-4 h-4 text-cyan-300" />
+            Live sessions &amp; joining instructions
+          </h3>
+          <p className="text-[12px] text-slate-400 mt-1">
+            One hour before each session day, every registrant who has{' '}
+            <span className="text-slate-200">confirmed attendance</span> is emailed the
+            instructions below. Unconfirmed and cancelled registrations are not.
+          </p>
+        </div>
+        {overview && (
+          <span
+            className={`inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md border ${
+              overview.armed
+                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-200'
+                : 'bg-slate-800/60 border-slate-700 text-slate-300'
+            }`}
+            title={overview.armed ? `Reminders go ${overview.lead_minutes} minutes before each session` : overview.blocked_by.join(', ')}
+          >
+            {overview.armed ? (
+              <>
+                <CheckCircle2 className="w-3 h-3" /> Reminders on · {overview.lead_minutes} min before
+              </>
+            ) : (
+              <>
+                <Clock className="w-3 h-3" /> Reminders off — {overview.blocked_by.join(', ')}
+              </>
+            )}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <LabeledInput
+            label="Session start (UTC, 24-hour)"
+            value={timeText}
+            onChange={setTimeText}
+            placeholder="14:00"
+            mono
+            icon={<Clock className="w-3 h-3 text-slate-300" />}
+          />
+          <p className={`text-[11px] mt-1 ${timeOk ? 'text-slate-400' : 'text-rose-300'}`}>
+            {!timeOk
+              ? 'Use HH:MM, e.g. 14:00'
+              : localHint
+                ? `= ${localHint} in your browser's time zone`
+                : 'Registrants also see their own local time in the email.'}
+          </p>
+        </div>
+        <LabeledInput
+          label="Session length (minutes)"
+          type="number"
+          min={0}
+          value={durationText}
+          onChange={setDurationText}
+        />
+        <div className="text-[11px] text-slate-400 md:pt-6">
+          Session days come from the day-by-day schedule above ({course.day_dates.length}{' '}
+          {course.day_dates.length === 1 ? 'day' : 'days'}).
+        </div>
+      </div>
+
+      <label className="block">
+        <span className="text-[11px] uppercase tracking-wider text-slate-300 flex items-center gap-1 mb-1">
+          <Video className="w-3 h-3 text-slate-300" />
+          Joining instructions (sent verbatim — links become clickable)
+        </span>
+        <textarea
+          value={meetingText}
+          onChange={(e) => setMeetingText(e.target.value)}
+          rows={5}
+          placeholder={
+            'To join the video meeting, click this link: https://meet.google.com/xxx-xxxx-xxx\n' +
+            'Otherwise, to join by phone, dial +1 ... and enter this PIN: ...#'
+          }
+          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 font-mono leading-relaxed focus:outline-none focus:border-cyan-500"
+        />
+        <span className="text-[11px] text-slate-400">
+          Paste the invitation text from Google Meet, Zoom or Teams. Leave it empty to turn the reminders off.
+        </span>
+      </label>
+
+      {dirty && (
+        <div className="flex items-center justify-between gap-3 text-xs text-amber-200 bg-amber-950/40 border border-amber-900/60 rounded-lg px-3 py-2">
+          <span>
+            {patch.meeting_info === ''
+              ? 'Saving clears the instructions and turns the reminders off.'
+              : 'Unsaved changes. Nothing is emailed on save — reminders go out one hour before each session.'}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setTimeText(savedTime);
+                setDurationText(String(savedDuration));
+                setMeetingText(savedMeeting);
+              }}
+              className="text-slate-300 hover:text-white"
+            >
+              Discard
+            </button>
+            <button
+              onClick={() => void save()}
+              disabled={saving || !timeOk}
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-cyan-500 hover:bg-cyan-400 text-slate-950 disabled:opacity-50"
+            >
+              <Save className="w-3 h-3" />
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading && !overview ? (
+        <div className="text-xs text-slate-400 flex items-center gap-2">
+          <Loader2 className="w-3 h-3 animate-spin" /> Loading reminder schedule…
+        </div>
+      ) : overview ? (
+        <>
+          {/* Schedule */}
+          <div className="border-t border-slate-800 pt-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+              <div className="text-[11px] uppercase tracking-wider text-slate-300 flex items-center gap-1">
+                <Send className="w-3 h-3 text-slate-300" />
+                Reminder schedule
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => void sendTest()}
+                  disabled={testing || !overview.armed || dirty}
+                  title={
+                    dirty
+                      ? 'Save first'
+                      : overview.armed
+                        ? 'Emails you (only you) the reminder exactly as registrants will get it'
+                        : `Set ${overview.blocked_by.join(', ')} first`
+                  }
+                  className="btn-secondary text-xs py-1.5 px-2.5 flex items-center gap-1 disabled:opacity-50"
+                >
+                  {testing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
+                  Send me a test email
+                </button>
+                <RefreshButton onClick={() => void load()} loading={loading} small />
+              </div>
+            </div>
+            {overview.sessions.length === 0 ? (
+              <div className="text-xs text-slate-400 italic">
+                Add session days and a start time to see the schedule.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400">
+                      <th className="py-1.5 pr-3 font-medium">Day</th>
+                      <th className="py-1.5 pr-3 font-medium">Session</th>
+                      <th className="py-1.5 pr-3 font-medium">Reminder goes out</th>
+                      <th className="py-1.5 pr-3 font-medium">Status</th>
+                      <th className="py-1.5 pr-3 font-medium text-right">Emailed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.sessions.map((s) => (
+                      <tr key={s.day} className="border-t border-slate-800/70 text-slate-200">
+                        <td className="py-2 pr-3 font-mono">Day {s.day}</td>
+                        <td className="py-2 pr-3">
+                          {formatDay(s.date)} · {s.start_utc.slice(11, 16)} UTC
+                        </td>
+                        <td className="py-2 pr-3">
+                          {s.remind_at_utc.slice(11, 16)} UTC
+                          <span className="text-slate-400"> · {formatDate(s.remind_at_utc)} local</span>
+                        </td>
+                        <td className="py-2 pr-3">
+                          <span className={`inline-block text-[11px] px-2 py-0.5 rounded border ${stateLabel[s.state].cls}`}>
+                            {stateLabel[s.state].text}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-3 text-right font-mono">
+                          {s.sent}/{s.sent + s.pending}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Recipients */}
+          <div className="border-t border-slate-800 pt-4">
+            <div className="text-[11px] uppercase tracking-wider text-slate-300 flex items-center gap-1 mb-2">
+              <UserCheck className="w-3 h-3 text-slate-300" />
+              Goes to {overview.recipients.length} confirmed{' '}
+              {overview.recipients.length === 1 ? 'registrant' : 'registrants'}
+            </div>
+            {overview.recipients.length === 0 ? (
+              <div className="text-xs text-slate-400 italic">
+                Nobody has confirmed attendance yet — confirm seats on the Registrations tab and they appear here.
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {overview.recipients.map((r) => (
+                  <span
+                    key={r.registration_id}
+                    title={`${r.email} · ${r.location || 'no location'} · ${r.timezone ? `local time shown (${r.timezone})` : 'UTC time only — location not recognised'}`}
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-slate-950/60 border border-slate-800 text-slate-200"
+                  >
+                    {r.full_name}
+                    <span className="text-slate-500">·</span>
+                    <span className={r.timezone ? 'text-slate-400' : 'text-amber-300'}>
+                      {r.timezone ? r.timezone.split('/').pop()?.replace('_', ' ') : 'UTC only'}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Log */}
+          {overview.log.length > 0 && (
+            <div className="border-t border-slate-800 pt-4">
+              <div className="text-[11px] uppercase tracking-wider text-slate-300 flex items-center gap-1 mb-2">
+                <Mail className="w-3 h-3 text-slate-300" />
+                Reminders sent
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <tbody>
+                    {overview.log.map((row, i) => (
+                      <tr key={i} className="border-t border-slate-800/70 text-slate-300">
+                        <td className="py-1 pr-3 whitespace-nowrap" title={row.ts}>
+                          {formatDate(row.ts)}
+                        </td>
+                        <td className="py-1 pr-3 font-mono">{row.session_date}</td>
+                        <td className="py-1 pr-3">{row.recipient}</td>
+                        <td className="py-1 pr-3">
+                          {row.ok ? (
+                            <span className="text-emerald-300 inline-flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> sent
+                            </span>
+                          ) : (
+                            <span className="text-rose-300 inline-flex items-center gap-1">
+                              <XCircle className="w-3 h-3" /> failed
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/** "14:00" UTC on an ISO day → "10:00 AM EDT" in the browser's zone. */
+function utcToLocal(isoDay: string, hhmm: string): string {
+  try {
+    const d = new Date(`${isoDay}T${hhmm}:00Z`);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  } catch {
+    return '';
+  }
 }
 
 function DayDatesEditor({

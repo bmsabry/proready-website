@@ -11,6 +11,8 @@ Admin (protected):
                                               Auto-notifies registrants if start_date changed.
   POST   /api/admin/courses/{code}/notify   — broadcast email to registrants
   GET    /api/admin/courses/{code}/registrations — registrations scoped to this course
+  GET    /api/admin/courses/{code}/meeting  — joining instructions + reminder state per session
+  POST   /api/admin/courses/{code}/meeting/test — email the admin a preview of the reminder
 """
 from __future__ import annotations
 
@@ -30,6 +32,7 @@ from ..emailer import (
     send_broadcast,
     start_date_updated_html,
 )
+from .. import session_reminders
 from ..models import Course, Product, Registration
 from ..stats_queries import active_enrollee_emails
 from ..schemas import (
@@ -37,6 +40,8 @@ from ..schemas import (
     CourseCreateIn,
     CourseOut,
     CoursePatchIn,
+    MeetingOut,
+    MeetingTestOut,
     NotifyIn,
     NotifyOut,
 )
@@ -233,6 +238,8 @@ def patch_course(
         course.session_time_utc = body.session_time_utc.strip()
     if body.session_duration_minutes is not None:
         course.session_duration_minutes = body.session_duration_minutes
+    if body.meeting_info is not None:
+        course.meeting_info = body.meeting_info.strip()
     if "recorded_product_code" in body.model_fields_set:
         # Explicit null clears the link; omitting the field leaves it alone.
         if body.recorded_product_code:
@@ -322,3 +329,42 @@ def list_course_registrations(
         .order_by(Registration.created_at.desc())
     )
     return list(db.execute(stmt).scalars().all())
+
+
+# ----- Live sessions: joining instructions + reminders -----------------------
+
+@admin_router.get("/{code}/meeting", response_model=MeetingOut)
+def get_meeting(code: str, db: Session = Depends(get_db)) -> MeetingOut:
+    """The course's joining instructions and the state of every session's reminder.
+
+    Admin-only on purpose: meeting_info never rides on CourseOut, which the
+    public /api/courses endpoint serves to anyone.
+    """
+    course = _get_or_404(db, code)
+    return MeetingOut(**session_reminders.overview(db, course))
+
+
+@admin_router.post("/{code}/meeting/test", response_model=MeetingTestOut)
+def send_meeting_test(
+    code: str,
+    db: Session = Depends(get_db),
+    admin_email: str = Depends(require_admin),
+) -> MeetingTestOut:
+    """Email the signed-in admin the reminder exactly as a registrant will get it.
+
+    Always to the admin's own address — there is no recipient parameter, so
+    this can never reach a registrant, and it is logged under its own
+    template so it never counts as the real send.
+    """
+    course = _get_or_404(db, code)
+    if session_reminders.blocked_by(course):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Set the meeting info, session start time and session days first: "
+            + ", ".join(session_reminders.blocked_by(course)) + ".",
+        )
+    try:
+        res = session_reminders.send_test(db, course, admin_email)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return MeetingTestOut(**res)

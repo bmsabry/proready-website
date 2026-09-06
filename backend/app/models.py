@@ -70,6 +70,12 @@ class Course(Base):
     session_time_utc: Mapped[str] = mapped_column(String(5), default="")
     session_duration_minutes: Mapped[int] = mapped_column(Integer, default=0)
 
+    # Joining instructions for the live sessions, exactly as the admin pasted
+    # them (video link, dial-in number, PIN). Admin-only: it is never part of
+    # the public CourseOut. Empty means "no meeting set", and the session
+    # reminder job sends nothing for the course until it is filled in.
+    meeting_info: Mapped[str] = mapped_column(Text, default="")
+
     # 'open' | 'closed' — 'closed' rejects new registrations.
     status: Mapped[str] = mapped_column(String(16), default="open", index=True)
 

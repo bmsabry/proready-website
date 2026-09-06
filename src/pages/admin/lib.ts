@@ -96,6 +96,9 @@ export type Course = {
   currency: string;
   /** Academy product carrying this course's recorded counterpart, or null. */
   recorded_product_code: string | null;
+  /** Session start "HH:MM" in UTC ("" = not set) and length in minutes (0 = not set). */
+  session_time_utc: string;
+  session_duration_minutes: number;
 };
 
 export type CoursePatch = {
@@ -107,6 +110,39 @@ export type CoursePatch = {
   price_cents?: number;
   currency?: string;
   recorded_product_code?: string | null;
+  session_time_utc?: string;
+  session_duration_minutes?: number;
+  /** Joining instructions, verbatim. "" turns the session reminders off. */
+  meeting_info?: string;
+};
+
+/** GET /api/admin/courses/{code}/meeting — joining instructions + reminder state. */
+export type MeetingOverview = {
+  meeting_info: string;
+  session_time_utc: string;
+  session_duration_minutes: number;
+  lead_minutes: number;
+  armed: boolean;
+  blocked_by: string[];
+  recipients: {
+    registration_id: number;
+    full_name: string;
+    email: string;
+    status: string;
+    location: string;
+    /** IANA zone the reminder will use for their local time, "" = UTC only. */
+    timezone: string;
+  }[];
+  sessions: {
+    day: number;
+    date: string;
+    start_utc: string;
+    remind_at_utc: string;
+    state: 'sent' | 'partial' | 'due' | 'scheduled' | 'missed';
+    sent: number;
+    pending: number;
+  }[];
+  log: { ts: string; session_date: string; recipient: string; ok: boolean; subject: string }[];
 };
 
 export type RecordedStats = {
