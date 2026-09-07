@@ -130,6 +130,8 @@ def test_mapping_calls_are_versioned_validated_and_expose_only_user_points(runti
         assert invoke(runtime, '__stateJson', 'one', False)['mapPoints'] == [point]
     with pytest.raises(Exception):
         invoke(runtime, '__call', 'one', 'clearMapping', '[1]')
+    edge = dict(point, bias={'PM3': 1 + 5e-10})
+    assert invoke(runtime, '__call', 'one', 'applyMapping', json.dumps([[edge]]))['mapPoints'] == [edge]
     cleared = invoke(runtime, '__call', 'one', 'clearMapping', '[]')
     assert not cleared['mapActive'] and cleared['mapPoints'] == []
     assert invoke(runtime, '__new', 'one', '9FA', 'multi', 'tuning')['state']['mapPoints'] == []

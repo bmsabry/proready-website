@@ -198,7 +198,7 @@ function __call(id, fn, argsJson) {
       Object.keys(point.bias).forEach(function (c) {
         var window = __tuneWindow(e, point.mode, c);
         var bias = point.bias[c];
-        if (typeof bias !== 'number' || !isFinite(bias) || Math.abs(bias) > window) throw new Error('mapping bias outside tuning window');
+        if (typeof bias !== 'number' || !isFinite(bias) || Math.abs(bias) > window + 1e-9) throw new Error('mapping bias outside tuning window');
       });
     });
     // Remaining engine-specific range and duplicate checks are atomic inside
