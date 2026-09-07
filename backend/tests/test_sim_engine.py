@@ -39,6 +39,7 @@ function Engine(key, shaft, limitSet) {
   this.ctim = key === '9FA' ? 54 : 59; this.sh = 0.0033; this.ftg = 86; this.lhv = 933; this.sg = 0.603;
   this.blend = 'site gas (design)'; this.mwiDesign = 51.43; this.path = 'backup'; this.mode = 'D5';
   this.transfer = null; this.purgeEnabled = false; this.tune = {}; this.loadMW = null; this.loadSetpoint = null;
+  this.mapPoints = []; this.mapActive = false; this.mappingSource = 'none';
   this.rampMWperMin = 10; this.atBaseLoad = false;
   this.faults = { gcvStuck: {}, purge: {}, d5PurgeT: null, pm2Broken: false };
   this.prot = { severity: 'INFO', findings: [], tripped: false, tripCause: null, purgeFault: null, tripAt: null };
@@ -53,8 +54,16 @@ Engine.prototype.log = function (m) { this.events.push([this.t, m]); };
 Engine.prototype.setBlend = function (n) { this.blend = n; };
 Engine.prototype.resetTrip = function () { this.prot.tripped = false; return true; };
 Engine.prototype.marginReport = function () { return { PM3: { up: 1.5, dn: 2.0, ok: true } }; };
-Engine.prototype.applyMapping = function (points) { this.mapPoints = points; this.mapActive = true; this.tune = {}; };
-Engine.prototype.clearMapping = function () { this.mapPoints = []; this.mapActive = false; this.tune = {}; };
+Engine.prototype.applyMapping = function (points) { this.mapPoints = points; this.mapActive = true; this.mappingSource = 'learner'; this.tune = {}; };
+Engine.prototype.clearMapping = function () { this.mapPoints = []; this.mapActive = false; this.mappingSource = 'none'; this.tune = {}; };
+Engine.prototype.loadTrainingState = function (name) {
+  if (name === 'mapped') {
+    if (this.key !== '9FA') throw new Error('No example mapping for this machine');
+    // Generic fixture only: no real engine schedule or calibration belongs here.
+    this.mapPoints = [{ mode: 'D5', ttrf1: 1000, bias: { PM3: 0.5 } }];
+    this.mapActive = true; this.mappingSource = 'preset'; this.tune = {};
+  } else this.clearMapping();
+};
 global.DLN = { Engine: Engine, interp: function (p, x) { return p.length ? p[0][1] : 0; },
   BANDS: ['0-30', '31-122'], BAND_TONE: {}, CIRCUITS: ['D5', 'PM1', 'PM3', 'PM2'], EVEN_OUTER: 60,
   FUEL_BLENDS: { 'site gas (design)': { CH4: 96 }, 'lean LNG (98 % CH4)': { CH4: 98 } }, MAX_OVER_MEAN_CAN: 1.44,
@@ -361,6 +370,45 @@ def test_saved_mapping_protocol_and_rejected_inputs_leave_the_session_usable(cli
         ws.send_json({"op": "new", "id": 7, "key": "9FA"})
         state = _recv_until(ws, "reply", id=7)["state"]
         assert state["mapPoints"] == [] and not state["mapActive"]
+
+
+def test_named_training_state_crosses_websocket_and_keeps_run_state(client, setup):
+    s = _sign_in(LEARNER_A)
+    copy = _copy(s, setup['lesson_id'])
+    with s.websocket_connect(_ws_url(setup['lesson_id'], copy), headers=_hdrs(s)) as ws:
+        ws.receive_json()
+        ws.send_json({'op': 'new', 'id': 1, 'key': '9FA'})
+        assert ws.receive_json()['state']['mappingSource'] == 'none'
+        ws.send_json({'op': 'set', 'id': 2, 'path': ['loadMW'], 'value': 120})
+        assert ws.receive_json()['state']['loadMW'] == 120
+        # The method's17-character name must pass the route's syntactic cap
+        # and then reach the host's exact callable whitelist.
+        ws.send_json({'op': 'call', 'id': 3, 'fn': 'loadTrainingState', 'args': ['mapped']})
+        reply = ws.receive_json()
+        assert reply['op'] == 'reply', reply
+        state = reply['state']
+        assert state['mappingSource'] == 'preset' and state['mapActive']
+        assert state['loadMW'] == 120 and state['t'] == 0
+        for message in [
+            {'op': 'call', 'fn': 'loadTrainingState', 'args': ['reference']},
+            {'op': 'call', 'fn': 'loadTrainingState', 'args': [{'mapped': True}]},
+            {'op': 'call', 'fn': 'loadTrainingState' * 2, 'args': ['mapped']},
+            {'op': 'set', 'path': ['mappingSource'], 'value': 'none'},
+        ]:
+            ws.send_json(dict(message, id=4))
+            assert ws.receive_json()['op'] == 'error'
+        ws.send_json({'op': 'run', 'id': 5, 'speed': 1})
+        assert _recv_until(ws, 'reply', id=5)['running']
+        ws.send_json({'op': 'call', 'id': 6, 'fn': 'loadTrainingState', 'args': ['unmapped']})
+        state = _recv_until(ws, 'reply', id=6)['state']
+        assert state['mappingSource'] == 'none' and not state['mapActive']
+        assert state['mapPoints'] == [] and state['loadMW'] == 120
+        sessions = [v for v in host.sessions.values() if v.learner_id == _learner_id(LEARNER_A)]
+        assert len(sessions) == 1 and sessions[0].running
+        ws.send_json({'op': 'stop', 'id': 7})
+        assert not _recv_until(ws, 'reply', id=7)['running']
+        ws.send_json({'op': 'new', 'id': 8, 'key': '9FA'})
+        assert _recv_until(ws, 'reply', id=8)['state']['mappingSource'] == 'none'
 
 
 def test_per_learner_session_cap(client, setup, monkeypatch):

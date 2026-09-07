@@ -18,7 +18,7 @@ Protocol (JSON text frames):
     {op:"new",  id, key, shaft, limitSet}     a fresh engine (Reset / boot)
     {op:"set",  id, path:[...], value}        whitelisted property write
     {op:"del",  id, path:[...]}               delete a nested key
-    {op:"call", id, fn, args:[...]}           setBlend | resetTrip | log | applyMapping | clearMapping
+    {op:"call", id, fn, args:[...]}           setBlend | resetTrip | log | applyMapping | clearMapping | loadTrainingState
     {op:"prime", id}                          first frame if none yet
     {op:"step", id, n}                        advance n seconds, reply frames
     {op:"run", speed} / {op:"stop"} / {op:"speed", speed}
@@ -279,7 +279,7 @@ async def _serve(ws: WebSocket, learner: Learner, lesson: Lesson, delivery: Asse
             elif op == "call":
                 fn = msg.get("fn", "")
                 args = msg.get("args", [])
-                if not isinstance(fn, str) or len(fn) > 16 or not isinstance(args, list) or len(args) > 4:
+                if not isinstance(fn, str) or len(fn) > 32 or not isinstance(args, list) or len(args) > 4:
                     await error(mid, "bad args")
                     continue
                 st = await host.call(session, fn, args)

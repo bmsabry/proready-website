@@ -147,3 +147,52 @@ def test_malformed_state_writes_are_refused_and_engine_remains_usable(runtime, p
     with pytest.raises(Exception):
         write(runtime, path, value)
     assert invoke(runtime, '__tick', 'one', 1, False)['frames'][0]['t'] == 1
+
+
+def test_named_training_state_preserves_operating_controls_and_private_configuration(runtime):
+    for key, value in [('loadMW', 120), ('loadSetpoint', 150), ('tnh', 100),
+                       ('ttrf1', 2250), ('ftg', 95), ('ctim', 80), ('sh', 0.004),
+                       ('breaker', True)]:
+        write(runtime, [key], value)
+    write(runtime, ['tune', 'D5', 'PM3'], 0.75)
+    before = invoke(runtime, '__stateJson', 'one', False)
+    runtime.eval("__S.one.trainingPreset = {privateMarker: 'protected-preset-marker'};")
+    mapped = invoke(runtime, '__call', 'one', 'loadTrainingState', '["mapped"]')
+    assert mapped['mappingSource'] == 'preset' and mapped['mapActive']
+    assert mapped['mapPoints'] == [{'mode': 'D5', 'ttrf1': 1000, 'bias': {'PM3': 0.5}}]
+    assert mapped['tune'] == {}
+    for key in ('t', 'mode', 'loadMW', 'loadSetpoint', 'tnh', 'ttrf1', 'ftg', 'ctim', 'sh', 'breaker'):
+        assert mapped[key] == before[key]
+    assert 'protected-preset-marker' not in json.dumps(mapped)
+    assert 'trainingPreset' not in mapped and 'resp' not in mapped
+    assert invoke(runtime, '__stateJson', 'two', False)['mappingSource'] == 'none'
+    with pytest.raises(Exception):
+        write(runtime, ['mappingSource'], 'preset')
+    unmapped = invoke(runtime, '__call', 'one', 'loadTrainingState', '["unmapped"]')
+    assert unmapped['mappingSource'] == 'none' and not unmapped['mapActive']
+    assert unmapped['mapPoints'] == [] and unmapped['tune'] == {}
+    assert invoke(runtime, '__new', 'one', '9FA', 'multi', 'tuning')['state']['mappingSource'] == 'none'
+
+
+@pytest.mark.parametrize('args', [[], ['reference'], ['constructor'], ['__proto__'],
+                                  [None], [True], [{}], ['mapped', 'unmapped'], 'mapped'])
+def test_training_state_refuses_malformed_or_unrecognized_selections(runtime, args):
+    before = invoke(runtime, '__stateJson', 'one', False)
+    with pytest.raises(Exception):
+        invoke(runtime, '__call', 'one', 'loadTrainingState', json.dumps(args))
+    assert invoke(runtime, '__stateJson', 'one', False) == before
+
+
+def test_training_state_reports_older_bundle_unavailable_without_changing_session(runtime):
+    runtime.eval('delete DLN.Engine.prototype.loadTrainingState; delete __S.one.mappingSource;')
+    with pytest.raises(Exception, match='training state selection unavailable'):
+        invoke(runtime, '__call', 'one', 'loadTrainingState', '["mapped"]')
+    assert invoke(runtime, '__stateJson', 'one', False)['mappingSource'] == 'none'
+    runtime.eval('__S.one.mapActive = true; __S.one.mappingSource = {secret: 1};')
+    assert invoke(runtime, '__stateJson', 'one', False)['mappingSource'] == 'learner'
+    assert invoke(runtime, '__tick', 'one', 1, False)['frames'][0]['t'] == 1
+
+
+def test_named_preset_does_not_overload_user_mapping_arguments(runtime):
+    with pytest.raises(Exception, match='mapping point array expected'):
+        invoke(runtime, '__call', 'one', 'applyMapping', '["mapped"]')

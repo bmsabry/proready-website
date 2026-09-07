@@ -210,6 +210,15 @@ function __call(id, fn, argsJson) {
     if (typeof e.clearMapping !== 'function') throw new Error('saved mapping unavailable in this engine version');
     e.clearMapping();
   }
+  else if (fn === 'loadTrainingState') {
+    if (args.length !== 1 || (args[0] !== 'mapped' && args[0] !== 'unmapped')) {
+      throw new Error('one mapped or unmapped training state expected');
+    }
+    if (typeof e.loadTrainingState !== 'function') throw new Error('training state selection unavailable in this engine version');
+    // The protected engine owns the example schedule. The client selects a
+    // named state; no preset coefficients or calibration cross this call.
+    e.loadTrainingState(args[0]);
+  }
   else throw new Error('not callable: ' + fn);
   return __stateJson(id, false);
 }
@@ -263,6 +272,8 @@ function __stateObj(id, wantMargin) {
     blend: e.blend, mwiDesign: e.mwiDesign, path: e.path, mode: e.mode,
     transfer: e.transfer, purgeEnabled: e.purgeEnabled, tune: e.tune,
     mapPoints: Array.isArray(e.mapPoints) ? e.mapPoints : [], mapActive: !!e.mapActive,
+    mappingSource: ['preset', 'learner', 'none'].indexOf(e.mappingSource) >= 0
+      ? e.mappingSource : (e.mapActive ? 'learner' : 'none'),
     loadMW: e.loadMW, rampMWperMin: e.rampMWperMin, loadSetpoint: e.loadSetpoint,
     atBaseLoad: e.atBaseLoad, faults: e.faults, events: e.events, key: e.key,
     shaft: e.shaft, limitSet: e.limitSet, cond60: e.cond60 || null,
