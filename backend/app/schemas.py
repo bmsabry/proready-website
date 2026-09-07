@@ -71,6 +71,13 @@ class MarkPaidOut(BaseModel):
     ok: bool
     taken: int
     registration: AdminRegistrationOut
+    # What mark-paid did beyond flipping the status. `transitioned` is False
+    # on a replay of an already-paid row (nothing is re-granted or re-sent).
+    transitioned: bool = True
+    materials_granted: bool = False
+    materials_email_sent: bool = False
+    materials_product: str = ""
+    materials_note: str = ""
 
 
 class AttendanceIn(BaseModel):

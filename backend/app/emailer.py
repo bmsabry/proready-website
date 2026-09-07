@@ -688,7 +688,7 @@ def purchase_welcome_html(
     )
     body += _cta_button("Start the course", link)
     body += _p(
-        f"That link signs you in and expires in {minutes} minutes. After that, "
+        f"That link signs you in and expires in {ttl_phrase(minutes * 60)}. After that, "
         "request a fresh one any time from the sign-in page, same email "
         "address, no password to remember.",
         size=13,
@@ -724,8 +724,26 @@ def purchase_welcome_html(
     )
 
 
-def enrollment_granted_html(full_name: str, course_title: str, link: str) -> str:
-    """Manual/comp grant — an admin added this learner by hand."""
+def ttl_phrase(seconds: int) -> str:
+    """'30 minutes', '2 hours', '7 days' — for 'this link expires in …'."""
+    if seconds >= 86400 and seconds % 86400 == 0:
+        n = seconds // 86400
+        return f"{n} day" + ("" if n == 1 else "s")
+    if seconds >= 3600 and seconds % 3600 == 0:
+        n = seconds // 3600
+        return f"{n} hour" + ("" if n == 1 else "s")
+    n = max(1, seconds // 60)
+    return f"{n} minute" + ("" if n == 1 else "s")
+
+
+def enrollment_granted_html(
+    full_name: str, course_title: str, link: str, valid_for: str = ""
+) -> str:
+    """Access provisioned for someone — a paid cohort seat or an admin grant.
+
+    `valid_for` is the link lifetime as words ("7 days"); when given, the
+    footer says so instead of leaving the reader to discover an expired link.
+    """
     greeting = f"Hi {full_name}," if full_name else "Hi,"
     body = _p(greeting)
     body += _p(
@@ -734,9 +752,10 @@ def enrollment_granted_html(full_name: str, course_title: str, link: str) -> str
         margin="0 0 22px",
     )
     body += _cta_button("Open the course", link)
+    lifetime = f" and works for the next {valid_for}" if valid_for else ""
     body += _p(
-        "This link signs you in once. After that, request a new one any time "
-        "from the sign-in page using this same email address.",
+        f"This link signs you in once{lifetime}. After that, request a new one any "
+        "time from the sign-in page using this same email address.",
         size=13,
         color=MUTED,
         margin="0",

@@ -21,7 +21,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deploy_auth import DEPLOYER, deployer_may_write, require_admin_or_deployer
 from ..deps import require_admin
-from ..emailer import enrollment_granted_html, login_link_html, send_email
+from ..emailer import enrollment_granted_html, login_link_html, send_email, ttl_phrase
 from ..learner_auth import issue_login_token
 from ..models import (
     AssetBlob,
@@ -487,12 +487,23 @@ def grant(
     )
 
     if body.send_email_invite:
-        raw = issue_login_token(db, learner, next_path=f"/learn/{body.product_code}")
+        raw = issue_login_token(
+            db, learner, next_path=f"/learn/{body.product_code}",
+            ttl_seconds=settings.WELCOME_LINK_TTL_SECONDS,
+        )
         link = f"{settings.SITE_URL}/learn/signin?token={raw}"
         send_email(
             to=learner.email,
             subject=f"Your access to {product.title}",
-            html=enrollment_granted_html(learner.full_name or "", product.title, link),
+            html=enrollment_granted_html(
+                learner.full_name or "", product.title, link,
+                valid_for=ttl_phrase(settings.WELCOME_LINK_TTL_SECONDS),
+            ),
+            db=db,
+            scope_kind="product",
+            scope_code=body.product_code,
+            audience="manual",
+            template="access_granted",
         )
 
     log.info("Admin %s granted %s access to %s", admin, learner.email, body.product_code)

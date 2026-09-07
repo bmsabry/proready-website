@@ -268,6 +268,7 @@ function RegistrationsTab({
   const [regs, setRegs] = useState<Registration[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [query, setQuery] = useState('');
   // 'unconfirmed' is not a registration status — it is the chase list: who
@@ -328,15 +329,40 @@ function RegistrationsTab({
   async function action(path: 'mark-paid' | 'cancel', id: number) {
     setBusyId(id);
     setError(null);
+    setFlash(null);
     try {
-      const body = await api<{ ok: boolean; taken: number; registration: Registration }>(
-        `/api/admin/${path}`,
-        { method: 'POST', body: JSON.stringify({ registration_id: id }) },
-      );
+      const body = await api<{
+        ok: boolean;
+        taken: number;
+        registration: Registration;
+        transitioned?: boolean;
+        materials_granted?: boolean;
+        materials_email_sent?: boolean;
+        materials_product?: string;
+        materials_note?: string;
+      }>(`/api/admin/${path}`, { method: 'POST', body: JSON.stringify({ registration_id: id }) });
       setRegs((prev) =>
         prev ? prev.map((r) => (r.id === body.registration.id ? body.registration : r)) : prev,
       );
       onSeatsChanged();
+      if (path === 'mark-paid') {
+        // Say what happened beyond the status flip, so nobody has to go and
+        // check whether the learner can actually get in.
+        const who = body.registration.email;
+        if (body.transitioned === false) {
+          setFlash(`${who} was already marked paid — nothing was re-granted or re-sent.`);
+        } else if (body.materials_granted && body.materials_email_sent) {
+          setFlash(
+            `Marked paid. ${who} now has access to ${body.materials_product} and the sign-in email is on its way.`,
+          );
+        } else if (body.materials_granted) {
+          setFlash(
+            `Marked paid. ${who} has access to ${body.materials_product}, but ${body.materials_note || 'the sign-in email was not sent'}.`,
+          );
+        } else {
+          setFlash(`Marked paid. No course materials were granted: ${body.materials_note || 'no product linked'}.`);
+        }
+      }
     } catch (e) {
       reportError(e, onAuthError, setError);
     } finally {
@@ -422,6 +448,7 @@ function RegistrationsTab({
         <Kpi icon={<Ban className="w-4 h-4" />} label="Cancelled" value={counts.cancelled} accent="slate" />
       </div>
 
+      {flash && <Notice kind="success">{flash}</Notice>}
       {error && <Notice kind="error">{error}</Notice>}
 
       {/* Toolbar */}

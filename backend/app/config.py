@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     LEARNER_SESSION_MAX_AGE_SECONDS: int = 60 * 60 * 24 * 30  # 30 days
     # How long a sign-in link stays valid before it must be re-requested.
     LOGIN_LINK_TTL_SECONDS: int = 60 * 30  # 30 minutes
+    # Links inside provisioning emails ("your course materials are ready",
+    # purchase welcome, admin grant) live longer: people read those when
+    # they get to them, not within half an hour. Still single-use.
+    WELCOME_LINK_TTL_SECONDS: int = 60 * 60 * 24 * 7  # 7 days
     # Sign-in links are rate limited per email to blunt inbox flooding.
     LOGIN_LINK_MAX_PER_HOUR: int = 5
 

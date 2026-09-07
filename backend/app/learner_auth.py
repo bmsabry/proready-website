@@ -112,12 +112,14 @@ def hash_login_token(raw: str) -> str:
 
 
 def issue_login_token(
-    db: Session, learner: Learner, *, next_path: str = "/learn"
+    db: Session, learner: Learner, *, next_path: str = "/learn", ttl_seconds: int | None = None
 ) -> str:
     """Mint a single-use sign-in token and persist only its hash.
 
     Returns the raw token — the ONLY moment it exists in plaintext. Callers
-    must put it straight into an email and then drop it.
+    must put it straight into an email and then drop it. `ttl_seconds`
+    defaults to LOGIN_LINK_TTL_SECONDS (a link the learner just asked for);
+    provisioning emails pass WELCOME_LINK_TTL_SECONDS.
     """
     settings = get_settings()
     raw = secrets.token_urlsafe(32)
@@ -125,7 +127,7 @@ def issue_login_token(
         learner_id=learner.id,
         token_hash=hash_login_token(raw),
         expires_at=datetime.now(timezone.utc)
-        + timedelta(seconds=settings.LOGIN_LINK_TTL_SECONDS),
+        + timedelta(seconds=ttl_seconds or settings.LOGIN_LINK_TTL_SECONDS),
         next_path=next_path or "/learn",
     )
     db.add(row)

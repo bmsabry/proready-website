@@ -337,14 +337,17 @@ def grant_and_welcome(
 
     if not send_welcome:
         return
-    raw = issue_login_token(db, learner, next_path=f"/learn/{order.product_code}")
+    raw = issue_login_token(
+        db, learner, next_path=f"/learn/{order.product_code}",
+        ttl_seconds=settings.WELCOME_LINK_TTL_SECONDS,
+    )
     link = f"{settings.SITE_URL}/learn/signin?token={raw}"
     send_email(
         to=learner.email,
         subject=f"You're in — {product.title}",
         html=purchase_welcome_html(
             learner.full_name or "", product.title, link,
-            settings.LOGIN_LINK_TTL_SECONDS // 60,
+            settings.WELCOME_LINK_TTL_SECONDS // 60,
             bank_pending=bank_pending,
         ),
         bcc=settings.ADMIN_NOTIFY_EMAIL or None,

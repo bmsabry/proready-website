@@ -24,7 +24,7 @@ from .. import academy as academy_svc
 from ..config import get_settings
 from ..db import get_db
 from ..deps import require_admin
-from ..emailer import enrollment_granted_html, send_email
+from ..emailer import enrollment_granted_html, send_email, ttl_phrase
 from ..learner_auth import issue_login_token
 from ..models import Course, Product, Registration
 from ..schemas import (
@@ -63,6 +63,7 @@ def mark_registration_paid(
     payment_ref: str = "",
     amount_cents: Optional[int] = None,
     notes: Optional[str] = None,
+    report: Optional[dict] = None,
 ) -> bool:
     """Core of mark-paid — shared by the admin endpoint and the online
     payment paths (PayPal capture, Stripe live-cohort webhook) so all of
@@ -72,6 +73,10 @@ def mark_registration_paid(
     idempotent replay of an already-paid row (callers use this to avoid
     re-sending receipt emails). Raises HTTPException(409) when the cohort
     is already at paid capacity.
+
+    `report`, when supplied, is filled with what the materials auto-grant
+    did (see _grant_course_materials) so the admin UI can say "access
+    granted and the sign-in email sent" instead of leaving Bassam to check.
     """
     settings = get_settings()
 
@@ -117,8 +122,9 @@ def mark_registration_paid(
     # course-materials account: learner row, product-wide enrollment, and a
     # sign-in link in their inbox. Deliberately after the commit and inside
     # its own guard — a hiccup here must never un-mark a payment.
+    outcome: dict = {"granted": False, "email_sent": False, "product": "", "note": ""}
     try:
-        _grant_course_materials(db, reg, course)
+        outcome = _grant_course_materials(db, reg, course)
     except Exception:  # pragma: no cover — provisioning is best-effort
         log.exception(
             "Materials auto-grant failed for %s / %s — grant manually from "
@@ -126,15 +132,25 @@ def mark_registration_paid(
             reg.email,
             reg.course_code,
         )
+        outcome["note"] = "materials grant failed — grant by hand from the Access tab"
+    if report is not None:
+        report.update(outcome)
     return True
 
 
 def _grant_course_materials(
     db: Session, reg: Registration, course: Optional[Course]
-) -> None:
-    """Provision full materials access for a paid cohort seat."""
+) -> dict:
+    """Provision full materials access for a paid cohort seat.
+
+    Returns {granted, email_sent, product, note} — the facts the admin sees
+    after clicking Mark paid.
+    """
     if course is None or not course.recorded_product_code:
-        return
+        return {
+            "granted": False, "email_sent": False, "product": "",
+            "note": "no course-materials product is linked to this course (Settings → Recorded product)",
+        }
     product = db.get(Product, course.recorded_product_code)
     if product is None:
         log.warning(
@@ -142,7 +158,10 @@ def _grant_course_materials(
             course.code,
             course.recorded_product_code,
         )
-        return
+        return {
+            "granted": False, "email_sent": False, "product": course.recorded_product_code,
+            "note": f"linked product '{course.recorded_product_code}' does not exist",
+        }
     settings = get_settings()
     learner = academy_svc.upsert_learner(db, reg.email, reg.full_name)
     academy_svc.grant_enrollment(
@@ -152,12 +171,18 @@ def _grant_course_materials(
         source="cohort",
         note=f"cohort {reg.course_code} marked paid (registration #{reg.id})",
     )
-    raw = issue_login_token(db, learner, next_path=f"/learn/{product.code}")
+    raw = issue_login_token(
+        db, learner, next_path=f"/learn/{product.code}",
+        ttl_seconds=settings.WELCOME_LINK_TTL_SECONDS,
+    )
     link = f"{settings.SITE_URL}/learn/signin?token={raw}"
-    send_email(
+    sent = send_email(
         to=learner.email,
         subject=f"Your course materials are ready — {product.title}",
-        html=enrollment_granted_html(learner.full_name or "", product.title, link),
+        html=enrollment_granted_html(
+            learner.full_name or "", product.title, link,
+            valid_for=ttl_phrase(settings.WELCOME_LINK_TTL_SECONDS),
+        ),
         db=db,
         scope_kind="course",
         scope_code=reg.course_code,
@@ -165,11 +190,16 @@ def _grant_course_materials(
         template="materials_ready",
     )
     log.info(
-        "Materials access granted to %s for %s (cohort %s)",
+        "Materials access granted to %s for %s (cohort %s); email %s",
         learner.email,
         product.code,
         reg.course_code,
+        "sent" if sent else "NOT sent",
     )
+    return {
+        "granted": True, "email_sent": bool(sent), "product": product.title,
+        "note": "" if sent else "the sign-in email could not be sent — resend from the Access tab",
+    }
 
 
 @router.post("/mark-paid", response_model=MarkPaidOut)
@@ -178,12 +208,18 @@ def mark_paid(body: MarkPaidIn, db: Session = Depends(get_db)) -> MarkPaidOut:
     if reg is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found.")
 
-    mark_registration_paid(db, reg, notes=body.notes)
+    report: dict = {}
+    transitioned = mark_registration_paid(db, reg, notes=body.notes, report=report)
 
     return MarkPaidOut(
         ok=True,
         taken=count_active(db, reg.course_code),
         registration=AdminRegistrationOut.model_validate(reg),
+        transitioned=transitioned,
+        materials_granted=bool(report.get("granted")),
+        materials_email_sent=bool(report.get("email_sent")),
+        materials_product=report.get("product", ""),
+        materials_note=report.get("note", "") if transitioned else "already marked paid earlier — nothing re-sent",
     )
 
 
