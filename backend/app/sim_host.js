@@ -15,7 +15,7 @@
  */
 'use strict';
 
-var __S = {};   /* session id -> engine */
+var __S = Object.create(null);   /* session id -> engine */
 
 /* Properties a browser may set directly, and the sub-objects it may write
  * into. Anything else is refused. Values are bounded in __set(). */
@@ -39,6 +39,44 @@ function __bounded(key, v) {
   return Math.max(b[0], Math.min(b[1], v));
 }
 
+function __own(obj, key) { return !!obj && Object.prototype.hasOwnProperty.call(obj, key); }
+function __record(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
+function __safeKey(key) {
+  return typeof key === 'string' && /^[A-Za-z0-9_.\-]{1,32}$/.test(key) &&
+    key !== '__proto__' && key !== 'prototype' && key !== 'constructor';
+}
+function __path(json, min) {
+  var path = JSON.parse(json);
+  if (!Array.isArray(path) || path.length < min || path.length > 3 || !path.every(__safeKey)) {
+    throw new Error('bad path');
+  }
+  return path;
+}
+function __mode(e, mode) {
+  if (!__safeKey(mode) || !e.deck || !__own(e.deck.modes, mode)) throw new Error('unknown tuning mode');
+  return e.deck.modes[mode];
+}
+function __tuneWindow(e, mode, circuit) {
+  var md = __mode(e, mode);
+  if (!__safeKey(circuit) || !__own(md.schedules, circuit) || !__own(md.window, circuit)) {
+    throw new Error('circuit not tunable in mode');
+  }
+  var window = md.window[circuit];
+  if (typeof window !== 'number' || !isFinite(window) || window < 0) throw new Error('bad tuning window');
+  return window;
+}
+function __writeTune(e, mode, circuit, value) {
+  var window = __tuneWindow(e, mode, circuit);
+  if (typeof value !== 'number' || !isFinite(value)) throw new Error('finite tuning bias expected');
+  if (typeof e.setTuneBias === 'function') {
+    // The engine accounts for an applied learner map before clamping a trim.
+    e.setTuneBias(mode, circuit, value);
+  } else {
+    if (!__own(e.tune, mode)) e.tune[mode] = {};
+    e.tune[mode][circuit] = Math.max(-window, Math.min(window, value));
+  }
+}
+
 function __new(id, key, shaft, limitSet) {
   if (typeof DLN === 'undefined' || !DLN.Engine) throw new Error('engine bundle not loaded');
   __S[id] = new DLN.Engine(String(key), String(shaft || 'multi'), String(limitSet || 'tuning'));
@@ -51,61 +89,82 @@ function __count() { return Object.keys(__S).length; }
 /* set a whitelisted property, possibly nested: path is a JSON array */
 function __set(id, pathJson, valueJson) {
   var e = __S[id]; if (!e) throw new Error('no session');
-  var path = JSON.parse(pathJson), value = JSON.parse(valueJson);
+  var path = __path(pathJson, 1), value = JSON.parse(valueJson);
   var head = path[0];
+  if (!__own(SETTABLE, head)) throw new Error('not settable: ' + head);
   var kind = SETTABLE[head];
-  if (!kind) throw new Error('not settable: ' + head);
-  if (path.length === 1) {
-    if (kind === 'num') { if (typeof value !== 'number') throw new Error('number expected'); e[head] = __bounded(head, value); }
-    else if (kind === 'numnull') { if (value !== null && typeof value !== 'number') throw new Error('number or null expected'); e[head] = value === null ? null : __bounded(head, value); }
-    else if (kind === 'bool') e[head] = !!value;
-    else if (kind === 'str') { if (STRINGS[head].indexOf(value) < 0) throw new Error('bad value for ' + head); e[head] = value; }
-    else if (kind === 'obj') {
-      if (head !== 'tune') throw new Error('cannot replace ' + head);
-      if (value === null || typeof value !== 'object') throw new Error('object expected');
-      e.tune = {};   /* the only whole-object write the UI makes: zero all biases */
+  if (head === 'tune') {
+    if (path.length === 1) {
+      if (!__record(value) || Object.keys(value).length) throw new Error('empty tuning object expected');
+      e.tune = {};
+    } else if (path.length === 2) {
+      __mode(e, path[1]);
+      if (!__record(value)) throw new Error('tuning object expected');
+      // Validate the complete update before writing any member.
+      Object.keys(value).forEach(function (c) {
+        __tuneWindow(e, path[1], c);
+        if (typeof value[c] !== 'number' || !isFinite(value[c])) throw new Error('finite tuning bias expected');
+      });
+      if (!__own(e.tune, path[1])) e.tune[path[1]] = {};
+      Object.keys(value).forEach(function (c) { __writeTune(e, path[1], c, value[c]); });
+    } else {
+      __writeTune(e, path[1], path[2], value);
     }
+    return __stateJson(id, false);
+  }
+  if (path.length === 1) {
+    if (kind === 'num') { if (typeof value !== 'number' || !isFinite(value)) throw new Error('finite number expected'); e[head] = __bounded(head, value); }
+    else if (kind === 'numnull') { if (value !== null && (typeof value !== 'number' || !isFinite(value))) throw new Error('finite number or null expected'); e[head] = value === null ? null : __bounded(head, value); }
+    else if (kind === 'bool') { if (typeof value !== 'boolean') throw new Error('boolean expected'); e[head] = value; }
+    else if (kind === 'str') { if (STRINGS[head].indexOf(value) < 0) throw new Error('bad value for ' + head); e[head] = value; }
+    else if (kind === 'obj') throw new Error('cannot replace ' + head);
     return __stateJson(id, false);
   }
   if (kind !== 'obj') throw new Error('not an object: ' + head);
   var allowed = SUB_SETTABLE[head];
-  if (allowed !== true && !allowed[path[1]]) throw new Error('not settable: ' + head + '.' + path[1]);
-  if (path.length > 3) throw new Error('path too deep');
-  for (var i = 1; i < path.length; i++) {
-    if (!/^[A-Za-z0-9_.\-]{1,32}$/.test(String(path[i]))) throw new Error('bad path');
+  if (!__own(allowed, path[1])) throw new Error('not settable: ' + head + '.' + path[1]);
+  var keyedFault = head === 'faults' && (path[1] === 'gcvStuck' || path[1] === 'purge');
+  if (keyedFault) {
+    if (path.length !== 3 || ['D5', 'PM1', 'PM3', 'PM2'].indexOf(path[2]) < 0) throw new Error('bad fault circuit');
+    if (path[1] === 'gcvStuck') {
+      if (typeof value !== 'number' || !isFinite(value)) throw new Error('finite fault offset expected');
+      value = Math.max(-100, Math.min(100, value));
+    } else if (['loss_of_purge', 'loss_of_blocking'].indexOf(value) < 0) throw new Error('bad purge fault');
+  } else {
+    if (path.length !== 2) throw new Error('path too deep');
+    if (head === 'prot' && value !== null) throw new Error('purge timer may only be cleared');
+    if ((head === 'instr' || path[1] === 'pm2Broken') && typeof value !== 'boolean') throw new Error('boolean expected');
+    if (path[1] === 'd5PurgeT' && value !== null) {
+      if (typeof value !== 'number' || !isFinite(value)) throw new Error('finite temperature or null expected');
+      value = Math.max(-50, Math.min(1000, value));
+    }
   }
-  if (typeof value === 'string' && value.length > 64) throw new Error('string too long');
-  if (value !== null && typeof value === 'object') {
-    /* the one nested object write the UI makes: tune[mode] = tune[mode] || {} */
-    if (head !== 'tune' || path.length !== 2 || Array.isArray(value)) throw new Error('primitive expected');
-    var cur = e.tune[path[1]] || {};
-    Object.keys(value).forEach(function (c) {
-      if (/^[A-Z0-9]{2,4}$/.test(c) && typeof value[c] === 'number' && isFinite(value[c])) cur[c] = Math.max(-20, Math.min(20, value[c]));
-    });
-    e.tune[path[1]] = cur;
-    return __stateJson(id, false);
-  }
-  if (typeof value === 'number' && !isFinite(value)) throw new Error('bad number');
   var o = e[head];
   for (var j = 1; j < path.length - 1; j++) {
-    if (o[path[j]] === null || typeof o[path[j]] !== 'object') o[path[j]] = {};
+    if (!__own(o, path[j]) || !__record(o[path[j]])) o[path[j]] = {};
     o = o[path[j]];
   }
   var leaf = path[path.length - 1];
-  if (head === 'tune' && typeof value === 'number') value = Math.max(-20, Math.min(20, value));
   o[leaf] = value;
   return __stateJson(id, false);
 }
 
 function __del(id, pathJson) {
   var e = __S[id]; if (!e) throw new Error('no session');
-  var path = JSON.parse(pathJson);
+  var path = __path(pathJson, 2);
   var head = path[0];
-  if (SETTABLE[head] !== 'obj' || path.length < 2 || path.length > 3) throw new Error('cannot delete ' + path.join('.'));
+  if (!__own(SETTABLE, head) || SETTABLE[head] !== 'obj') throw new Error('cannot delete ' + path.join('.'));
   var allowed = SUB_SETTABLE[head];
-  if (allowed !== true && !allowed[path[1]]) throw new Error('not deletable');
+  if (head === 'tune') {
+    __mode(e, path[1]);
+    if (path.length === 3) __tuneWindow(e, path[1], path[2]);
+  } else {
+    if (!__own(allowed, path[1]) || head !== 'faults' ||
+        ['gcvStuck', 'purge'].indexOf(path[1]) < 0 || path.length !== 3 ||
+        ['D5', 'PM1', 'PM3', 'PM2'].indexOf(path[2]) < 0) throw new Error('not deletable');
+  }
   var o = e[head];
-  for (var j = 1; j < path.length - 1; j++) { if (!o[path[j]]) return __stateJson(id, false); o = o[path[j]]; }
+  for (var j = 1; j < path.length - 1; j++) { if (!__own(o, path[j])) return __stateJson(id, false); o = o[path[j]]; }
   delete o[path[path.length - 1]];
   return __stateJson(id, false);
 }
@@ -114,9 +173,43 @@ function __del(id, pathJson) {
 function __call(id, fn, argsJson) {
   var e = __S[id]; if (!e) throw new Error('no session');
   var args = JSON.parse(argsJson);
-  if (fn === 'setBlend') { e.setBlend(String(args[0]).slice(0, 64)); }
-  else if (fn === 'resetTrip') { e.resetTrip(); }
-  else if (fn === 'log') { e.log(String(args[0]).slice(0, 200)); }
+  if (!Array.isArray(args)) throw new Error('bad args');
+  if (fn === 'setBlend' || fn === 'log') {
+    if (args.length !== 1 || typeof args[0] !== 'string') throw new Error('one string argument expected');
+    if (fn === 'setBlend') {
+      if (!__own(DLN.FUEL_BLENDS, args[0])) throw new Error('unknown fuel blend');
+      e.setBlend(args[0]);
+    }
+    else e.log(args[0].slice(0, 200));
+  }
+  else if (fn === 'resetTrip') {
+    if (args.length) throw new Error('no arguments expected');
+    e.resetTrip();
+  }
+  else if (fn === 'applyMapping') {
+    if (typeof e.applyMapping !== 'function') throw new Error('saved mapping unavailable in this engine version');
+    if (args.length !== 1 || !Array.isArray(args[0]) || args[0].length > 128) throw new Error('mapping point array expected (maximum 128)');
+    args[0].forEach(function (point) {
+      if (!__record(point) || Object.keys(point).sort().join(',') !== 'bias,mode,ttrf1' ||
+          typeof point.ttrf1 !== 'number' || !isFinite(point.ttrf1) || !__record(point.bias)) {
+        throw new Error('bad mapping point');
+      }
+      __mode(e, point.mode);
+      Object.keys(point.bias).forEach(function (c) {
+        var window = __tuneWindow(e, point.mode, c);
+        var bias = point.bias[c];
+        if (typeof bias !== 'number' || !isFinite(bias) || Math.abs(bias) > window) throw new Error('mapping bias outside tuning window');
+      });
+    });
+    // Remaining engine-specific range and duplicate checks are atomic inside
+    // the bundle. Only the learner's own schedule points cross this boundary.
+    e.applyMapping(args[0]);
+  }
+  else if (fn === 'clearMapping') {
+    if (args.length) throw new Error('no arguments expected');
+    if (typeof e.clearMapping !== 'function') throw new Error('saved mapping unavailable in this engine version');
+    e.clearMapping();
+  }
   else throw new Error('not callable: ' + fn);
   return __stateJson(id, false);
 }
@@ -145,6 +238,10 @@ function __responding(e) {
   var modeKey = e.mode + ((e.mode === '6.2' && e.shaft === 'single') ? '_single' : '');
   var tbl = sens[modeKey] || {};
   ['D5', 'PM1', 'PM3', 'PM2'].forEach(function (circuit) {
+    if (typeof DLN.respondingBands === 'function') {
+      out[circuit] = DLN.respondingBands(modeKey, circuit, e.ttrf1, e.key);
+      return;
+    }
     var r = {};
     Object.keys(tbl).forEach(function (band) {
       var s = tbl[band][circuit];
@@ -165,6 +262,7 @@ function __stateObj(id, wantMargin) {
     igv: e.igv, ctim: e.ctim, sh: e.sh, ftg: e.ftg, lhv: e.lhv, sg: e.sg,
     blend: e.blend, mwiDesign: e.mwiDesign, path: e.path, mode: e.mode,
     transfer: e.transfer, purgeEnabled: e.purgeEnabled, tune: e.tune,
+    mapPoints: Array.isArray(e.mapPoints) ? e.mapPoints : [], mapActive: !!e.mapActive,
     loadMW: e.loadMW, rampMWperMin: e.rampMWperMin, loadSetpoint: e.loadSetpoint,
     atBaseLoad: e.atBaseLoad, faults: e.faults, events: e.events, key: e.key,
     shaft: e.shaft, limitSet: e.limitSet, cond60: e.cond60 || null,

@@ -2,6 +2,13 @@
 
 **Purpose:** This file lives in the git repo so that if Cowork dies, your laptop dies, or a new agent starts cold, the project can be reconstructed without re-discovering every architectural decision. Update it whenever something non-obvious lands.
 
+**Simulator runtime update (2026-09-07):** the protected host delegates response
+highlights and mapped-trim clamping to optional engine methods, supports explicit
+learner-map apply/clear calls, and rejects prototype paths and out-of-window
+tuning writes. See `backend/docs/SIMULATOR_RUNTIME.md` for the public contract and
+focused tests. Engine bundles and scenario/calibration data remain exclusively
+in the private simulator repository and protected asset store.
+
 **Last updated:** 2026-05-06 (commit reflecting RESTORE.md creation; check `git log -1 RESTORE.md` for actual)
 
 ---

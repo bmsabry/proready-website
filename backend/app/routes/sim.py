@@ -18,7 +18,7 @@ Protocol (JSON text frames):
     {op:"new",  id, key, shaft, limitSet}     a fresh engine (Reset / boot)
     {op:"set",  id, path:[...], value}        whitelisted property write
     {op:"del",  id, path:[...]}               delete a nested key
-    {op:"call", id, fn, args:[...]}           setBlend | resetTrip | log
+    {op:"call", id, fn, args:[...]}           setBlend | resetTrip | log | applyMapping | clearMapping
     {op:"prime", id}                          first frame if none yet
     {op:"step", id, n}                        advance n seconds, reply frames
     {op:"run", speed} / {op:"stop"} / {op:"speed", speed}
@@ -260,24 +260,26 @@ async def _serve(ws: WebSocket, learner: Learner, lesson: Lesson, delivery: Asse
 
             elif op == "set":
                 path = msg.get("path")
-                if not isinstance(path, list) or not path or len(path) > 3:
+                if (not isinstance(path, list) or not path or len(path) > 3
+                        or any(not isinstance(p, str) or len(p) > 32 for p in path)):
                     await error(mid, "bad path")
                     continue
-                st = await host.set(session, [str(p)[:32] for p in path], msg.get("value"))
+                st = await host.set(session, path, msg.get("value"))
                 await reply(mid, state=st)
 
             elif op == "del":
                 path = msg.get("path")
-                if not isinstance(path, list) or len(path) < 2 or len(path) > 3:
+                if (not isinstance(path, list) or len(path) < 2 or len(path) > 3
+                        or any(not isinstance(p, str) or len(p) > 32 for p in path)):
                     await error(mid, "bad path")
                     continue
-                st = await host.delete(session, [str(p)[:32] for p in path])
+                st = await host.delete(session, path)
                 await reply(mid, state=st)
 
             elif op == "call":
-                fn = str(msg.get("fn", ""))[:16]
-                args = msg.get("args") or []
-                if not isinstance(args, list) or len(args) > 4:
+                fn = msg.get("fn", "")
+                args = msg.get("args", [])
+                if not isinstance(fn, str) or len(fn) > 16 or not isinstance(args, list) or len(args) > 4:
                     await error(mid, "bad args")
                     continue
                 st = await host.call(session, fn, args)

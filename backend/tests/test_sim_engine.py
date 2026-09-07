@@ -34,7 +34,7 @@ window.DLN_DATA = {
 (function (global) {
 function Engine(key, shaft, limitSet) {
   this.key = key; this.shaft = shaft || 'multi'; this.limitSet = limitSet || 'tuning';
-  this.deck = { key: key, modes: { 'D5': { schedules: {}, fueled: ['D5'], purged: [] } }, primary: ['D5'], backup: ['D5'] };
+  this.deck = { key: key, modes: { 'D5': { schedules: { PM3: {} }, window: { PM3: 1 }, fueled: ['D5'], purged: [] } }, primary: ['D5'], backup: ['D5'] };
   this.t = 0; this.tnh = 0; this.breaker = false; this.ttrf1 = 0; this.ttrf1cmd = 0; this.igv = 49;
   this.ctim = key === '9FA' ? 54 : 59; this.sh = 0.0033; this.ftg = 86; this.lhv = 933; this.sg = 0.603;
   this.blend = 'site gas (design)'; this.mwiDesign = 51.43; this.path = 'backup'; this.mode = 'D5';
@@ -53,9 +53,11 @@ Engine.prototype.log = function (m) { this.events.push([this.t, m]); };
 Engine.prototype.setBlend = function (n) { this.blend = n; };
 Engine.prototype.resetTrip = function () { this.prot.tripped = false; return true; };
 Engine.prototype.marginReport = function () { return { PM3: { up: 1.5, dn: 2.0, ok: true } }; };
+Engine.prototype.applyMapping = function (points) { this.mapPoints = points; this.mapActive = true; this.tune = {}; };
+Engine.prototype.clearMapping = function () { this.mapPoints = []; this.mapActive = false; this.tune = {}; };
 global.DLN = { Engine: Engine, interp: function (p, x) { return p.length ? p[0][1] : 0; },
   BANDS: ['0-30', '31-122'], BAND_TONE: {}, CIRCUITS: ['D5', 'PM1', 'PM3', 'PM2'], EVEN_OUTER: 60,
-  FUEL_BLENDS: { 'site gas (design)': { CH4: 96 } }, MAX_OVER_MEAN_CAN: 1.44,
+  FUEL_BLENDS: { 'site gas (design)': { CH4: 96 }, 'lean LNG (98 % CH4)': { CH4: 98 } }, MAX_OVER_MEAN_CAN: 1.44,
   TUNING_LIMIT: { '0-30': 3, '31-122': 4 }, FINAL_TUNE: { '0-30': 0.3, '31-122': 2 } };
 })(typeof window !== 'undefined' ? window : globalThis);
 """
@@ -324,6 +326,41 @@ def test_whitelist_refuses_everything_else(client, setup):
         # the engine is intact after all that
         ws.send_json({"op": "step", "id": 106, "n": 1})
         assert _recv_until(ws, "reply", id=106)["frames"][0]["t"] == pytest.approx(1.0)
+
+
+def test_saved_mapping_protocol_and_rejected_inputs_leave_the_session_usable(client, setup):
+    s = _sign_in(LEARNER_A)
+    copy = _copy(s, setup["lesson_id"])
+    with s.websocket_connect(_ws_url(setup["lesson_id"], copy), headers=_hdrs(s)) as ws:
+        ws.receive_json()
+        ws.send_json({"op": "new", "id": 1, "key": "9FA"})
+        state = _recv_until(ws, "reply", id=1)["state"]
+        assert state["mapPoints"] == [] and not state["mapActive"]
+        point = {"mode": "D5", "ttrf1": 1000, "bias": {"PM3": 0.5}}
+        ws.send_json({"op": "call", "id": 2, "fn": "applyMapping", "args": [[point]]})
+        state = _recv_until(ws, "reply", id=2)["state"]
+        assert state["mapPoints"] == [point] and state["mapActive"]
+        for request in [
+            {"op": "set", "path": ["tune", "__proto__", "polluted"], "value": 1},
+            {"op": "del", "path": ["faults", "__proto__", "toString"]},
+            {"op": "set", "path": ["tune", 3, "PM3"], "value": 1},
+            {"op": "set", "path": ["mapActive"], "value": False},
+            {"op": "call", "fn": "clearMapping", "args": [1]},
+            {"op": "call", "fn": "applyMapping", "args": [[dict(point, bias={"PM3": 2})]]},
+        ]:
+            ws.send_json(dict(request, id=3))
+            assert _recv_until(ws, "error", id=3)["op"] == "error"
+        ws.send_json({"op": "prime", "id": 4})
+        state = _recv_until(ws, "reply", id=4)["state"]
+        assert state["mapPoints"] == [point] and state["mapActive"]
+        ws.send_json({"op": "call", "id": 5, "fn": "clearMapping", "args": []})
+        state = _recv_until(ws, "reply", id=5)["state"]
+        assert state["mapPoints"] == [] and not state["mapActive"]
+        ws.send_json({"op": "call", "id": 6, "fn": "applyMapping", "args": [[point]]})
+        _recv_until(ws, "reply", id=6)
+        ws.send_json({"op": "new", "id": 7, "key": "9FA"})
+        state = _recv_until(ws, "reply", id=7)["state"]
+        assert state["mapPoints"] == [] and not state["mapActive"]
 
 
 def test_per_learner_session_cap(client, setup, monkeypatch):
