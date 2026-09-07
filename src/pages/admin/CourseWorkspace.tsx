@@ -271,11 +271,13 @@ function RegistrationsTab({
   const [flash, setFlash] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [query, setQuery] = useState('');
-  // 'unconfirmed' is not a registration status — it is the chase list: who
-  // still hasn't answered the confirm-your-seat email.
+  // 'confirmed' and 'unconfirmed' are not registration statuses — they split
+  // the ACTIVE rows (paid + pending) by whether the person has answered the
+  // confirm-your-seat email. 'confirmed' is the default view: the people
+  // the session is actually being run for. The other chips show the rest.
   const [statusFilter, setStatusFilter] = useState<
-    'all' | 'pending' | 'paid' | 'cancelled' | 'unconfirmed'
-  >('all');
+    'confirmed' | 'all' | 'pending' | 'paid' | 'cancelled' | 'unconfirmed'
+  >('confirmed');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -313,7 +315,9 @@ function RegistrationsTab({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (regs ?? []).filter((r) => {
-      if (statusFilter === 'unconfirmed') {
+      if (statusFilter === 'confirmed') {
+        if (r.status === 'cancelled' || !r.attendance_confirmed_at) return false;
+      } else if (statusFilter === 'unconfirmed') {
         if (r.status === 'cancelled' || r.attendance_confirmed_at) return false;
       } else if (statusFilter !== 'all' && r.status !== statusFilter) {
         return false;
@@ -462,14 +466,16 @@ function RegistrationsTab({
             className="bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 w-64 max-w-full"
           />
         </div>
-        {(['all', 'pending', 'paid', 'cancelled', 'unconfirmed'] as const).map((s) => (
+        {(['confirmed', 'all', 'pending', 'paid', 'cancelled', 'unconfirmed'] as const).map((s) => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
             title={
-              s === 'unconfirmed'
-                ? "Active registrants who haven't confirmed attendance yet"
-                : undefined
+              s === 'confirmed'
+                ? 'Paid and pending registrants who confirmed attendance — the default view'
+                : s === 'unconfirmed'
+                  ? "Active registrants who haven't confirmed attendance yet"
+                  : undefined
             }
             className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
               statusFilter === s
@@ -477,7 +483,11 @@ function RegistrationsTab({
                 : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-slate-200'
             }`}
           >
-            {s === 'all' ? `All (${counts.total})` : `${s} (${counts[s]})`}
+            {s === 'all'
+              ? `All (${counts.total})`
+              : s === 'confirmed'
+                ? `Confirmed (${counts.confirmed})`
+                : `${s} (${counts[s]})`}
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2">
@@ -501,7 +511,11 @@ function RegistrationsTab({
           <div className="p-8 text-slate-300 text-sm">No registrations yet for this course.</div>
         )}
         {regs && regs.length > 0 && filtered.length === 0 && (
-          <div className="p-8 text-slate-300 text-sm">No registrations match the current filters.</div>
+          <div className="p-8 text-slate-300 text-sm">
+            {statusFilter === 'confirmed' && !query
+              ? 'Nobody has confirmed attendance yet. Use the other buttons to see pending, paid or cancelled registrations.'
+              : 'No registrations match the current filters.'}
+          </div>
         )}
         {filtered.length > 0 && (
           <div className="overflow-x-auto">
