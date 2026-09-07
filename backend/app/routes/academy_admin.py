@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
@@ -23,6 +24,7 @@ from ..deploy_auth import DEPLOYER, deployer_may_write, require_admin_or_deploye
 from ..deps import require_admin
 from ..emailer import enrollment_granted_html, login_link_html, send_email, ttl_phrase
 from ..learner_auth import issue_login_token
+from ..progress_guard import allow_progress_loss
 from ..models import (
     AssetBlob,
     AssetDelivery,
@@ -310,22 +312,33 @@ def ingest_module(
     lessons = db.execute(
         select(Lesson).where(Lesson.module_id == module.id).order_by(Lesson.position)
     ).scalars().all()
-    videos = [l for l in lessons if l.kind == "video"]
+    # Only the seeded upload-size parts ("GT-05-V00", "-V01", ...) and an
+    # existing master are the lecture. Any other video lesson in the module —
+    # a bonus recording, a demo added later — is somebody's material with
+    # somebody's progress on it, and is left exactly as it is.
+    part_re = re.compile(rf"^{re.escape(module.code)}-V\d+$")
+    master_code = f"{module.code}-LECTURE"
+    videos = [
+        l for l in lessons
+        if l.kind == "video" and (l.code == master_code or part_re.match(l.code))
+    ]
+    videos.sort(key=lambda l: (l.code != master_code, l.position))
 
     keep: Lesson | None = None
+    migrated = 0
     if videos:
         keep, *extra = videos
         keep.title = f"{module.code} — full lecture"
-        keep.code = f"{module.code}-LECTURE"
+        keep.code = master_code
         keep.video_uid = body.video_uid
         keep.duration_s = body.duration_s
         keep.source_file = "master.mp4"
-        # The surplus part-lessons carry progress rows, so they are removed
-        # together with them rather than orphaned.
+        # The surplus part-lessons go, but what learners did on them does
+        # not: their progress rows are folded into the master (watched time
+        # summed, completion kept when every part was finished) before the
+        # part rows are removed — the progress guard would refuse otherwise.
         for row in extra:
-            db.execute(
-                delete(LessonProgress).where(LessonProgress.lesson_id == row.id)
-            )
+            migrated += _fold_progress_into(db, source=row, target=keep, all_parts=extra)
             db.delete(row)
     elif body.video_uid:
         keep = Lesson(
@@ -386,7 +399,55 @@ def ingest_module(
         "chapters": len(body.chapters),
         "slides": len(body.slides),
         "part_lessons_removed": max(0, len(videos) - 1),
+        "progress_rows_migrated": migrated,
     }
+
+
+def _fold_progress_into(db: Session, *, source: Lesson, target: Lesson, all_parts: list[Lesson]) -> int:
+    """Move every learner's progress on a superseded part-lesson onto the master.
+
+    Watched seconds add up (a learner who watched all the parts has watched the
+    lecture); the resume position is not meaningful across the join, so the
+    master keeps its own; completion carries over only when the learner had
+    finished every part. Returns the number of rows folded.
+    """
+    rows = db.execute(
+        select(LessonProgress).where(LessonProgress.lesson_id == source.id)
+    ).scalars().all()
+    if not rows:
+        return 0
+    part_ids = [p.id for p in all_parts]
+    for src in rows:
+        dst = db.execute(
+            select(LessonProgress).where(
+                LessonProgress.learner_id == src.learner_id,
+                LessonProgress.lesson_id == target.id,
+            )
+        ).scalar_one_or_none()
+        if dst is None:
+            dst = LessonProgress(
+                learner_id=src.learner_id, lesson_id=target.id, position_s=0, watched_s=0
+            )
+            db.add(dst)
+        dst.watched_s = (dst.watched_s or 0) + (src.watched_s or 0)
+        if target.duration_s:
+            dst.watched_s = min(dst.watched_s, target.duration_s)
+        if dst.completed_at is None and src.completed_at is not None:
+            finished_every_part = db.execute(
+                select(func.count(LessonProgress.id)).where(
+                    LessonProgress.learner_id == src.learner_id,
+                    LessonProgress.lesson_id.in_(part_ids),
+                    LessonProgress.completed_at.is_not(None),
+                )
+            ).scalar_one() == len(part_ids)
+            if finished_every_part:
+                dst.completed_at = src.completed_at
+        # The part row is history that has been carried over — the guard
+        # requires saying so explicitly.
+        with allow_progress_loss(f"progress on part-lesson {source.code} folded into {target.code}"):
+            db.delete(src)
+            db.flush()
+    return len(rows)
 
 
 # -----------------------------------------------------------------------------
@@ -844,6 +905,11 @@ class SlideIn(BaseModel):
 
 class SlideBatchIn(BaseModel):
     slides: list[SlideIn]
+    # The new deck's slide count. When given (send it with the LAST batch),
+    # slides numbered above it — leftovers of a longer previous deck — are
+    # removed, so a re-upload really replaces the deck. Learner progress is
+    # untouched: deck completion is recorded on the lesson, not the slides.
+    total: int | None = Field(default=None, ge=1)
 
 
 @router.post("/modules/{module_id}/slides")
@@ -900,11 +966,24 @@ def load_slides(
             # The learner endpoint is the only reader of these paths.
             setattr(row, f"image_{size}",
                     f"/api/academy/slide-image/{module_id}/{s.number}/{size}")
+    pruned = 0
+    if body.total is not None:
+        stale = db.execute(
+            select(Slide).where(Slide.module_id == module_id, Slide.number > body.total)
+        ).scalars().all()
+        for row in stale:
+            db.delete(row)
+        pruned = len(stale)
+        db.execute(
+            delete(SlideImage).where(
+                SlideImage.module_id == module_id, SlideImage.number > body.total
+            )
+        )
     db.commit()
     n = db.execute(
         select(func.count(Slide.id)).where(Slide.module_id == module_id)
     ).scalar_one()
-    return {"ok": True, "module_id": module_id, "slides_total": n}
+    return {"ok": True, "module_id": module_id, "slides_total": n, "slides_pruned": pruned}
 
 
 class AssetIn(BaseModel):

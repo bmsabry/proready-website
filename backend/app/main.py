@@ -12,6 +12,7 @@ from .academy_seed import seed_academy
 from .config import get_settings
 from .db import Base, SessionLocal, engine
 from .models import Course, SoftwareProduct
+from .progress_guard import install as install_progress_guard
 from .routes import academy as academy_routes
 from .routes import academy_admin as academy_admin_routes
 from .routes import certification as certification_routes
@@ -64,6 +65,10 @@ settings = get_settings()
 # Create tables on startup. Safe for a single-table schema; swap to
 # Alembic if the model grows.
 Base.metadata.create_all(bind=engine)
+
+# Learner history (progress, quiz attempts, quiz-app state) can never be
+# deleted by a content update — see progress_guard.py.
+install_progress_guard(engine)
 
 
 def _ensure_column(table: str, column: str, ddl: str) -> None:

@@ -489,6 +489,23 @@ def course(
     }
 
 
+
+def _resume_position(lesson: Lesson, prog) -> int:
+    """Where the player should resume.
+
+    A recording can be replaced by a shorter one after a learner has watched
+    the old one; a saved position past the new end would seek to a black
+    frame. Start such a lesson over — its completion, if earned, is kept on
+    the progress row regardless. Decks are unaffected: the viewer clamps the
+    slide index itself.
+    """
+    if prog is None:
+        return 0
+    if lesson.kind == "video" and lesson.duration_s and prog.position_s >= lesson.duration_s:
+        return 0
+    return prog.position_s
+
+
 @router.get("/lesson/{lesson_id}")
 def lesson_detail(
     lesson_id: int,
@@ -543,7 +560,7 @@ def lesson_detail(
         "video_pending": lesson.kind == "video"
         and (not lesson.video_uid or not stream_configured()),
         "progress": {
-            "position_s": prog.position_s if prog else 0,
+            "position_s": _resume_position(lesson, prog),
             "watched_s": prog.watched_s if prog else 0,
             "completed": svc.lesson_is_complete(lesson, prog, len(slides)),
         },
