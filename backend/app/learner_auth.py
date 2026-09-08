@@ -75,9 +75,13 @@ def verify_learner_token(token: str) -> int | None:
 def set_learner_cookie(response: Response, learner: Learner) -> None:
     """Attach the session cookie.
 
-    SameSite=None + Secure because the SPA is on proreadyengineer.com while
-    the API is on onrender.com — a cross-site pair. Same constraint the admin
-    cookie already lives under.
+    The API is served on api.proreadyengineer.com — the same site as the pages
+    that call it — so browsers treat this as a first-party cookie. That is
+    not cosmetic: while the API lived only on onrender.com the cookie was
+    cross-site, and Safari (iPhone, Mac) silently dropped it, so a learner's
+    sign-in link verified and then nothing stayed signed in (2026-09-08).
+    SameSite=None + Secure is kept so the pages.dev previews and any other
+    host in CORS_ORIGINS keep working in browsers that allow it.
     """
     settings = get_settings()
     response.set_cookie(

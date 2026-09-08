@@ -9,7 +9,7 @@ import { usePageMeta } from '../lib/meta';
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ||
-  'https://proreadyengineer-training-api-jd9a.onrender.com';
+  'https://api.proreadyengineer.com';
 
 // Every claim below maps to a capability documented in the Pro3DWorks release
 // guides (docs/RELEASE_*.md in the product repo) and shipped in the current

@@ -46,7 +46,7 @@ def _set_session_cookie(response: Response, email: str) -> None:
         max_age=settings.SESSION_MAX_AGE_SECONDS,
         httponly=True,
         secure=True,          # required with SameSite=None
-        samesite="none",      # cross-site cookie: frontend=.com, api=onrender.com
+        samesite="none",      # API is api.proreadyengineer.com (same site as the SPA); None keeps previews working
         path="/",
     )
 

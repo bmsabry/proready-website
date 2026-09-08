@@ -181,6 +181,7 @@ class Settings(BaseSettings):
     # material may legitimately be opened from.
     ASSET_ALLOWED_HOSTS: str = (
         "proreadyengineer.com,www.proreadyengineer.com,"
+        "api.proreadyengineer.com,"
         "proreadyengineer-training-api-jd9a.onrender.com,"
         "proready-website.pages.dev,localhost,127.0.0.1"
     )
