@@ -55,6 +55,20 @@ const SignIn: React.FC = () => {
         navigate(res.next_path || '/learn', { replace: true });
       } catch (err) {
         if (cancelled) return;
+        // A link opened twice (mail app preview, then "open in browser";
+        // a re-tap) is used up on the second load — but if the first load
+        // already signed this browser in, that is not an error the person
+        // needs to see. Production logs show exactly this pattern.
+        try {
+          const me = await academy.me();
+          if (cancelled) return;
+          if (me.signed_in) {
+            navigate('/learn', { replace: true });
+            return;
+          }
+        } catch {
+          /* not signed in — fall through to the message */
+        }
         setVerifying(false);
         setError(
           err instanceof ApiError
