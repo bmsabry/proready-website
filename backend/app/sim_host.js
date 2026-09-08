@@ -211,10 +211,14 @@ function __call(id, fn, argsJson) {
     e.clearMapping();
   }
   else if (fn === 'loadTrainingState') {
-    if (args.length !== 1 || (args[0] !== 'mapped' && args[0] !== 'unmapped')) {
-      throw new Error('one mapped or unmapped training state expected');
+    if (args.length !== 1 || ['mapped', 'unmapped', 'unmapped_1', 'unmapped_2'].indexOf(args[0]) < 0) {
+      throw new Error('one recognized training state expected');
     }
     if (typeof e.loadTrainingState !== 'function') throw new Error('training state selection unavailable in this engine version');
+    if ((args[0] === 'unmapped_1' || args[0] === 'unmapped_2') &&
+        ['scenario1', 'scenario2'].indexOf(e.trainingScenario) < 0) {
+      throw new Error('training scenarios unavailable in this engine version');
+    }
     // The protected engine owns the example schedule. The client selects a
     // named state; no preset coefficients or calibration cross this call.
     e.loadTrainingState(args[0]);
@@ -263,6 +267,19 @@ function __responding(e) {
   return out;
 }
 
+/* Only current-mode command offsets are display state. Do not serialize the
+ * protected scenario definitions, helpers, or any unrecognized object keys. */
+function __scenarioBias(e) {
+  var bias = e.scenarioBias, out = {};
+  if (!__record(bias)) return out;
+  var md = e.deck && e.deck.modes && e.deck.modes[e.mode];
+  if (!md || !md.schedules) return out;
+  ['D5', 'PM1', 'PM3', 'PM2'].forEach(function (c) {
+    if (__own(md.schedules, c) && __own(bias, c) && typeof bias[c] === 'number' && isFinite(bias[c])) out[c] = bias[c];
+  });
+  return out;
+}
+
 function __stateObj(id, wantMargin) {
   var e = __S[id];
   var P = e.prot || {};
@@ -274,6 +291,8 @@ function __stateObj(id, wantMargin) {
     mapPoints: Array.isArray(e.mapPoints) ? e.mapPoints : [], mapActive: !!e.mapActive,
     mappingSource: ['preset', 'learner', 'none'].indexOf(e.mappingSource) >= 0
       ? e.mappingSource : (e.mapActive ? 'learner' : 'none'),
+    trainingScenario: ['scenario1', 'scenario2'].indexOf(e.trainingScenario) >= 0 ? e.trainingScenario : 'scenario1',
+    scenarioBias: __scenarioBias(e),
     loadMW: e.loadMW, rampMWperMin: e.rampMWperMin, loadSetpoint: e.loadSetpoint,
     atBaseLoad: e.atBaseLoad, faults: e.faults, events: e.events, key: e.key,
     shaft: e.shaft, limitSet: e.limitSet, cond60: e.cond60 || null,

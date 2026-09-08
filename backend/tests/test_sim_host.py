@@ -196,3 +196,54 @@ def test_training_state_reports_older_bundle_unavailable_without_changing_sessio
 def test_named_preset_does_not_overload_user_mapping_arguments(runtime):
     with pytest.raises(Exception, match='mapping point array expected'):
         invoke(runtime, '__call', 'one', 'applyMapping', '["mapped"]')
+
+
+def test_scenario_selection_and_mapping_keep_only_current_public_metadata(runtime):
+    # Synthetic fixture values only. Real scenario definitions remain private.
+    runtime.eval("__S.one.trainingScenarios = {secret: 'private-scenario-sentinel'};")
+    selected = invoke(runtime, '__call', 'one', 'loadTrainingState', '["unmapped_2"]')
+    assert selected['trainingScenario'] == 'scenario2'
+    assert selected['scenarioBias'] == {'PM3': 0.4}
+    assert 'private-scenario-sentinel' not in json.dumps(selected)
+    assert invoke(runtime, '__stateJson', 'two', False)['trainingScenario'] == 'scenario1'
+    mapped = invoke(runtime, '__call', 'one', 'loadTrainingState', '["mapped"]')
+    assert mapped['trainingScenario'] == 'scenario2' and mapped['mapActive']
+    cleared = invoke(runtime, '__call', 'one', 'clearMapping', '[]')
+    assert cleared['trainingScenario'] == 'scenario2' and not cleared['mapActive']
+    assert cleared['scenarioBias'] == {'PM3': 0.4}
+    for name in ['unmapped_1', 'unmapped']:
+        invoke(runtime, '__call', 'one', 'loadTrainingState', '["unmapped_2"]')
+        reset = invoke(runtime, '__call', 'one', 'loadTrainingState', json.dumps([name]))
+        assert reset['trainingScenario'] == 'scenario1' and reset['scenarioBias'] == {}
+    invoke(runtime, '__call', 'one', 'loadTrainingState', '["unmapped_2"]')
+    fresh = invoke(runtime, '__new', 'one', '9FA', 'multi', 'tuning')['state']
+    assert fresh['trainingScenario'] == 'scenario1' and fresh['scenarioBias'] == {}
+
+
+@pytest.mark.parametrize('path,value', [
+    (['trainingScenario'], 'scenario2'), (['scenarioBias'], {'PM3': 0.4}),
+    (['scenarioBias', 'PM3'], 0.4), (['training_scenarios'], {}),
+])
+def test_scenario_metadata_is_not_client_settable(runtime, path, value):
+    before = invoke(runtime, '__stateJson', 'one', False)
+    with pytest.raises(Exception, match='not settable'):
+        write(runtime, path, value)
+    assert invoke(runtime, '__stateJson', 'one', False) == before
+
+
+def test_scenario_snapshot_filters_extra_private_fields_and_legacy_functions(runtime):
+    runtime.eval("__S.one.trainingScenario = {secret: 1}; __S.one.scenarioBias = {PM3: 0.4, PM1: 9, secret: 'private', D5: NaN};")
+    snap = invoke(runtime, '__stateJson', 'one', False)
+    assert snap['trainingScenario'] == 'scenario1' and snap['scenarioBias'] == {'PM3': 0.4}
+    runtime.eval("__S.one.scenarioBias = function() { return {secret: 1}; };")
+    assert invoke(runtime, '__stateJson', 'one', False)['scenarioBias'] == {}
+
+
+def test_older_bundle_refuses_scenario_aliases_without_mutation(runtime):
+    runtime.eval('delete __S.one.trainingScenario; delete __S.one.scenarioBias;')
+    before = invoke(runtime, '__stateJson', 'one', False)
+    for name in ['unmapped_1', 'unmapped_2']:
+        with pytest.raises(Exception, match='training scenarios unavailable'):
+            invoke(runtime, '__call', 'one', 'loadTrainingState', json.dumps([name]))
+        assert invoke(runtime, '__stateJson', 'one', False) == before
+    assert invoke(runtime, '__call', 'one', 'loadTrainingState', '["mapped"]')['mappingSource'] == 'preset'

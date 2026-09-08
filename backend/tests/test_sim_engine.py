@@ -40,6 +40,7 @@ function Engine(key, shaft, limitSet) {
   this.blend = 'site gas (design)'; this.mwiDesign = 51.43; this.path = 'backup'; this.mode = 'D5';
   this.transfer = null; this.purgeEnabled = false; this.tune = {}; this.loadMW = null; this.loadSetpoint = null;
   this.mapPoints = []; this.mapActive = false; this.mappingSource = 'none';
+  this.trainingScenario = 'scenario1'; this.scenarioBias = {};
   this.rampMWperMin = 10; this.atBaseLoad = false;
   this.faults = { gcvStuck: {}, purge: {}, d5PurgeT: null, pm2Broken: false };
   this.prot = { severity: 'INFO', findings: [], tripped: false, tripCause: null, purgeFault: null, tripAt: null };
@@ -62,7 +63,12 @@ Engine.prototype.loadTrainingState = function (name) {
     // Generic fixture only: no real engine schedule or calibration belongs here.
     this.mapPoints = [{ mode: 'D5', ttrf1: 1000, bias: { PM3: 0.5 } }];
     this.mapActive = true; this.mappingSource = 'preset'; this.tune = {};
-  } else this.clearMapping();
+  } else {
+    this.trainingScenario = name === 'unmapped_2' ? 'scenario2' : 'scenario1';
+    // Synthetic scenario offset only, unrelated to the protected engine.
+    this.scenarioBias = this.trainingScenario === 'scenario2' ? { PM3: 0.4 } : {};
+    this.clearMapping();
+  }
 };
 global.DLN = { Engine: Engine, interp: function (p, x) { return p.length ? p[0][1] : 0; },
   BANDS: ['0-30', '31-122'], BAND_TONE: {}, CIRCUITS: ['D5', 'PM1', 'PM3', 'PM2'], EVEN_OUTER: 60,
@@ -394,6 +400,8 @@ def test_named_training_state_crosses_websocket_and_keeps_run_state(client, setu
             {'op': 'call', 'fn': 'loadTrainingState', 'args': [{'mapped': True}]},
             {'op': 'call', 'fn': 'loadTrainingState' * 2, 'args': ['mapped']},
             {'op': 'set', 'path': ['mappingSource'], 'value': 'none'},
+            {'op': 'set', 'path': ['trainingScenario'], 'value': 'scenario2'},
+            {'op': 'set', 'path': ['scenarioBias', 'PM3'], 'value': 0.4},
         ]:
             ws.send_json(dict(message, id=4))
             assert ws.receive_json()['op'] == 'error'
@@ -405,10 +413,24 @@ def test_named_training_state_crosses_websocket_and_keeps_run_state(client, setu
         assert state['mapPoints'] == [] and state['loadMW'] == 120
         sessions = [v for v in host.sessions.values() if v.learner_id == _learner_id(LEARNER_A)]
         assert len(sessions) == 1 and sessions[0].running
+        ws.send_json({'op': 'call', 'id': 61, 'fn': 'loadTrainingState', 'args': ['unmapped_2']})
+        state = _recv_until(ws, 'reply', id=61)['state']
+        assert state['trainingScenario'] == 'scenario2' and state['scenarioBias'] == {'PM3': 0.4}
+        assert state['loadMW'] == 120 and sessions[0].running
+        ws.send_json({'op': 'call', 'id': 62, 'fn': 'loadTrainingState', 'args': ['mapped']})
+        state = _recv_until(ws, 'reply', id=62)['state']
+        assert state['trainingScenario'] == 'scenario2' and state['mappingSource'] == 'preset'
+        ws.send_json({'op': 'call', 'id': 63, 'fn': 'clearMapping', 'args': []})
+        state = _recv_until(ws, 'reply', id=63)['state']
+        assert state['trainingScenario'] == 'scenario2' and not state['mapActive'] and sessions[0].running
         ws.send_json({'op': 'stop', 'id': 7})
         assert not _recv_until(ws, 'reply', id=7)['running']
+        ws.send_json({'op': 'call', 'id': 71, 'fn': 'loadTrainingState', 'args': ['unmapped_1']})
+        assert _recv_until(ws, 'reply', id=71)['state']['trainingScenario'] == 'scenario1'
+        assert not sessions[0].running
         ws.send_json({'op': 'new', 'id': 8, 'key': '9FA'})
-        assert _recv_until(ws, 'reply', id=8)['state']['mappingSource'] == 'none'
+        fresh = _recv_until(ws, 'reply', id=8)['state']
+        assert fresh['mappingSource'] == 'none' and fresh['trainingScenario'] == 'scenario1'
 
 
 def test_per_learner_session_cap(client, setup, monkeypatch):
