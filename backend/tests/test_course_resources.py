@@ -91,3 +91,11 @@ def test_a_handout_extra_seeds_as_a_reading_lesson_in_a_gate_exempt_section():
         assert module.gate_exempt is False
     finally:
         db.close()
+
+
+def test_asset_content_type_column_fits_the_office_mime_types():
+    # Postgres enforces the declared VARCHAR length; the .docx type is the
+    # longest of the Office MIME types and used to overflow VARCHAR(64).
+    from app.models import AssetBlob
+    longest = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    assert AssetBlob.__table__.c.content_type.type.length >= len(longest)

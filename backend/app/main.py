@@ -91,6 +91,26 @@ def _ensure_column(table: str, column: str, ddl: str) -> None:
     log.info("Migrated: added %s.%s column", table, column)
 
 
+def _widen_column(table: str, column: str, length: int) -> None:
+    """Grow a VARCHAR(n) column to VARCHAR(length) if it is narrower.
+
+    Postgres enforces the declared length; a value longer than it fails the
+    write. SQLite ignores it, so the check is a no-op there.
+    """
+    inspector = inspect(engine)
+    if table not in inspector.get_table_names():
+        return
+    col = next((c for c in inspector.get_columns(table) if c["name"] == column), None)
+    if col is None:
+        return
+    current = getattr(col["type"], "length", None)
+    if current is None or current >= length:
+        return
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE {table} ALTER COLUMN {column} TYPE VARCHAR({length})"))
+    log.info("Migrated: widened %s.%s to VARCHAR(%d)", table, column, length)
+
+
 def _run_column_migrations() -> None:
     # courses.day_dates — the JSON default needs a ::json cast on Postgres
     # but not on SQLite's TEXT-backed JSON.
@@ -225,6 +245,10 @@ def _run_column_migrations() -> None:
         ("email_sent_at", "TIMESTAMP WITH TIME ZONE"),
     ]:
         _ensure_column("academy_certificates", column, ddl)
+    # academy_asset_blobs.content_type — the Office MIME types (an .xlsx
+    # workbook, a .docx handout) are 65-71 characters; VARCHAR(64) refused
+    # them.
+    _widen_column("academy_asset_blobs", "content_type", 128)
 
 
 _run_column_migrations()

@@ -661,7 +661,8 @@ class AssetBlob(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     key: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     filename: Mapped[str] = mapped_column(String(300), default="")
-    content_type: Mapped[str] = mapped_column(String(64), default="text/html")
+    # 128: the Office MIME types alone run to 71 characters.
+    content_type: Mapped[str] = mapped_column(String(128), default="text/html")
     data: Mapped[bytes] = mapped_column(LargeBinary)
 
     created_at: Mapped[datetime] = mapped_column(
