@@ -92,6 +92,9 @@ def _seed_module(db: Session, product_code: str, spec: dict) -> Module:
     module.objectives = list(spec.get("objectives") or [])
     module.topics = list(spec.get("topics") or [])
     module.quiz_app_url = spec.get("quiz_app_url", "")
+    # Support sections (a Q&A handout, a resource pack) sit outside the
+    # sequential chain: open as soon as the learner is entitled, never a gate.
+    module.gate_exempt = bool(spec.get("gate_exempt", False))
     db.commit()
     db.refresh(module)
     return module
@@ -159,6 +162,7 @@ def _seed_lessons(db: Session, module: Module, spec: dict) -> None:
         "calculator": "Design calculator",
         "lab": "Interactive lab",
         "simulator": "Interactive simulator",
+        "handout": "Handout",
     }
     for index, extra in enumerate(spec.get("extras") or []):
         position += 1
@@ -169,9 +173,9 @@ def _seed_lessons(db: Session, module: Module, spec: dict) -> None:
             db.add(lesson)
         kind = extra.get("kind", "deck")
         lesson.title = extra.get("label") or _KIND_LABEL.get(kind, "Resource")
-        lesson.kind = "slides" if kind == "deck" else (
-            "lab" if kind in ("lab", "simulator") else "calculator"
-        )
+        lesson.kind = {
+            "deck": "slides", "lab": "lab", "simulator": "lab", "handout": "reading",
+        }.get(kind, "calculator")
         lesson.position = position
         lesson.source_file = extra.get("filename", "")
 

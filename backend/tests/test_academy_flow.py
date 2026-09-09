@@ -43,12 +43,12 @@ def test_seed_created_full_curriculum(client):
     assert r.status_code == 200
     modules = r.json()["modules"]
     assert [m["code"] for m in modules] == [
-        "GT-03", "GT-05", "GT-06", "GT-07", "GT-12", "GT-13", "GT-15"
+        "GT-03", "GT-05", "GT-06", "GT-07", "GT-12", "GT-13", "GT-15", "QA"
     ]
     videos = {m["code"]: sum(1 for l in m["lessons"] if l["kind"] == "video")
               for m in modules}
     assert videos == {"GT-03": 0, "GT-05": 11, "GT-06": 14,
-                      "GT-07": 23, "GT-12": 0, "GT-13": 17, "GT-15": 18}
+                      "GT-07": 23, "GT-12": 0, "GT-13": 17, "GT-15": 18, "QA": 0}
     # The GT-05 bank landed on GT-05 and nowhere else.
     counts = {m["code"]: m["quiz_item_count"] for m in modules}
     assert counts["GT-05"] == 67
@@ -154,7 +154,7 @@ def test_publish_with_price(client, anon):
     catalog = anon.get("/api/academy/catalog").json()["products"]
     assert len(catalog) == 1
     assert catalog[0]["price_cents"] == 129900
-    assert len(catalog[0]["curriculum"]) == 7
+    assert len(catalog[0]["curriculum"]) == 8
 
 
 def test_admin_endpoints_reject_anonymous(anon):
@@ -310,7 +310,12 @@ def test_learner_cookie_does_not_grant_admin(client):
 def test_only_first_module_starts_unlocked(client):
     modules = client.get(f"/api/academy/course/{PRODUCT}").json()["modules"]
     assert modules[0]["unlocked"] is True
-    assert all(m["unlocked"] is False for m in modules[1:])
+    gated = [m for m in modules[1:] if not m["gate_exempt"]]
+    assert all(m["unlocked"] is False for m in gated)
+    # A support section (the Q&A handout) is a resource, not a step: open
+    # from day one and never a blocker.
+    assert [m["code"] for m in modules if m["gate_exempt"]] == ["QA"]
+    assert all(m["unlocked"] is True for m in modules if m["gate_exempt"])
 
 
 def test_locked_module_lesson_is_denied(client):
@@ -540,7 +545,7 @@ def test_stats_reports_the_module_funnel(client):
         f"/api/admin/academy/stats?product_code={PRODUCT}", headers=ADMIN
     ).json()
     assert body["active_enrollments"] == 1
-    assert len(body["modules"]) == 7
+    assert len(body["modules"]) == 8
     gt05 = next(m for m in body["modules"] if m["code"] == "GT-05")
     assert gt05["quiz_attempts"] >= 2
     assert gt05["learners_passed"] == 1

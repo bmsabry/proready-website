@@ -383,6 +383,23 @@
           "filename": "centrifugal_compressor_design_calculator_with_combustor_and_turbine.xlsx"
         }
       ]
+    },
+    {
+      "position": 8,
+      "code": "QA",
+      "title": "Questions and Answers",
+      "hours": 0,
+      "gate_exempt": true,
+      "summary": "A generic handout of questions and answers on preliminary micro gas turbine design: turning compressor parameters into three-dimensional geometry, the course calculator, component geometry, compressor stability, shaft dynamics and combustor development. Open to every enrolled learner at any point in the course.",
+      "objectives": [],
+      "topics": [],
+      "extras": [
+        {
+          "kind": "handout",
+          "label": "Micro Gas Turbine Design Questions and Answers",
+          "filename": "Micro_Gas_Turbine_Design_QA.docx"
+        }
+      ]
     }
   ]
 }

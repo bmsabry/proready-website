@@ -99,7 +99,9 @@ const ModuleCard = ({
             <span className="font-mono text-xs uppercase tracking-widest text-cyan-400">
               {module.code}
             </span>
-            <span className="text-xs text-slate-400">{module.hours} hrs</span>
+            {module.hours > 0 && (
+              <span className="text-xs text-slate-400">{module.hours} hrs</span>
+            )}
             {module.formative_passed && (
               <span className="text-xs text-cyan-300">
                 assessment passed{module.formative_score !== null ? ` · ${module.formative_score}%` : ''}

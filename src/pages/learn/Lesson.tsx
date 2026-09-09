@@ -781,6 +781,29 @@ const Lesson: React.FC = () => {
           </div>
         )}
 
+        {lesson.kind === 'reading' && lesson.asset_path && (
+          <div className="card p-6 mb-6 relative overflow-hidden">
+            <Watermark text={lesson.watermark} />
+            <p className="text-slate-300 leading-relaxed">
+              The handout for this section downloads as a document you can keep
+              and annotate. It is generic course material, licensed to your
+              account for training use only.
+            </p>
+            <a
+              href={
+                lesson.asset_path.startsWith('blob:')
+                  ? lessonAssetUrl(lesson.id)
+                  : lesson.asset_path
+              }
+              className="btn-secondary mt-4"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Download the handout <ExternalLink className="w-4 h-4" aria-hidden="true" />
+            </a>
+          </div>
+        )}
+
         {lesson.kind === 'lab' && lesson.asset_path && (
           <div className="card p-6 mb-6">
             <p className="text-slate-300 leading-relaxed mb-2">

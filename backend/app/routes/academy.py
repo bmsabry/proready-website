@@ -944,6 +944,12 @@ def lesson_asset(
         )
         _launch_cap_check(db, request, learner=learner, lesson=lesson, delivery=delivery)
 
+    else:
+        # A workbook or handout downloads; give it its real name so the file
+        # on the learner's disk is "…calculator.xlsx", not "14".
+        fname = (blob.filename or path[len("blob:"):]).replace('"', "")
+        headers["Content-Disposition"] = f'attachment; filename="{fname}"'
+
     log.info("Asset %s served to %s", path, learner.email)
     return _carry_cookies(
         response, Response(content=data, media_type=blob.content_type, headers=headers)
