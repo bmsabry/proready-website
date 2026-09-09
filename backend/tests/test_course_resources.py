@@ -99,3 +99,15 @@ def test_asset_content_type_column_fits_the_office_mime_types():
     from app.models import AssetBlob
     longest = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     assert AssetBlob.__table__.c.content_type.type.length >= len(longest)
+
+
+def test_widening_a_column_is_a_no_op_on_sqlite(tmp_path, monkeypatch):
+    # The dev database is SQLite, which has no ALTER COLUMN; a pre-existing
+    # narrow column must not crash startup there.
+    from sqlalchemy import create_engine, text
+    from app import main as app_main
+    eng = create_engine(f"sqlite:///{tmp_path/'narrow.db'}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE academy_asset_blobs (id INTEGER PRIMARY KEY, content_type VARCHAR(64))"))
+    monkeypatch.setattr(app_main, "engine", eng)
+    app_main._widen_column("academy_asset_blobs", "content_type", 128)  # no exception

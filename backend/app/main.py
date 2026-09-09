@@ -95,8 +95,11 @@ def _widen_column(table: str, column: str, length: int) -> None:
     """Grow a VARCHAR(n) column to VARCHAR(length) if it is narrower.
 
     Postgres enforces the declared length; a value longer than it fails the
-    write. SQLite ignores it, so the check is a no-op there.
+    write. SQLite ignores the length (and has no ALTER COLUMN), so this is
+    a no-op there.
     """
+    if engine.dialect.name != "postgresql":
+        return
     inspector = inspect(engine)
     if table not in inspector.get_table_names():
         return
