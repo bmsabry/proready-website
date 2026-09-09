@@ -882,7 +882,9 @@ const Lesson: React.FC = () => {
 
         <p className="mt-8 text-xs text-slate-600 flex items-center gap-2">
           <Download className="w-3.5 h-3.5" aria-hidden="true" />
-          Course materials are view-only and are not downloadable. This copy is
+          {lesson.kind === 'calculator' || (lesson.kind === 'reading' && lesson.asset_path)
+            ? 'This file is yours to download and keep. It is'
+            : 'Course materials are view-only and are not downloadable. This copy is'}{' '}
           registered to {lesson.watermark || 'your account'} for training use
           only, never for operation of real equipment.
         </p>
