@@ -6,10 +6,19 @@ import { academy, ApiError } from '../../lib/academyApi';
 
 /* Passwordless sign-in.
  *
- * Two jobs in one page. With `?token=...` it exchanges a magic link for a
- * session and redirects. Without one it collects an email and asks the API
- * to send a link — and always reports success, because the API deliberately
- * cannot tell us whether the address exists and we must not leak it either. */
+ * Two jobs in one page. With `?token=...` it offers a button that exchanges
+ * the magic link for a session and redirects. Without one it collects an
+ * email and asks the API to send a link — and always reports success, because
+ * the API deliberately cannot tell us whether the address exists and we must
+ * not leak it either.
+ *
+ * The button is not decoration. Corporate mail security (Microsoft Defender
+ * Safe Links and the like) opens every link in an incoming email inside a
+ * sandbox that runs the page's JavaScript — production logs show a Microsoft
+ * address exchanging a learner's one-time token 20–30 seconds after the mail
+ * was sent, so by the time the learner clicked, the link was already used
+ * and they were sent round again. A scanner loads pages; it does not press
+ * buttons. So the token is only spent on a click. */
 
 const SignIn: React.FC = () => {
   const [params] = useSearchParams();
@@ -23,7 +32,10 @@ const SignIn: React.FC = () => {
   const [email, setEmail] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [error, setError] = useState('');
-  const [verifying, setVerifying] = useState(!!token);
+  const [verifying, setVerifying] = useState(false);
+  // A link that failed is shown as a message above the email form; the
+  // token is dropped so a retry means "send me a fresh one".
+  const [tokenSpent, setTokenSpent] = useState(false);
 
   usePageMeta('Sign in', 'Sign in to your ProReadyEngineer courses.', {
     noindex: true,
@@ -45,42 +57,38 @@ const SignIn: React.FC = () => {
     };
   }, [token, navigate]);
 
-  useEffect(() => {
+  // Only ever called from the button: the token must not be spent by a page
+  // load (see the note at the top of the file).
+  const finishSignIn = async () => {
     if (!token) return;
-    let cancelled = false;
-    (async () => {
+    setVerifying(true);
+    setError('');
+    try {
+      const res = await academy.verify(token);
+      navigate(res.next_path || '/learn', { replace: true });
+    } catch (err) {
+      // A link opened twice (mail app preview, then "open in browser";
+      // a re-tap) is used up on the second load — but if the first load
+      // already signed this browser in, that is not an error the person
+      // needs to see. Production logs show exactly this pattern.
       try {
-        const res = await academy.verify(token);
-        if (cancelled) return;
-        navigate(res.next_path || '/learn', { replace: true });
-      } catch (err) {
-        if (cancelled) return;
-        // A link opened twice (mail app preview, then "open in browser";
-        // a re-tap) is used up on the second load — but if the first load
-        // already signed this browser in, that is not an error the person
-        // needs to see. Production logs show exactly this pattern.
-        try {
-          const me = await academy.me();
-          if (cancelled) return;
-          if (me.signed_in) {
-            navigate('/learn', { replace: true });
-            return;
-          }
-        } catch {
-          /* not signed in — fall through to the message */
+        const me = await academy.me();
+        if (me.signed_in) {
+          navigate('/learn', { replace: true });
+          return;
         }
-        setVerifying(false);
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : 'That sign-in link could not be used.'
-        );
+      } catch {
+        /* not signed in — fall through to the message */
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [token, navigate]);
+      setVerifying(false);
+      setTokenSpent(true);
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'That sign-in link could not be used.'
+      );
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,6 +114,23 @@ const SignIn: React.FC = () => {
               <div className="animate-pulse text-cyan-400 font-mono text-sm uppercase tracking-widest">
                 Signing you in…
               </div>
+            </div>
+          ) : token && !tokenSpent ? (
+            <div className="text-center">
+              <CheckCircle2 className="w-10 h-10 text-cyan-400 mx-auto mb-4" aria-hidden="true" />
+              <h1 className="text-2xl font-bold mb-3">You're almost in</h1>
+              <p className="text-slate-300 leading-relaxed">
+                Press the button to finish signing in. The link works once and
+                expires 30 minutes after it was sent.
+              </p>
+              <button
+                type="button"
+                onClick={finishSignIn}
+                className="btn-primary w-full mt-6"
+              >
+                Continue to my courses
+                <ArrowRight className="w-4 h-4" aria-hidden="true" />
+              </button>
             </div>
           ) : state === 'sent' ? (
             <div className="text-center">
