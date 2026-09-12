@@ -71,7 +71,7 @@ const COURSE_JSONLD = JSON.stringify({
   name: 'Gas Turbine Emissions Mapping',
   description:
     
-    'Four-day live expert course (two weekends) on DLE gas turbine emissions mapping, built on 194 slides across 10 chapters: combustion and gas turbine fundamentals, combustion dynamics and DLE combustion system operation, NOx/CO and EPA Method 7E CEMS, the step-by-step mapping procedure practised on a simulated combustion system, then ambient effects, flex fuel and field troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
+    'Four-day live expert course (two weekends) on DLE gas turbine emissions mapping, built on 227 slides across 10 chapters: combustion and gas turbine fundamentals, combustion dynamics and DLE combustion system operation, NOx/CO and EPA Method 7E CEMS, step-by-step mapping campaigns for aeroderivative and heavy-duty machines practised on a simulated combustion system, then ambient effects, flex fuel and field troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
   provider: {
     '@type': 'Organization',
     name: 'ProReadyEngineer LLC',
@@ -145,16 +145,23 @@ const CURRICULUM: Day[] = [
   },
   {
     title: 'Emissions, CEMS & Combustion Mapping',
-    chapters: 'Chapters 5–6 · 47 slides + simulator',
+    chapters: 'Chapters 5–6 · 80 slides + simulator',
     summary:
-      'Where NOx and CO come from, how they are legally measured, and then the mapping procedure itself, worked step by step on a simulated combustion system.',
+      'Where NOx and CO come from, how they are legally measured, and then mapping itself — carried end to end on both aeroderivative and heavy-duty machines, with the procedure worked step by step on a simulated combustion system.',
     topics: [
       'NOx pathways (thermal, prompt, fuel-bound, N₂O); CO formation, quench and LBO proximity',
       'Extractive vs in-situ CEMS, and the EPA Method 7E sampling train',
       'Analyzers compared: CLD, NDIR and O₂ cells; probe siting and heated sample lines',
       'Calibration drift against the ±2.5%-of-span limit, and emissions data QA',
       'Regulatory corrections: 15% O₂, dry basis, ISO conditions',
-      'Per-circuit emissions and acoustics response',
+      'What a mapping campaign has to deliver, and how that differs between the two machine classes',
+      'Aeroderivative combustion: ring staging, staging valves, and the valve-by-valve mode change',
+      'The combustor modes, the power band of each, and the hand-over where two modes overlap',
+      'Bleed control, reference schedules against compressor discharge temperature, and where bulk demand sits inside the window',
+      'The two walls of the operating window, the five mapping points, and the order the adjustments are made',
+      'Sweeping one adjustment cleanly, carrying a campaign mode by mode, then writing bias into tables and verifying the hand-over',
+      'A real field mapping log read row by row: what each adjustment did, and where the walls turned out to be',
+      'Heavy-duty mapping on the simulator HMI: per-circuit emissions and acoustics response',
       'IGV settings versus load, and part-load CO',
       'Mapping preparation, safety protocols, tools, and the step-by-step procedure',
       'Cold-tune / hot-check discipline across fuel temperature',
@@ -164,6 +171,7 @@ const CURRICULUM: Day[] = [
     outcomes: [
       'Correct raw analyzer readings to 15% O₂ dry, and judge a daily drift check',
       'Run a full mapping sequence on the simulated combustion system, inside the mapping window',
+      'Plan and carry a mode-by-mode mapping campaign, and read a real field mapping log',
       'Produce as-left mapping tables and release an engine with the right evidence behind it',
     ],
     icon: <Gauge className="w-6 h-6" />,
@@ -538,7 +546,7 @@ const GasTurbineEmissionsMapping = () => {
             <div className="card overflow-hidden mb-10 shadow-2xl shadow-cyan-900/10">
               <img
                 src="/Mapping_Course_Advertisement.png"
-                alt="Gas Turbine Emissions Mapping, flagship live online course: from zero to field-ready in 4 live days. Day 1 combustion and gas turbine fundamentals, Day 2 combustion dynamics and DLE operation, Day 3 emissions, CEMS and the live mapping simulator, Day 4 ambient, flex fuel and troubleshooting. 194 slides, mapping simulator, daily mastery checks, quiz and interview for certification. Led by Bassam Abdelnabi. Next cohort August 29, 2026."
+                alt="Gas Turbine Emissions Mapping, flagship live online course: from zero to field-ready in 4 live days. Day 1 combustion and gas turbine fundamentals, Day 2 combustion dynamics and DLE operation, Day 3 emissions, CEMS and the live mapping simulator, Day 4 ambient, flex fuel and troubleshooting. 227 slides, mapping simulator, daily mastery checks, quiz and interview for certification. Led by Bassam Abdelnabi."
                 className="w-full h-auto block"
                 width={1671}
                 height={941}
@@ -754,7 +762,7 @@ const GasTurbineEmissionsMapping = () => {
         <Reveal className="mb-16 card overflow-hidden">
           <img
             src="/Mapping_Course_Advertisement.png"
-            alt="Course overview: the four live days, what each covers, and what is included: 194 slides, the mapping simulator, daily mastery checks, and the certification quiz and interview."
+            alt="Course overview: the four live days, what each covers, and what is included: 227 slides, the mapping simulator, daily mastery checks, and the certification quiz and interview."
             className="w-full h-auto block"
             width={1671}
             height={941}
@@ -864,7 +872,7 @@ const GasTurbineEmissionsMapping = () => {
               {
                 icon: <Award className="w-5 h-5" aria-hidden="true" />,
                 title: 'Course Materials You Keep Access To',
-                body: 'All 194 slides across the four days, in your own browser account, so you can review any chapter long after the live sessions end.',
+                body: 'All 227 slides across the four days, in your own browser account, so you can review any chapter long after the live sessions end.',
               },
               {
                 icon: <CheckCircle2 className="w-5 h-5" aria-hidden="true" />,
