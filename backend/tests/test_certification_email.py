@@ -11,7 +11,7 @@ Captured at the Resend seam (emailer._resend_post) on the shared SQLite DB.
 from __future__ import annotations
 
 import base64
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 
@@ -218,6 +218,22 @@ def test_completion_email_invites_the_examined_tier_when_offered(outbox):
     assert get_settings().INSTRUCTOR_NAME in html
 
 
+def test_certificate_counts_taught_modules_only():
+    """MGT has seven taught modules plus a gate-exempt Q&A handout. The
+    specimen the owner approved says 7 MODULES; an issued certificate said 8."""
+    db = SessionLocal()
+    learner = db.query(Learner).filter(Learner.email == "second.finisher@example.com").one()
+    product = db.get(Product, PRODUCT)
+    cert = certs.get_certificate(db, learner, PRODUCT, "completion")
+    total = db.query(Module).filter(Module.product_code == PRODUCT).count()
+    exempt = db.query(Module).filter(Module.product_code == PRODUCT, Module.gate_exempt.is_(True)).count()
+    assert exempt >= 1, "the fixture course needs a support module for this test to mean anything"
+    spec = certs.build_spec(db, cert, product)
+    assert spec.module_count == total - exempt
+    assert len(certs.taught_modules(db, product)) == total - exempt
+    db.close()
+
+
 def test_no_invitation_once_the_verified_certificate_is_held():
     db = SessionLocal()
     learner = db.query(Learner).filter(Learner.email == "second.finisher@example.com").one()
@@ -255,6 +271,44 @@ def test_verified_tier_email_has_no_upsell_and_is_signed_by_him():
     assert "examined live, one-on-one" in html and "signed by me" in html
     assert "Book my examination" not in html
     assert "Dr. Bassam Abdelnabi" in html
+
+
+def test_principles_the_certificate_cannot_carry_are_refused():
+    """Two columns above a fixed signature row: ten two-line items at the
+    smallest type is the limit. Over that, the save is refused with the
+    reason, not silently trimmed or printed overlapping."""
+    with TestClient(app, base_url="https://testserver") as c:
+        url = f"/api/admin/academy/products/{PRODUCT}"
+        before = c.get(f"/api/admin/academy/certification/{PRODUCT}", headers=ADMIN).json()["product"]["certificate_competencies"]
+        r = c.patch(url, json={"certificate_competencies": [f"Principle {i}" for i in range(11)]}, headers=ADMIN)
+        assert r.status_code == 422 and "at most 10" in r.json()["detail"]
+        r = c.patch(url, json={"certificate_competencies": ["ok", "x" * 151]}, headers=ADMIN)
+        assert r.status_code == 422 and "item 2 is 151 characters" in r.json()["detail"]
+        r = c.patch(url, json={"certificate_competencies": [f"  Principle   {i} " for i in range(10)]}, headers=ADMIN)
+        assert r.status_code == 200
+        after = c.get(f"/api/admin/academy/certification/{PRODUCT}", headers=ADMIN).json()["product"]["certificate_competencies"]
+        assert after == [f"Principle {i}" for i in range(10)]
+        assert c.patch(url, json={"certificate_competencies": before}, headers=ADMIN).status_code == 200
+
+
+def test_long_principles_step_the_type_down_but_never_reach_the_signature_row():
+    """Ten items at the 150-character cap must render clear of the bottom row."""
+    import fitz
+
+    from app.certificate_render import CertificateSpec, render_certificate
+
+    items = [("Principle %d: " % i + "word " * 40)[:150].rstrip() for i in range(10)]
+    pdf = render_certificate(CertificateSpec(
+        tier="verified", learner_name="Fit Test", course_title="Fit Course", course_descriptor="x",
+        credential_id="PRE-V-0000-0001", verify_url="https://proreadyengineer.com/verify/PRE-V-0000-0001",
+        issued_on=date.today(), signature_fingerprint="0000", competencies=items,
+        exam_date=date.today(), sample=True,
+    ))
+    page = fitz.open(stream=pdf, filetype="pdf")[0]
+    words = page.get_text("words")
+    verify_top = min(w[1] for w in words if w[4] == "VERIFY")
+    lowest_principle = max(w[3] for w in words if w[4] == "word")
+    assert lowest_principle < verify_top
 
 
 def test_first_name_and_sender_helpers():

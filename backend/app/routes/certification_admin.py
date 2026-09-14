@@ -201,7 +201,7 @@ def sample_pdf(
         instructor=certs._instructor(),
         mastery_threshold_pct=int(settings.MASTERY_THRESHOLD_PCT),
         course_hours=product.total_hours or None,
-        module_count=len(certs.course_competencies(db, product)) or None,
+        module_count=len(certs.taught_modules(db, product)) or None,
         sample=True,
     )
     return Response(

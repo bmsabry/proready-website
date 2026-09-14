@@ -50,6 +50,12 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin/academy", tags=["academy-admin"])
 
+# What the verified certificate's "Principles examined" block can carry (see
+# certificate_render._draw_verified): two columns, type stepped down to 6.4 pt
+# at most, above a fixed signature row.
+MAX_COMPETENCIES = 10
+MAX_COMPETENCY_CHARS = 150
+
 
 class GrantIn(BaseModel):
     email: EmailStr
@@ -187,7 +193,24 @@ def patch_product(
     if body.certificate_competencies is not None:
         body.certificate_competencies = [
             " ".join(str(x).split()) for x in body.certificate_competencies if str(x).strip()
-        ][:12]
+        ]
+        # The verified certificate prints these in two columns above the
+        # signature row. Ten two-line items is the most that fits at the
+        # smallest type the renderer will step down to; refuse anything the
+        # page cannot carry rather than print a certificate that overlaps.
+        if len(body.certificate_competencies) > MAX_COMPETENCIES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Principles examined: at most {MAX_COMPETENCIES} fit on the certificate "
+                       f"({len(body.certificate_competencies)} given).",
+            )
+        for i, item in enumerate(body.certificate_competencies, start=1):
+            if len(item) > MAX_COMPETENCY_CHARS:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Principles examined: item {i} is {len(item)} characters; the certificate "
+                           f"fits {MAX_COMPETENCY_CHARS} per item.",
+                )
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(product, field, value)
     db.commit()

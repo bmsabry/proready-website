@@ -364,7 +364,7 @@ function SettingsCard({
             />
           </label>
           <label className="block">
-            <span className="text-[11px] uppercase tracking-wider text-slate-300">Principles examined — one per line (verified certificate)</span>
+            <span className="text-[11px] uppercase tracking-wider text-slate-300">Principles examined — one per line, up to 10, 150 characters each (verified certificate)</span>
             <textarea
               rows={7}
               value={competencies}

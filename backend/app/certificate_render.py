@@ -508,6 +508,25 @@ def _draw_verified(c: canvas.Canvas, spec: CertificateSpec) -> None:
     half = (len(items) + 1) // 2
     cols = [items[:half], items[half:]]
     yy_start = py - 16
+
+    # Bottom row: signature (left) · dates (centre) · verify (right)
+    row_y = y + 74
+
+    # The principles are admin-edited text of any length. Fit them above the
+    # bottom row by stepping the type size down (never below 6.4 pt) rather
+    # than letting a long list run into the verification block; a list that
+    # fits at the design size renders exactly as before.
+    floor = row_y + 58
+    size, leading = 7.9, 9.6
+    for size, leading in ((7.9, 9.6), (7.5, 9.1), (7.1, 8.6), (6.8, 8.2), (6.4, 7.8)):
+        tallest = max(
+            (sum(leading * len(_wrap(item, "Inter", size, col_w - 16)) + 3.2 for item in col)
+             for col in cols),
+            default=0,
+        )
+        if yy_start - tallest >= floor:
+            break
+
     yy_end = yy_start
     for ci, col in enumerate(cols):
         yy = yy_start
@@ -517,16 +536,13 @@ def _draw_verified(c: canvas.Canvas, spec: CertificateSpec) -> None:
             c.setFont("Mono-Medium", 6.8)
             c.setFillColor(BLUE)
             c.drawString(colx, yy, f"{n:02d}")
-            lines = _wrap(item, "Inter", 7.9, col_w - 16)
-            c.setFont("Inter", 7.9)
+            lines = _wrap(item, "Inter", size, col_w - 16)
+            c.setFont("Inter", size)
             c.setFillColor(BODY)
             for li, line in enumerate(lines):
-                c.drawString(colx + 15, yy - li * 9.6, line)
-            yy -= 9.6 * len(lines) + 3.2
+                c.drawString(colx + 15, yy - li * leading, line)
+            yy -= leading * len(lines) + 3.2
         yy_end = min(yy_end, yy)
-
-    # Bottom row: signature (left) · dates (centre) · verify (right)
-    row_y = y + 74
     lx = x + 56
     sig_w, sig_h = 140, 40
     if spec.signature_png:

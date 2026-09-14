@@ -158,13 +158,21 @@ def _new_code(db: Session, tier: str) -> str:
 # Product-level certificate copy (descriptor + competencies)
 # -----------------------------------------------------------------------------
 
-def course_descriptor(db: Session, product: Product) -> str:
-    if product.certificate_descriptor.strip():
-        return product.certificate_descriptor.strip()
+def taught_modules(db: Session, product: Product) -> list[Module]:
+    """The modules a certificate counts: the taught ones, in order. Support
+    modules (`gate_exempt` — the simulator lab, a Q&A handout) are part of
+    the course but not a module OF it, and the specimen the owner approved
+    counts them out; an issued certificate must say the same number."""
     modules = db.execute(
         select(Module).where(Module.product_code == product.code).order_by(Module.position)
     ).scalars().all()
-    n = len(modules)
+    return [m for m in modules if not m.gate_exempt]
+
+
+def course_descriptor(db: Session, product: Product) -> str:
+    if product.certificate_descriptor.strip():
+        return product.certificate_descriptor.strip()
+    n = len(taught_modules(db, product))
     hours = f"{product.total_hours:g}-hour, " if product.total_hours else ""
     words = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
              8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"}
@@ -176,10 +184,7 @@ def course_competencies(db: Session, product: Product) -> list[str]:
     items = [str(x).strip() for x in (product.certificate_competencies or []) if str(x).strip()]
     if items:
         return items
-    modules = db.execute(
-        select(Module).where(Module.product_code == product.code).order_by(Module.position)
-    ).scalars().all()
-    return [m.title for m in modules if not m.gate_exempt]
+    return [m.title for m in taught_modules(db, product)]
 
 
 # -----------------------------------------------------------------------------
@@ -234,9 +239,7 @@ def blob_bytes(db: Session, key: str) -> bytes | None:
 def build_spec(db: Session, cert: Certificate, product: Product, *, sample: bool = False) -> CertificateSpec:
     settings = get_settings()
     issued_on = svc._aware(cert.issued_at) or datetime.now(timezone.utc)
-    module_count = db.execute(
-        select(Module).where(Module.product_code == product.code)
-    ).scalars().all()
+    module_count = len(taught_modules(db, product))
     return CertificateSpec(
         tier=cert.tier,
         learner_name=cert.learner_name,
@@ -253,7 +256,7 @@ def build_spec(db: Session, cert: Certificate, product: Product, *, sample: bool
         instructor=_instructor(),
         mastery_threshold_pct=int(settings.MASTERY_THRESHOLD_PCT),
         course_hours=product.total_hours or None,
-        module_count=len(module_count) or None,
+        module_count=module_count or None,
         sample=sample,
     )
 
