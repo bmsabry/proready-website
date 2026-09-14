@@ -637,9 +637,9 @@ def _draw_attendance(c: canvas.Canvas, spec: CertificateSpec) -> None:
     c.setFillColor(NAVY)
     c.drawCentredString(cx, name_y - 60, spec.course_title.upper())
 
-    para_w = 580
-    last = _paragraph(c, cx - para_w / 2, name_y - 82, spec.course_descriptor,
-                      "Inter", 9.4, 12.8, para_w, BODY, align="center")
+    para_w = 588
+    last = _paragraph(c, cx - para_w / 2, name_y - 80, spec.course_descriptor,
+                      "Inter", 9.0, 11.9, para_w, BODY, align="center")
 
     # Facts line: contact hours / PDH · days · cohort span.
     facts = []
@@ -649,17 +649,17 @@ def _draw_attendance(c: canvas.Canvas, spec: CertificateSpec) -> None:
     span = _fmt_span(spec.cohort_start, spec.cohort_end)
     if span:
         facts.append(f"held {span}")
-    _tracked_text(c, cx, last - 19, "   ·   ".join(facts).upper(), "Mono", 6.9, 1.3, MUTED)
+    _tracked_text(c, cx, last - 17, "   ·   ".join(facts).upper(), "Mono", 6.9, 1.3, MUTED)
 
     attest = (
         "This certifies that the holder was present for and participated in the live, instructor-led "
         "delivery of this programme in full. It records attendance and participation only; it is not an "
         "examination or an assessment of the holder's knowledge or competency."
     )
-    last = _paragraph(c, cx - 255, last - 40, attest, "Cormorant-Italic", 11.2, 13.4, 510, INK, align="center")
+    last = _paragraph(c, cx - 255, last - 34, attest, "Cormorant-Italic", 10.8, 12.7, 510, INK, align="center")
 
     # Topics covered — two columns, auto-fitted above the bottom row.
-    py = last - 15
+    py = last - 13
     _tracked_text(c, cx, py, "TOPICS COVERED", "Inter-Semi", 7.2, 2.4, MUTED)
     _gradient_rect(c, cx - 52, py - 5, 104, 0.7, [WHITE, CYAN, BLUE, WHITE])
     items = list(spec.competencies or [])
@@ -671,7 +671,7 @@ def _draw_attendance(c: canvas.Canvas, spec: CertificateSpec) -> None:
     cols = [items[:half], items[half:]]
     yy_start = py - 16
 
-    row_y = y + 66
+    row_y = y + 74
     floor = row_y + 52
     size, leading = 7.6, 9.2
     for size, leading in ((7.6, 9.2), (7.2, 8.7), (6.9, 8.3), (6.6, 8.0), (6.4, 7.7)):
@@ -725,7 +725,7 @@ def _draw_attendance(c: canvas.Canvas, spec: CertificateSpec) -> None:
     c.setFillColor(MUTED)
     c.drawCentredString(cx, row_y - 8, spec.issuer.place)
 
-    _verify_block(c, x + w - 52, row_y - 18, spec, size=60)
+    _verify_block(c, x + w - 52, row_y - 14, spec, size=60)
     scope = ("This certificate confirms attendance and participation in the programme described above. "
              "It is not a certification of competency and is not a professional engineering licence.")
     _footer(c, box, spec, extra_line=scope, fy=y + 18)
