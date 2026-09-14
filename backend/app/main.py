@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import date
 
 from fastapi import FastAPI
@@ -403,4 +404,6 @@ def root() -> dict:
 
 @app.get("/healthz", tags=["meta"])
 def healthz() -> dict:
-    return {"ok": True}
+    # Render sets RENDER_GIT_COMMIT on the running instance; surfacing it is
+    # how a deploy is confirmed live without dashboard access.
+    return {"ok": True, "commit": os.environ.get("RENDER_GIT_COMMIT", "")[:12]}
