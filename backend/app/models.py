@@ -1080,6 +1080,47 @@ class ModuleState(Base):
     )
 
 
+class LearnerRequest(Base):
+    """A learner asking the instructor for something the platform will not
+    do on its own — and the instructor's answer.
+
+    kind:
+      'completion' — mark every requirement of the course complete (the
+                     learner lost their answers to a site problem) so the
+                     Certificate of Completion can issue.
+      'answers'    — email the answer key (every module's evaluation and
+                     mastery check, with answers and explanations) as a PDF.
+
+    Nothing happens on creation except an email to the owner with a link to
+    the admin panel; the effect is applied only by an admin session pressing
+    Approve there. That keeps a mail scanner opening the link from approving
+    anything (see SignIn.tsx for why that is not hypothetical).
+    """
+
+    __tablename__ = "academy_learner_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    learner_id: Mapped[int] = mapped_column(Integer, index=True)
+    product_code: Mapped[str] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(16), index=True)
+    # 'pending' | 'approved' | 'declined'
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    # What the learner wrote, if anything.
+    note: Mapped[str] = mapped_column(String(1000), default="")
+    # What the admin wrote when deciding; sent to the learner on a decline.
+    decision_note: Mapped[str] = mapped_column(String(1000), default="")
+    decided_by: Mapped[str] = mapped_column(String(320), default="")
+    # What approving did: the certificate code issued, 'awaiting_name',
+    # 'answer_key_sent' …; shown in the admin list.
+    result: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+
 class AppLaunch(Base):
     """One anonymous launch signal from the Pro3DWorks in-app update check.
 

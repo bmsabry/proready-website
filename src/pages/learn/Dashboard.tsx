@@ -28,6 +28,7 @@ import {
 } from '../../lib/academyApi';
 
 import CertificationPanel from './CertificationPanel';
+import CourseSupportPanel from './CourseSupportPanel';
 
 const DEFAULT_PRODUCT = 'micro-gas-turbine-design';
 
@@ -892,6 +893,23 @@ const Dashboard: React.FC = () => {
             />
           ))}
         </div>
+
+        {course.support && (
+          <CourseSupportPanel
+            code={code}
+            courseTitle={course.product.title}
+            support={course.support}
+            hasCertificate={Boolean(course.certificate_code)}
+            onChanged={(support) => {
+              if (support) {
+                setCourse({ ...course, support });
+              } else {
+                // A reset changed everything on this page: reload it.
+                void academy.course(code).then(setCourse).catch(() => undefined);
+              }
+            }}
+          />
+        )}
           </>
         )}
       </div>

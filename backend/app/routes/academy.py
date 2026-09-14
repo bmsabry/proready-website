@@ -47,6 +47,7 @@ from sqlalchemy.orm import Session
 
 from .. import academy as svc
 from .. import asset_lock as lock
+from .. import learner_requests as lr
 from .. import integrity_alerts as alerts
 from .. import provenance as prov
 from ..config import get_settings
@@ -486,6 +487,64 @@ def course(
         "complete": svc.course_complete(db, learner, code),
         "certificate_code": certificate.code if certificate else None,
         "video_ready": stream_configured(),
+        # The three self-service buttons (start over / request completion
+        # marks / request the answer key) and what each may do right now.
+        "support": lr.support_state(db, learner, product),
+    }
+
+
+class ResetIn(BaseModel):
+    # The word the learner had to type; a stray click cannot wipe a course.
+    confirm: str = ""
+
+
+class LearnerRequestIn(BaseModel):
+    kind: str
+    note: str = Field(default="", max_length=1000)
+
+
+@router.post("/course/{code}/reset")
+def reset_course(
+    code: str,
+    body: ResetIn,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> dict:
+    """Start the course over: the learner's own watch progress, quiz attempts
+    and quiz-app state for this course are cleared. Certificates are kept."""
+    product = _product_or_404(db, code)
+    if not svc.has_any_access(db, learner, code):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="You don't have access to this course yet.")
+    if body.confirm.strip().upper() != "RESET":
+        raise HTTPException(status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+                            detail="Type RESET to confirm starting the course over.")
+    return {"ok": True, **lr.reset_progress(db, learner, product)}
+
+
+@router.post("/course/{code}/requests")
+def create_learner_request(
+    code: str,
+    body: LearnerRequestIn,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> dict:
+    """Ask the instructor for completion marks or the answer key. Emails the
+    owner; nothing is applied until he approves in the admin panel."""
+    product = _product_or_404(db, code)
+    if not svc.has_any_access(db, learner, code):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="You don't have access to this course yet.")
+    try:
+        row = lr.create_request(db, learner, product, body.kind, body.note)
+    except lr.RequestRefused as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "id": row.id,
+        "kind": row.kind,
+        "status": row.status,
+        "support": lr.support_state(db, learner, product),
     }
 
 

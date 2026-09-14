@@ -25,6 +25,7 @@ import {
   type Owners,
 } from './lib';
 import { ConfirmButton, Notice, RefreshButton, Section, SettlementBadge, StatusBadge } from './ui';
+import LearnerRequestsSection from './LearnerRequestsSection';
 
 export default function AcademyPage({ onAuthError }: { onAuthError: () => void }) {
   const [products, setProducts] = useState<AcademyProduct[] | null>(null);
@@ -172,6 +173,8 @@ export default function AcademyPage({ onAuthError }: { onAuthError: () => void }
 
   return (
     <div className="space-y-8">
+      <LearnerRequestsSection onAuthError={onAuthError} />
+
       <Section
         icon={<GraduationCap className="w-5 h-5 text-cyan-400" />}
         title="Academy"

@@ -17,6 +17,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from .. import academy as svc
+from .. import learner_requests as lr
 from .. import provenance as prov
 from ..config import get_settings
 from ..db import get_db
@@ -26,6 +27,7 @@ from ..emailer import enrollment_granted_html, login_link_html, send_email, ttl_
 from ..learner_auth import issue_login_token
 from ..progress_guard import allow_progress_loss
 from ..models import (
+    LearnerRequest,
     AssetBlob,
     AssetDelivery,
     AssetPing,
@@ -1670,3 +1672,73 @@ async def integrity_revoke(
     log.info("Integrity: %s withdrew %d copy(ies) (%s), ended %d live session(s)",
              admin, len(rows), body.token or f"learner {body.learner_id}", ended)
     return {"ok": True, "revoked": len(rows), "sessions_ended": ended}
+
+
+# -----------------------------------------------------------------------------
+# Learner requests — completion marks / answer key (see app/learner_requests.py)
+# -----------------------------------------------------------------------------
+
+class DecisionIn(BaseModel):
+    note: str = Field(default="", max_length=1000)
+
+
+@router.get("/requests")
+def list_learner_requests(
+    status_filter: str = "",
+    product_code: str = "",
+    limit: int = 200,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin),
+) -> dict:
+    """Every course, newest first; pending ones carry the learner's standing
+    (lessons, evaluations) and how they came to the course (live cohort or
+    self-study) so the decision can be made from the list."""
+    q = select(LearnerRequest)
+    if status_filter:
+        q = q.where(LearnerRequest.status == status_filter)
+    if product_code:
+        q = q.where(LearnerRequest.product_code == product_code)
+    rows = db.execute(
+        q.order_by(LearnerRequest.created_at.desc()).limit(max(1, min(limit, 1000)))
+    ).scalars().all()
+    pending = db.execute(
+        select(func.count(LearnerRequest.id)).where(LearnerRequest.status == "pending")
+    ).scalar_one()
+    return {"requests": [lr.admin_out(db, r) for r in rows], "pending": pending}
+
+
+def _request_or_404(db: Session, request_id: int) -> LearnerRequest:
+    row = db.get(LearnerRequest, request_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Request not found.")
+    return row
+
+
+@router.post("/requests/{request_id}/approve")
+def approve_learner_request(
+    request_id: int,
+    body: DecisionIn,
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin),
+) -> dict:
+    row = _request_or_404(db, request_id)
+    try:
+        lr.approve(db, row, admin, body.note)
+    except lr.RequestRefused as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return lr.admin_out(db, row)
+
+
+@router.post("/requests/{request_id}/decline")
+def decline_learner_request(
+    request_id: int,
+    body: DecisionIn,
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin),
+) -> dict:
+    row = _request_or_404(db, request_id)
+    try:
+        lr.decline(db, row, admin, body.note)
+    except lr.RequestRefused as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return lr.admin_out(db, row)

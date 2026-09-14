@@ -1042,6 +1042,115 @@ def certificate_issued_html(
     return _shell(title, heading, body)
 
 
+# -----------------------------------------------------------------------------
+# Learner requests (start over / completion marks / answer key)
+# -----------------------------------------------------------------------------
+
+def learner_request_admin_html(
+    *,
+    kind: str,
+    learner_name: str,
+    learner_email: str,
+    course_title: str,
+    note: str,
+    progress: dict,
+    cohort: Optional[dict],
+    review_url: str,
+    request_id: int,
+) -> str:
+    """To the owner. States what the learner asks and where they stand, and
+    sends him to the admin panel to decide — the email itself approves
+    nothing."""
+    who = f"{escape_html(learner_name)} ({escape_html(learner_email)})" if learner_name else escape_html(learner_email)
+    if kind == "completion":
+        ask = (
+            f"{who} asks you to mark every requirement of <strong>{escape_html(course_title)}"
+            "</strong> as completed so the Certificate of Completion can be issued — "
+            "there was an issue with the site that made them lose their answers."
+        )
+        heading = "A learner asks for completion marks"
+    else:
+        ask = (
+            f"{who} asks for the answer key of <strong>{escape_html(course_title)}</strong> — "
+            "every module evaluation and mastery check with answers and explanations, as a PDF."
+        )
+        heading = "A learner asks for the answer key"
+    body = _p(ask)
+    if note:
+        body += _p(f"Their note: <em>{escape_html(note)}</em>")
+    standing = (
+        f"{progress.get('lessons_done', 0)} of {progress.get('lessons_total', 0)} lessons · "
+        f"{progress.get('sets_passed', 0)} of {progress.get('sets_total', 0)} evaluations and "
+        f"mastery checks passed"
+        + (" · course complete" if progress.get("complete") else "")
+    )
+    if cohort:
+        how = "Live-cohort registrant"
+        if cohort.get("course_title"):
+            how += f" — {escape_html(cohort['course_title'])}"
+        how += f" ({escape_html(cohort.get('registration_status', ''))}"
+        how += ", attendance confirmed)" if cohort.get("attendance_confirmed") else ")"
+    else:
+        how = "Self-study access (no live-cohort registration on file)"
+    body += _kv_table(
+        [
+            ("Request", f"#{request_id}"),
+            ("Standing", standing),
+            ("Access", how),
+        ]
+    )
+    body += _p(
+        "Approve or decline in the admin panel. Approving a completion request marks every "
+        "lesson and evaluation complete and issues the certificate at once; approving an "
+        "answer-key request emails the PDF to the learner. A decline sends them your note."
+    )
+    body += _cta_button("Review the request", review_url)
+    return _shell("Learner request", heading, body)
+
+
+def request_approved_awaiting_name_html(full_name: str, course_title: str, dashboard_url: str) -> str:
+    greeting = f"Hi {escape_html(first_name(full_name))}," if first_name(full_name) else "Hi,"
+    body = _p(greeting)
+    body += _p(
+        f"Your request was approved: every requirement of <strong>{escape_html(course_title)}"
+        "</strong> is now marked complete. One thing is missing before your Certificate of "
+        "Completion can be issued — the name to print on it."
+    )
+    body += _p("Add it on your course page and the certificate is issued and emailed immediately.")
+    body += _cta_button("Add my name and get my certificate", dashboard_url)
+    return _shell("Request approved", "Your requirements are marked complete", body)
+
+
+def answer_key_html(full_name: str, course_title: str) -> str:
+    greeting = f"Hi {escape_html(first_name(full_name))}," if first_name(full_name) else "Hi,"
+    body = _p(greeting)
+    body += _p(
+        f"As you requested, the answer key for <strong>{escape_html(course_title)}</strong> is "
+        "attached: every module evaluation and mastery check, with the answer to each item and "
+        "the explanation where one is recorded."
+    )
+    body += _p(
+        "It is prepared for you personally, for your own study. Please do not share or "
+        "forward it.",
+        size=13,
+        color=MUTED,
+    )
+    return _shell("Answer key", "Your answer key is attached", body)
+
+
+def request_declined_html(full_name: str, course_title: str, what: str, note: str) -> str:
+    greeting = f"Hi {escape_html(first_name(full_name))}," if first_name(full_name) else "Hi,"
+    body = _p(greeting)
+    body += _p(
+        f"Your request for {escape_html(what)} on <strong>{escape_html(course_title)}</strong> "
+        "was not approved."
+    )
+    if note:
+        body += _p(f"From the instructor: <em>{escape_html(note)}</em>")
+    body += _p("If you think something was missed, reply to this email and say what happened.")
+    return _shell("Learner request", f"About your request for {escape_html(what)}", body)
+
+
 def advanced_purchased_html(
     full_name: str, course_title: str, exam_url: str, price_display: str
 ) -> str:

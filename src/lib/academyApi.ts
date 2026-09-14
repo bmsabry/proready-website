@@ -132,6 +132,16 @@ export type ModuleState = {
   lessons: LessonSummary[];
 };
 
+/* The three self-service actions on the course dashboard and what each may
+ * do for this learner right now (see backend app/learner_requests.py). */
+export type CourseSupport = {
+  reset_available: boolean;
+  completion_request_available: boolean;
+  answers_request_available: boolean;
+  answers_blocked_reason: string;
+  pending: Partial<Record<'completion' | 'answers', { id: number; created_at: string }>>;
+};
+
 export type CourseState = {
   product: {
     code: string;
@@ -147,6 +157,7 @@ export type CourseState = {
   complete: boolean;
   certificate_code: string | null;
   video_ready: boolean;
+  support: CourseSupport;
 };
 
 export type SlideMeta = {
@@ -291,6 +302,19 @@ export const academy = {
     }),
 
   myCourses: () => request<{ courses: MyCourse[] }>('/api/academy/my-courses'),
+
+  /* ---- course support: start over / ask the instructor ---- */
+  resetCourse: (code: string, confirm: string) =>
+    request<{ ok: boolean; lessons_cleared: number; attempts_cleared: number }>(
+      `/api/academy/course/${code}/reset`,
+      { method: 'POST', body: JSON.stringify({ confirm }) }
+    ),
+
+  requestSupport: (code: string, kind: 'completion' | 'answers', note: string) =>
+    request<{ ok: boolean; id: number; kind: string; status: string; support: CourseSupport }>(
+      `/api/academy/course/${code}/requests`,
+      { method: 'POST', body: JSON.stringify({ kind, note }) }
+    ),
 
   /* ---- certification (both tiers) ---- */
   certification: (code: string) =>
