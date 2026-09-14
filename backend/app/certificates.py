@@ -370,22 +370,27 @@ def _price_display(cents: int, currency: str) -> str:
 
 def examined_tier_offer(db: Session, learner: Learner, product: Product) -> dict | None:
     """The facts the course page publishes about the paid tier, for the
-    completion email — or None when there is nothing to offer this learner
-    (tier not switched on / no exam bank / no price / already holds it)."""
+    completion email. Every finisher hears about it; None only when this
+    learner already holds it. `bookable` says whether the course page can
+    take the registration today (tier switched on, exam bank loaded, price
+    set); otherwise the email carries a request link instead of a dead one."""
     from . import advanced_cert as adv  # noqa: PLC0415 — advanced_cert imports this module
 
-    if not adv.offered(db, product) or product.advanced_cert_price_cents <= 0:
-        return None
     if get_certificate(db, learner, product.code, "verified") is not None:
         return None
     settings = get_settings()
+    price = product.advanced_cert_price_cents
+    bookable = adv.offered(db, product) and price > 0
+    subject = quote(f"Verified Competency examination — {product.title}", safe="")
     return {
-        "price_display": _price_display(product.advanced_cert_price_cents, product.currency),
+        "bookable": bookable,
+        "price_display": _price_display(price, product.currency) if price > 0 else "",
         "exam_item_count": len(adv.exam_items(db, product.code)),
         "exam_threshold_pct": settings.ADVANCED_EXAM_THRESHOLD_PCT,
         "exam_max_attempts": settings.ADVANCED_EXAM_MAX_ATTEMPTS,
         "interview_minutes": settings.ADVANCED_INTERVIEW_MINUTES,
         "booking_url": booking_url(product.code),
+        "request_mailto": f"mailto:{settings.EMAIL_REPLY_TO}?subject={subject}",
     }
 
 
@@ -424,7 +429,7 @@ def email_certificate(db: Session, cert: Certificate, learner: Learner, product:
             mastery_threshold_pct=settings.MASTERY_THRESHOLD_PCT,
             offer=offer,
         ),
-        from_override=sender_as(settings.INSTRUCTOR_NAME),
+        from_override=sender_as(settings.INSTRUCTOR_NAME, mailbox=settings.INSTRUCTOR_MAILBOX),
         cc=settings.ADMIN_NOTIFY_EMAIL or None,
         db=db,
         scope_kind="product",

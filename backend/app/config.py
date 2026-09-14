@@ -109,6 +109,10 @@ class Settings(BaseSettings):
     # alpha). Uploaded through the admin assets endpoint, never committed —
     # the repository is public. The verified tier refuses to issue without it.
     INSTRUCTOR_SIGNATURE_ASSET_KEY: str = "instructor-signature.png"
+    # Local part of the address the instructor's own emails (certificates)
+    # are sent from, on EMAIL_FROM's verified domain. Distinct from info@ so
+    # mail clients show his name rather than a saved "Support" contact.
+    INSTRUCTOR_MAILBOX: str = "bassam"
     # Written examination of the paid tier: pass mark and attempt cap.
     ADVANCED_EXAM_THRESHOLD_PCT: float = 80.0
     ADVANCED_EXAM_MAX_ATTEMPTS: int = 2

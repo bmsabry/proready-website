@@ -172,8 +172,9 @@ def test_completion_email_is_from_bassam_with_him_on_cc(outbox):
     # Visible copy to the owner — cc, not bcc.
     assert mail["cc"] == [settings.ADMIN_NOTIFY_EMAIL]
     assert "bcc" not in mail
-    # Sent under his name from the verified platform address.
-    assert mail["from"] == f'"{settings.INSTRUCTOR_NAME}" <info@proreadyengineer.com>'
+    # Sent under his name from his own mailbox on the verified domain — not
+    # info@, which mail clients relabel with the saved "Support" contact.
+    assert mail["from"] == f'"{settings.INSTRUCTOR_NAME}" <bassam@proreadyengineer.com>'
     assert mail["subject"] == (
         "Congratulations, Ada — your Certificate of Completion for Micro Gas Turbine Design"
     )
@@ -185,10 +186,15 @@ def test_completion_email_is_from_bassam_with_him_on_cc(outbox):
     # The PDF rides along.
     assert mail["attachments"][0]["filename"].endswith(f"{code}.pdf")
     assert base64.b64decode(mail["attachments"][0]["content"])[:5] == b"%PDF-"
-    # Examined tier not offered on this course yet → nothing to book.
+    # Examined tier not open on this course yet: the learner still hears
+    # about it, with a request link — never a booking link to a dead end.
+    assert "Certificate of Verified Competency" in html
+    assert "$300 USD" in html and "60 minutes, live and one-on-one" in html
     assert "Book my examination" not in html
     assert "advanced=start" not in html
-    assert "Verified Competency" not in html
+    assert "Request my examination" in html
+    assert 'href="mailto:info@proreadyengineer.com?subject=Verified%20Competency%20examination' in html
+    assert "reply to this email" in html
 
 
 def test_completion_email_invites_the_examined_tier_when_offered(outbox):
@@ -316,4 +322,5 @@ def test_first_name_and_sender_helpers():
     assert E.first_name("Eng. Ahmed Ali") == "Ahmed"
     assert E.first_name("  ") == ""
     assert E.sender_as("Dr. Bassam Abdelnabi") == '"Dr. Bassam Abdelnabi" <info@proreadyengineer.com>'
+    assert E.sender_as("Dr. Bassam Abdelnabi", mailbox="bassam") == '"Dr. Bassam Abdelnabi" <bassam@proreadyengineer.com>'
     assert E.sender_as("") == get_settings().EMAIL_FROM

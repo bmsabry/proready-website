@@ -872,17 +872,22 @@ _TIER_TITLES = {
 }
 
 
-def sender_as(display_name: str) -> str:
-    """EMAIL_FROM's address under a different display name.
+def sender_as(display_name: str, mailbox: str = "") -> str:
+    """A sender on EMAIL_FROM's verified domain under a different name.
 
     The certificate emails go out as the instructor rather than as the
     platform: the learner has just finished his course and the note is his.
-    Only the display name changes — the address (and so DKIM/SPF) is the
-    verified one from EMAIL_FROM.
+    `mailbox` replaces the local part (bassam@…) — needed, not cosmetic: the
+    support desk already sends from info@, and a mail client that has that
+    address on file shows its saved contact name ("ProReadyEngineer Support")
+    whatever display name the message carries. The domain stays the verified
+    one, so DKIM/SPF alignment is unchanged.
     """
     configured = get_settings().EMAIL_FROM
     m = re.search(r"<([^>]+)>", configured)
     address = m.group(1) if m else configured.strip()
+    if mailbox and "@" in address:
+        address = f"{mailbox}@{address.split('@', 1)[1]}"
     name = display_name.replace('"', "").strip()
     return f'"{name}" <{address}>' if name else configured
 
@@ -912,13 +917,15 @@ def certificate_issued_html(
     """The certificate is attached as a PDF; this is the instructor's note.
 
     Written in the first person and sent under his name (see `sender_as`),
-    with him on cc. `offer` — present only for a completion certificate on a
-    course where the examined tier is purchasable and not yet held — carries
-    the facts the course page publishes about the Certificate of Verified
-    Competency (price, written exam size and pass mark, oral exam length) and
-    the link that opens the examination card on the learner's course page:
-      {price_display, exam_item_count, exam_threshold_pct, exam_max_attempts,
-       interview_minutes, booking_url}
+    with him on cc. `offer` — present for a completion certificate unless the
+    learner already holds the examined tier — carries the facts the course
+    page publishes about the Certificate of Verified Competency (price,
+    written exam size and pass mark, oral exam length). When the tier is open
+    on the course (`bookable`), the button opens the examination card on the
+    learner's course page; when it is not open yet, the button starts an
+    email asking the instructor to open it — never a link to a dead end:
+      {bookable, price_display, exam_item_count, exam_threshold_pct,
+       exam_max_attempts, interview_minutes, booking_url, request_mailto}
     """
     name = escape_html(first_name(full_name))
     greeting = f"Dear {name}," if name else "Dear learner,"
@@ -971,41 +978,52 @@ def certificate_issued_html(
             "course — the one a hiring manager can trust, because it is examined "
             "rather than completed. Here is what it involves:"
         )
-        body += _kv_table(
-            [
-                (
-                    "Written examination",
-                    f"{offer['exam_item_count']} analysis-level questions, taken from "
-                    f"your course page. Pass mark {offer['exam_threshold_pct']:g}%, "
-                    f"{offer['exam_max_attempts']} attempts.",
-                ),
-                (
-                    "Oral examination",
-                    f"{offer['interview_minutes']} minutes, live and one-on-one with me by "
-                    "video, scheduled around your time zone. Questions without notice, "
-                    "design cases not covered in the material, reasoning out loud.",
-                ),
-                (
-                    "Certificate",
-                    "Signed by me after the examination, naming every key principle you "
-                    "demonstrated. Digitally signed, publicly verifiable, LinkedIn-ready.",
-                ),
+        n = offer.get("exam_item_count") or 0
+        written = (
+            f"{n} analysis-level questions, taken from your course page. "
+            if n else "Analysis-level questions, taken from your course page. "
+        ) + f"Pass mark {offer['exam_threshold_pct']:g}%, {offer['exam_max_attempts']} attempts."
+        rows = [
+            ("Written examination", written),
+            (
+                "Oral examination",
+                f"{offer['interview_minutes']} minutes, live and one-on-one with me by "
+                "video, scheduled around your time zone. Questions without notice, "
+                "design cases not covered in the material, reasoning out loud.",
+            ),
+            (
+                "Certificate",
+                "Signed by me after the examination, naming every key principle you "
+                "demonstrated. Digitally signed, publicly verifiable, LinkedIn-ready.",
+            ),
+        ]
+        if offer.get("price_display"):
+            rows.append(
                 (
                     "Fee",
                     f"<strong>{offer['price_display']}</strong>. It pays for the "
                     "examination, not the outcome; if mastery is not shown the first "
                     "time, one complimentary re-examination is offered after a study "
                     "period.",
-                ),
-            ]
-        )
-        body += _p(
-            "Getting started takes a minute. The button below opens the examination "
-            "section of your course page; register there and the written examination "
-            "opens immediately. When you pass it, you propose three windows that suit "
-            "you, and I confirm one and send the meeting link."
-        )
-        body += _cta_button("Book my examination", offer["booking_url"])
+                )
+            )
+        body += _kv_table(rows)
+        if offer.get("bookable"):
+            body += _p(
+                "Getting started takes a minute. The button below opens the examination "
+                "section of your course page; register there and the written examination "
+                "opens immediately. When you pass it, you propose three windows that suit "
+                "you, and I confirm one and send the meeting link."
+            )
+            body += _cta_button("Book my examination", offer["booking_url"])
+        else:
+            body += _p(
+                "The examined tier opens on each course once its first learners complete "
+                "it — which is now you. If you would like to sit it, press the button below "
+                "(or simply reply to this email) and I will open the examination for you and "
+                "send you the link to register."
+            )
+            body += _cta_button("Request my examination", offer["request_mailto"])
         body += _p(
             "There is no deadline on this. Your course access and your Certificate of "
             "Completion are yours either way.",
