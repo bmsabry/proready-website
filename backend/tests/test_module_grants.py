@@ -432,6 +432,28 @@ def test_admin_reads_the_deck_as_text_without_pixels(client, setup):
         f"/api/admin/academy/modules/{module_ids['DAY-1']}/slides").status_code == 401
 
 
+def test_admin_reads_a_bank_with_answers_and_learners_do_not(client, setup):
+    module_ids, _ = setup
+    r = client.post(
+        f"/api/admin/academy/modules/{module_ids['DAY-1']}/quiz-items",
+        json={"items": [{
+            "code": "F1.X", "item_set": "formative", "kind": "mcq",
+            "stem": "Which pathway dominates?",
+            "options": [{"key": "A", "text": "Thermal"}, {"key": "B", "text": "Prompt"}],
+            "answer": {"key": "A"}, "explanation": "Thermal NOx is 70-90 % in DLE.",
+            "cognitive_level": "Remember", "outcome_id": "D1.O1", "position": 1,
+        }], "replace": False},
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+    r = client.get(f"/api/admin/academy/modules/{module_ids['DAY-1']}/quiz-items", headers=ADMIN)
+    assert r.status_code == 200, r.text
+    item = next(i for i in r.json()["items"] if i["code"] == "F1.X")
+    assert item["answer"] == {"key": "A"} and "70-90" in item["explanation"]
+    assert TestClient(app, base_url="https://testserver").get(
+        f"/api/admin/academy/modules/{module_ids['DAY-1']}/quiz-items").status_code == 401
+
+
 # -----------------------------------------------------------------------------
 # /my-courses — the /learn chooser feed
 # -----------------------------------------------------------------------------

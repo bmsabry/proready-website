@@ -850,6 +850,34 @@ class QuizBankIn(BaseModel):
     replace: bool = True
 
 
+@router.get("/modules/{module_id}/quiz-items")
+def read_quiz_items(
+    module_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin),
+) -> dict:
+    """The module's assessment bank with answers, rubrics and explanations —
+    admin only; learners get the answer-free view from /api/academy/quiz.
+    Re-post the result (edited) with replace=true to update a bank in place."""
+    module = db.get(Module, module_id)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found.")
+    rows = db.execute(
+        select(QuizItem)
+        .where(QuizItem.module_id == module_id)
+        .order_by(QuizItem.item_set, QuizItem.position, QuizItem.id)
+    ).scalars().all()
+    fields = ("code", "item_set", "kind", "stem", "options", "answer", "rubric",
+              "explanation", "cognitive_level", "outcome_id", "position")
+    return {
+        "module_id": module_id,
+        "code": module.code,
+        "objectives": list(module.objectives or []),
+        "topics": list(module.topics or []),
+        "items": [{f: getattr(r, f) for f in fields} for r in rows],
+    }
+
+
 @router.post("/modules/{module_id}/quiz-items")
 def load_quiz_items(
     module_id: int,
