@@ -58,8 +58,6 @@ const FALLBACK_LIVE_PRICE_CENTS = 300000;
 const DEFAULT_LIVE_COHORT_DATE = snapshotStartLabel(LIVE_COURSE_CODE, 'October 1, 2026');
 
 const VIDEO_HOURS = 16;
-const REFERENCE_ENGINE = '700 N';
-
 function formatPrice(cents: number, currency = 'usd'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -73,7 +71,7 @@ const OUTCOMES: { icon: React.ElementType; title: string; body: string }[] = [
   {
     icon: Gauge,
     title: 'Size a compressor stage from a thrust target',
-    body: `Work from a ${REFERENCE_ENGINE} spec to impeller diameter, tip speed, blade count and backsweep, then check the slip factor and the pressure ratio you actually get, not the one you hoped for.`,
+    body: `Work from the thrust spec to impeller diameter, tip speed, blade count and backsweep, then check the slip factor and the pressure ratio you actually get, not the one you hoped for.`,
   },
   {
     icon: CircuitBoard,
@@ -141,7 +139,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'Is this theory or practice?',
-    a: `Both, weighted toward practice. A ${REFERENCE_ENGINE} class reference engine runs through every module, so each piece of theory lands on the same machine. The worked examples use real dimensions and real speeds.`,
+    a: `Both, weighted toward practice. One reference engine runs through every module, so each piece of theory lands on the same machine. The worked examples use real dimensions and real speeds.`,
   },
   {
     q: 'Do I have to take the modules in order?',
@@ -468,15 +466,15 @@ const MicroGasTurbineDesign: React.FC = () => {
 
   usePageMeta(
     'Micro Gas Turbine Design: On-Demand Course',
-    `${TOTAL_HOURS} hours across 7 modules on designing a ${REFERENCE_ENGINE} single-shaft turbojet: architecture, centrifugal compressor, combustor, axial turbine, compressor maps, CFD and combustor analysis. Lifetime access.`,
+    `${TOTAL_HOURS} hours across 7 modules on designing a single-shaft turbojet: architecture, centrifugal compressor, combustor, axial turbine, compressor maps, CFD and combustor analysis. Lifetime access.`,
     {
-      image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic.jpg',
+      image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic_v2.jpg',
       jsonLd: [
         {
           '@context': 'https://schema.org',
           '@type': 'Course',
           name: 'Micro Gas Turbine Design',
-          image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic.jpg',
+          image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic_v2.jpg',
           description: COURSE_SUBTITLE,
           provider: {
             '@type': 'Organization',
@@ -631,7 +629,7 @@ const MicroGasTurbineDesign: React.FC = () => {
               </p>
               <p className="mt-5 text-slate-400 leading-relaxed max-w-2xl">
                 Seven modules and {TOTAL_HOURS} hours, recorded from the programme delivered to a
-                national jet-engine development team. One {REFERENCE_ENGINE} class engine runs
+                national jet-engine development team. One reference engine runs
                 through every module, so the compressor you size in module two is the compressor the
                 turbine has to match in module four.
               </p>
@@ -746,10 +744,11 @@ const MicroGasTurbineDesign: React.FC = () => {
         <div className="container-site">
           <Reveal>
             <img
-              src="/Micro_Gas_Turbine_Design_Infographic.jpg"
-              alt="Micro Gas Turbine Design: design a 700 N single-shaft turbojet end to end: engine architecture and gas path, centrifugal compressor, evaporative combustor, axial turbine, compressor maps and surge, turbomachinery CFD, and combustor analysis. Seven modules, 28.5 hours, 16 hours of video, lifetime access."
+              src="/Micro_Gas_Turbine_Design_Infographic_v2.jpg"
+              alt="Micro Gas Turbine Design: design a single-shaft turbojet end to end: engine architecture and gas path, centrifugal compressor, evaporative combustor, axial turbine, compressor maps and surge, turbomachinery CFD, and combustor analysis. Seven modules, 28.5 hours, 16 hours of video, lifetime access."
               className="w-full max-w-2xl mx-auto rounded-2xl border border-slate-800"
-              width={1200}
+              width={941}
+              height={1672}
               loading="lazy"
               decoding="async"
             />

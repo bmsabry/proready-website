@@ -207,4 +207,4 @@ export const MODULES: Module[] = [
 
 export const TOTAL_HOURS = 28.5;
 export const TOTAL_VIDEO_PARTS = 83;
-export const COURSE_SUBTITLE = 'Design a 700 N single-shaft turbojet end to end, from gas path stations to CFD and combustor analysis.';
+export const COURSE_SUBTITLE = 'Design a single-shaft turbojet end to end, from gas path stations to CFD and combustor analysis.';

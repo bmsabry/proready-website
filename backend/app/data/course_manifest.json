@@ -2,8 +2,8 @@
   "product": {
     "code": "micro-gas-turbine-design",
     "title": "Micro Gas Turbine Design",
-    "subtitle": "Design a 700 N single-shaft turbojet end to end, from gas path stations to CFD and combustor analysis.",
-    "summary": "Seven sessions and 28.5 hours on the design of a small single-shaft turbojet, starting from engine architecture and material selection and working through centrifugal compressor aerodynamics, the evaporative tube combustor and the single-stage axial turbine. The later modules turn to analysis: compressor map generation and surge margin, CFD setup and validation for turbomachinery, and combustor heat release, liner cooling and fuel scheduling. Worked examples track a 700 N class reference engine throughout, and five of the seven sessions carry recorded video, design spreadsheets and interactive tools.",
+    "subtitle": "Design a single-shaft turbojet end to end, from gas path stations to CFD and combustor analysis.",
+    "summary": "Seven sessions and 28.5 hours on the design of a small single-shaft turbojet, starting from engine architecture and material selection and working through centrifugal compressor aerodynamics, the evaporative tube combustor and the single-stage axial turbine. The later modules turn to analysis: compressor map generation and surge margin, CFD setup and validation for turbomachinery, and combustor heat release, liner cooling and fuel scheduling. Worked examples track one reference engine throughout, and five of the seven sessions carry recorded video, design spreadsheets and interactive tools.",
     "total_hours": 28.5,
     "module_count": 7,
     "certification": {

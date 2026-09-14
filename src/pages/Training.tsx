@@ -74,7 +74,7 @@ const courses = [
       : "7 Days",
     level: "Design-Focused",
     attendees: "Registration open",
-    description: "Design a 700 N single-shaft turbojet end to end, live with the instructor: architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Seven sessions of four hours over consecutive business days, with lifetime access to the complete recorded course included.",
+    description: "Design a single-shaft turbojet end to end, live with the instructor: architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Seven sessions of four hours over consecutive business days, with lifetime access to the complete recorded course included.",
     nextDate: snapshotStartLabel(MGT_LIVE_CODE, "October 1, 2026"),
     slug: "micro-gas-turbine-design-live",
     code: MGT_LIVE_CODE,
@@ -715,7 +715,7 @@ const Training = () => {
                     Micro Gas Turbine Design
                   </h2>
                   <p className="text-slate-300 leading-relaxed mb-8">
-                    Design a 700 N single-shaft turbojet end to end: architecture, centrifugal
+                    Design a single-shaft turbojet end to end: architecture, centrifugal
                     compressor, evaporative combustor, axial turbine, compressor maps, CFD and
                     combustor analysis. One curriculum, one set of materials, one certificate,
                     offered two ways. Pick the delivery that fits you.
@@ -822,10 +822,11 @@ const Training = () => {
                     className="block mb-6 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/50 hover:border-cyan-500/40 transition-colors"
                   >
                     <img
-                      src="/Micro_Gas_Turbine_Design_Infographic.jpg"
-                      alt="Micro Gas Turbine Design: design a 700 N single-shaft turbojet end to end, engine architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Offered as a live online cohort or self-paced on-demand, with the same curriculum and materials in both."
+                      src="/Micro_Gas_Turbine_Design_Infographic_v2.jpg"
+                      alt="Micro Gas Turbine Design: design a single-shaft turbojet end to end, engine architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Offered as a live online cohort or self-paced on-demand, with the same curriculum and materials in both."
                       className="w-full h-auto block"
-                      width={1200}
+                      width={941}
+                      height={1672}
                       loading="lazy"
                       decoding="async"
                     />

@@ -78,7 +78,7 @@ const COURSE_JSONLD = JSON.stringify({
   '@type': 'Course',
   name: 'Micro Gas Turbine Design: Live Online Cohort',
   description:
-    'Seven-day live online cohort on designing a 700 N single-shaft turbojet end to end: engine architecture and materials, centrifugal compressor aerodynamics, the evaporative tube combustor, the axial turbine, compressor maps and surge margin, turbomachinery CFD, and combustor design analysis. Four live hours per day over consecutive business days, with lifetime access to the complete recorded course included.',
+    'Seven-day live online cohort on designing a single-shaft turbojet end to end: engine architecture and materials, centrifugal compressor aerodynamics, the evaporative tube combustor, the axial turbine, compressor maps and surge margin, turbomachinery CFD, and combustor design analysis. Four live hours per day over consecutive business days, with lifetime access to the complete recorded course included.',
   provider: {
     '@type': 'Organization',
     name: 'ProReadyEngineer LLC',
@@ -164,14 +164,14 @@ const DEFAULT_DAY_DATES: string[] = snapshotDayLabels(COURSE_CODE, [
 const MicroGasTurbineDesignLive = () => {
   usePageMeta(
     'Micro Gas Turbine Design: Live Online Cohort',
-    'Seven-day live online cohort, four hours per day over consecutive business days, on designing a 700 N single-shaft turbojet end to end: architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Includes lifetime access to the complete recorded course.',
+    'Seven-day live online cohort, four hours per day over consecutive business days, on designing a single-shaft turbojet end to end: architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Includes lifetime access to the complete recorded course.',
     {
-      image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic.jpg',
+      image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic_v2.jpg',
       jsonLd: {
         '@context': 'https://schema.org',
         '@type': 'Course',
         name: 'Micro Gas Turbine Design: Live Online Cohort',
-        image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic.jpg',
+        image: 'https://proreadyengineer.com/Micro_Gas_Turbine_Design_Infographic_v2.jpg',
         description: COURSE_SUBTITLE,
         provider: { '@id': 'https://proreadyengineer.com/#org' },
         teaches: MODULES.map((m) => m.title),
@@ -453,7 +453,7 @@ const MicroGasTurbineDesignLive = () => {
               Micro Gas Turbine <span className="text-gradient">Design</span>
             </h1>
             <p className="text-xl md:text-2xl font-light text-slate-300 mb-8 max-w-3xl">
-              Design a 700 N single-shaft turbojet end to end, live with the instructor,
+              Design a single-shaft turbojet end to end, live with the instructor,
               over seven half-day sessions.
             </p>
 
@@ -523,10 +523,11 @@ const MicroGasTurbineDesignLive = () => {
             {/* Course infographic — placed directly under the title, matching site pattern */}
             <div className="card overflow-hidden mb-10 shadow-2xl shadow-cyan-900/10">
               <img
-                src="/Micro_Gas_Turbine_Design_Infographic.jpg"
-                alt="Micro Gas Turbine Design live online cohort: design a 700 N single-shaft turbojet end to end. Engine architecture and gas path, centrifugal compressor, evaporative combustor, axial turbine, compressor maps and surge, turbomachinery CFD, and combustor analysis. Seven live days of four hours each, with the complete recorded course included."
+                src="/Micro_Gas_Turbine_Design_Infographic_v2.jpg"
+                alt="Micro Gas Turbine Design live online cohort: design a single-shaft turbojet end to end. Engine architecture and gas path, centrifugal compressor, evaporative combustor, axial turbine, compressor maps and surge, turbomachinery CFD, and combustor analysis. Seven live days of four hours each, with the complete recorded course included."
                 className="w-full h-auto block"
-                width={1200}
+                width={941}
+                height={1672}
                 loading="eager"
                 fetchPriority="high"
               />
@@ -535,7 +536,7 @@ const MicroGasTurbineDesignLive = () => {
             <p className="text-slate-300 text-lg mb-10 leading-relaxed max-w-4xl">
               This is the live edition of our Micro Gas Turbine Design programme: the same
               curriculum delivered to a national jet-engine development team, taught in real
-              time over seven consecutive business days. One 700 N class reference engine runs
+              time over seven consecutive business days. One reference engine runs
               through every session, so the compressor you size on day two is the compressor
               the turbine has to match on day four. You bring your questions to the instructor
               as the design unfolds, and you keep lifetime access to the complete recorded
@@ -797,7 +798,7 @@ const MicroGasTurbineDesignLive = () => {
             <p>
               This cohort is designed to take you through a real design sequence: the
               architecture and materials on day one become the compressor you size on day
-              two, the combustor you analyse on day seven: one 700 N engine, carried end to
+              two, the combustor you analyse on day seven: one engine, carried end to
               end.
             </p>
             <p className="text-slate-300">
@@ -834,7 +835,7 @@ const MicroGasTurbineDesignLive = () => {
               {
                 icon: <Gauge className="w-5 h-5" aria-hidden="true" />,
                 title: 'One Reference Engine, End to End',
-                body: 'A 700 N class engine runs through every session: the compressor you size in one module is the compressor the turbine has to match in another.',
+                body: 'One reference engine runs through every session: the compressor you size in one module is the compressor the turbine has to match in another.',
               },
               {
                 icon: <BadgeCheck className="w-5 h-5" aria-hidden="true" />,
