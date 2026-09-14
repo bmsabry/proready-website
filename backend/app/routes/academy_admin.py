@@ -912,6 +912,40 @@ class SlideBatchIn(BaseModel):
     total: int | None = Field(default=None, ge=1)
 
 
+@router.get("/modules/{module_id}/slides")
+def read_slides(
+    module_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin),
+) -> dict:
+    """The deck as text — number, title, section and the slide's words — so
+    an assessment bank can be checked against what the slides actually say
+    without pulling the .pptx. No pixels: the images stay behind the learner
+    endpoint."""
+    module = db.get(Module, module_id)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found.")
+    rows = db.execute(
+        select(Slide).where(Slide.module_id == module_id).order_by(Slide.number)
+    ).scalars().all()
+    return {
+        "module_id": module_id,
+        "code": module.code,
+        "total": len(rows),
+        "slides": [
+            {
+                "number": r.number,
+                "title": r.title,
+                "section": r.section,
+                "text": r.text or "",
+                "appears_at_s": r.appears_at_s,
+                "has_video": bool(r.video_asset),
+            }
+            for r in rows
+        ],
+    }
+
+
 @router.post("/modules/{module_id}/slides")
 def load_slides(
     module_id: int,

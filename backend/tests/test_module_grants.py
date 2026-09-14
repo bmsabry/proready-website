@@ -410,6 +410,28 @@ def test_slide_image_is_watermarked_per_learner(client, setup):
     assert lg.content[:8] == b"\x89PNG\r\n\x1a\n"
 
 
+def test_admin_reads_the_deck_as_text_without_pixels(client, setup):
+    module_ids, _ = setup
+    r = client.post(
+        f"/api/admin/academy/modules/{module_ids['DAY-1']}/slides",
+        json={"slides": [{"number": 2, "title": "NOx pathways", "section": "Chapter 5",
+                          "text": "Thermal NOx dominates on pipeline gas."}]},
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+    r = client.get(f"/api/admin/academy/modules/{module_ids['DAY-1']}/slides", headers=ADMIN)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["code"] == "DAY-1" and body["total"] == len(body["slides"])
+    two = next(x for x in body["slides"] if x["number"] == 2)
+    assert two["title"] == "NOx pathways" and two["section"] == "Chapter 5"
+    assert two["text"] == "Thermal NOx dominates on pipeline gas."
+    assert "image_lg" not in two and "image_lg_b64" not in two
+    # anonymous callers get nothing
+    assert TestClient(app, base_url="https://testserver").get(
+        f"/api/admin/academy/modules/{module_ids['DAY-1']}/slides").status_code == 401
+
+
 # -----------------------------------------------------------------------------
 # /my-courses — the /learn chooser feed
 # -----------------------------------------------------------------------------
