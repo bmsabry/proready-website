@@ -28,6 +28,11 @@ const SignIn: React.FC = () => {
   // Same passwordless sign-in, but the copy says why they are here and the
   // link lands them on the course page with the change-password form open.
   const resetting = params.get('reason') === 'password';
+  // ?next=/learn/...: where a signed-out deep link (e.g. the certificate
+  // email's "Book my examination" button) wanted to go. Only learn-area
+  // paths are honoured, so the parameter cannot send anyone off-site.
+  const rawNext = params.get('next') || '';
+  const nextPath = /^\/learn(\/|\?|$)/.test(rawNext) ? rawNext : '';
 
   const [email, setEmail] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
@@ -49,13 +54,13 @@ const SignIn: React.FC = () => {
     academy
       .me()
       .then((me) => {
-        if (!cancelled && me.signed_in) navigate('/learn', { replace: true });
+        if (!cancelled && me.signed_in) navigate(nextPath || '/learn', { replace: true });
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [token, navigate]);
+  }, [token, navigate, nextPath]);
 
   // Only ever called from the button: the token must not be spent by a page
   // load (see the note at the top of the file).
@@ -95,7 +100,10 @@ const SignIn: React.FC = () => {
     setState('sending');
     setError('');
     try {
-      await academy.requestLink(email.trim(), resetting ? '/learn?password=1' : '/learn');
+      await academy.requestLink(
+        email.trim(),
+        resetting ? '/learn?password=1' : nextPath || '/learn'
+      );
       setState('sent');
     } catch (err) {
       setState('error');

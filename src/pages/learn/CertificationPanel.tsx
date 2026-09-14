@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Award,
@@ -302,14 +302,22 @@ const Step = ({
   </div>
 );
 
-const CertificationPanel: React.FC<{ code: string; paidReturn?: boolean }> = ({
-  code,
-  paidReturn,
-}) => {
+const CertificationPanel: React.FC<{
+  code: string;
+  paidReturn?: boolean;
+  /* ?advanced=start — the "Book my examination" button in the completion
+   * certificate email. Bring the examined-tier card into view and mark it,
+   * so the Register button is the first thing on screen. Nothing is
+   * purchased or submitted by the page load itself; checkout still needs
+   * the click (a mail scanner opening this link must not create an order). */
+  startAdvanced?: boolean;
+}> = ({ code, paidReturn, startAdvanced }) => {
   const [data, setData] = useState<CertificationStatus | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const verifiedRef = useRef<HTMLElement | null>(null);
+  const [spotlight, setSpotlight] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -334,6 +342,18 @@ const CertificationPanel: React.FC<{ code: string; paidReturn?: boolean }> = ({
     }, 3000);
     return () => window.clearInterval(t);
   }, [paidReturn, load]);
+
+  // Deep link from the email: once the card exists, scroll to it and hold a
+  // highlight ring on it for a few seconds.
+  useEffect(() => {
+    if (!startAdvanced || !data) return;
+    const el = verifiedRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setSpotlight(true);
+    const t = window.setTimeout(() => setSpotlight(false), 6000);
+    return () => window.clearTimeout(t);
+  }, [startAdvanced, data]);
 
   if (error) {
     return (
@@ -417,7 +437,14 @@ const CertificationPanel: React.FC<{ code: string; paidReturn?: boolean }> = ({
 
       {/* ---- Tier 2: Certificate of Verified Competency ---- */}
       {(advanced.offered || advanced.certificate) && (
-        <section className="card p-6 mb-8 border-cyan-500/30" aria-labelledby="cert-verified">
+        <section
+          ref={verifiedRef}
+          id="cert-verified-card"
+          className={`card p-6 mb-8 border-cyan-500/30 scroll-mt-28 transition-shadow duration-700 ${
+            spotlight ? 'ring-2 ring-cyan-400/70 shadow-glow-cyan' : ''
+          }`}
+          aria-labelledby="cert-verified"
+        >
           <div className="flex items-start gap-4">
             <BadgeCheck className="w-8 h-8 text-cyan-400 shrink-0" aria-hidden="true" />
             <div className="flex-1 min-w-0">

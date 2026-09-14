@@ -629,7 +629,16 @@ const Dashboard: React.FC = () => {
   const { productCode } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const paidReturn = new URLSearchParams(location.search).get('advanced') === 'paid';
+  const advancedParam = new URLSearchParams(location.search).get('advanced');
+  const paidReturn = advancedParam === 'paid';
+  // ?advanced=start is the "Book my examination" link in the certificate
+  // email: land on the examined-tier card, where the Register button is.
+  const startAdvanced = advancedParam === 'start';
+  // A signed-out click on a deep link (the email's booking button) should
+  // come back here after sign-in, not to the bare course chooser.
+  const signInHere = `/learn/signin?next=${encodeURIComponent(
+    location.pathname + location.search
+  )}`;
 
   const [code, setCode] = useState(productCode || '');
   const [course, setCourse] = useState<CourseState | null>(null);
@@ -658,7 +667,7 @@ const Dashboard: React.FC = () => {
         const me = await academy.me();
         if (cancelled) return;
         if (!me.signed_in) {
-          navigate('/learn/signin', { replace: true });
+          navigate(signInHere, { replace: true });
           return;
         }
         setEmail(me.email || '');
@@ -697,7 +706,7 @@ const Dashboard: React.FC = () => {
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
-          navigate('/learn/signin', { replace: true });
+          navigate(signInHere, { replace: true });
           return;
         }
         setError(err instanceof ApiError ? err.message : 'Could not load your course.');
@@ -708,7 +717,7 @@ const Dashboard: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [productCode, navigate]);
+  }, [productCode, navigate, signInHere]);
 
   const signOut = async () => {
     try {
@@ -871,7 +880,7 @@ const Dashboard: React.FC = () => {
           )}
         </div>
 
-        <CertificationPanel code={code} paidReturn={paidReturn} />
+        <CertificationPanel code={code} paidReturn={paidReturn} startAdvanced={startAdvanced} />
 
         <div className="space-y-4">
           {course.modules.map((m, i) => (

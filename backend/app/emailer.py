@@ -93,6 +93,9 @@ def _log_email(
 _TAG_RE = re.compile(r"<[^>]+>")
 _BLOCK_END_RE = re.compile(r"</(p|div|tr|h1|h2|h3|table)>", re.I)
 _BR_RE = re.compile(r"<br\s*/?>", re.I)
+# A label cell followed by its value cell: "Credential ID PRE-C-…", not
+# "Credential IDPRE-C-…".
+_CELL_END_RE = re.compile(r"</t[dh]>", re.I)
 _HEAD_RE = re.compile(r"<(head|style|script|title)[^>]*>.*?</\1>", re.I | re.S)
 
 
@@ -124,6 +127,7 @@ def html_to_text(html: str) -> str:
         flags=re.I | re.S,
     )
     body = _BR_RE.sub("\n", body)
+    body = _CELL_END_RE.sub(" ", body)
     body = _BLOCK_END_RE.sub("\n\n", body)
     body = _TAG_RE.sub("", body)
     body = unescape(body)
@@ -142,6 +146,7 @@ def send_email(
     *,
     reply_to: Optional[str] = None,
     bcc: Optional[str] = None,
+    cc: Optional[str] = None,
     db: Optional[Session] = None,
     scope_kind: str = "system",
     scope_code: str = "",
@@ -170,7 +175,8 @@ def send_email(
     send as its own address while the rest of the platform keeps
     EMAIL_FROM, and `text` supplies a plain-text alternative part.
     `attachments` is a list of {"filename", "content" (base64)} dicts in
-    Resend's own shape — certificates ride along as PDFs.
+    Resend's own shape — certificates ride along as PDFs. `cc` is a visible
+    copy (the recipient sees the address); `bcc` is not.
     """
     settings = get_settings()
 
@@ -202,6 +208,10 @@ def send_email(
             payload["reply_to"] = reply_to or settings.EMAIL_REPLY_TO
         if bcc:
             payload["bcc"] = [bcc]
+        if cc:
+            # Visible copy — the certificate emails put the instructor on
+            # cc so the learner sees he received it too.
+            payload["cc"] = [cc]
         if headers:
             # Drop empties: Resend rejects a header whose value is null, and
             # an absent In-Reply-To is normal on the first mail of a thread.
@@ -862,6 +872,29 @@ _TIER_TITLES = {
 }
 
 
+def sender_as(display_name: str) -> str:
+    """EMAIL_FROM's address under a different display name.
+
+    The certificate emails go out as the instructor rather than as the
+    platform: the learner has just finished his course and the note is his.
+    Only the display name changes — the address (and so DKIM/SPF) is the
+    verified one from EMAIL_FROM.
+    """
+    configured = get_settings().EMAIL_FROM
+    m = re.search(r"<([^>]+)>", configured)
+    address = m.group(1) if m else configured.strip()
+    name = display_name.replace('"', "").strip()
+    return f'"{name}" <{address}>' if name else configured
+
+
+def first_name(full_name: str) -> str:
+    """'Ada Lovelace' -> 'Ada'; 'Eng. Ahmed Ali' -> 'Ahmed'; '' -> ''."""
+    for token in (full_name or "").split():
+        if not token.endswith("."):
+            return token
+    return ""
+
+
 def certificate_issued_html(
     full_name: str,
     course_title: str,
@@ -869,22 +902,46 @@ def certificate_issued_html(
     code: str,
     verify_url: str,
     dashboard_url: str,
+    *,
+    instructor_name: str,
+    instructor_credentials: str,
+    instructor_title: str,
+    mastery_threshold_pct: float,
+    offer: Optional[dict] = None,
 ) -> str:
-    """The certificate itself is attached as a PDF; this carries the links."""
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    """The certificate is attached as a PDF; this is the instructor's note.
+
+    Written in the first person and sent under his name (see `sender_as`),
+    with him on cc. `offer` — present only for a completion certificate on a
+    course where the examined tier is purchasable and not yet held — carries
+    the facts the course page publishes about the Certificate of Verified
+    Competency (price, written exam size and pass mark, oral exam length) and
+    the link that opens the examination card on the learner's course page:
+      {price_display, exam_item_count, exam_threshold_pct, exam_max_attempts,
+       interview_minutes, booking_url}
+    """
+    name = escape_html(first_name(full_name))
+    greeting = f"Dear {name}," if name else "Dear learner,"
     title = _TIER_TITLES.get(tier, "Certificate")
     body = _p(greeting)
+
     if tier == "verified":
         body += _p(
-            f"Congratulations. Your <strong>{title}</strong> for "
-            f"<strong>{course_title}</strong> is attached. It is signed by your "
-            "examiner and records that you were examined live, one-on-one, and "
-            "demonstrated a verified command of the subject."
+            f"You were examined live, one-on-one, and you demonstrated a verified "
+            f"command of <strong>{course_title}</strong>. Your "
+            f"<strong>{title}</strong> is attached, signed by me; it lists each "
+            "principle you were examined on. My sincere congratulations."
         )
     else:
         body += _p(
-            f"Congratulations. You have completed <strong>{course_title}</strong>. "
-            f"Your <strong>{title}</strong> is attached as a PDF."
+            f"You have completed every lesson of <strong>{course_title}</strong> and "
+            f"passed every module evaluation and mastery check at the "
+            f"{mastery_threshold_pct:g}% threshold. That is the whole programme, and "
+            "I know what it takes. Well done."
+        )
+        body += _p(
+            f"Your <strong>{title}</strong> is attached as a PDF. It is issued in your "
+            "name and digitally signed, and anyone can verify it in seconds:"
         )
     body += _kv_table(
         [
@@ -893,13 +950,78 @@ def certificate_issued_html(
         ]
     )
     body += _p(
-        "Anyone can confirm this credential at the link above. It checks the "
-        "digital signature and shows exactly what was attested. From your course "
-        "page you can download the PDF again, add the credential to your LinkedIn "
-        "profile, or share it.",
+        f"From {_link(dashboard_url, 'your course page')} you can download the PDF "
+        "again, add the credential to your LinkedIn profile in one click, or share it."
     )
-    body += _cta_button("Open your course page", dashboard_url)
-    return _shell("Credential issued", f"Your {title}", body)
+
+    if offer:
+        body += (
+            f'<hr style="border:0;border-top:1px solid {CARD_BORDER};margin:26px 0 22px;">'
+        )
+        body += _p(
+            "The next step, if you want it: the "
+            "<strong>Certificate of Verified Competency</strong>",
+            size=17,
+            weight=700,
+            color=HEADING,
+            margin="0 0 10px",
+        )
+        body += _p(
+            "You now hold the prerequisite for the second credential I offer on this "
+            "course — the one a hiring manager can trust, because it is examined "
+            "rather than completed. Here is what it involves:"
+        )
+        body += _kv_table(
+            [
+                (
+                    "Written examination",
+                    f"{offer['exam_item_count']} analysis-level questions, taken from "
+                    f"your course page. Pass mark {offer['exam_threshold_pct']:g}%, "
+                    f"{offer['exam_max_attempts']} attempts.",
+                ),
+                (
+                    "Oral examination",
+                    f"{offer['interview_minutes']} minutes, live and one-on-one with me by "
+                    "video, scheduled around your time zone. Questions without notice, "
+                    "design cases not covered in the material, reasoning out loud.",
+                ),
+                (
+                    "Certificate",
+                    "Signed by me after the examination, naming every key principle you "
+                    "demonstrated. Digitally signed, publicly verifiable, LinkedIn-ready.",
+                ),
+                (
+                    "Fee",
+                    f"<strong>{offer['price_display']}</strong>. It pays for the "
+                    "examination, not the outcome; if mastery is not shown the first "
+                    "time, one complimentary re-examination is offered after a study "
+                    "period.",
+                ),
+            ]
+        )
+        body += _p(
+            "Getting started takes a minute. The button below opens the examination "
+            "section of your course page; register there and the written examination "
+            "opens immediately. When you pass it, you propose three windows that suit "
+            "you, and I confirm one and send the meeting link."
+        )
+        body += _cta_button("Book my examination", offer["booking_url"])
+        body += _p(
+            "There is no deadline on this. Your course access and your Certificate of "
+            "Completion are yours either way.",
+            size=13,
+            color=MUTED,
+        )
+
+    body += _p(
+        "With my congratulations,<br>"
+        f"<strong>{instructor_name}</strong><br>"
+        f"{instructor_credentials}<br>"
+        f"{instructor_title}",
+        margin="26px 0 0",
+    )
+    heading = f"Congratulations, {name}" if name else "Congratulations"
+    return _shell(title, heading, body)
 
 
 def advanced_purchased_html(

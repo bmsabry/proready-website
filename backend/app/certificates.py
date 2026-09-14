@@ -32,7 +32,7 @@ from . import academy as svc
 from . import certificate_signing as signing
 from .certificate_render import CertificateSpec, Instructor, render_certificate
 from .config import get_settings
-from .emailer import certificate_issued_html, send_email
+from .emailer import certificate_issued_html, first_name, send_email, sender_as
 from .models import AssetBlob, Certificate, Learner, Lesson, Module, Product
 
 log = logging.getLogger(__name__)
@@ -353,7 +353,43 @@ def _issue(
     return cert
 
 
+def booking_url(product_code: str) -> str:
+    """Opens the learner's course page at the examination card, where the
+    'Register for the examination' button starts the paid tier (Dashboard
+    reads ?advanced=start; a signed-out click survives sign-in)."""
+    return f"{get_settings().SITE_URL}/learn/{product_code}?advanced=start"
+
+
+def _price_display(cents: int, currency: str) -> str:
+    amount = f"{cents / 100:,.0f}" if cents % 100 == 0 else f"{cents / 100:,.2f}"
+    return f"${amount} {currency.upper()}"
+
+
+def examined_tier_offer(db: Session, learner: Learner, product: Product) -> dict | None:
+    """The facts the course page publishes about the paid tier, for the
+    completion email — or None when there is nothing to offer this learner
+    (tier not switched on / no exam bank / no price / already holds it)."""
+    from . import advanced_cert as adv  # noqa: PLC0415 — advanced_cert imports this module
+
+    if not adv.offered(db, product) or product.advanced_cert_price_cents <= 0:
+        return None
+    if get_certificate(db, learner, product.code, "verified") is not None:
+        return None
+    settings = get_settings()
+    return {
+        "price_display": _price_display(product.advanced_cert_price_cents, product.currency),
+        "exam_item_count": len(adv.exam_items(db, product.code)),
+        "exam_threshold_pct": settings.ADVANCED_EXAM_THRESHOLD_PCT,
+        "exam_max_attempts": settings.ADVANCED_EXAM_MAX_ATTEMPTS,
+        "interview_minutes": settings.ADVANCED_INTERVIEW_MINUTES,
+        "booking_url": booking_url(product.code),
+    }
+
+
 def email_certificate(db: Session, cert: Certificate, learner: Learner, product: Product) -> None:
+    """The instructor's congratulations, sent under his name with him on cc,
+    the certificate PDF attached — and, on a completion certificate, the
+    invitation to book the instructor-examined tier."""
     settings = get_settings()
     pdf = blob_bytes(db, cert.pdf_key)
     attachments = None
@@ -364,9 +400,14 @@ def email_certificate(db: Session, cert: Certificate, learner: Learner, product:
                 "content": base64.b64encode(pdf).decode(),
             }
         ]
+    offer = examined_tier_offer(db, learner, product) if cert.tier == "completion" else None
+    who = first_name(learner.full_name or "")
     ok = send_email(
         to=learner.email,
-        subject=f"Your {TIER_TITLES[cert.tier]} — {product.title}",
+        subject=(
+            f"Congratulations{', ' + who if who else ''} — your {TIER_TITLES[cert.tier]} "
+            f"for {product.title}"
+        ),
         html=certificate_issued_html(
             learner.full_name or "",
             product.title,
@@ -374,8 +415,14 @@ def email_certificate(db: Session, cert: Certificate, learner: Learner, product:
             cert.code,
             verify_url(cert.code),
             f"{settings.SITE_URL}/learn/{product.code}",
+            instructor_name=settings.INSTRUCTOR_NAME,
+            instructor_credentials=settings.INSTRUCTOR_CREDENTIALS,
+            instructor_title=settings.INSTRUCTOR_TITLE,
+            mastery_threshold_pct=settings.MASTERY_THRESHOLD_PCT,
+            offer=offer,
         ),
-        bcc=settings.ADMIN_NOTIFY_EMAIL or None,
+        from_override=sender_as(settings.INSTRUCTOR_NAME),
+        cc=settings.ADMIN_NOTIFY_EMAIL or None,
         db=db,
         scope_kind="product",
         scope_code=product.code,
