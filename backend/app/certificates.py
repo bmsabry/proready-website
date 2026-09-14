@@ -563,6 +563,21 @@ def issue_attendance(
     """
     existing = get_certificate(db, learner, product.code, "attendance")
     if existing is not None:
+        if existing.status != "issued":
+            # Re-marking a withdrawn seat attended: reinstate the same
+            # credential (same code, fresh signature and file) rather than
+            # leave the learner marked attended but holding a dead, revoked
+            # certificate. This is an explicit moderator assertion of
+            # attendance, so — unlike the auto-issued completion tier — the
+            # certificate should come back to life, and be re-emailed.
+            reissue(db, existing, learner_name=learner.full_name.strip())
+            log.info("Reinstated ATTENDANCE certificate %s for %s (%s)",
+                     existing.code, learner.email, product.code)
+            if send_email:
+                try:
+                    email_certificate(db, existing, learner, product)
+                except Exception as exc:  # pragma: no cover
+                    log.error("Certificate email failed for %s: %s", existing.code, exc)
         return existing
     if not learner.full_name.strip():
         raise ValueError("The learner has no name on file.")

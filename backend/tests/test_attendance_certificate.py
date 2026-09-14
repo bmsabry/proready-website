@@ -121,6 +121,30 @@ def test_withdrawing_attendance_revokes_the_certificate():
     assert v["valid"] is False and v["status"] == "revoked"
 
 
+def test_re_marking_a_withdrawn_seat_attended_reinstates_the_certificate():
+    """Withdraw revokes the credential; marking attended again must bring the
+    SAME credential back to life — not leave the learner marked attended but
+    holding a revoked, dead certificate."""
+    c = _client()
+    rid = _cohort_and_registration("attend.reattend@example.com")
+    first = c.post("/api/admin/mark-attended", headers=ADMIN,
+                   json={"registration_id": rid, "send_email": False}).json()
+    code = first["certificate_code"]
+
+    # Withdraw: the certificate is revoked.
+    c.post("/api/admin/mark-attended", headers=ADMIN,
+           json={"registration_id": rid, "attended": False})
+    assert c.get(f"/api/academy/verify/{code}").json()["status"] == "revoked"
+
+    # Mark attended again: same code, and it is live once more.
+    again = c.post("/api/admin/mark-attended", headers=ADMIN,
+                   json={"registration_id": rid, "send_email": False}).json()
+    assert again["certificate_code"] == code
+    assert again["transitioned"] is True
+    v = c.get(f"/api/academy/verify/{code}").json()
+    assert v["valid"] is True and v["status"] == "issued"
+
+
 def test_admin_can_preview_an_attendance_specimen():
     c = _client()
     r = c.get(f"/api/admin/academy/certification/{PRODUCT}/sample.pdf?tier=attendance", headers=ADMIN)
