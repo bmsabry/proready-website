@@ -15,6 +15,7 @@ import {
   Send,
   AlertTriangle,
   Sparkles,
+  BadgeCheck,
 } from 'lucide-react';
 import { Reveal } from '../../components/ui';
 import PayPalButtons, { fetchPaymentsConfig, PaymentsConfig } from '../../components/PayPalButtons';
@@ -521,6 +522,9 @@ const GasTurbineEmissionsMapping = () => {
               <FactChip icon={<Sparkles className="w-3.5 h-3.5" aria-hidden="true" />}>
                 {formatAmount(priceCents, currency)} per seat · over 60% off
               </FactChip>
+              <FactChip icon={<BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" />}>
+                3 verifiable credentials
+              </FactChip>
             </div>
 
             <div className="flex flex-wrap items-center gap-4 mb-12">
@@ -879,10 +883,20 @@ const GasTurbineEmissionsMapping = () => {
                 title: 'Daily Evaluation and Mastery Check',
                 body: 'Each day closes with a graded evaluation that teaches as it marks (every answer is explained), plus a mastery check built on scenarios you have not seen. 80% to pass, retakes allowed.',
               },
+              {
+                icon: <BadgeCheck className="w-5 h-5" aria-hidden="true" />,
+                title: 'Three Verifiable Credentials',
+                body: 'Your Certificate of Attendance, with contact hours and PDH, is issued when your full attendance is recorded and is available only to live attendees. Pass every daily evaluation and mastery check for the Certificate of Completion, and you become eligible for the instructor-examined Certificate of Verified Competency. All three are digitally signed and publicly verifiable.',
+                // The strength point of a live seat: spans the last row and
+                // carries the featured accent rather than sitting as an orphan.
+                featured: true,
+              },
             ].map((item) => (
               <div
                 key={item.title}
-                className="card card-hover p-5 flex flex-col"
+                className={`card card-hover p-5 flex flex-col${
+                  item.featured ? ' md:col-span-2 lg:col-span-3 border-cyan-500/40 shadow-glow-cyan' : ''
+                }`}
               >
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">

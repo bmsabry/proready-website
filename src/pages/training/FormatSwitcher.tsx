@@ -15,10 +15,11 @@ export type FormatOption = {
 /* Two-format chooser shown on both Micro Gas Turbine Design pages.
  *
  * The course is ONE offering with two delivery methods — same seven-module
- * curriculum, same materials, same certificate; only the delivery differs.
- * So each page names both formats with their prices and lets the visitor
- * jump straight to the other, the standard pattern for multi-format
- * courses. The page it sits on is marked as the current format.
+ * curriculum, same materials. The credentials differ in one way: the live
+ * cohort additionally earns a Certificate of Attendance, which the recorded
+ * edition cannot. So each page names both formats with their prices and
+ * lets the visitor jump straight to the other, the standard pattern for
+ * multi-format courses. The page it sits on is marked as the current format.
  */
 const FormatSwitcher = ({
   options,
@@ -29,7 +30,7 @@ const FormatSwitcher = ({
 }) => (
   <div className="mb-10">
     <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-3">
-      Offered two ways: same curriculum, same materials, same certificate
+      Offered two ways: same curriculum and materials · the live cohort adds a Certificate of Attendance
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
       {options.map((o) => {

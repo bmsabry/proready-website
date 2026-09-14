@@ -19,6 +19,7 @@ import {
   Cpu,
   FlaskConical,
   PlayCircle,
+  BadgeCheck,
   Infinity as InfinityIcon,
 } from 'lucide-react';
 import { Reveal } from '../../components/ui';
@@ -474,6 +475,9 @@ const MicroGasTurbineDesignLive = () => {
               <FactChip icon={<PlayCircle className="w-3.5 h-3.5" aria-hidden="true" />}>
                 Recorded course included
               </FactChip>
+              <FactChip icon={<BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" />}>
+                3 verifiable credentials
+              </FactChip>
             </div>
 
             {/* One course, two delivery formats — let the visitor switch */}
@@ -833,14 +837,19 @@ const MicroGasTurbineDesignLive = () => {
                 body: 'A 700 N class engine runs through every session: the compressor you size in one module is the compressor the turbine has to match in another.',
               },
               {
-                icon: <Award className="w-5 h-5" aria-hidden="true" />,
-                title: 'Quizzes and a Verifiable Certificate',
-                body: 'Module quizzes track your understanding, and the course closes with a certificate carrying public verification.',
+                icon: <BadgeCheck className="w-5 h-5" aria-hidden="true" />,
+                title: 'Three Verifiable Credentials',
+                body: 'Your Certificate of Attendance, with contact hours and PDH, is issued when your full attendance is recorded and is available only to live attendees. Complete every module for the Certificate of Completion, and you become eligible for the instructor-examined Certificate of Verified Competency. All three are digitally signed and publicly verifiable.',
+                // The strength point of a live seat over the recorded edition:
+                // carries the featured accent so it reads as the headline card.
+                featured: true,
               },
             ].map((item) => (
               <div
                 key={item.title}
-                className="card card-hover p-5 flex flex-col"
+                className={`card card-hover p-5 flex flex-col${
+                  item.featured ? ' border-cyan-500/40 shadow-glow-cyan' : ''
+                }`}
               >
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
