@@ -1174,7 +1174,7 @@ const MicroGasTurbineDesignLive = () => {
       </div>
 
       {/* ---------------- Certification ---------------- */}
-      <CertificationSection courseTitle="Micro Gas Turbine Design" examinedPrice="$300" />
+      <CertificationSection courseTitle="Micro Gas Turbine Design" examinedPrice="$300" showAttendance />
 
       <div className="container-site">
         {/* Legal independence notice — shown on every course page */}

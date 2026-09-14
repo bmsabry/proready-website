@@ -106,6 +106,7 @@ def overview(
         "counts": {
             "completion": sum(1 for c in issued if c.tier == "completion" and c.status == "issued"),
             "verified": sum(1 for c in issued if c.tier == "verified" and c.status == "issued"),
+            "attendance": sum(1 for c in issued if c.tier == "attendance" and c.status == "issued"),
             "awaiting_action": sum(1 for r in rows if r.status in ("slots_proposed", "scheduled")),
         },
     }
@@ -182,26 +183,35 @@ def sample_pdf(
 ) -> Response:
     """Render a SAMPLE-watermarked specimen with the product's current copy."""
     product = _product(db, product_code)
-    if tier not in ("completion", "verified"):
-        raise HTTPException(status_code=400, detail="tier must be completion or verified.")
+    if tier not in ("completion", "verified", "attendance"):
+        raise HTTPException(status_code=400, detail="tier must be completion, verified or attendance.")
     settings = get_settings()
+    code_stub = {"completion": "PRE-C-0000-0000", "verified": "PRE-V-0000-0000",
+                 "attendance": "PRE-A-0000-0000"}[tier]
+    competencies = (
+        certs.attendance_topics(db, product) if tier == "attendance"
+        else certs.course_competencies(db, product)
+    )
+    first, last = certs.cohort_span_for_product(db, product) if tier == "attendance" else (None, None)
     spec = CertificateSpec(
         tier=tier,
         learner_name="Your Name Here",
         course_title=product.title,
         course_descriptor=certs.course_descriptor(db, product),
-        credential_id="PRE-C-0000-0000" if tier == "completion" else "PRE-V-0000-0000",
+        credential_id=code_stub,
         verify_url=f"{settings.SITE_URL}/verify/SAMPLE",
         issued_on=date.today(),
         signature_fingerprint="0000-0000-0000-0000",
         exam_date=date.today(),
         exam_minutes=settings.ADVANCED_INTERVIEW_MINUTES,
-        competencies=certs.course_competencies(db, product),
+        competencies=competencies,
         signature_png=certs.instructor_signature_png(db) if tier == "verified" else None,
         instructor=certs._instructor(),
         mastery_threshold_pct=int(settings.MASTERY_THRESHOLD_PCT),
         course_hours=product.total_hours or None,
         module_count=len(certs.taught_modules(db, product)) or None,
+        cohort_start=first,
+        cohort_end=last,
         sample=True,
     )
     return Response(

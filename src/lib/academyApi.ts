@@ -357,7 +357,7 @@ export const academy = {
 
 export type IssuedCertificate = {
   code: string;
-  tier: 'completion' | 'verified';
+  tier: 'completion' | 'verified' | 'attendance';
   title: string;
   status: 'issued' | 'revoked';
   learner_name: string;
@@ -438,6 +438,10 @@ export type CertificationStatus = {
     state: AdvancedState | null;
     certificate: IssuedCertificate | null;
   };
+  // Issued by a moderator for live-cohort attendees; no learner-facing action.
+  attendance?: {
+    certificate: IssuedCertificate | null;
+  };
 };
 
 export type AdvancedExamSet = {
@@ -466,7 +470,7 @@ export type VerifyResult = {
   code: string;
   status?: 'issued' | 'revoked';
   revoke_reason?: string;
-  tier?: 'completion' | 'verified';
+  tier?: 'completion' | 'verified' | 'attendance';
   title?: string;
   learner_name?: string;
   course?: string;
@@ -508,7 +512,7 @@ export type MyCourse = {
     sets_total: number;
     complete: boolean;
   };
-  certificates: { tier: 'completion' | 'verified'; code: string; issued_at: string | null }[];
+  certificates: { tier: 'completion' | 'verified' | 'attendance'; code: string; issued_at: string | null }[];
 };
 
 /* Absolute URL for a protected slide image. The <img> must be rendered with

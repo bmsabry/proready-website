@@ -369,6 +369,34 @@ const CertificationPanel: React.FC<{
 
   return (
     <>
+      {/* ---- Certificate of Attendance (issued by a moderator for live-cohort
+             attendees; shown only when held — there is no learner action) ---- */}
+      {data.attendance?.certificate && (
+        <section className="card p-6 mb-8" aria-labelledby="cert-attendance">
+          <div className="flex items-start gap-4">
+            <BadgeCheck className="w-8 h-8 text-cyan-400 shrink-0" aria-hidden="true" />
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h2 id="cert-attendance" className="font-semibold text-white">
+                  Certificate of Attendance
+                </h2>
+                <span className="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full border border-slate-600 text-slate-300">
+                  Live cohort
+                </span>
+              </div>
+              <p className="text-sm text-slate-300 mt-1">
+                Issued for attending the live, instructor-led course. Complete the online
+                course below for your Certificate of Completion, which is stronger — it
+                records that you were assessed, not only present.
+              </p>
+              <div className="mt-4">
+                <CertificateCard cert={data.attendance.certificate} />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ---- Tier 1: Certificate of Completion ---- */}
       <section className="card p-6 mb-8" aria-labelledby="cert-completion">
         <div className="flex items-start gap-4">

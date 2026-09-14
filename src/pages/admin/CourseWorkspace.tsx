@@ -393,6 +393,44 @@ function RegistrationsTab({
     }
   }
 
+  /** Record that a paid registrant attended the full live course — issues
+   *  their Certificate of Attendance and emails it. Withdraw with attended:false. */
+  async function markAttended(id: number, attended: boolean) {
+    setBusyId(id);
+    setError(null);
+    setFlash(null);
+    try {
+      const body = await api<{
+        ok: boolean;
+        registration: Registration;
+        transitioned?: boolean;
+        certificate_code?: string;
+        certificate_email_sent?: boolean;
+        note?: string;
+      }>('/api/admin/mark-attended', {
+        method: 'POST',
+        body: JSON.stringify({ registration_id: id, attended }),
+      });
+      setRegs((prev) =>
+        prev ? prev.map((r) => (r.id === body.registration.id ? body.registration : r)) : prev,
+      );
+      const who = body.registration.email;
+      if (!attended) {
+        setFlash(`Attendance withdrawn for ${who}${body.certificate_code ? ' and the certificate revoked' : ''}.`);
+      } else if (body.transitioned === false) {
+        setFlash(`${who} was already marked attended — the certificate ${body.certificate_code || ''} stands; nothing re-sent.`);
+      } else if (body.certificate_email_sent) {
+        setFlash(`Attendance recorded. Certificate ${body.certificate_code} issued and emailed to ${who}.`);
+      } else {
+        setFlash(`Attendance recorded and certificate ${body.certificate_code || ''} issued for ${who}${body.note ? ` (${body.note})` : ''}.`);
+      }
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function exportCsv() {
     downloadCsv(
       `registrations-${code}.csv`,
@@ -409,6 +447,7 @@ function RegistrationsTab({
         'Registered',
         'Paid at',
         'Attendance confirmed at',
+        'Attended (full course) at',
       ],
       filtered.map((r) => [
         r.id,
@@ -423,6 +462,7 @@ function RegistrationsTab({
         r.created_at,
         r.paid_at ?? '',
         r.attendance_confirmed_at ?? '',
+        r.attended_at ?? '',
       ]),
     );
   }
@@ -652,6 +692,38 @@ function RegistrationsTab({
                             Mark paid
                           </ConfirmButton>
                         )}
+                        {/* Attendance certificate — only for paid live-cohort seats.
+                            The click issues a Certificate of Attendance and emails it. */}
+                        {r.status === 'paid' &&
+                          (r.attended_at ? (
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span
+                                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/40 text-cyan-200"
+                                title={`Certificate of Attendance issued ${formatDate(r.attended_at)}`}
+                              >
+                                <Award className="w-3 h-3" />
+                                Attended
+                              </span>
+                              <ConfirmButton
+                                message={`Withdraw ${r.full_name}'s attendance record? Their Certificate of Attendance will be revoked.`}
+                                onConfirm={() => void markAttended(r.id, false)}
+                                disabled={busyId === r.id}
+                                className="text-[11px] text-slate-400 hover:text-slate-200 underline disabled:opacity-50"
+                              >
+                                withdraw
+                              </ConfirmButton>
+                            </div>
+                          ) : (
+                            <ConfirmButton
+                              message={`Record that ${r.full_name} (${r.email}) attended the full live course? This issues their Certificate of Attendance and emails it to them.`}
+                              onConfirm={() => void markAttended(r.id, true)}
+                              disabled={busyId === r.id}
+                              className="inline-flex items-center justify-center gap-1 whitespace-nowrap w-28 text-xs px-2 py-1 rounded-md bg-cyan-600/90 hover:bg-cyan-500 text-white disabled:opacity-50"
+                            >
+                              <Award className="w-3 h-3" />
+                              Mark attended
+                            </ConfirmButton>
+                          ))}
                       </div>
                     </td>
                   </tr>

@@ -15,29 +15,96 @@ type Props = {
   examinedPrice: string;
   /* False when the examined tier is not offered on this course yet. */
   examinedAvailable?: boolean;
+  /* True on a live-cohort page: attendees also receive a Certificate of
+   *  Attendance, shown here as a third, entry-level specimen. */
+  showAttendance?: boolean;
 };
 
 const CertificationSection: React.FC<Props> = ({
   courseTitle,
   examinedPrice,
   examinedAvailable = true,
+  showAttendance = false,
 }) => (
   <section id="certification" className="section-pad bg-slate-950/40 scroll-mt-24">
     <div className="container-site">
       <Reveal className="text-center max-w-3xl mx-auto mb-12">
         <span className="eyebrow">Certification</span>
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4">
-          Two credentials. One is included, the other is{' '}
-          <span className="text-gradient">earned in front of the instructor</span>.
+          {showAttendance ? (
+            <>
+              Three credentials, from attending to being{' '}
+              <span className="text-gradient">examined in person</span>.
+            </>
+          ) : (
+            <>
+              Two credentials. One is included, the other is{' '}
+              <span className="text-gradient">earned in front of the instructor</span>.
+            </>
+          )}
         </h2>
         <p className="text-slate-300 leading-relaxed mt-4">
-          Both are issued in your name, digitally signed, publicly verifiable by QR code or
-          credential ID, and ready to add to your LinkedIn profile in one click. They differ in
-          what they attest, and in who did the attesting.
+          {showAttendance
+            ? 'Each is issued in your name, digitally signed, publicly verifiable by QR code or credential ID, and ready to add to your LinkedIn profile in one click. They differ in what they attest — attendance, completion, or examined competency — and in who did the attesting.'
+            : 'Both are issued in your name, digitally signed, publicly verifiable by QR code or credential ID, and ready to add to your LinkedIn profile in one click. They differ in what they attest, and in who did the attesting.'}
         </p>
       </Reveal>
 
-      <div className="grid lg:grid-cols-2 gap-8 max-w-6xl mx-auto items-stretch">
+      <div
+        className={`grid gap-8 mx-auto items-stretch ${
+          showAttendance ? 'lg:grid-cols-3 max-w-7xl' : 'lg:grid-cols-2 max-w-6xl'
+        }`}
+      >
+        {/* ---- Certificate of Attendance (live cohorts only) ---- */}
+        {showAttendance && (
+          <Reveal className="card overflow-hidden flex flex-col">
+            <a
+              href="/certificates/sample-attendance.jpg"
+              target="_blank"
+              rel="noopener"
+              className="block bg-white border-b border-slate-800"
+              aria-label="Open a sample Certificate of Attendance"
+            >
+              <img
+                src="/certificates/sample-attendance.jpg"
+                alt={`Sample Certificate of Attendance for ${courseTitle}, marked SAMPLE`}
+                width={1600}
+                height={1237}
+                loading="lazy"
+                className="w-full h-auto block"
+              />
+            </a>
+            <div className="p-7 flex-1 flex flex-col">
+              <div className="flex flex-wrap items-center gap-3">
+                <BadgeCheck className="w-6 h-6 text-cyan-400" aria-hidden="true" />
+                <h3 className="text-xl font-semibold text-white">Certificate of Attendance</h3>
+                <span className="ml-auto text-xs font-mono uppercase tracking-widest px-2.5 py-1 rounded-full border border-slate-600 text-slate-300">
+                  Live cohort
+                </span>
+              </div>
+              <p className="text-slate-300 leading-relaxed mt-3">
+                For attending the live, instructor-led course in full. It records your attendance
+                and lists the topics covered and the professional development hours — a clean
+                record for your CPD or PE renewal. It does not assess your knowledge; that is what
+                the two stronger credentials do.
+              </p>
+              <ul className="mt-4 space-y-2 text-sm text-slate-300">
+                {[
+                  'Issued and emailed when the instructor records your attendance',
+                  'Contact hours and PDH stated on the certificate',
+                  'Unique credential ID and QR code; anyone can verify it online',
+                  'Add to LinkedIn profile and share buttons built in',
+                ].map((t) => (
+                  <li key={t} className="flex gap-2">
+                    <Check className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" aria-hidden="true" />
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
+        )}
+
         {/* ---- Tier 1 ---- */}
         <Reveal className="card overflow-hidden flex flex-col">
           <a
@@ -172,9 +239,9 @@ const CertificationSection: React.FC<Props> = ({
         ))}
       </Reveal>
       <p className="text-center text-xs text-slate-500 mt-8 max-w-3xl mx-auto">
-        Specimens above are marked SAMPLE and were not issued to anyone. Certificates attest to
-        demonstrated understanding in the assessment described; they are not a professional
-        engineering licence.
+        Specimens above are marked SAMPLE and were not issued to anyone. Each certificate attests
+        to what it describes — attendance, completion, or examined competency; none is a
+        professional engineering licence.
       </p>
     </div>
   </section>

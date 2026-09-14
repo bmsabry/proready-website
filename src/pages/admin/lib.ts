@@ -77,6 +77,9 @@ export type Registration = {
   paid_at?: string | null;
   /** Null until they reply to a "confirm your seat" broadcast. */
   attendance_confirmed_at?: string | null;
+  /** Set when a moderator recorded they attended the full live course
+   *  (and a Certificate of Attendance was issued). */
+  attended_at?: string | null;
 };
 
 export type Course = {

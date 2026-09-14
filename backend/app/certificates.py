@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
+import re
 import secrets
 from datetime import date, datetime, timezone
 from urllib.parse import quote
@@ -40,6 +41,7 @@ log = logging.getLogger(__name__)
 TIER_TITLES = {
     "completion": "Certificate of Completion",
     "verified": "Certificate of Verified Competency",
+    "attendance": "Certificate of Attendance",
 }
 
 
@@ -145,8 +147,8 @@ def by_code(db: Session, code: str) -> Certificate | None:
 
 
 def _new_code(db: Session, tier: str) -> str:
-    """PRE-C-XXXX-XXXX (completion) / PRE-V-XXXX-XXXX (verified)."""
-    letter = "V" if tier == "verified" else "C"
+    """PRE-C-… (completion) / PRE-V-… (verified) / PRE-A-… (attendance)."""
+    letter = {"verified": "V", "attendance": "A"}.get(tier, "C")
     while True:
         h = secrets.token_hex(4).upper()
         code = f"PRE-{letter}-{h[:4]}-{h[4:]}"
@@ -185,6 +187,45 @@ def course_competencies(db: Session, product: Product) -> list[str]:
     if items:
         return items
     return [m.title for m in taught_modules(db, product)]
+
+
+_DAY_PREFIX = re.compile(r"^\s*Day\s+\d+\s*[—\-:.]\s*", re.IGNORECASE)
+_CH_SUFFIX = re.compile(r"\s*\((?:Ch\.?|Chapters?|Modules?)[^)]*\)\s*$", re.IGNORECASE)
+
+
+def cohort_span_for_product(db: Session, product: Product):
+    """(first, last) date of a live cohort linked to this product, for the
+    attendance specimen. (None, None) when no cohort is linked. The issued
+    certificate uses the specific registrant's cohort, not this."""
+    from .models import Course  # local import: avoids a cycle at module load
+
+    course = db.execute(
+        select(Course).where(Course.recorded_product_code == product.code)
+        .order_by(Course.id.desc())
+    ).scalars().first()
+    dates = []
+    for raw in (course.day_dates or []) if course is not None else []:
+        try:
+            dates.append(date.fromisoformat(str(raw)[:10]))
+        except (ValueError, TypeError):
+            continue
+    return (min(dates), max(dates)) if dates else (None, None)
+
+
+def attendance_topics(db: Session, product: Product) -> list[str]:
+    """The day-by-day outline an attendance certificate lists as 'topics
+    covered': the taught modules' titles, cleaned of the 'Day N —' prefix and
+    the '(Ch. …)' suffix so each reads as a plain topic. This is the course
+    outline, not a claim about the holder — attendance records presence."""
+    out: list[str] = []
+    for m in taught_modules(db, product):
+        title = _CH_SUFFIX.sub("", _DAY_PREFIX.sub("", m.title or "")).strip()
+        # A 'Topic: elaboration' title reduces to its topic head, so the
+        # outline reads as short labels rather than full sentences.
+        head = title.split(":", 1)[0].strip() if ":" in title else title
+        if head:
+            out.append(head)
+    return out
 
 
 # -----------------------------------------------------------------------------
@@ -257,6 +298,8 @@ def build_spec(db: Session, cert: Certificate, product: Product, *, sample: bool
         mastery_threshold_pct=int(settings.MASTERY_THRESHOLD_PCT),
         course_hours=product.total_hours or None,
         module_count=module_count or None,
+        cohort_start=cert.cohort_start,
+        cohort_end=cert.cohort_end,
         sample=sample,
     )
 
@@ -322,6 +365,8 @@ def _issue(
     exam_date: date | None = None,
     exam_minutes: int = 0,
     competencies: list[str] | None = None,
+    cohort_start: date | None = None,
+    cohort_end: date | None = None,
 ) -> Certificate:
     if tier == "verified" and instructor_signature_png(db) is None:
         raise RuntimeError(
@@ -340,6 +385,8 @@ def _issue(
         exam_date=exam_date,
         exam_minutes=exam_minutes,
         competencies=list(competencies or []),
+        cohort_start=cohort_start,
+        cohort_end=cohort_end,
     )
     db.add(cert)
     db.commit()
@@ -408,7 +455,11 @@ def email_certificate(db: Session, cert: Certificate, learner: Learner, product:
                 "content": base64.b64encode(pdf).decode(),
             }
         ]
-    offer = examined_tier_offer(db, learner, product) if cert.tier == "completion" else None
+    offer = (
+        examined_tier_offer(db, learner, product)
+        if cert.tier in ("completion", "attendance")
+        else None
+    )
     who = first_name(learner.full_name or "")
     ok = send_email(
         to=learner.email,
@@ -493,6 +544,40 @@ def issue_verified(
         email_certificate(db, cert, learner, product)
     except Exception as exc:  # pragma: no cover
         log.error("Certificate email failed for %s: %s", cert.code, exc)
+    return cert
+
+
+def issue_attendance(
+    db: Session,
+    learner: Learner,
+    product: Product,
+    *,
+    cohort_start: date | None = None,
+    cohort_end: date | None = None,
+    send_email: bool = True,
+) -> Certificate:
+    """The moderator-issued tier: recorded presence at the live course.
+
+    Idempotent — a learner holds at most one attendance certificate per
+    product; re-marking returns the existing one and does not re-email.
+    """
+    existing = get_certificate(db, learner, product.code, "attendance")
+    if existing is not None:
+        return existing
+    if not learner.full_name.strip():
+        raise ValueError("The learner has no name on file.")
+    cert = _issue(
+        db, learner, product, "attendance",
+        competencies=attendance_topics(db, product),
+        cohort_start=cohort_start,
+        cohort_end=cohort_end,
+    )
+    log.info("Issued ATTENDANCE certificate %s to %s for %s", cert.code, learner.email, product.code)
+    if send_email:
+        try:
+            email_certificate(db, cert, learner, product)
+        except Exception as exc:  # pragma: no cover
+            log.error("Certificate email failed for %s: %s", cert.code, exc)
     return cert
 
 

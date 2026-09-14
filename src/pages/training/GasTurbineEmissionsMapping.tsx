@@ -1229,7 +1229,7 @@ const GasTurbineEmissionsMapping = () => {
       </div>
 
       {/* ---------------- Certification ---------------- */}
-      <CertificationSection courseTitle="Gas Turbine Emissions Mapping" examinedPrice="$300" examinedAvailable={false} />
+      <CertificationSection courseTitle="Gas Turbine Emissions Mapping" examinedPrice="$300" examinedAvailable={false} showAttendance />
 
       <div className="container-site">
         {/* Legal independence notice — shown on every course page */}

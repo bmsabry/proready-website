@@ -72,12 +72,13 @@ def certification_payload(db: Session, learner: Learner, product: Product) -> di
     completion = certs.completion_status(db, learner, product.code)
     cert_c = certs.get_certificate(db, learner, product.code, "completion")
     cert_v = certs.get_certificate(db, learner, product.code, "verified")
+    cert_a = certs.get_certificate(db, learner, product.code, "attendance")
     name = (learner.full_name or "").strip()
     return {
         "full_name": name,
         # Once anything has been issued the printed name is fixed; changes go
         # through support (admin re-issue).
-        "name_locked": bool(cert_c or cert_v),
+        "name_locked": bool(cert_c or cert_v or cert_a),
         "completion": {
             **completion,
             "certificate": certs.certificate_out(db, cert_c, product) if cert_c else None,
@@ -86,6 +87,11 @@ def certification_payload(db: Session, learner: Learner, product: Product) -> di
         "advanced": {
             **adv.learner_out(db, learner, product, adv.current(db, learner, product.code)),
             "certificate": certs.certificate_out(db, cert_v, product) if cert_v else None,
+        },
+        # Issued by a moderator when the holder attended the live cohort. It
+        # has no learner-facing action — it either exists or it does not.
+        "attendance": {
+            "certificate": certs.certificate_out(db, cert_a, product) if cert_a else None,
         },
     }
 

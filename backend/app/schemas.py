@@ -60,6 +60,9 @@ class AdminRegistrationOut(BaseModel):
     paid_at: Optional[datetime] = None
     # Null = has not replied to a "confirm your seat" broadcast yet.
     attendance_confirmed_at: Optional[datetime] = None
+    # Set when a moderator recorded that they attended the full live course
+    # (and a Certificate of Attendance was issued).
+    attended_at: Optional[datetime] = None
 
 
 class MarkPaidIn(BaseModel):
@@ -85,6 +88,24 @@ class AttendanceIn(BaseModel):
     # False un-confirms — for when a confirmation was recorded against the
     # wrong person and the list needs correcting.
     confirmed: bool = True
+
+
+class AttendedIn(BaseModel):
+    registration_id: int
+    # False withdraws: clears the record and revokes the attendance certificate.
+    attended: bool = True
+    send_email: bool = True
+
+
+class AttendedOut(BaseModel):
+    ok: bool
+    registration: AdminRegistrationOut
+    # False on an idempotent replay (already recorded / already withdrawn).
+    transitioned: bool = True
+    certificate_code: str = ""
+    certificate_verify_url: str = ""
+    certificate_email_sent: bool = False
+    note: str = ""
 
 
 class LoginIn(BaseModel):

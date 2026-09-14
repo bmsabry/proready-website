@@ -26,10 +26,12 @@ from ..db import get_db
 from ..deps import require_admin
 from ..emailer import enrollment_granted_html, send_email, ttl_phrase
 from ..learner_auth import issue_login_token
-from ..models import Course, Product, Registration
+from ..models import Course, Learner, Product, Registration
 from ..schemas import (
     AdminRegistrationOut,
     AttendanceIn,
+    AttendedIn,
+    AttendedOut,
     MarkPaidIn,
     MarkPaidOut,
 )
@@ -290,6 +292,110 @@ def set_attendance(body: AttendanceIn, db: Session = Depends(get_db)) -> MarkPai
         ok=True,
         taken=count_active(db, reg.course_code),
         registration=AdminRegistrationOut.model_validate(reg),
+    )
+
+
+def _cohort_span(course: Optional[Course]):
+    """(first, last) date of the cohort from its day_dates, for the
+    attendance certificate's held-on line. (None, None) when unknown."""
+    from datetime import date as _date
+
+    dates = []
+    for raw in (course.day_dates or []) if course is not None else []:
+        try:
+            dates.append(_date.fromisoformat(str(raw)[:10]))
+        except (ValueError, TypeError):
+            continue
+    if not dates:
+        return None, None
+    return min(dates), max(dates)
+
+
+@router.post("/mark-attended", response_model=AttendedOut)
+def mark_attended(body: AttendedIn, db: Session = Depends(get_db)) -> AttendedOut:
+    """Record that a live-cohort registrant attended the full course and hand
+    them a Certificate of Attendance (or withdraw it).
+
+    Only a paid seat can be marked attended — attendance is the live edition's
+    third credential, below the online Certificate of Completion and the
+    instructor-examined tier. Issuing is idempotent: a second click returns the
+    same certificate and does not re-email.
+    """
+    from .. import certificates as certs
+
+    reg = db.get(Registration, body.registration_id)
+    if reg is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found.")
+
+    course = db.execute(
+        select(Course).where(Course.code == reg.course_code)
+    ).scalar_one_or_none()
+    product = (
+        db.get(Product, course.recorded_product_code)
+        if course is not None and course.recorded_product_code
+        else None
+    )
+
+    if not body.attended:
+        # Withdraw: clear the record and revoke the certificate, if any.
+        was = reg.attended_at is not None
+        reg.attended_at = None
+        db.commit()
+        cert = None
+        if product is not None:
+            learner = db.execute(
+                select(Learner).where(Learner.email == reg.email.lower().strip())
+            ).scalar_one_or_none()
+            if learner is not None:
+                cert = certs.get_certificate(db, learner, product.code, "attendance")
+                if cert is not None and cert.status == "issued":
+                    certs.revoke(db, cert, "Attendance record withdrawn by the moderator.")
+        db.refresh(reg)
+        return AttendedOut(
+            ok=True,
+            registration=AdminRegistrationOut.model_validate(reg),
+            transitioned=was,
+            note="attendance withdrawn" + (" and certificate revoked" if cert else ""),
+        )
+
+    if reg.status != "paid":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Mark the seat paid before recording attendance — the attendance "
+            "certificate is for paid live-cohort seats.",
+        )
+    if product is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No course-materials product is linked to this cohort "
+            "(Settings → Recorded product), so there is nothing to certify attendance of.",
+        )
+
+    already = reg.attended_at is not None
+    if reg.attended_at is None:
+        reg.attended_at = datetime.now(timezone.utc)
+        db.commit()
+
+    learner = academy_svc.upsert_learner(db, reg.email, reg.full_name)
+    if not (learner.full_name or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The registrant has no name on file — add a name before issuing.",
+        )
+    first, last = _cohort_span(course)
+    cert = certs.issue_attendance(
+        db, learner, product, cohort_start=first, cohort_end=last,
+        send_email=body.send_email,
+    )
+    db.refresh(reg)
+    return AttendedOut(
+        ok=True,
+        registration=AdminRegistrationOut.model_validate(reg),
+        transitioned=not already,
+        certificate_code=cert.code,
+        certificate_verify_url=certs.verify_url(cert.code),
+        certificate_email_sent=bool(cert.email_sent_at) if body.send_email else False,
+        note="already recorded — nothing re-sent" if already else "attendance recorded and certificate issued",
     )
 
 

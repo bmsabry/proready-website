@@ -107,6 +107,9 @@ class CertificateSpec:
     mastery_threshold_pct: int = 80
     course_hours: float | None = None
     module_count: int | None = None
+    # attendance tier only — the live cohort the holder attended.
+    cohort_start: date | None = None
+    cohort_end: date | None = None
     # Marketing preview: a faint diagonal SAMPLE watermark so a specimen can
     # never pass as an issued credential.
     sample: bool = False
@@ -118,6 +121,19 @@ class CertificateSpec:
 
 def _fmt_date(d: date) -> str:
     return f"{d.strftime('%B')} {d.day}, {d.year}"
+
+
+def _fmt_span(a: date | None, b: date | None) -> str:
+    """A human date span for the cohort line: 'September 5–13, 2026', or a
+    single date, or '' when nothing is known."""
+    if a and b and a != b:
+        if a.year == b.year and a.month == b.month:
+            return f"{a.strftime('%B')} {a.day}–{b.day}, {a.year}"
+        if a.year == b.year:
+            return f"{a.strftime('%B')} {a.day} – {b.strftime('%B')} {b.day}, {a.year}"
+        return f"{_fmt_date(a)} – {_fmt_date(b)}"
+    one = a or b
+    return _fmt_date(one) if one else ""
 
 
 def _gradient_rect(c: canvas.Canvas, x: float, y: float, w: float, h: float,
@@ -582,6 +598,140 @@ def _draw_verified(c: canvas.Canvas, spec: CertificateSpec) -> None:
 
 
 # -----------------------------------------------------------------------------
+# Tier 3 — Certificate of Attendance (live, instructor-led)
+# -----------------------------------------------------------------------------
+
+def _draw_attendance(c: canvas.Canvas, spec: CertificateSpec) -> None:
+    box = _frame(c, 22)
+    x, y, w, h = box
+    band_h = 118
+    band_y = y + h - band_h
+    _band(c, x + 1, band_y, w - 2, band_h - 1)
+
+    cx = PAGE_W / 2
+    _tracked_text(c, cx, band_y + band_h - 28, "PROREADYENGINEER LLC   ·   LIVE INSTRUCTOR-LED TRAINING",
+                  "Mono-Medium", 7.4, 2.1, CYAN)
+    _tracked_text(c, cx, band_y + band_h - 66, "CERTIFICATE OF ATTENDANCE",
+                  "Cinzel", 25, 5.0, WHITE)
+    _gradient_rect(c, cx - 118, band_y + band_h - 78, 236, 1.2, [NAVY_DEEP, CYAN, BLUE, NAVY_DEEP])
+
+    seal_r = 38
+    _seal(c, cx, band_y, seal_r)
+
+    top = band_y - seal_r - 20
+    _tracked_text(c, cx, top, "THIS IS TO CERTIFY THAT", "Inter-Semi", 8.4, 2.6, MUTED)
+
+    name_y = top - 44
+    c.setFont("Cormorant-Semi", 38)
+    c.setFillColor(NAVY)
+    c.drawCentredString(cx, name_y, spec.learner_name)
+    name_w = pdfmetrics.stringWidth(spec.learner_name, "Cormorant-Semi", 38)
+    rule_w = max(220, min(name_w + 60, 420))
+    _gradient_rect(c, cx - rule_w / 2, name_y - 11, rule_w, 1.1, [WHITE, CYAN, BLUE, WHITE])
+
+    c.setFont("Inter", 11)
+    c.setFillColor(BODY)
+    c.drawCentredString(cx, name_y - 33, "attended and participated in the live, instructor-led programme")
+
+    c.setFont("Cinzel-Bold", 16.5)
+    c.setFillColor(NAVY)
+    c.drawCentredString(cx, name_y - 60, spec.course_title.upper())
+
+    para_w = 580
+    last = _paragraph(c, cx - para_w / 2, name_y - 82, spec.course_descriptor,
+                      "Inter", 9.4, 12.8, para_w, BODY, align="center")
+
+    # Facts line: contact hours / PDH · days · cohort span.
+    facts = []
+    if spec.course_hours:
+        facts.append(f"{spec.course_hours:g} contact hours")
+        facts.append(f"{spec.course_hours:g} PDH")
+    span = _fmt_span(spec.cohort_start, spec.cohort_end)
+    if span:
+        facts.append(f"held {span}")
+    _tracked_text(c, cx, last - 19, "   ·   ".join(facts).upper(), "Mono", 6.9, 1.3, MUTED)
+
+    attest = (
+        "This certifies that the holder was present for and participated in the live, instructor-led "
+        "delivery of this programme in full. It records attendance and participation only; it is not an "
+        "examination or an assessment of the holder's knowledge or competency."
+    )
+    last = _paragraph(c, cx - 255, last - 40, attest, "Cormorant-Italic", 11.2, 13.4, 510, INK, align="center")
+
+    # Topics covered — two columns, auto-fitted above the bottom row.
+    py = last - 15
+    _tracked_text(c, cx, py, "TOPICS COVERED", "Inter-Semi", 7.2, 2.4, MUTED)
+    _gradient_rect(c, cx - 52, py - 5, 104, 0.7, [WHITE, CYAN, BLUE, WHITE])
+    items = list(spec.competencies or [])
+    col_w = 300
+    gap = 20
+    left_x = cx - col_w - gap / 2
+    right_x = cx + gap / 2
+    half = (len(items) + 1) // 2
+    cols = [items[:half], items[half:]]
+    yy_start = py - 16
+
+    row_y = y + 66
+    floor = row_y + 52
+    size, leading = 7.6, 9.2
+    for size, leading in ((7.6, 9.2), (7.2, 8.7), (6.9, 8.3), (6.6, 8.0), (6.4, 7.7)):
+        tallest = max(
+            (sum(leading * len(_wrap(item, "Inter", size, col_w - 16)) + 3.0 for item in col)
+             for col in cols),
+            default=0,
+        )
+        if yy_start - tallest >= floor:
+            break
+    for ci, col in enumerate(cols):
+        yy = yy_start
+        colx = left_x if ci == 0 else right_x
+        for k, item in enumerate(col):
+            n = k + 1 + (0 if ci == 0 else half)
+            c.setFont("Mono-Medium", 6.6)
+            c.setFillColor(BLUE)
+            c.drawString(colx, yy, f"{n:02d}")
+            lines = _wrap(item, "Inter", size, col_w - 16)
+            c.setFont("Inter", size)
+            c.setFillColor(BODY)
+            for li, line in enumerate(lines):
+                c.drawString(colx + 15, yy - li * leading, line)
+            yy -= leading * len(lines) + 3.0
+
+    # Bottom row: issuer (left) · issue date (centre) · verify (right)
+    lx = x + 58
+    c.setStrokeColor(FAINT)
+    c.setLineWidth(0.7)
+    c.line(lx, row_y + 32, lx + 220, row_y + 32)
+    c.setFont("Cinzel", 10.5)
+    c.setFillColor(NAVY)
+    c.drawString(lx, row_y + 18, "PROREADYENGINEER LLC")
+    c.setFont("Inter", 7.6)
+    c.setFillColor(BODY)
+    c.drawString(lx, row_y + 6, "Issuing organisation")
+    c.setFont("Inter-Semi", 7.6)
+    c.setFillColor(INK)
+    c.drawString(lx, row_y - 6, f"Course instructor: {spec.instructor.name}, {spec.instructor.credentials}")
+    c.setFont("Inter", 7.2)
+    c.setFillColor(MUTED)
+    c.drawString(lx, row_y - 17, "Attendance recorded by the course moderator at ProReadyEngineer.")
+
+    c.setFont("Inter", 7.2)
+    c.setFillColor(MUTED)
+    c.drawCentredString(cx, row_y + 20, "ISSUED ON")
+    c.setFont("Cormorant-Semi", 14)
+    c.setFillColor(NAVY)
+    c.drawCentredString(cx, row_y + 4, _fmt_date(spec.issued_on))
+    c.setFont("Inter", 7.2)
+    c.setFillColor(MUTED)
+    c.drawCentredString(cx, row_y - 8, spec.issuer.place)
+
+    _verify_block(c, x + w - 52, row_y - 18, spec, size=60)
+    scope = ("This certificate confirms attendance and participation in the programme described above. "
+             "It is not a certification of competency and is not a professional engineering licence.")
+    _footer(c, box, spec, extra_line=scope, fy=y + 18)
+
+
+# -----------------------------------------------------------------------------
 # Public API
 # -----------------------------------------------------------------------------
 
@@ -599,8 +749,11 @@ def render_certificate(spec: CertificateSpec) -> bytes:
     _register_fonts()
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(PAGE_W, PAGE_H))
-    title = ("Certificate of Completion" if spec.tier == "completion"
-             else "Certificate of Verified Competency")
+    title = {
+        "completion": "Certificate of Completion",
+        "verified": "Certificate of Verified Competency",
+        "attendance": "Certificate of Attendance",
+    }.get(spec.tier, "Certificate")
     c.setTitle(f"{title}: {spec.learner_name}, {spec.course_title}")
     c.setAuthor(spec.issuer.legal_name)
     c.setSubject(f"{spec.course_title} · Credential {spec.credential_id}")
@@ -611,6 +764,8 @@ def render_certificate(spec: CertificateSpec) -> bytes:
         _draw_completion(c, spec)
     elif spec.tier == "verified":
         _draw_verified(c, spec)
+    elif spec.tier == "attendance":
+        _draw_attendance(c, spec)
     else:
         raise ValueError(f"unknown tier {spec.tier!r}")
     if spec.sample:

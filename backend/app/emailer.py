@@ -869,6 +869,7 @@ def settlement_failed_admin_html(
 _TIER_TITLES = {
     "completion": "Certificate of Completion",
     "verified": "Certificate of Verified Competency",
+    "attendance": "Certificate of Attendance",
 }
 
 
@@ -939,6 +940,16 @@ def certificate_issued_html(
             f"<strong>{title}</strong> is attached, signed by me; it lists each "
             "principle you were examined on. My sincere congratulations."
         )
+    elif tier == "attendance":
+        body += _p(
+            f"Thank you for attending <strong>{course_title}</strong> live. I appreciate "
+            "the time you gave it and your engagement throughout."
+        )
+        body += _p(
+            f"Your <strong>{title}</strong> is attached as a PDF, issued in your name and "
+            "digitally signed. It records your attendance and the topics the course "
+            "covered, and anyone can verify it in seconds:"
+        )
     else:
         body += _p(
             f"You have completed every lesson of <strong>{course_title}</strong> and "
@@ -961,7 +972,39 @@ def certificate_issued_html(
         "again, add the credential to your LinkedIn profile in one click, or share it."
     )
 
-    if offer:
+    if tier == "attendance":
+        body += (
+            f'<hr style="border:0;border-top:1px solid {CARD_BORDER};margin:26px 0 22px;">'
+        )
+        body += _p(
+            "Two ways to take it further, if you want them", size=17, weight=700,
+            color=HEADING, margin="0 0 10px",
+        )
+        body += _p(
+            "<strong>Step two — the Certificate of Completion.</strong> Work through the "
+            "recorded course on your own time. When you have completed every lesson and "
+            f"passed every module evaluation and mastery check at the {mastery_threshold_pct:g}% "
+            "threshold, your Certificate of Completion is issued automatically — a stronger "
+            "credential, because it says you were assessed, not only present."
+        )
+        body += _cta_button("Open my course", dashboard_url)
+        if offer:
+            fee = f" The fee is {offer['price_display']}." if offer.get("price_display") else ""
+            body += _p(
+                "<strong>Step three — the Certificate of Verified Competency.</strong> After "
+                "you complete the course, you can choose to be examined by me: a written "
+                "examination followed by a live, one-on-one oral examination by video. It is "
+                "the credential a hiring manager can trust, because it is examined rather than "
+                f"completed.{fee} You do not need to decide now — it opens once you have "
+                "completed the course.",
+                size=13, color=MUTED,
+            )
+        body += _p(
+            "There is no deadline on either of these. Your Certificate of Attendance is "
+            "yours to keep regardless.",
+            size=13, color=MUTED,
+        )
+    elif offer:
         body += (
             f'<hr style="border:0;border-top:1px solid {CARD_BORDER};margin:26px 0 22px;">'
         )

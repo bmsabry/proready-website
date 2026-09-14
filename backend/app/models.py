@@ -122,6 +122,14 @@ class Registration(Base):
         DateTime(timezone=True), default=None
     )
 
+    # When a moderator recorded that the registrant attended the full live
+    # course. Distinct from attendance_confirmed_at (a pre-course "I will
+    # attend" reply): this is presence, after the fact, and issuing it hands
+    # the learner a Certificate of Attendance.
+    attended_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
     # Free-text admin notes (optional, nullable).
     admin_notes: Mapped[str | None] = mapped_column(String(2000), default=None)
 
@@ -979,6 +987,11 @@ class Certificate(Base):
     exam_date: Mapped[date | None] = mapped_column(Date, default=None)
     exam_minutes: Mapped[int] = mapped_column(Integer, default=0)
     competencies: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    # Attendance tier only — the live cohort the holder attended, printed on
+    # the certificate as its held-on span.
+    cohort_start: Mapped[date | None] = mapped_column(Date, default=None)
+    cohort_end: Mapped[date | None] = mapped_column(Date, default=None)
 
     email_sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None

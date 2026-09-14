@@ -249,6 +249,13 @@ def _run_column_migrations() -> None:
         ("email_sent_at", "TIMESTAMP WITH TIME ZONE"),
     ]:
         _ensure_column("academy_certificates", column, ddl)
+    # academy_certificates cohort span — the live cohort an attendance
+    # certificate records (printed as its held-on dates).
+    _ensure_column("academy_certificates", "cohort_start", "DATE")
+    _ensure_column("academy_certificates", "cohort_end", "DATE")
+    # registrations.attended_at — a moderator's record that the registrant
+    # attended the full live course (issues the Certificate of Attendance).
+    _ensure_column("registrations", "attended_at", "TIMESTAMP WITH TIME ZONE")
     # academy_asset_blobs.content_type — the Office MIME types (an .xlsx
     # workbook, a .docx handout) are 65-71 characters; VARCHAR(64) refused
     # them.
