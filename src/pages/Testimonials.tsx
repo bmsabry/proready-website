@@ -413,8 +413,8 @@ const Testimonials = () => {
                     <p className="text-xs font-mono uppercase tracking-widest text-slate-300 mt-1">Years Impact</p>
                   </div>
                   <div className="text-center">
-                    <p className="font-display text-2xl font-bold text-gradient">100%</p>
-                    <p className="text-xs font-mono uppercase tracking-widest text-slate-300 mt-1">Positive</p>
+                    <p className="font-display text-2xl font-bold text-gradient">{sentimentData.length}</p>
+                    <p className="text-xs font-mono uppercase tracking-widest text-slate-300 mt-1">Themes</p>
                   </div>
                 </div>
               </div>
