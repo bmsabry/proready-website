@@ -80,6 +80,11 @@ export type Registration = {
   /** Set when a moderator recorded they attended the full live course
    *  (and a Certificate of Attendance was issued). */
   attended_at?: string | null;
+  /** Past-cohort rows only (scope=past|all): the cohort they sat, from their
+   *  Certificate of Attendance, and its code. */
+  attended_cohort_start?: string | null;
+  attended_cohort_end?: string | null;
+  attendance_certificate_code?: string;
 };
 
 export type Course = {
@@ -459,7 +464,7 @@ export const SUPPORT_STATUS_LABEL: Record<string, string> = {
   spam: 'Spam',
 };
 
-export type NotifyAudience = 'all' | 'paid' | 'pending' | 'recorded' | 'everyone';
+export type NotifyAudience = 'all' | 'paid' | 'pending' | 'recorded' | 'everyone' | 'alumni';
 
 export type NotifyResult = {
   ok: boolean;
@@ -495,6 +500,7 @@ export type CourseTab =
   | 'stats'
   | 'materials'
   | 'certification'
+  | 'past'
   | 'settings';
 
 export const COURSE_TABS: CourseTab[] = [
@@ -506,6 +512,7 @@ export const COURSE_TABS: CourseTab[] = [
   'stats',
   'materials',
   'certification',
+  'past',
   'settings',
 ];
 

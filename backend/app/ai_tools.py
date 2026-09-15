@@ -255,10 +255,16 @@ def list_registrations(
         if err:
             return err
         stmt = stmt.where(Registration.course_code == code)
-    if status:
-        if status not in ("paid", "pending", "cancelled"):
-            return {"ok": False, "error": "status must be paid|pending|cancelled"}
-        stmt = stmt.where(Registration.status == status)
+    if status == "attended":
+        # Past cohorts: people who sat a previous delivery. Never part of the
+        # default list — they are not awaiting anything.
+        stmt = stmt.where(Registration.attended_at.is_not(None))
+    else:
+        stmt = stmt.where(Registration.attended_at.is_(None))
+        if status:
+            if status not in ("paid", "pending", "cancelled"):
+                return {"ok": False, "error": "status must be paid|pending|cancelled|attended"}
+            stmt = stmt.where(Registration.status == status)
     stmt = stmt.order_by(Registration.created_at.desc()).limit(min(int(limit), 500))
     rows = list(db.execute(stmt).scalars())
     return {
@@ -923,6 +929,7 @@ def list_unconfirmed(db: Session, course_code: str, **_: Any) -> Dict[str, Any]:
             select(Registration).where(
                 Registration.course_code == course_code,
                 Registration.status != "cancelled",
+                Registration.attended_at.is_(None),  # past cohorts are not chased
             ).order_by(Registration.created_at)
         )
         .scalars()
@@ -1081,6 +1088,7 @@ def session_local_times(db: Session, course_code: str, **_: Any) -> Dict[str, An
             select(Registration).where(
                 Registration.course_code == course_code,
                 Registration.status != "cancelled",
+                Registration.attended_at.is_(None),
             )
         )
         .scalars()
@@ -1248,7 +1256,7 @@ TOOL_SPECS = [
                     "type": "string",
                     "description": "A course code from list_courses, or 'all' for every course.",
                 },
-                "status": {"type": "string", "enum": ["paid", "pending", "cancelled"]},
+                "status": {"type": "string", "enum": ["paid", "pending", "cancelled", "attended"], "description": "Omit for the active registrants (awaiting the cohort). 'attended' lists past cohorts instead — people who already sat a delivery; they are never part of the default list."},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 500, "default": 100},
             },
             "required": ["course_code"],
@@ -1313,9 +1321,9 @@ TOOL_SPECS = [
                 "body": {"type": "string", "description": "Plain text. Backend converts to email HTML."},
                 "audience": {
                     "type": "string",
-                    "enum": ["all", "paid", "pending", "recorded", "everyone"],
+                    "enum": ["all", "paid", "pending", "recorded", "everyone", "alumni"],
                     "default": "all",
-                    "description": "all = live paid+pending; recorded = active buyers of the linked recorded product; everyone = all + recorded.",
+                    "description": "all = ACTIVE live registrants (paid+pending, not attended); alumni = past cohorts (attended) — only when the owner explicitly asks to write to them; recorded = active buyers of the linked recorded product; everyone = all + recorded.",
                 },
             },
             "required": ["code", "subject", "body"],

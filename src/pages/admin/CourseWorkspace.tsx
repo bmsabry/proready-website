@@ -23,6 +23,7 @@ import {
   FileText,
   GraduationCap,
   HelpCircle,
+  History,
   Loader2,
   Lock,
   Mail,
@@ -84,6 +85,7 @@ import {
   StatusBadge,
 } from './ui';
 import CertificationTab from './CertificationTab';
+import PastCohortsTab from './PastCohortsTab';
 
 type Props = {
   code: string;
@@ -102,6 +104,7 @@ const TAB_DEFS: { key: CourseTab; label: string; icon: React.ReactNode }[] = [
   { key: 'stats', label: 'Stats', icon: <BarChart3 className="w-4 h-4" /> },
   { key: 'materials', label: 'Materials', icon: <PlayCircle className="w-4 h-4" /> },
   { key: 'certification', label: 'Certification', icon: <Award className="w-4 h-4" /> },
+  { key: 'past', label: 'Past cohorts', icon: <History className="w-4 h-4" /> },
   { key: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" /> },
 ];
 
@@ -235,6 +238,14 @@ export default function CourseWorkspace({ code, tab, onTab, onBack, onAuthError 
           gotoSettings={() => onTab('settings')}
         />
       )}
+      {course && tab === 'past' && (
+        <PastCohortsTab
+          code={code}
+          onAuthError={onAuthError}
+          onSeatsChanged={() => void load()}
+          gotoComms={() => onTab('comms')}
+        />
+      )}
       {course && tab === 'settings' && (
         <SettingsTab
           key={course.code}
@@ -298,7 +309,7 @@ function RegistrationsTab({
   const counts = useMemo(() => {
     // confirmed/unconfirmed count ACTIVE rows only — someone who cancelled
     // isn't outstanding, so counting them would inflate the chase list.
-    const c = { pending: 0, paid: 0, cancelled: 0, total: 0, confirmed: 0, unconfirmed: 0 };
+    const c = { pending: 0, paid: 0, cancelled: 0, total: 0, confirmed: 0, unconfirmed: 0, closeable: 0 };
     for (const r of regs ?? []) {
       c.total += 1;
       if (r.status === 'pending') c.pending += 1;
@@ -308,6 +319,8 @@ function RegistrationsTab({
         if (r.attendance_confirmed_at) c.confirmed += 1;
         else c.unconfirmed += 1;
       }
+      // What "Close cohort" would mark: paid, confirmed, not yet attended.
+      if (r.status === 'paid' && r.attendance_confirmed_at && !r.attended_at) c.closeable += 1;
     }
     return c;
   }, [regs]);
@@ -393,6 +406,31 @@ function RegistrationsTab({
     }
   }
 
+  /** Close the cohort: every paid, confirmed, not-yet-attended seat is marked
+   *  attended in one go (each gets its certificate email) and leaves this list. */
+  async function closeCohort() {
+    setBusyId(-1);
+    setError(null);
+    setFlash(null);
+    try {
+      const out = await api<{ marked: number; skipped: number; results: { name: string; ok: boolean; detail?: string }[] }>(
+        `/api/admin/courses/${encodeURIComponent(code)}/mark-all-attended`,
+        { method: 'POST', body: JSON.stringify({ course_code: code, send_email: true }) },
+      );
+      const skipped = out.results.filter((r) => !r.ok).map((r) => `${r.name}: ${r.detail ?? 'skipped'}`);
+      setFlash(
+        `${out.marked} registrant${out.marked === 1 ? '' : 's'} marked attended and moved to Past cohorts` +
+          (skipped.length ? `; ${out.skipped} skipped — ${skipped.join('; ')}` : '.'),
+      );
+      await load();
+      onSeatsChanged();
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   /** Record that a paid registrant attended the full live course — issues
    *  their Certificate of Attendance and emails it. Withdraw with attended:false. */
   async function markAttended(id: number, attended: boolean) {
@@ -411,18 +449,25 @@ function RegistrationsTab({
         method: 'POST',
         body: JSON.stringify({ registration_id: id, attended }),
       });
+      // An attended row is a past-cohort record: it leaves this list (and the
+      // seat count, and every automatic audience) and appears under Past cohorts.
       setRegs((prev) =>
-        prev ? prev.map((r) => (r.id === body.registration.id ? body.registration : r)) : prev,
+        prev
+          ? attended
+            ? prev.filter((r) => r.id !== body.registration.id)
+            : prev.map((r) => (r.id === body.registration.id ? body.registration : r))
+          : prev,
       );
+      onSeatsChanged();
       const who = body.registration.email;
       if (!attended) {
         setFlash(`Attendance withdrawn for ${who}${body.certificate_code ? ' and the certificate revoked' : ''}.`);
       } else if (body.transitioned === false) {
-        setFlash(`${who} was already marked attended — the certificate ${body.certificate_code || ''} stands; nothing re-sent.`);
+        setFlash(`${who} was already marked attended — the certificate ${body.certificate_code || ''} stands; nothing re-sent. Moved to Past cohorts.`);
       } else if (body.certificate_email_sent) {
-        setFlash(`Attendance recorded. Certificate ${body.certificate_code} issued and emailed to ${who}.`);
+        setFlash(`Attendance recorded. Certificate ${body.certificate_code} issued and emailed to ${who}. Moved to Past cohorts — no more automatic notices for this cohort.`);
       } else {
-        setFlash(`Attendance recorded and certificate ${body.certificate_code || ''} issued for ${who}${body.note ? ` (${body.note})` : ''}.`);
+        setFlash(`Attendance recorded and certificate ${body.certificate_code || ''} issued for ${who}${body.note ? ` (${body.note})` : ''}. Moved to Past cohorts.`);
       }
     } catch (e) {
       reportError(e, onAuthError, setError);
@@ -531,6 +576,16 @@ function RegistrationsTab({
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2">
+          <ConfirmButton
+            message={`Close this cohort? Every paid, attendance-confirmed registrant (${counts.closeable}) is marked attended, receives their Certificate of Attendance by email, and moves to Past cohorts — out of the seat count and every automatic notice (date changes, session reminders). Pending or unconfirmed registrants stay here for the next cohort.`}
+            onConfirm={() => void closeCohort()}
+            disabled={counts.closeable === 0 || busyId === -1}
+            className="btn-secondary flex items-center gap-2 text-xs py-1.5 px-2.5 disabled:opacity-50"
+            title="Mark every paid, confirmed registrant as attended and move them to Past cohorts"
+          >
+            <History className="w-3.5 h-3.5" />
+            {busyId === -1 ? 'Closing…' : `Close cohort (${counts.closeable})`}
+          </ConfirmButton>
           <button
             onClick={exportCsv}
             disabled={filtered.length === 0}
@@ -1502,6 +1557,20 @@ function CommsTab({
   const [body, setBody] = useState('');
   const [rawHtml, setRawHtml] = useState(false);
   const [audience, setAudience] = useState<NotifyAudience>('all');
+  // Past attendees are outside every automatic audience; count them here so
+  // the chip says how many a deliberate message would reach.
+  const [alumniCount, setAlumniCount] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api<Registration[]>(`/api/admin/registrations?course=${encodeURIComponent(course.code)}&scope=past`)
+      .then((rows) => {
+        if (!cancelled) setAlumniCount(new Set(rows.map((r) => r.email.toLowerCase())).size);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [course.code]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -1548,6 +1617,12 @@ function CommsTab({
       count:
         recordedCount === null ? null : course.seats_taken + recordedCount,
       hint: 'live + recorded, deduped',
+    },
+    {
+      key: 'alumni',
+      label: 'Past attendees',
+      count: alumniCount,
+      hint: 'attended a previous cohort — never emailed automatically',
     },
   ];
 
@@ -2220,7 +2295,7 @@ function SettingsTab({
       applySaved(updated);
       setFlash(
         patch.start_date
-          ? `Saved ${course.code}. Registrants notified of the new start date.`
+          ? `Saved ${course.code}. Active registrants notified of the new start date (past attendees were not).`
           : `Saved ${course.code}.`,
       );
       window.setTimeout(() => setFlash(null), 4000);
@@ -2339,7 +2414,7 @@ function SettingsTab({
           <div className="flex items-center justify-between gap-3 text-xs text-amber-200 bg-amber-950/40 border border-amber-900/60 rounded-lg px-3 py-2">
             <span>
               {patch.start_date
-                ? 'Saving will email all registrants about the new start date.'
+                ? `Saving will email the ${course.seats_taken} active registrant${course.seats_taken === 1 ? '' : 's'} (pending + paid) about the new start date. Past attendees are never emailed by this.`
                 : 'Unsaved changes.'}
             </span>
             <div className="flex items-center gap-2">

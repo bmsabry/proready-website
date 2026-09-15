@@ -95,11 +95,14 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
     # second lead. Cancelled rows DO NOT block re-registration — a person
     # who cancelled previously is allowed to rejoin, and a fresh pending row
     # is created alongside the historical cancelled one.
+    # An attended row is a past-cohort record: the same person may register
+    # again for the next delivery and gets a fresh pending row.
     existing = db.execute(
         select(Registration).where(
             Registration.course_code == course_code,
             Registration.email == email_normalized,
             Registration.status.in_(("paid", "pending")),
+            Registration.attended_at.is_(None),
         )
     ).scalars().first()
 

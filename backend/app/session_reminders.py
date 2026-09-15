@@ -84,6 +84,7 @@ def confirmed_registrants(db: Session, course_code: str) -> list[Registration]:
         .where(
             Registration.course_code == course_code,
             Registration.status.in_(LIVE_STATUSES),
+            Registration.attended_at.is_(None),  # past cohorts get no reminders
             Registration.attendance_confirmed_at.is_not(None),
         )
         .order_by(Registration.full_name)

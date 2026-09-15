@@ -25,6 +25,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import support_service as svc
+from .. import registrants
 from ..db import get_db
 from ..deps import require_admin
 from ..emailer import (
@@ -75,13 +76,15 @@ def _parse_day_dates(raw) -> List[date]:
 def _to_out(course: Course, db: Session) -> CourseOut:
     """Compute seat counts and return the response model.
 
-    seats_taken = active (paid + pending) — the public counter.
+    seats_taken = active (paid + pending, not attended) — the public counter.
     seats_paid  = paid only — admin UI uses this for the paid/pending split.
+    Attended rows are past-cohort records and hold no seat (app/registrants.py).
     """
     counts = dict(
         db.execute(
             select(Registration.status, func.count(Registration.id)).where(
                 Registration.course_code == course.code,
+                Registration.attended_at.is_(None),
             ).group_by(Registration.status)
         ).all()
     )
@@ -118,21 +121,22 @@ def _get_or_404(db: Session, code: str) -> Course:
 def _recipients_for(db: Session, course: Course, audience: str) -> list[str]:
     """Resolve a notify audience to a deduped list of email addresses.
 
-    Live audiences ('all' | 'paid' | 'pending') read the registrations
-    table; 'recorded' reads the active enrollees of the linked academy
-    product (course.recorded_product_code — empty link means an empty
-    audience, not an error); 'everyone' unions live 'all' with 'recorded'.
+    Live audiences ('all' | 'paid' | 'pending') read the ACTIVE rows of the
+    registrations table (never attended, never cancelled); 'alumni' is the
+    attended rows — past cohorts, written to only on purpose; 'recorded'
+    reads the active enrollees of the linked academy product
+    (course.recorded_product_code — empty link means an empty audience, not
+    an error); 'everyone' unions live 'all' with 'recorded'.
     Dedup keeps first-seen order so batch chunks stay deterministic, and
     matters because one person can be both a live registrant and a
     recorded buyer.
     """
 
+    # Live audiences are ACTIVE registrants only: attended rows are past-cohort
+    # records and are never part of an automatic or "all" audience. They are
+    # reachable on purpose through 'alumni' (see app/registrants.py).
     def live(statuses: tuple[str, ...]) -> list[str]:
-        stmt = select(Registration.email).where(
-            Registration.course_code == course.code,
-            Registration.status.in_(statuses),
-        )
-        return [email for (email,) in db.execute(stmt).all()]
+        return registrants.active_emails(db, course.code, statuses)
 
     if audience == "paid":
         emails = live(("paid",))
@@ -140,11 +144,13 @@ def _recipients_for(db: Session, course: Course, audience: str) -> list[str]:
         emails = live(("pending",))
     elif audience == "recorded":
         emails = active_enrollee_emails(db, course.recorded_product_code)
+    elif audience == "alumni":
+        emails = registrants.past_emails(db, course.code)
     elif audience == "everyone":
         emails = live(("paid", "pending")) + active_enrollee_emails(
             db, course.recorded_product_code
         )
-    else:  # 'all' — live registrants, excluding cancelled
+    else:  # 'all' — active live registrants, excluding cancelled and attended
         emails = live(("paid", "pending"))
     return list(dict.fromkeys(emails))
 

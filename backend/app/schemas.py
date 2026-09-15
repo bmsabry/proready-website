@@ -61,8 +61,14 @@ class AdminRegistrationOut(BaseModel):
     # Null = has not replied to a "confirm your seat" broadcast yet.
     attendance_confirmed_at: Optional[datetime] = None
     # Set when a moderator recorded that they attended the full live course
-    # (and a Certificate of Attendance was issued).
+    # (and a Certificate of Attendance was issued). An attended row is a
+    # past-cohort record: it holds no seat and is in no automatic audience.
     attended_at: Optional[datetime] = None
+    # Filled for attended rows from their Certificate of Attendance: the
+    # cohort they sat (so Past cohorts can group by delivery) and the code.
+    attended_cohort_start: Optional[date] = None
+    attended_cohort_end: Optional[date] = None
+    attendance_certificate_code: str = ""
 
 
 class MarkPaidIn(BaseModel):
@@ -269,10 +275,11 @@ class NotifyIn(BaseModel):
     subject: str = Field(min_length=1, max_length=200)
     body_html: str = Field(min_length=1, max_length=100_000)
     # Which segment to target. Live audiences ('all' = paid + pending,
-    # never cancelled) come from the registrations table; 'recorded' is
+    # never cancelled, never attended) come from the registrations table;
+    # 'alumni' = attended rows (past cohorts), only ever on purpose; 'recorded' is
     # the active enrollees of the course's linked academy product; and
     # 'everyone' unions live 'all' with 'recorded', deduped.
-    audience: Literal["all", "paid", "pending", "recorded", "everyone"] = "all"
+    audience: Literal["all", "paid", "pending", "recorded", "everyone", "alumni"] = "all"
 
 
 class NotifyOut(BaseModel):

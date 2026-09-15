@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -48,13 +49,60 @@ router = APIRouter(
 
 @router.get("/registrations", response_model=List[AdminRegistrationOut])
 def list_registrations(
-    course: Optional[str] = None, db: Session = Depends(get_db)
-) -> List[Registration]:
-    """All registrations, newest first. ?course= narrows to one cohort."""
+    course: Optional[str] = None,
+    scope: str = "current",
+    db: Session = Depends(get_db),
+) -> List[AdminRegistrationOut]:
+    """Registrations, newest first. ?course= narrows to one cohort.
+
+    ?scope= says which rows (see app/registrants.py):
+      current — everything that has NOT attended: the Registrations tab
+                (pending, paid and cancelled rows of the coming cohort);
+      past    — attended rows only: the Past cohorts tab, each carrying the
+                cohort it sat and its Certificate of Attendance code;
+      all     — both.
+    """
     stmt = select(Registration).order_by(Registration.created_at.desc())
     if course:
         stmt = stmt.where(Registration.course_code == course)
-    return list(db.execute(stmt).scalars().all())
+    if scope == "past":
+        stmt = stmt.where(Registration.attended_at.is_not(None))
+    elif scope != "all":
+        stmt = stmt.where(Registration.attended_at.is_(None))
+    rows = list(db.execute(stmt).scalars().all())
+    out = [AdminRegistrationOut.model_validate(r) for r in rows]
+    if scope in ("past", "all"):
+        _attach_attendance(db, rows, out)
+    return out
+
+
+def _attach_attendance(db: Session, rows: List[Registration], out: List[AdminRegistrationOut]) -> None:
+    """Fill the past-cohort fields from each attended row's Certificate of
+    Attendance (which records the cohort span it was issued for)."""
+    from .. import certificates as certs
+
+    courses: dict[str, Optional[Course]] = {}
+    for reg, o in zip(rows, out):
+        if reg.attended_at is None:
+            continue
+        if reg.course_code not in courses:
+            courses[reg.course_code] = db.execute(
+                select(Course).where(Course.code == reg.course_code)
+            ).scalar_one_or_none()
+        course = courses[reg.course_code]
+        if course is None or not course.recorded_product_code:
+            continue
+        learner = db.execute(
+            select(Learner).where(Learner.email == reg.email.lower().strip())
+        ).scalar_one_or_none()
+        if learner is None:
+            continue
+        cert = certs.get_certificate(db, learner, course.recorded_product_code, "attendance")
+        if cert is None:
+            continue
+        o.attended_cohort_start = cert.cohort_start
+        o.attended_cohort_end = cert.cohort_end
+        o.attendance_certificate_code = cert.code if cert.status == "issued" else ""
 
 
 def mark_registration_paid(
@@ -309,6 +357,53 @@ def _cohort_span(course: Optional[Course]):
     if not dates:
         return None, None
     return min(dates), max(dates)
+
+
+class MarkAllAttendedIn(BaseModel):
+    course_code: str
+    send_email: bool = True
+
+
+class MarkAllAttendedOut(BaseModel):
+    ok: bool = True
+    marked: int = 0
+    skipped: int = 0
+    results: list = []
+
+
+@router.post("/courses/{code}/mark-all-attended", response_model=MarkAllAttendedOut)
+def mark_all_attended(
+    code: str, body: MarkAllAttendedIn, db: Session = Depends(get_db)
+) -> MarkAllAttendedOut:
+    """Close a cohort: record attendance for every paid, attendance-confirmed
+    seat that is not yet marked, issuing each Certificate of Attendance. Rows
+    that cannot be marked (unpaid, unconfirmed, no name, no linked product)
+    are reported, not fatal, so one bad row never blocks the rest. After this
+    the cohort's registrants are past-cohort records — out of every automatic
+    audience and off the seat count — and the course can be re-dated for its
+    next delivery without writing to them."""
+    course = db.execute(select(Course).where(Course.code == code)).scalar_one_or_none()
+    if course is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found.")
+    rows = db.execute(
+        select(Registration).where(
+            Registration.course_code == code,
+            Registration.status == "paid",
+            Registration.attendance_confirmed_at.is_not(None),
+            Registration.attended_at.is_(None),
+        ).order_by(Registration.created_at)
+    ).scalars().all()
+    out = MarkAllAttendedOut()
+    for reg in rows:
+        try:
+            res = mark_attended(AttendedIn(registration_id=reg.id, send_email=body.send_email), db)
+            out.marked += 1
+            out.results.append({"id": reg.id, "name": reg.full_name, "ok": True,
+                                "certificate_code": res.certificate_code})
+        except HTTPException as exc:
+            out.skipped += 1
+            out.results.append({"id": reg.id, "name": reg.full_name, "ok": False, "detail": exc.detail})
+    return out
 
 
 @router.post("/mark-attended", response_model=AttendedOut)
