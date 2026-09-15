@@ -10,7 +10,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { History, Mail, Undo2 } from 'lucide-react';
-import { api, formatDate, reportError, type Registration } from './lib';
+import { api, formatDate, formatDay, reportError, type Registration } from './lib';
 import { ConfirmButton, Notice, RefreshButton, Section } from './ui';
 
 type Group = { key: string; label: string; rows: Registration[] };
@@ -56,10 +56,12 @@ export default function PastCohortsTab({
       const start = r.attended_cohort_start ?? (r.attended_at ? r.attended_at.slice(0, 10) : '');
       const end = r.attended_cohort_end ?? '';
       const key = start || 'unknown';
+      // Cohort spans are calendar dates (no time of day): format them as days,
+      // not timestamps, or the label shifts by the viewer's timezone.
       const label = start
         ? end && end !== start
-          ? `Cohort ${formatDate(start)} – ${formatDate(end)}`
-          : `Cohort ${formatDate(start)}`
+          ? `Cohort ${formatDay(start)} – ${formatDay(end)}`
+          : `Cohort ${formatDay(start)}`
         : 'Cohort dates not recorded';
       if (!by.has(key)) by.set(key, { key, label, rows: [] });
       by.get(key)!.rows.push(r);
