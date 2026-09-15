@@ -36,11 +36,13 @@ import CertificationSection from './CertificationSection';
 // local preview before the backend is reachable.
 const COURSE_CODE = 'gas-turbine-emissions-mapping-2026-05';
 const DEFAULT_CAPACITY = 15;
-// Founding Cohort seat price and the regular rate it is discounted from.
-// The live price comes from the course record at runtime; this default keeps
-// the prerendered HTML honest until that fetch lands.
-const DEFAULT_PRICE_CENTS = 150000;
+// Launch seat price and the regular rate it is discounted from. The live
+// price comes from the course record at runtime; this default keeps the
+// prerendered HTML honest until that fetch lands. The discount label is the
+// owner's stated figure for the launch offer ($2,500 against $4,500).
+const DEFAULT_PRICE_CENTS = 250000;
 const REGULAR_PRICE_CENTS = 450000;
+const LAUNCH_DISCOUNT_LABEL = '45%';
 // Prerender fallback for the cohort start, taken from the build-time snapshot
 // of the live course record (see data/courseSnapshot). The literal is only a
 // last resort for a course the build has never been able to reach.
@@ -245,7 +247,7 @@ const GasTurbineEmissionsMapping = () => {
     
     'Four-day live expert course, held over two weekends, on DLE gas turbine emissions mapping: combustion and GT fundamentals, dynamics and DLE combustion system operation, CEMS and the full mapping procedure on a simulator, then ambient, flex fuel and troubleshooting. Taught by a practitioner with 19+ years of field experience.',
     {
-      image: 'https://proreadyengineer.com/Mapping_Course_Advertisement.png',
+      image: 'https://proreadyengineer.com/Mapping_Course_Advertisement_v2.jpg',
       jsonLd: {
         '@context': 'https://schema.org',
         '@type': 'Course',
@@ -520,7 +522,7 @@ const GasTurbineEmissionsMapping = () => {
                     : 'Registration open'}
               </FactChip>
               <FactChip icon={<Sparkles className="w-3.5 h-3.5" aria-hidden="true" />}>
-                {formatAmount(priceCents, currency)} per seat · over 60% off
+                {formatAmount(priceCents, currency)} per seat · {LAUNCH_DISCOUNT_LABEL} off
               </FactChip>
               <FactChip icon={<BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" />}>
                 3 verifiable credentials
@@ -549,7 +551,7 @@ const GasTurbineEmissionsMapping = () => {
             {/* Course infographic — placed directly under the title, matching site pattern */}
             <div className="card overflow-hidden mb-10 shadow-2xl shadow-cyan-900/10">
               <img
-                src="/Mapping_Course_Advertisement.png"
+                src="/Mapping_Course_Advertisement_v2.jpg"
                 alt="Gas Turbine Emissions Mapping, flagship live online course: from zero to field-ready in 4 live days. Day 1 combustion and gas turbine fundamentals, Day 2 combustion dynamics and DLE operation, Day 3 emissions, CEMS and the live mapping simulator, Day 4 ambient, flex fuel and troubleshooting. 228 slides, mapping simulator, daily mastery checks, quiz and interview for certification. Led by Bassam Abdelnabi."
                 className="w-full h-auto block"
                 width={1671}
@@ -765,7 +767,7 @@ const GasTurbineEmissionsMapping = () => {
         {/* COURSE MAP INFOGRAPHIC */}
         <Reveal className="mb-16 card overflow-hidden">
           <img
-            src="/Mapping_Course_Advertisement.png"
+            src="/Mapping_Course_Advertisement_v2.jpg"
             alt="Course overview: the four live days, what each covers, and what is included: 228 slides, the mapping simulator, daily mastery checks, and the certification quiz and interview."
             className="w-full h-auto block"
             width={1671}
@@ -774,18 +776,18 @@ const GasTurbineEmissionsMapping = () => {
           />
         </Reveal>
 
-        {/* PRICING — Founding Cohort offer for the first live cohort */}
+        {/* PRICING — launch offer while the programme is newly launched */}
         <Reveal className="mb-16">
           <span className="eyebrow mb-4">Pricing</span>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-3">
-            Founding Cohort Pricing
+            Launch Pricing
           </h2>
           <p className="text-slate-300 text-base mb-8 max-w-2xl leading-relaxed">
-            For the first live offering, this advanced training is available at a special
-            Founding Cohort price.
+            Because the programme is newly launched, this advanced training is offered at a
+            {' '}{LAUNCH_DISCOUNT_LABEL} launch discount.
           </p>
 
-          {/* Price hero — Founding Cohort price with the regular rate anchored */}
+          {/* Price hero — launch price with the regular rate anchored */}
           <div className="relative rounded-2xl bg-gradient-to-br from-cyan-900/20 via-slate-900/60 to-blue-900/20 border border-cyan-500/30 p-8 md:p-10 mb-8 overflow-hidden">
             <div
               className="absolute -top-24 -right-16 w-72 h-72 bg-cyan-500/10 blur-[100px] rounded-full pointer-events-none"
@@ -795,7 +797,7 @@ const GasTurbineEmissionsMapping = () => {
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs font-mono uppercase tracking-wider mb-4">
                   <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
-                  Over 60% Founding Cohort discount
+                  {LAUNCH_DISCOUNT_LABEL} launch discount
                 </div>
                 <div className="flex items-baseline gap-3 flex-wrap mb-2">
                   <span className="text-3xl md:text-4xl font-bold text-white tabular-nums">
@@ -807,7 +809,7 @@ const GasTurbineEmissionsMapping = () => {
                   <span className="text-lg font-normal text-slate-300">per seat</span>
                 </div>
                 <p className="text-slate-300 text-sm leading-relaxed max-w-xl">
-                  The Founding Cohort price is over 60% off the regular{' '}
+                  The launch price is {LAUNCH_DISCOUNT_LABEL} off the regular{' '}
                   {formatAmount(REGULAR_PRICE_CENTS, currency)} per-seat rate. Register with
                   no payment to hold your seat, then pay online or by invoice.
                 </p>
@@ -909,14 +911,14 @@ const GasTurbineEmissionsMapping = () => {
             ))}
           </div>
 
-          {/* First-offering-only note */}
+          {/* Launch-offer note */}
           <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-5 mb-4 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
             <div className="text-sm leading-relaxed">
-              <div className="text-amber-200 font-semibold mb-1">First offering only</div>
+              <div className="text-amber-200 font-semibold mb-1">Launch offer</div>
               <p className="text-amber-100/90">
-                The Founding Cohort discount of over 60% is available only for the first live offering.
-                Future offerings will return to the regular{' '}
+                The {LAUNCH_DISCOUNT_LABEL} launch discount applies while the programme is newly
+                launched. Later offerings return to the regular{' '}
                 {formatAmount(REGULAR_PRICE_CENTS, 'usd')} per-seat price.
               </p>
             </div>
@@ -1048,7 +1050,7 @@ const GasTurbineEmissionsMapping = () => {
                     <div className="max-w-md mx-auto text-left rounded-2xl border border-cyan-500/30 bg-slate-900/60 p-6">
                       <h4 className="text-lg font-bold text-white mb-1">Secure your seat now</h4>
                       <p className="text-sm text-slate-300 mb-5">
-                        Founding Cohort seat:{' '}
+                        Launch-price seat:{' '}
                         <span className="text-white font-semibold">
                           {formatAmount(priceCents, currency)}
                         </span>

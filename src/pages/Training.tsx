@@ -675,7 +675,7 @@ const Training = () => {
                   className="block rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/50 hover:border-cyan-500/40 transition-colors"
                 >
                   <img
-                    src="/Mapping_Course_Advertisement.png"
+                    src="/Mapping_Course_Advertisement_v2.jpg"
                     alt="Gas Turbine Emissions Mapping, flagship live online course, four live days covering combustion fundamentals, dynamics and DLE operation, emissions and mapping on a simulator, then ambient, flex fuel and troubleshooting."
                     className="w-full h-auto block"
                     width={1671}
