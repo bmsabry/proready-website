@@ -74,7 +74,7 @@ const COURSE_JSONLD = JSON.stringify({
   name: 'Gas Turbine Emissions Mapping',
   description:
     
-    'Four-day live expert course (two weekends) on DLE gas turbine emissions mapping, built on 231 slides across 10 chapters: combustion and gas turbine fundamentals, combustion dynamics and DLE combustion system operation, NOx/CO and EPA Method 7E CEMS, step-by-step mapping campaigns for aeroderivative and heavy-duty machines practised on a simulated combustion system, then ambient effects, flex fuel and field troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
+    'Four-day live expert course (two weekends) on DLE gas turbine emissions mapping, built on 232 slides across 10 chapters: combustion and gas turbine fundamentals, combustion dynamics and DLE combustion system operation, NOx/CO and EPA Method 7E CEMS, step-by-step mapping campaigns for aeroderivative and heavy-duty machines practised on a simulated combustion system, then ambient effects, flex fuel and field troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
   provider: {
     '@type': 'Organization',
     name: 'ProReadyEngineer LLC',
@@ -103,7 +103,7 @@ type Day = {
 const CURRICULUM: Day[] = [
   {
     title: 'Combustion & Gas Turbine Fundamentals',
-    chapters: 'Chapters 1–2 · 59 slides',
+    chapters: 'Chapters 1–2 · 60 slides',
     summary:
       'The physics you need before you can tune anything: how flames behave, what sets flame temperature and NOx, and how a DLE machine is actually built, from premixer to metering valve.',
     topics: [
@@ -552,7 +552,7 @@ const GasTurbineEmissionsMapping = () => {
             <div className="card overflow-hidden mb-10 shadow-2xl shadow-cyan-900/10">
               <img
                 src="/Mapping_Course_Advertisement_v2.jpg"
-                alt="Gas Turbine Emissions Mapping, flagship live online course: from zero to field-ready in 4 live days. Day 1 combustion and gas turbine fundamentals, Day 2 combustion dynamics and DLE operation, Day 3 emissions, CEMS and the live mapping simulator, Day 4 ambient, flex fuel and troubleshooting. 231 slides, mapping simulator, daily mastery checks, quiz and interview for certification. Led by Bassam Abdelnabi."
+                alt="Gas Turbine Emissions Mapping, flagship live online course: from zero to field-ready in 4 live days. Day 1 combustion and gas turbine fundamentals, Day 2 combustion dynamics and DLE operation, Day 3 emissions, CEMS and the live mapping simulator, Day 4 ambient, flex fuel and troubleshooting. 232 slides, mapping simulator, daily mastery checks, quiz and interview for certification. Led by Bassam Abdelnabi."
                 className="w-full h-auto block"
                 width={1671}
                 height={941}
@@ -768,7 +768,7 @@ const GasTurbineEmissionsMapping = () => {
         <Reveal className="mb-16 card overflow-hidden">
           <img
             src="/Mapping_Course_Advertisement_v2.jpg"
-            alt="Course overview: the four live days, what each covers, and what is included: 231 slides, the mapping simulator, daily mastery checks, and the certification quiz and interview."
+            alt="Course overview: the four live days, what each covers, and what is included: 232 slides, the mapping simulator, daily mastery checks, and the certification quiz and interview."
             className="w-full h-auto block"
             width={1671}
             height={941}
@@ -878,7 +878,7 @@ const GasTurbineEmissionsMapping = () => {
               {
                 icon: <Award className="w-5 h-5" aria-hidden="true" />,
                 title: 'Course Materials You Keep Access To',
-                body: 'All 231 slides across the four days, in your own browser account, so you can review any chapter long after the live sessions end.',
+                body: 'All 232 slides across the four days, in your own browser account, so you can review any chapter long after the live sessions end.',
               },
               {
                 icon: <CheckCircle2 className="w-5 h-5" aria-hidden="true" />,
