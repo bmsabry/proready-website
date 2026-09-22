@@ -374,3 +374,17 @@ def test_ua_summary():
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/128.0 Safari/537.36 Edg/128.0") == "Edge on Windows"
     assert report.ua_summary("") == "Unknown browser"
+
+
+def test_sign_in_sets_the_device_cookie_before_the_first_page_loads(admin, course):
+    """The page fires several requests at once right after signing in; if
+    none of them carried a device cookie, each minted its own id and one
+    person showed up as two browsers used at the same time."""
+    email = "fresh.browser@example.com"
+    admin.post("/api/admin/academy/grant", json={
+        "email": email, "product_code": PRODUCT, "send_email_invite": False}, headers=ADMIN)
+    c = TestClient(app, base_url="https://testserver")
+    link = c.post("/api/admin/academy/login-link", json={"email": email}, headers=ADMIN).json()["link"]
+    r = c.post("/api/academy/auth/verify", json={"token": link.split("token=")[1]})
+    assert r.status_code == 200
+    assert "learner_device=" in r.headers.get("set-cookie", "")

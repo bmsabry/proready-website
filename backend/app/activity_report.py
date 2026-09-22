@@ -121,6 +121,19 @@ def ua_summary(ua: str) -> str:
     return f"{browser} on {os_}"
 
 
+def overlap_kind(o: LearnerOverlapEvent, kinds: dict[str, str]) -> str:
+    """'networks' — two networks at once (the strongest sharing sign);
+    'devices' — two different kinds of device on one network;
+    'same' — the same kind of browser twice on one network, which is most
+    often one browser that lost its device cookie."""
+    if o.ip_a and o.ip_b and o.ip_a != o.ip_b:
+        return "networks"
+    a, b = kinds.get(o.device_a), kinds.get(o.device_b)
+    if a is not None and a == b:
+        return "same"
+    return "devices"
+
+
 # -------------------------------------------------------------- the events --
 
 @dataclass
@@ -364,17 +377,20 @@ def load(db: Session, learner_ids: list[int], since: datetime) -> Bundle:
         )
     ).scalars(), lambda o: o.learner_id)
     for lid, os_ in overlaps.items():
+        kinds = {d.device_id: ua_summary(d.user_agent or "") for d in devices.get(lid, [])}
         for o in os_:
             at = _aw(o.at)
             if at is None or at < since:
                 continue
-            diff = bool(o.ip_a and o.ip_b and o.ip_a != o.ip_b)
+            k = overlap_kind(o, kinds)
             events[lid].append(Event(
                 at=at, kind="overlap", source="records",
-                severity="warn" if diff else "info",
-                label=("Signed in on two browsers at once, on different networks "
-                       f"({o.ip_a} and {o.ip_b})") if diff else
-                      f"Signed in on two browsers at once, same network ({o.ip_a or o.ip_b})"))
+                severity="warn" if k == "networks" else "info",
+                label={
+                    "networks": f"In use on two browsers at once, on different networks ({o.ip_a} and {o.ip_b})",
+                    "devices": f"In use on two different devices at once, same network ({o.ip_a or o.ip_b})",
+                    "same": f"Two sessions of the same browser type at once, same network ({o.ip_a or o.ip_b})",
+                }[k]))
 
     # ---- requests, access, terms
     for r in db.execute(
@@ -621,7 +637,8 @@ def integrity(bundle: Bundle, lid: int) -> dict:
     once = [d for d in recent if (d.seen_count or 0) <= 1]
     ips = {d.ip for d in recent if d.ip}
     overlaps = [o for o in bundle.overlaps.get(lid, []) if (_aw(o.at) or now) >= d30]
-    diff = [o for o in overlaps if o.ip_a and o.ip_b and o.ip_a != o.ip_b]
+    kinds = {d.device_id: ua_summary(d.user_agent or "") for d in devices}
+    classes = [overlap_kind(o, kinds) for o in overlaps]
     pings = bundle.alert_pings.get(lid, [])
     open_alerts = [p for p, _ in pings if p.reviewed_at is None]
     deliveries = bundle.deliveries.get(lid, [])
@@ -630,8 +647,11 @@ def integrity(bundle: Bundle, lid: int) -> dict:
         "devices_30d": len(recent),
         "devices_seen_once_30d": len(once),
         "ips_30d": len(ips),
+        "browser_kinds_30d": len({ua_summary(d.user_agent or "") for d in recent}),
         "overlaps_30d": len(overlaps),
-        "overlaps_different_networks_30d": len(diff),
+        "overlaps_different_networks_30d": classes.count("networks"),
+        "overlaps_different_devices_30d": classes.count("devices"),
+        "overlaps_same_browser_30d": classes.count("same"),
         "copy_alerts": len(pings),
         "copy_alerts_open": len(open_alerts),
         "launches": len(deliveries),
@@ -667,25 +687,31 @@ def flags(bundle: Bundle, lid: int) -> list[dict]:
         out.append({"severity": sev, "title": title, "detail": detail, "at": _iso(at)})
 
     # Account sharing
-    if integ["overlaps_different_networks_30d"]:
-        n = integ["overlaps_different_networks_30d"]
+    n = integ["overlaps_different_networks_30d"]
+    if n:
         add("alert" if n >= 3 else "warn",
-            f"Used on two browsers at the same time from different networks ×{n} in 30 days",
-            "The strongest sign of a shared login. A phone on mobile data and a laptop on "
-            "Wi-Fi used together by one person can also cause it.")
-    same = integ["overlaps_30d"] - integ["overlaps_different_networks_30d"]
-    if same:
-        add("warn" if same >= 3 else "info",
-            f"Used on two browsers at the same time on the same network ×{same} in 30 days",
-            "Could be one person with two devices at home or at work, or colleagues "
-            "sharing one login in the same office.")
+            f"In use on two browsers at the same time from different networks ×{n} in 30 days",
+            "The strongest sign of a shared login. One person using a phone on mobile data "
+            "and a laptop on Wi-Fi together can also cause it.")
+    n = integ["overlaps_different_devices_30d"]
+    if n:
+        add("warn" if n >= 3 else "info",
+            f"In use on two different devices at the same time on the same network ×{n} in 30 days",
+            "One person with a phone and a laptop, or colleagues sharing one login in the same office.")
+    n = integ["overlaps_same_browser_30d"]
+    if n:
+        add("info",
+            f"Two sessions of the same browser type at the same time on the same network ×{n} in 30 days",
+            "Usually one browser counted twice: until 22 Sep 2026 the first page requests after "
+            "a sign-in could each be given their own device id, and private browsing starts "
+            "afresh every time. Identical office computers would look the same.")
     if integ["devices_30d"] >= DEVICES_30D_NOTE:
-        once = integ["devices_seen_once_30d"]
-        note = (f"{once} of them were seen only once. Private browsing, cleared cookies, or "
-                "sign-in links opened inside an email app also produce one-time browsers."
-                if once else "")
-        add("warn" if integ["devices_30d"] - once >= DEVICES_30D_NOTE else "info",
-            f"{integ['devices_30d']} different browsers in 30 days", note.strip())
+        k = integ["browser_kinds_30d"]
+        add("warn" if k >= DEVICES_30D_NOTE else "info",
+            f"{integ['devices_30d']} browser sessions in 30 days — {k} kind{'s' if k != 1 else ''} of browser",
+            "A browser shows up as new whenever it has no device cookie: private browsing, "
+            "cleared cookies, or (until 22 Sep 2026) the first moments after each sign-in. "
+            "Many different kinds of browser is the stronger sign.")
     if integ["ips_30d"] >= IPS_30D_NOTE:
         add("info", f"{integ['ips_30d']} different networks (IP addresses) in 30 days",
             "Travel and mobile data change addresses often; worth a look only with other signs.")

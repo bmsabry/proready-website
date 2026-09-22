@@ -63,6 +63,9 @@ type Integrity = {
   ips_30d: number;
   overlaps_30d: number;
   overlaps_different_networks_30d: number;
+  overlaps_different_devices_30d: number;
+  overlaps_same_browser_30d: number;
+  browser_kinds_30d: number;
   copy_alerts: number;
   copy_alerts_open: number;
   launches: number;
@@ -794,9 +797,15 @@ function CertificatesView({ certs }: { certs: Cert[] }) {
 
 function IntegrityView({ i, devices }: { i: Integrity; devices: DeviceOut[] }) {
   const tiles: [string, number, string?][] = [
-    ['Browsers, 30 days', i.devices_30d, i.devices_seen_once_30d ? `${i.devices_seen_once_30d} seen only once` : undefined],
+    ['Browser sessions, 30 days', i.devices_30d, `${i.browser_kinds_30d} kind${i.browser_kinds_30d === 1 ? '' : 's'} of browser${i.devices_seen_once_30d ? ` · ${i.devices_seen_once_30d} seen once` : ''}`],
     ['Networks, 30 days', i.ips_30d],
-    ['Used at once, 30 days', i.overlaps_30d, i.overlaps_30d ? `${i.overlaps_different_networks_30d} on different networks` : undefined],
+    [
+      'Used at once, 30 days',
+      i.overlaps_30d,
+      i.overlaps_30d
+        ? `${i.overlaps_different_networks_30d} different networks · ${i.overlaps_different_devices_30d} different devices · ${i.overlaps_same_browser_30d} same browser type`
+        : undefined,
+    ],
     ['Protected launches', i.launches, i.copies_withdrawn ? `${i.copies_withdrawn} copies withdrawn` : undefined],
     ['Copy alerts', i.copy_alerts, i.copy_alerts ? `${i.copy_alerts_open} not reviewed` : undefined],
     ['Unlock keys refused', i.key_refusals],
