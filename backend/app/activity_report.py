@@ -631,6 +631,10 @@ def _visit_summary(evs: list[Event]) -> str:
                                                "quiz_open", "course_open")]
         if opened:
             parts.append(opened[-1].label + (f" (+{len(opened) - 1} more)" if len(opened) > 1 else ""))
+    if not parts:
+        signed = [e for e in evs if e.kind == "sign_in"]
+        if signed:
+            parts.append(signed[-1].label)
     if not parts and evs:
         parts.append(evs[-1].label)
     alerts = [e for e in evs if e.severity in ("warn", "alert")]
