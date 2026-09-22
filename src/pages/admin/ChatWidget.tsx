@@ -65,6 +65,10 @@ function describeCurrentView(): string {
         : 'Admin → Support (the ticket inbox).';
     case 'academy':
       return 'Admin → Academy (recorded on-demand products).';
+    case 'students':
+      return view.learner
+        ? `Admin → Student Activity, with learner id ${view.learner} expanded.`
+        : 'Admin → Student Activity (visits, progress, certificates, integrity per trainee).';
     case 'comms':
       return 'Admin → Comms (outbound email log and broadcasts).';
     case 'ai':

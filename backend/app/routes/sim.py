@@ -44,6 +44,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import academy as svc
+from .. import activity
 from ..config import get_settings
 from ..db import SessionLocal, get_db
 from ..deploy_auth import require_admin_or_deployer
@@ -137,6 +138,7 @@ async def sim_ws(websocket: WebSocket, lesson: int = 0, copy: str = "") -> None:
     if isinstance(admitted[0], int):
         code, reason = admitted  # type: ignore[misc]
         log.warning("SIM refused %s lesson=%s copy=%s: %s", code, lesson, (copy or "")[:8], reason)
+        await asyncio.to_thread(_record_refusal, _ws_meta(websocket), code, reason, int(lesson), copy)
         await _refuse(websocket, code, reason)
         return
     learner, lesson_row, delivery = admitted  # type: ignore[misc]
@@ -178,6 +180,8 @@ async def sim_ws(websocket: WebSocket, lesson: int = 0, copy: str = "") -> None:
         if session is not None:
             await host.drop(session)
             log.info("SIM session ended for %s (%d ops)", learner.email, session.ops)
+            await asyncio.to_thread(_record_session, _ws_meta(websocket), learner.id,
+                                    lesson_row, session)
 
 
 async def _serve(ws: WebSocket, learner: Learner, lesson: Lesson, delivery: AssetDelivery,
@@ -233,6 +237,8 @@ async def _serve(ws: WebSocket, learner: Learner, lesson: Lesson, delivery: Asse
         if session is not None:
             session.last_seen = time.time()
             session.ops += 1
+            key = op if isinstance(op, str) and len(op) <= 12 else "?"
+            session.op_counts[key] = session.op_counts.get(key, 0) + 1
 
         try:
             if op == "ping":
@@ -291,6 +297,7 @@ async def _serve(ws: WebSocket, learner: Learner, lesson: Lesson, delivery: Asse
 
             elif op == "step":
                 n = int(msg.get("n", 1) or 1)
+                session.sim_seconds += max(1, min(n, settings.SIM_MAX_SPEED))
                 out = await host.tick(session, n, _want_margin(session))
                 await ws.send_text('{"op":"reply","id":%s,' % json.dumps(mid) + out[1:])
 
@@ -361,6 +368,7 @@ async def _run_loop(ws: WebSocket, session: SimSession) -> None:
             if not session.running:
                 break
             next_at += tick
+            session.sim_seconds += session.speed
             out = await host.tick(session, session.speed, _want_margin(session))
             await ws.send_text('{"op":"frames",' + out[1:])
             if loop.time() > next_at + tick:   # fell far behind (slow client): resync
@@ -372,6 +380,98 @@ async def _run_loop(ws: WebSocket, session: SimSession) -> None:
     except Exception:  # pragma: no cover
         log.exception("SIM run loop died for %s", session.learner_email)
         session.running = False
+
+
+# ------------------------------------------------------------- activity --
+# What the Student Activity page shows for the simulator: every session that
+# ran (how long, how many commands) and every connection that was refused
+# with a signed-in account behind it. Both are written after the socket is
+# done with, on their own DB session, and never raise.
+
+def _ws_meta(ws: WebSocket) -> dict:
+    host_ip = ws.client.host if ws.client else ""
+    return {
+        "device": (ws.cookies.get("learner_device") or "")[:32],
+        "cookie": ws.cookies.get(LEARNER_COOKIE_NAME, ""),
+        "ip": activity.client_ip(ws.headers, host_ip),
+        "origin": (ws.headers.get("origin") or "")[:200],
+    }
+
+
+def refusal_kind(code: int, reason: str) -> str:
+    """Name a refusal by what it means for integrity (see sim._admit)."""
+    text = reason.lower()
+    if code == CLOSE_ORIGIN and "runs only from" in text:
+        return "offsite"
+    if "not licensed" in text:
+        return "other_copy"
+    if "withdrawn" in text:
+        return "withdrawn"
+    if "expired" in text and code == CLOSE_COPY:
+        return "expired"
+    if code == CLOSE_FULL:
+        return "too_many" if "another window" in text else "capacity"
+    if code == CLOSE_AUTH:
+        return "signed_out"
+    return "access"
+
+
+_REFUSAL_LABEL = {
+    "offsite": "Simulator refused: a copy tried to run outside proreadyengineer.com",
+    "other_copy": "Simulator refused: the copy was issued to a different account",
+    "withdrawn": "Simulator refused: the copy had been withdrawn",
+    "expired": "Simulator refused: the copy had expired (open longer than its lifetime)",
+    "too_many": "Simulator refused: already open in too many windows",
+    "capacity": "Simulator refused: server busy",
+    "access": "Simulator refused: no access to this lesson",
+}
+
+
+def _record_refusal(meta: dict, code: int, reason: str, lesson_id: int, copy: str) -> None:
+    try:
+        learner_id = verify_learner_token(meta["cookie"]) if meta.get("cookie") else None
+        if learner_id is None:
+            return  # nobody signed in: nothing to attach it to
+        kind = refusal_kind(code, reason)
+        db = SessionLocal()
+        try:
+            activity.record(
+                db, learner_id, "sim_refused", visit="existing",
+                device_id=meta["device"], ip=meta["ip"], lesson_id=lesson_id,
+                label=_REFUSAL_LABEL.get(kind, "Simulator refused"),
+                detail={"why": kind, "code": code, "origin": meta["origin"],
+                        "copy": (copy or "")[:8]},
+            )
+        finally:
+            db.close()
+    except Exception:  # pragma: no cover
+        log.exception("SIM refusal could not be recorded")
+
+
+def _record_session(meta: dict, learner_id: int, lesson: Lesson, session: SimSession) -> None:
+    try:
+        start = datetime.fromtimestamp(session.created, tz=timezone.utc)
+        end = datetime.now(timezone.utc)
+        minutes = max(0.0, (end - start).total_seconds() / 60.0)
+        db = SessionLocal()
+        try:
+            activity.record(
+                db, learner_id, "sim_session", visit="existing",
+                device_id=meta["device"], ip=meta["ip"], lesson_id=lesson.id,
+                module_id=lesson.module_id, at=start, last_at=end, amount=session.ops,
+                label="Ran the simulator",
+                detail={
+                    "minutes": round(minutes, 1),
+                    "ops": session.ops,
+                    "op_counts": dict(session.op_counts),
+                    "sim_seconds": session.sim_seconds,
+                    "copy": session.copy_token[:8],
+                },
+            )
+        finally:
+            db.close()
+    except Exception:  # pragma: no cover
+        log.exception("SIM session could not be recorded")
 
 
 # ---------------------------------------------------------------- admin --

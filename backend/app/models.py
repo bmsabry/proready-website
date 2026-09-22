@@ -444,6 +444,67 @@ class LearnerOverlapEvent(Base):
     )
 
 
+class LearnerVisit(Base):
+    """One stretch of signed-in use from one browser.
+
+    A learner session is a 30-day cookie, so "signed in" happens rarely; what
+    the instructor wants to see is each time a trainee actually came back.
+    A visit opens on the first authenticated request from a device after
+    30 minutes of silence (or on any fresh sign-in) and is extended by
+    every later request from that device (throttled with the device
+    registry, see activity.py). The quiz apps sign in with a password and a
+    bearer token; their visits carry device_id 'app'.
+    """
+
+    __tablename__ = "academy_learner_visits"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    learner_id: Mapped[int] = mapped_column(Integer, index=True)
+    device_id: Mapped[str] = mapped_column(String(32), default="", index=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    user_agent: Mapped[str] = mapped_column(String(400), default="")
+    # How the visit began: 'link' (email sign-in link), 'password' (quiz
+    # app), or '' (the browser was still signed in).
+    sign_in: Mapped[str] = mapped_column(String(16), default="")
+
+
+class LearnerActivity(Base):
+    """Something a learner did that no other table records.
+
+    Lesson completions, evaluation attempts, simulator launches, certificates
+    and integrity pings already have their own tables; the admin activity
+    report reads those directly. This table holds the rest: sign-ins and
+    failed passwords, which lesson or course page was opened, time spent on
+    a lesson (one row per visit and lesson, `amount` = seconds), evaluation
+    sets opened (for timing), simulator sessions and refusals.
+    """
+
+    __tablename__ = "academy_learner_activity"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    learner_id: Mapped[int] = mapped_column(Integer, index=True)
+    visit_id: Mapped[int | None] = mapped_column(Integer, index=True, default=None)
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    last_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    kind: Mapped[str] = mapped_column(String(24), index=True)
+    product_code: Mapped[str] = mapped_column(String(64), default="")
+    module_id: Mapped[int] = mapped_column(Integer, default=0)
+    lesson_id: Mapped[int] = mapped_column(Integer, default=0)
+    label: Mapped[str] = mapped_column(String(300), default="")
+    amount: Mapped[int] = mapped_column(Integer, default=0)
+    detail: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    device_id: Mapped[str] = mapped_column(String(32), default="")
+
+
 class Product(Base):
     """A sellable course. One row per thing a visitor can buy."""
 

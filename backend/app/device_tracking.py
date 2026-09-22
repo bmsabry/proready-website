@@ -27,6 +27,7 @@ from fastapi import Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import activity
 from .models import Learner, LearnerDevice, LearnerOverlapEvent
 
 log = logging.getLogger(__name__)
@@ -63,8 +64,13 @@ def track_device(
     request: Request,
     response: Response,
     device_cookie: str,
+    sign_in: str = "",
 ) -> None:
-    """Record that this learner's session was just used from this device."""
+    """Record that this learner's session was just used from this device.
+
+    Also keeps the learner's visit log (activity.py) on the same throttled
+    write. `sign_in` ('link' | 'password') marks a fresh sign-in: it always
+    opens a new visit, even inside the throttle window."""
     # Capture the id up front: on a broken/closed session even reading
     # learner.id can raise (detached instance), and nothing in here —
     # including the error path — is allowed to break auth.
@@ -89,6 +95,13 @@ def track_device(
                 path="/",
             )
 
+        # The activity recorder reads this: a cookie minted on this request
+        # is not in request.cookies yet.
+        try:
+            request.state.learner_device = device_id
+        except Exception:  # pragma: no cover
+            pass
+
         now = datetime.now(timezone.utc)
         row = db.execute(
             select(LearnerDevice).where(
@@ -99,7 +112,7 @@ def track_device(
 
         if row is not None:
             last_seen = _aware(row.last_seen_at)
-            if last_seen is not None and now - last_seen < TOUCH_INTERVAL:
+            if last_seen is not None and now - last_seen < TOUCH_INTERVAL and not sign_in:
                 return  # touched recently — nothing to write
             row.last_seen_at = now
             row.ip = _client_ip(request)
@@ -118,6 +131,10 @@ def track_device(
             db.add(row)
 
         overlapped = _record_overlap(db, learner_id, device_id, row.ip, now)
+        activity.touch_visit(
+            db, learner_id, device_id, ip=row.ip, user_agent=row.user_agent,
+            now=now, sign_in=sign_in,
+        )
         db.commit()
         if overlapped:
             # Off-thread, on its own session: the auth path never waits on

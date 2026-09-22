@@ -38,12 +38,13 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import academy as svc
+from .. import activity
 from ..config import get_settings
 from ..db import get_db
 from ..models import Learner, ModuleState
@@ -357,7 +358,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)) -> TokenResponse:
 
 
 @auth_router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
     learner = db.execute(
         select(Learner).where(Learner.email == body.email.lower().strip())
     ).scalar_one_or_none()
@@ -371,6 +372,12 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
             detail=_recovery_hint("This email has course access but no password yet."),
         )
     if learner is None or not verify_password(body.password, learner.password_hash):
+        if learner is not None:
+            activity.record(
+                db, learner.id, "sign_in_failed", request=request, visit="none",
+                device_id=activity.APP_DEVICE,
+                label="Wrong password on the quiz-app sign-in",
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=_recovery_hint("Invalid email or password. Forgot it?"),
@@ -382,6 +389,20 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     learner.last_login_at = datetime.now(timezone.utc)
     db.commit()
     svc.promote_if_owner(db, learner)
+    try:
+        activity.touch_visit(
+            db, learner.id, activity.APP_DEVICE,
+            ip=activity.client_ip(request.headers, request.client.host if request.client else ""),
+            user_agent=request.headers.get("user-agent", ""), sign_in="password",
+        )
+        db.commit()
+    except Exception:  # pragma: no cover — never break sign-in
+        log.exception("[activity] quiz-app visit failed for learner %s", learner.id)
+        db.rollback()
+    activity.record(
+        db, learner.id, "sign_in", request=request, device_id=activity.APP_DEVICE,
+        label="Signed in to the quiz apps with a password", detail={"method": "password"},
+    )
     return _token_response(learner)
 
 
@@ -608,6 +629,7 @@ def get_progress(
 def put_progress(
     module_id: str,
     body: ProgressIn,
+    request: Request,
     db: Session = Depends(get_db),
     learner: Learner = Depends(current_learner),
 ) -> ProgressOut:
@@ -627,4 +649,21 @@ def put_progress(
     row.last_active_at = now
     db.commit()
     db.refresh(row)
-    return ProgressOut(payload=row.payload, updated_at=row.updated_at)
+    out = ProgressOut(payload=row.payload, updated_at=row.updated_at)
+    try:
+        activity.touch_visit(
+            db, learner.id, activity.APP_DEVICE,
+            ip=activity.client_ip(request.headers, request.client.host if request.client else ""),
+            user_agent=request.headers.get("user-agent", ""), now=now,
+        )
+        db.commit()
+    except Exception:  # pragma: no cover — never break the save
+        log.exception("[activity] quiz-app visit failed for learner %s", learner.id)
+        db.rollback()
+    info = MODULES.get(module_id.lower(), {})
+    activity.record(
+        db, learner.id, "quiz_app", request=request, device_id=activity.APP_DEVICE,
+        label=f"Worked in the {info.get('title') or module_id.upper()} quiz app",
+        detail={"app": module_id.lower()}, dedupe=timedelta(minutes=30),
+    )
+    return out

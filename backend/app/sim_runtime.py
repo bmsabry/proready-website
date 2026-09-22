@@ -62,6 +62,8 @@ class SimSession:
     running: bool = False
     want_margin_until: float = 0.0
     ops: int = 0                  # total ops, for the admin view
+    op_counts: dict = field(default_factory=dict)  # per op name, for the activity log
+    sim_seconds: int = 0          # simulated seconds advanced (step + run)
     run_task: Optional[asyncio.Task] = None
     ws: Any = None                # the socket, so a withdrawal can close it
 

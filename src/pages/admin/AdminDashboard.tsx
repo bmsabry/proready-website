@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Activity,
   BookOpen,
   GraduationCap,
   LayoutDashboard,
@@ -25,6 +26,7 @@ import OverviewPage from './OverviewPage';
 import CoursesPage from './CoursesPage';
 import CourseWorkspace from './CourseWorkspace';
 import AcademyPage from './AcademyPage';
+import StudentActivityPage from './StudentActivityPage';
 import SoftwarePage from './SoftwarePage';
 import CommsPage from './CommsPage';
 import SupportPage from './SupportPage';
@@ -36,6 +38,7 @@ const NAV: { page: ViewState['page']; label: string; icon: LucideIcon }[] = [
   { page: 'overview', label: 'Overview', icon: LayoutDashboard },
   { page: 'courses', label: 'Courses', icon: BookOpen },
   { page: 'academy', label: 'Academy', icon: GraduationCap },
+  { page: 'students', label: 'Student Activity', icon: Activity },
   { page: 'software', label: 'Software', icon: MonitorDown },
   { page: 'comms', label: 'Comms', icon: Mail },
   { page: 'support', label: 'Support', icon: LifeBuoy },
@@ -135,6 +138,17 @@ export default function AdminDashboard() {
     }
     case 'academy':
       content = <AcademyPage onAuthError={onAuthError} />;
+      break;
+    case 'students':
+      content = (
+        <StudentActivityPage
+          onAuthError={onAuthError}
+          openId={view.learner ?? null}
+          onOpen={(id) =>
+            go(id ? { page: 'students', learner: id } : { page: 'students' }, { replace: true })
+          }
+        />
+      );
       break;
     case 'software':
       content = (

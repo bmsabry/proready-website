@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
@@ -46,12 +47,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import academy as svc
+from .. import activity
 from .. import asset_lock as lock
 from .. import learner_requests as lr
 from .. import integrity_alerts as alerts
 from .. import provenance as prov
 from ..config import get_settings
 from ..db import get_db
+from ..device_tracking import DEVICE_COOKIE_NAME, track_device
 from ..emailer import login_link_html, send_email
 from ..learner_auth import (
     clear_learner_cookie,
@@ -240,7 +243,7 @@ def catalog_detail(
 # -----------------------------------------------------------------------------
 
 @router.post("/auth/request-link", response_model=OkOut)
-def request_link(body: RequestLinkIn, db: Session = Depends(get_db)) -> OkOut:
+def request_link(body: RequestLinkIn, request: Request, db: Session = Depends(get_db)) -> OkOut:
     """Email a one-time sign-in link.
 
     Always returns ok=True, whether or not the address is known. Confirming
@@ -274,6 +277,11 @@ def request_link(body: RequestLinkIn, db: Session = Depends(get_db)) -> OkOut:
 
     if recent_link_count(db, learner.id) >= settings.LOGIN_LINK_MAX_PER_HOUR:
         log.warning("Sign-in link rate limit hit for learner id=%s", learner.id)
+        activity.record(
+            db, learner.id, "link_requested", request=request, visit="none",
+            label="Asked for a sign-in link — hourly limit reached, none sent",
+            detail={"sent": False},
+        )
         return OkOut()
 
     next_path = body.next_path if body.next_path.startswith("/") else "/learn"
@@ -287,11 +295,20 @@ def request_link(body: RequestLinkIn, db: Session = Depends(get_db)) -> OkOut:
             learner.full_name or "", link, settings.LOGIN_LINK_TTL_SECONDS // 60
         ),
     )
+    activity.record(
+        db, learner.id, "link_requested", request=request, visit="none",
+        label="Asked for a sign-in link", detail={"sent": True},
+    )
     return OkOut()
 
 
 @router.post("/auth/verify")
-def verify(body: VerifyIn, response: Response, db: Session = Depends(get_db)) -> dict:
+def verify(
+    body: VerifyIn,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> dict:
     result = consume_login_token(db, body.token)
     if result is None:
         raise HTTPException(
@@ -304,6 +321,12 @@ def verify(body: VerifyIn, response: Response, db: Session = Depends(get_db)) ->
     # password path and the quiz apps never see is_admin.
     svc.promote_if_owner(db, learner)
     set_learner_cookie(response, learner)
+    # A fresh sign-in always opens a new visit on this browser (minting the
+    # device cookie now if the browser has none yet).
+    track_device(db, learner, request, response,
+                 request.cookies.get(DEVICE_COOKIE_NAME, ""), sign_in="link")
+    activity.record(db, learner.id, "sign_in", request=request,
+                    label="Signed in with an email link", detail={"method": "link"})
     return {
         "ok": True,
         "email": learner.email,
@@ -451,6 +474,7 @@ def accept_terms(
 @router.get("/course/{code}")
 def course(
     code: str,
+    request: Request,
     db: Session = Depends(get_db),
     learner: Learner = Depends(require_learner),
 ) -> dict:
@@ -460,6 +484,11 @@ def course(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this course yet.",
         )
+    activity.record(
+        db, learner.id, "course_open", request=request, product_code=code,
+        label=f"Opened the course page — {product.title}",
+        dedupe=timedelta(minutes=30),
+    )
     modules = svc.course_state(db, learner, code)
     total_lessons = sum(m["lesson_count"] for m in modules)
     done_lessons = sum(m["lessons_completed"] for m in modules)
@@ -507,6 +536,7 @@ class LearnerRequestIn(BaseModel):
 def reset_course(
     code: str,
     body: ResetIn,
+    request: Request,
     db: Session = Depends(get_db),
     learner: Learner = Depends(require_learner),
 ) -> dict:
@@ -519,7 +549,12 @@ def reset_course(
     if body.confirm.strip().upper() != "RESET":
         raise HTTPException(status_code=status.HTTP_428_PRECONDITION_REQUIRED,
                             detail="Type RESET to confirm starting the course over.")
-    return {"ok": True, **lr.reset_progress(db, learner, product)}
+    result = lr.reset_progress(db, learner, product)
+    activity.record(
+        db, learner.id, "course_reset", request=request, product_code=code,
+        label=f"Started the course over (own progress reset) — {product.title}",
+    )
+    return {"ok": True, **result}
 
 
 @router.post("/course/{code}/requests")
@@ -568,6 +603,7 @@ def _resume_position(lesson: Lesson, prog) -> int:
 @router.get("/lesson/{lesson_id}")
 def lesson_detail(
     lesson_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     learner: Learner | None = Depends(optional_learner),
 ) -> dict:
@@ -582,6 +618,14 @@ def lesson_detail(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=reason)
 
     module = db.get(Module, lesson.module_id)
+    if learner is not None:
+        activity.record(
+            db, learner.id, "lesson_open", request=request,
+            product_code=module.product_code if module else "",
+            module_id=lesson.module_id, lesson_id=lesson.id,
+            label=f"Opened “{lesson.title}”", detail={"lesson_kind": lesson.kind},
+            dedupe=timedelta(minutes=30),
+        )
     prog = svc.progress_map(db, learner, [lesson.id]).get(lesson.id)
 
     siblings = db.execute(
@@ -659,6 +703,7 @@ def lesson_detail(
 def lesson_progress(
     lesson_id: int,
     body: ProgressIn,
+    request: Request,
     db: Session = Depends(get_db),
     learner: Learner = Depends(require_learner),
 ) -> dict:
@@ -683,6 +728,13 @@ def lesson_progress(
         module = db.get(Module, lesson.module_id)
         if module is not None:
             certs.maybe_issue_completion(db, learner, module.product_code)
+    if body.watched_delta_s > 0:
+        module = db.get(Module, lesson.module_id)
+        activity.add_time_on_lesson(
+            db, learner.id, request, lesson_id=lesson.id, module_id=lesson.module_id,
+            product_code=module.product_code if module else "", title=lesson.title,
+            seconds=body.watched_delta_s,
+        )
     return {
         "ok": True,
         "position_s": row.position_s,
@@ -715,6 +767,7 @@ def _module_for_learner(db: Session, module_id: int, learner: Learner) -> Module
 def quiz_items(
     module_id: int,
     item_set: str,
+    request: Request,
     db: Session = Depends(get_db),
     learner: Learner = Depends(require_learner),
 ) -> dict:
@@ -730,6 +783,12 @@ def quiz_items(
 
     settings = get_settings()
     previous = svc.best_attempt(db, learner, module.id, item_set)
+    activity.record(
+        db, learner.id, "quiz_open", request=request,
+        product_code=module.product_code, module_id=module.id,
+        label=f"Opened the {'evaluation' if item_set == 'formative' else 'mastery check'} — {module.title}",
+        detail={"item_set": item_set, "items": len(items)},
+    )
     return {
         "module": {"id": module.id, "code": module.code, "title": module.title},
         "item_set": item_set,
