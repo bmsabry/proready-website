@@ -491,7 +491,7 @@ function StudentRow({
             <div className="text-white text-lg font-semibold leading-none group-hover:text-cyan-300 underline decoration-dotted decoration-slate-600 underline-offset-4">
               {r.visits}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1">
+            <div className="text-[11px] text-slate-400 mt-1 whitespace-nowrap">
               {r.sign_ins} sign-in{r.sign_ins === 1 ? '' : 's'}
             </div>
           </button>
