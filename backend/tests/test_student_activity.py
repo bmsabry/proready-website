@@ -308,7 +308,8 @@ def test_history_from_before_tracking_is_reconstructed(admin, course):
     lid = _learner_id(email)
     db = SessionLocal()
     try:
-        first = min(v.started_at for v in db.query(LearnerVisit).all())
+        first = min((v.started_at for v in db.query(LearnerVisit).all()),
+                    default=datetime.now(timezone.utc))
         if first.tzinfo is None:
             first = first.replace(tzinfo=timezone.utc)
         at = first - timedelta(days=5)
@@ -317,6 +318,12 @@ def test_history_from_before_tracking_is_reconstructed(admin, course):
         db.add(LessonProgress(learner_id=lid, lesson_id=lessons[0], position_s=0,
                               watched_s=10, completed_at=at + timedelta(minutes=10),
                               updated_at=at + timedelta(minutes=10)))
+        # The only browser this learner used then: the rebuilt visit names it.
+        db.add(LearnerDevice(learner_id=lid, device_id="d" * 32, ip="198.51.100.7",
+                             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) "
+                                        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+                             first_seen_at=at - timedelta(days=1), last_seen_at=at + timedelta(minutes=12),
+                             seen_count=3))
         db.commit()
     finally:
         db.close()
@@ -327,6 +334,7 @@ def test_history_from_before_tracking_is_reconstructed(admin, course):
     assert "sign_in" in kinds and "link_requested" in kinds
     assert visit["how"] == "Email-link sign-in"
     assert visit["counts_as_visit"] is True
+    assert visit["device"] == "Safari on Mac" and visit["ip"] == "198.51.100.7"
     row = _row(admin, email)
     assert row["sign_ins"] >= 1
 

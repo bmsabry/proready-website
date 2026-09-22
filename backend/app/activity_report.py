@@ -556,10 +556,22 @@ def build_visits(bundle: Bundle, lid: int) -> list[dict]:
         cluster.append(e)
     if cluster:
         rebuilt.append(cluster)
+    known = [(_aw(d.first_seen_at), _aw(d.last_seen_at), d) for d in bundle.devices.get(lid, [])
+             if d.first_seen_at and d.last_seen_at]
     for c in rebuilt:
         ips = [x.ip for x in c if x.ip]
         devs = [x.device for x in c if x.device and x.kind != "new_device"] or \
                [x.device for x in c if x.device]
+        if not ips or not devs:
+            # Records such as evaluation attempts carry no browser. When exactly
+            # one of the learner's browsers was in use around that time, it is
+            # the one — say so; otherwise leave it blank rather than guess.
+            lo, hi = c[0].at, max(x.end or x.at for x in c)
+            pad = timedelta(minutes=5)
+            cover = [d for f, l, d in known if f - pad <= hi and lo <= l + pad]
+            if len(cover) == 1:
+                ips = ips or ([cover[0].ip] if cover[0].ip else [])
+                devs = devs or [ua_summary(cover[0].user_agent or "")]
         present = any(x.kind in PRESENCE_KINDS for x in c)
         signed_out = not present and any(x.kind in SIGNED_OUT_KINDS for x in c)
         slots.append({
