@@ -105,6 +105,11 @@ CATEGORY_LABEL: dict[str, str] = {
 # correct one. The customer still gets an instant acknowledgement.
 ESCALATE_ALWAYS: set[str] = {"payment", "access", "bug", "business"}
 
+# Website forms whose tickets have a fixed category, whatever the model
+# reads into them. The team training request form is a sales lead: always
+# "business" (escalated to Bassam), never parked as spam by the model.
+FORM_KINDS: dict[str, str] = {"team_training": "business"}
+
 # Two AI turns per ticket. Past that the customer is clearly not getting
 # what they need and it goes to Bassam.
 MAX_AI_ATTEMPTS = 2
@@ -922,6 +927,10 @@ def _sanitize_classification(raw: dict, ticket: SupportTicket) -> dict[str, Any]
     cat = cat.strip().strip(":").lower().replace(" ", "_").replace("-", "_")
     if cat not in CATEGORIES:
         cat = "general"
+    kind = str((ticket.meta or {}).get("kind") or "")
+    fixed = FORM_KINDS.get(kind)
+    if fixed:
+        cat = fixed
 
     try:
         conf = float(raw.get("confidence", 0.5))
@@ -946,7 +955,7 @@ def _sanitize_classification(raw: dict, ticket: SupportTicket) -> dict[str, Any]
     return {
         "category": cat,
         "priority": CATEGORY_PRIORITY.get(cat, 8),
-        "is_spam": bool(raw.get("is_spam", False)),
+        "is_spam": bool(raw.get("is_spam", False)) and not fixed,
         "confidence": conf,
         "summary": str(raw.get("summary", "") or "")[:500],
         "reply_html": reply,
@@ -960,9 +969,10 @@ def _fallback_classification(ticket: SupportTicket) -> dict[str, Any]:
     """What we do when the model is unavailable: acknowledge and escalate."""
     name = (ticket.submitter_name or "").strip().split(" ")[0]
     greeting = f"<p>Hi {name},</p>" if name else "<p>Hello,</p>"
+    cat = FORM_KINDS.get(str((ticket.meta or {}).get("kind") or "")) or ticket.category or "general"
     return {
-        "category": ticket.category or "general",
-        "priority": CATEGORY_PRIORITY.get(ticket.category or "general", 8),
+        "category": cat,
+        "priority": CATEGORY_PRIORITY.get(cat, 8),
         "is_spam": False,
         "confidence": 0.0,
         "summary": "Automatic triage unavailable — needs manual review.",

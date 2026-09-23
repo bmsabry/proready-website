@@ -187,6 +187,69 @@ def test_sensitive_categories_never_auto_resolve(
     assert any(m.get("audience") == "admin" for m in captured_mail)
 
 
+@pytest.mark.parametrize(
+    "model",
+    [
+        # The model thinks it can answer a "course info" question itself.
+        {"category": "course_info", "is_spam": False, "can_auto_resolve": True},
+        # The model mistakes an Arabic-language request for spam.
+        {"category": "general", "is_spam": True, "can_auto_resolve": False},
+    ],
+)
+def test_team_training_requests_always_reach_bassam(
+    client, db, monkeypatch, captured_mail, model
+):
+    """The Training page's team request form is a sales lead: whatever the
+    model reads into it, it is filed as a business enquiry and escalated."""
+    fake_llm(
+        monkeypatch,
+        {
+            **model,
+            "priority": 5,
+            "confidence": 0.97,
+            "summary": "Training enquiry.",
+            "reply_html": "<p>Our next course starts soon.</p>",
+            "escalation_reason": "",
+        },
+    )
+    r = client.post(
+        "/api/support/contact",
+        json={
+            "name": "Khalid",
+            "email": "khalid@plant.example",
+            "subject": "Team training request: Plant Co (Saudi Arabia)",
+            "message": "Company: Plant Co\nLanguage: Arabic\n\nنحتاج دورة لفريق من 12 مهندساً",
+            "kind": "team_training",
+        },
+    )
+    assert r.status_code == 201
+    t = ticket_by_ref(db, r.json()["ref"])
+    assert t.category == "business" and t.is_spam is False
+    assert t.status == "escalated" and t.resolved_at is None
+    assert (t.meta or {}).get("kind") == "team_training"
+    assert any(m.get("audience") == "admin" for m in captured_mail)
+    assert any(m["to"] == "khalid@plant.example" for m in captured_mail)
+
+
+def test_team_training_request_escalates_when_the_model_is_down(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    r = client.post(
+        "/api/support/contact",
+        json={"email": "hr@plant.example", "message": "12 trainees", "kind": "team_training"},
+    )
+    t = ticket_by_ref(db, r.json()["ref"])
+    assert t.category == "business" and t.status == "escalated"
+
+
+def test_unknown_form_kinds_are_ignored(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    r = client.post(
+        "/api/support/contact",
+        json={"email": "x@example.com", "message": "hi", "kind": "vip_override"},
+    )
+    assert "kind" not in (ticket_by_ref(db, r.json()["ref"]).meta or {})
+
+
 def test_low_confidence_blocks_auto_reply(client, db, monkeypatch):
     """A model unsure what it is reading doesn't get to answer alone."""
     fake_llm(

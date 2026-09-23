@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Calendar,
   Clock,
@@ -14,7 +14,13 @@ import {
   PlayCircle,
   Tag,
 } from 'lucide-react';
-import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
+import { Reveal, SectionHeading, PageHero } from '../components/ui';
+import {
+  BeyondCatalog,
+  DeliveryOptions,
+  TEAM_FORM_ID,
+  TeamTrainingForm,
+} from './training/TeamTraining';
 import { usePageMeta } from '../lib/meta';
 import {
   courseSnapshot,
@@ -421,8 +427,21 @@ const UpcomingCard = ({ course, index }: { course: UpcomingCourse; index: number
 const Training = () => {
   usePageMeta(
     'Professional Training',
-    'Gas turbine, combustion, rotating equipment, and digital twin training taught by the engineers who design and test these systems. Live cohorts, on-demand programs, and a growing catalog: pumps, compressors, mechanical seals, valves, combustor design, combustion testing, digital twins.',
+    'Gas turbine, combustion, and emissions training taught by the engineers who design and test these systems. Delivered at your facility anywhere in the world, at a regional venue such as Istanbul, Dubai, or Cairo, in Cincinnati, or live online, in English or Arabic. Fundamentals and custom courses on request.',
   );
+
+  // In-page anchors (#team-training, #open-courses) also work when arriving
+  // from another page: the route change scrolls to the top first, so scroll
+  // to the section once it has rendered.
+  // Scrolled twice: once when the section exists, again once late layout
+  // (fonts, images) has settled, which otherwise leaves phones past the mark.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return;
+    const go = () => document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+    const timers = [100, 900].map((ms) => window.setTimeout(go, ms));
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [hash]);
 
   const [liveByCode, setLiveByCode] = useState<Record<string, LiveCourseInfo>>({});
   const [recordedPriceCents, setRecordedPriceCents] = useState<number>(
@@ -565,8 +584,16 @@ const Training = () => {
             <span className="text-gradient">Build These Systems</span>
           </>
         }
-        subtitle="Specialized courses taught by the engineers who design and test gas turbines, combustion systems, and industrial AI. Ex-GE, PhD-led, field-proven."
+        subtitle="Specialized courses taught by the engineers who design and test gas turbines, combustion systems, and industrial AI. Ex-GE, PhD-led, field-proven. Delivered at your facility anywhere in the world, at a regional venue, in Cincinnati, or live online, in English or Arabic."
       >
+        <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
+          <a href={`#${TEAM_FORM_ID}`} className="btn-primary">
+            Plan Training for Your Team <ArrowRight className="w-4 h-4" aria-hidden="true" />
+          </a>
+          <a href="#open-courses" className="btn-secondary">
+            See Open Courses
+          </a>
+        </div>
         <p className="mt-6 text-sm text-slate-400">
           Already enrolled?{' '}
           <Link to="/learn" className="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-medium">
@@ -574,6 +601,9 @@ const Training = () => {
           </Link>
         </p>
       </PageHero>
+
+      {/* WHERE WE DELIVER — on-site worldwide, regional venue, Cincinnati, online */}
+      <DeliveryOptions />
 
       {/* WHY TRAIN WITH US */}
       <section className="pt-2 pb-16">
@@ -600,7 +630,7 @@ const Training = () => {
       </section>
 
       {/* AVAILABLE NOW */}
-      <section className="pb-8">
+      <section id="open-courses" className="pb-8 scroll-mt-24">
         <div className="container-site">
           <SectionHeading
             eyebrow="Available Now"
@@ -658,6 +688,10 @@ const Training = () => {
                     Ask a Question
                   </Link>
                 </div>
+                <a href={`#${TEAM_FORM_ID}`} className="btn-ghost mt-4">
+                  <Users className="w-4 h-4" aria-hidden="true" />
+                  Run this course for your team, on site or at a venue
+                </a>
                 {flagshipLive?.recordedProductCode && (
                   <Link
                     to={`/training/${flagshipLive.recordedProductCode}`}
@@ -809,10 +843,10 @@ const Training = () => {
                   <p className="text-sm text-slate-400 leading-relaxed">
                     Same topics, same depth, same certificate in both formats. Only the
                     delivery differs. For teams,{' '}
-                    <Link to="/contact" className="text-cyan-400 hover:text-cyan-300 underline">
-                      contact us
-                    </Link>{' '}
-                    for group registration and licences.
+                    <a href={`#${TEAM_FORM_ID}`} className="text-cyan-400 hover:text-cyan-300 underline">
+                      ask us
+                    </a>{' '}
+                    about group registration, licences, or an in-person edition.
                   </p>
                 </div>
 
@@ -880,12 +914,11 @@ const Training = () => {
         </div>
       </section>
 
-      <CTABand
-        title="Need Training Built Around Your Fleet?"
-        subtitle="We tailor any program to your hardware, your data, and your team's experience level. Delivered on-site or live online."
-        primaryLabel="Ask About Custom Training"
-        primaryTo="/contact"
-      />
+      {/* ON REQUEST — fundamentals and custom courses not scheduled publicly */}
+      <BeyondCatalog />
+
+      {/* REQUEST FORM — the page's closing call to action */}
+      <TeamTrainingForm />
     </div>
   );
 };

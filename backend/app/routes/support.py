@@ -179,6 +179,10 @@ class ContactIn(BaseModel):
     email: EmailStr
     subject: str = Field(default="", max_length=300)
     message: str = Field(min_length=1, max_length=20_000)
+    # Which form sent it. "team_training" (the Training page's team request
+    # form) is always filed as a corporate training enquiry and escalated to
+    # Bassam: a sales lead must reach a human, never an automated answer.
+    kind: str = Field(default="", max_length=40)
     # Honeypot. A real browser leaves it blank; bots fill every field they
     # find. Filled means "accept and discard" — telling a bot it failed
     # just teaches it to try again.
@@ -251,6 +255,9 @@ def contact(
         # Honeypot tripped. Look exactly like success.
         return ContactOut(ref="00000000", message="Thanks — your message has been sent.")
 
+    meta = _request_meta(request)
+    if payload.kind.strip() in svc.FORM_KINDS:
+        meta["kind"] = payload.kind.strip()
     ticket = _create_ticket(
         db,
         email=str(payload.email),
@@ -258,7 +265,7 @@ def contact(
         subject=payload.subject,
         message=payload.message,
         source="contact_form",
-        meta=_request_meta(request),
+        meta=meta,
     )
     background.add_task(_triage_later, ticket.id)
     log.info("[support] ticket %s created from contact form (%s)", ticket.ref, ticket.submitter_email)
