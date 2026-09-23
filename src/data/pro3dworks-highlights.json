@@ -1,7 +1,8 @@
 {
-  "version": "2.68.2",
-  "name": "Reliable reasoning settings and faster AI startup",
+  "version": "2.68.3",
+  "name": "Auto-orient diagnostics and cancellation",
   "highlights": [
+    "Auto-orient shows elapsed waits and retry attempts, supports cancellation, and exports timing diagnostics for comparing providers without sharing API keys or CAD images.",
     "AI batches preserve provider thinking defaults. Reasoning changes are explicit settings, and optional price lookups no longer delay auto-orient or component identification.",
     "AI output-token and request-time limits are user-configurable, with no application-imposed limit by default. OpenRouter connection tests explain provider, credit, authentication and browser-network failures.",
     "Model loading and cached reopening are more responsive, with stronger source-identity checks and safeguards against incomplete assembly imports.",
