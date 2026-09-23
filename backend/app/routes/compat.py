@@ -46,7 +46,7 @@ from sqlalchemy.orm import Session
 from .. import academy as svc
 from .. import activity
 from ..config import get_settings
-from ..db import get_db
+from ..db import get_db, release_connection
 from ..models import Learner, ModuleState
 
 log = logging.getLogger(__name__)
@@ -285,6 +285,9 @@ def current_learner(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
         )
+    # Do not hold a pooled connection across the hop to the endpoint
+    # (see db.release_connection).
+    release_connection(db)
     return learner
 
 

@@ -30,7 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .db import get_db
+from .db import get_db, release_connection
 from .device_tracking import DEVICE_COOKIE_NAME, track_device
 from .models import Learner, LoginToken
 
@@ -209,8 +209,12 @@ def optional_learner(
         return None
     learner = db.get(Learner, learner_id)
     if learner is None or learner.status != "active":
+        release_connection(db)
         return None
     track_device(db, learner, request, response, learner_device)
+    # The endpoint runs on another thread hop; do not hold a pooled
+    # connection while waiting for it (see db.release_connection).
+    release_connection(db)
     return learner
 
 
