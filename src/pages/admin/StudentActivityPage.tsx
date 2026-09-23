@@ -14,6 +14,13 @@ import {
   AlertTriangle,
   Award,
   BookOpenCheck,
+  Building2,
+  CircleHelp,
+  EyeOff,
+  Satellite,
+  Server,
+  Smartphone,
+  Wifi,
   ChevronDown,
   ChevronRight,
   CircleCheck,
@@ -155,6 +162,34 @@ type DeviceOut = {
   seen_count: number;
 };
 
+type NetKind =
+  | 'mobile' | 'home' | 'business' | 'education' | 'government'
+  | 'datacenter' | 'vpn' | 'satellite' | 'local' | 'unknown';
+
+type IpInfo = {
+  ip: string;
+  place: string;
+  city: string;
+  country: string;
+  country_code: string;
+  provider: string;
+  netname: string;
+  kind: NetKind;
+  kind_label: string;
+  flags_known: boolean;
+};
+
+type Place = {
+  place: string;
+  country: string;
+  provider: string;
+  kind: NetKind;
+  kind_label: string;
+  ips: string[];
+  visits: number;
+  last_at: string | null;
+};
+
 type Detail = {
   since: string;
   tracking_since: string | null;
@@ -162,6 +197,9 @@ type Detail = {
   visits: Visit[];
   courses: CourseDetail[];
   devices: DeviceOut[];
+  ip_info: Record<string, IpInfo>;
+  locations: Place[];
+  ip_lookup_keyed: boolean;
 };
 
 // ----- Small pieces ----------------------------------------------------------
@@ -236,6 +274,51 @@ function ProgressBar({ c, wide }: { c: CourseProgress; wide?: boolean }) {
       <div className="text-[10px] text-slate-500 mt-0.5">
         {c.lessons_done}/{c.lessons_total} lessons · {c.sets_passed}/{c.sets_total} evaluations
       </div>
+    </div>
+  );
+}
+
+const NET: Record<NetKind, { short: string; tone: string; Icon: typeof Wifi }> = {
+  mobile: { short: 'Mobile data', tone: 'text-cyan-300', Icon: Smartphone },
+  home: { short: 'Home / office internet', tone: 'text-emerald-300', Icon: Wifi },
+  business: { short: 'Company network', tone: 'text-slate-300', Icon: Building2 },
+  education: { short: 'University / school', tone: 'text-slate-300', Icon: Building2 },
+  government: { short: 'Government network', tone: 'text-slate-300', Icon: Building2 },
+  datacenter: { short: 'Data centre', tone: 'text-amber-300', Icon: Server },
+  vpn: { short: 'VPN / proxy', tone: 'text-amber-300', Icon: EyeOff },
+  satellite: { short: 'Satellite', tone: 'text-slate-300', Icon: Satellite },
+  local: { short: 'Private address', tone: 'text-slate-500', Icon: CircleHelp },
+  unknown: { short: 'Type not known', tone: 'text-slate-500', Icon: CircleHelp },
+};
+
+/** Network kind with its icon: "Mobile data", "Home / office internet"… */
+function NetBadge({ kind, title }: { kind: NetKind; title?: string }) {
+  const n = NET[kind] ?? NET.unknown;
+  return (
+    <span className={`inline-flex items-center gap-1 ${n.tone}`} title={title}>
+      <n.Icon className="w-3 h-3 shrink-0" aria-hidden="true" />
+      {n.short}
+    </span>
+  );
+}
+
+/** An IP with where it is and what kind of network it belongs to. */
+function IpCell({ ip, info }: { ip: string; info?: IpInfo }) {
+  if (!ip) return <span className="text-slate-500">—</span>;
+  return (
+    <div className="min-w-[170px]">
+      <div className="font-mono text-slate-400">{ip}</div>
+      {info?.place && <div className="text-slate-200">{info.place}</div>}
+      {info && (
+        <div className="text-[11px]">
+          <NetBadge kind={info.kind} title={info.kind_label} />
+        </div>
+      )}
+      {info?.provider && (
+        <div className="text-[11px] text-slate-500" title={info.netname || undefined}>
+          {info.provider}
+        </div>
+      )}
     </div>
   );
 }
@@ -625,16 +708,38 @@ function StudentDetail({
           </button>
         ))}
       </div>
-      {tab === 'visits' && <VisitsTable visits={d.visits} />}
+      {tab === 'visits' && (
+        <>
+          {!d.ip_lookup_keyed && <KeyNote />}
+          <VisitsTable visits={d.visits} ipInfo={d.ip_info} />
+        </>
+      )}
       {tab === 'lessons' && <LessonsView courses={d.courses} />}
       {tab === 'certificates' && <CertificatesView certs={r.certificates} />}
-      {tab === 'integrity' && <IntegrityView i={r.integrity} devices={d.devices} />}
+      {tab === 'integrity' && (
+        <IntegrityView
+          i={r.integrity}
+          devices={d.devices}
+          ipInfo={d.ip_info}
+          places={d.locations}
+          keyed={d.ip_lookup_keyed}
+        />
+      )}
       {tab === 'flags' && <FlagsView flags={r.flags} />}
     </div>
   );
 }
 
-function VisitsTable({ visits }: { visits: Visit[] }) {
+function KeyNote() {
+  return (
+    <p className="text-xs text-slate-400 mb-3">
+      Locations are shown; home-vs-mobile needs the free ipapi.is key (Render → Environment →{' '}
+      <span className="font-mono">IPAPI_KEY</span>).
+    </p>
+  );
+}
+
+function VisitsTable({ visits, ipInfo }: { visits: Visit[]; ipInfo: Record<string, IpInfo> }) {
   const [open, setOpen] = useState<number | null>(null);
   if (visits.length === 0) return <p className="text-slate-400 text-sm">No visits in this period.</p>;
   return (
@@ -668,7 +773,9 @@ function VisitsTable({ visits }: { visits: Visit[] }) {
                 <td className="px-3 py-2 whitespace-nowrap text-slate-300">{duration(v.minutes)}</td>
                 <td className="px-3 py-2 whitespace-nowrap text-slate-300">{v.how}</td>
                 <td className="px-3 py-2 whitespace-nowrap text-slate-300">{v.device || '—'}</td>
-                <td className="px-3 py-2 whitespace-nowrap font-mono text-slate-400">{v.ip || '—'}</td>
+                <td className="px-3 py-2 align-top">
+                  <IpCell ip={v.ip} info={ipInfo[v.ip]} />
+                </td>
                 <td className="px-3 py-2 text-slate-200 min-w-[260px]">{v.summary}</td>
               </tr>
               {open === idx && (
@@ -681,7 +788,12 @@ function VisitsTable({ visits }: { visits: Visit[] }) {
                           <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${SEV_DOT[e.severity === 'info' ? '' : e.severity]}`} />
                           <span className={e.severity === 'alert' ? 'text-red-300' : e.severity === 'warn' ? 'text-amber-300' : 'text-slate-200'}>
                             {e.label}
-                            {e.ip && e.ip !== v.ip && <span className="text-slate-500 font-mono"> · {e.ip}</span>}
+                            {e.ip && e.ip !== v.ip && (
+                              <span className="text-slate-500">
+                                {' '}· <span className="font-mono">{e.ip}</span>
+                                {ipInfo[e.ip]?.place ? ` (${ipInfo[e.ip].place}, ${NET[ipInfo[e.ip].kind]?.short ?? ''})` : ''}
+                              </span>
+                            )}
                           </span>
                         </li>
                       ))}
@@ -795,7 +907,19 @@ function CertificatesView({ certs }: { certs: Cert[] }) {
   );
 }
 
-function IntegrityView({ i, devices }: { i: Integrity; devices: DeviceOut[] }) {
+function IntegrityView({
+  i,
+  devices,
+  ipInfo,
+  places,
+  keyed,
+}: {
+  i: Integrity;
+  devices: DeviceOut[];
+  ipInfo: Record<string, IpInfo>;
+  places: Place[];
+  keyed: boolean;
+}) {
   const tiles: [string, number, string?][] = [
     ['Browser sessions, 30 days', i.devices_30d, `${i.browser_kinds_30d} kind${i.browser_kinds_30d === 1 ? '' : 's'} of browser${i.devices_seen_once_30d ? ` · ${i.devices_seen_once_30d} seen once` : ''}`],
     ['Networks, 30 days', i.ips_30d],
@@ -824,6 +948,42 @@ function IntegrityView({ i, devices }: { i: Integrity; devices: DeviceOut[] }) {
       <p className="text-xs text-slate-400">
         To withdraw a protected copy or end a live simulator session, use the course's Integrity tab.
       </p>
+      <div>
+        <div className="text-sm text-white font-medium mb-2">Where this account was used</div>
+        {!keyed && <KeyNote />}
+        {places.length === 0 ? (
+          <p className="text-slate-400 text-xs">No addresses recorded in this period.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-800">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-[10px] font-mono uppercase tracking-widest text-slate-500 border-b border-slate-800">
+                  <th className="px-3 py-2">Place</th>
+                  <th className="px-3 py-2">Network</th>
+                  <th className="px-3 py-2">Provider</th>
+                  <th className="px-3 py-2">Visits</th>
+                  <th className="px-3 py-2">Last seen</th>
+                  <th className="px-3 py-2">IP addresses</th>
+                </tr>
+              </thead>
+              <tbody>
+                {places.map((p, k) => (
+                  <tr key={k} className="border-b border-slate-800/60 last:border-0 align-top">
+                    <td className="px-3 py-2 text-slate-200">{p.place}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <NetBadge kind={p.kind} title={p.kind_label} />
+                    </td>
+                    <td className="px-3 py-2 text-slate-300">{p.provider || '—'}</td>
+                    <td className="px-3 py-2 text-slate-300">{p.visits}</td>
+                    <td className="px-3 py-2 text-slate-300 whitespace-nowrap">{when(p.last_at)}</td>
+                    <td className="px-3 py-2 font-mono text-slate-400">{p.ips.join(', ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
       {devices.length > 0 && (
         <div className="overflow-x-auto rounded-xl border border-slate-800">
           <table className="w-full text-xs">
@@ -840,7 +1000,9 @@ function IntegrityView({ i, devices }: { i: Integrity; devices: DeviceOut[] }) {
               {devices.map((dv, k) => (
                 <tr key={k} className="border-b border-slate-800/60 last:border-0">
                   <td className="px-3 py-2 text-slate-200 whitespace-nowrap">{dv.browser}</td>
-                  <td className="px-3 py-2 font-mono text-slate-400">{dv.ip || '—'}</td>
+                  <td className="px-3 py-2 align-top">
+                    <IpCell ip={dv.ip} info={ipInfo[dv.ip]} />
+                  </td>
                   <td className="px-3 py-2 text-slate-300 whitespace-nowrap">{when(dv.first_seen_at)}</td>
                   <td className="px-3 py-2 text-slate-300 whitespace-nowrap">{when(dv.last_seen_at)}</td>
                   <td className="px-3 py-2 text-slate-300">{dv.seen_count}</td>

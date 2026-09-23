@@ -505,6 +505,44 @@ class LearnerActivity(Base):
     device_id: Mapped[str] = mapped_column(String(32), default="")
 
 
+class IpLookup(Base):
+    """Where an IP address is and what kind of network it belongs to.
+
+    One row per address, filled from ipapi.is the first time the admin
+    Student Activity page shows it (never on a learner's request). The
+    network flags are None when the address was looked up without an API
+    key, which returns location and provider only; such rows are looked up
+    again once a key is configured.
+    """
+
+    __tablename__ = "ip_lookups"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ip: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    city: Mapped[str] = mapped_column(String(120), default="")
+    region: Mapped[str] = mapped_column(String(120), default="")
+    country: Mapped[str] = mapped_column(String(120), default="")
+    country_code: Mapped[str] = mapped_column(String(4), default="")
+    # Who operates the network: the provider's organisation, and the name of
+    # the specific block (e.g. TELUS-FIBRE-KTMTBC01, which says fibre).
+    provider: Mapped[str] = mapped_column(String(200), default="")
+    netname: Mapped[str] = mapped_column(String(200), default="")
+    asn: Mapped[int] = mapped_column(Integer, default=0)
+    # isp | business | education | government | banking | hosting | ""
+    company_type: Mapped[str] = mapped_column(String(24), default="")
+    is_mobile: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    is_datacenter: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    is_vpn: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    is_proxy: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    is_tor: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    is_satellite: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    # 'ipapi.is' (with key, flags filled) | 'ipapi.is-keyless'
+    source: Mapped[str] = mapped_column(String(24), default="")
+    looked_up_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class Product(Base):
     """A sellable course. One row per thing a visitor can buy."""
 

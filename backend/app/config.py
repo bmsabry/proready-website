@@ -213,6 +213,16 @@ class Settings(BaseSettings):
     # Where integrity alerts go. Empty = ADMIN_NOTIFY_EMAIL.
     INTEGRITY_ALERT_EMAIL: str = ""
 
+    # --- IP location for the Student Activity page (app/ip_intel.py) ------
+    # ipapi.is: country, city, provider, and whether an address belongs to a
+    # mobile carrier, a data centre or a VPN. Without a key the service
+    # answers 30 lookups a day with location and provider only; with the
+    # free account key, 1,000 a day with the network flags (commercial use
+    # allowed on both). Every answer is cached in ip_lookups.
+    IPAPI_KEY: str = ""
+    IP_LOOKUP_ENABLED: bool = True
+    IP_LOOKUP_URL: str = "https://api.ipapi.is"
+
     # --- Server-side simulator engine (app/sim_runtime.py) ----------------
     # The engine bundle lives in academy_asset_blobs under this key; it is
     # never in the repository. The thin client connects over a WebSocket on

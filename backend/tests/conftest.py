@@ -26,4 +26,5 @@ os.environ.update(
     ADMIN_EMAIL=ADMIN_EMAIL,
     SITE_URL="https://proreadyengineer.com",
     RESEND_API_KEY="",  # emailer logs instead of sending
+    IP_LOOKUP_ENABLED="false",  # no calls to ipapi.is from tests
 )

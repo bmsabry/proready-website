@@ -26,6 +26,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from . import academy as svc
+from . import ip_intel
 from .activity import APP_DEVICE, VISIT_GAP
 from .certificates import TIER_TITLES
 from .config import get_settings
@@ -1032,11 +1033,96 @@ def detail(db: Session, learner: Learner, since: datetime) -> dict:
     courses = []
     for c in row["courses"]:
         courses.append({**c, **course_breakdown(db, learner, c["code"])})
+    visits = build_visits(bundle, learner.id)[:400]
+    devices = integrity_devices(bundle, learner.id)
+
+    # Where each address is and what kind of network it is (cached lookups).
+    ips = {v["ip"] for v in visits} | {e["ip"] for v in visits for e in v["events"]}
+    ips |= {d["ip"] for d in devices}
+    ip_info = ip_intel.lookup_many(db, [ip for ip in ips if ip])
+    locations = _locations(visits, devices, ip_info)
+    row["flags"] = sorted(row["flags"] + location_flags(visits, ip_info),
+                          key=lambda f: SEVERITY_RANK[f["severity"]], reverse=True)
+    row["worst"] = _worst(row["flags"])
     return {
         "since": since.isoformat(),
         "tracking_since": _iso(bundle.tracking_since),
         "learner": row,
-        "visits": build_visits(bundle, learner.id)[:400],
+        "visits": visits,
         "courses": courses,
-        "devices": integrity_devices(bundle, learner.id),
+        "devices": devices,
+        "ip_info": ip_info,
+        "locations": locations,
+        "ip_lookup_keyed": bool(get_settings().IPAPI_KEY.strip()),
     }
+
+
+def _locations(visits: list[dict], devices: list[dict], ip_info: dict) -> list[dict]:
+    """Where the account was used: one row per place and kind of network,
+    most recent first."""
+    places: dict[tuple, dict] = {}
+
+    def add(ip: str, at: str | None, visit: bool) -> None:
+        info = ip_info.get(ip)
+        if not ip or info is None:
+            return
+        key = (info["place"] or "Unknown place", info["provider"], info["kind"])
+        p = places.setdefault(key, {
+            "place": key[0], "country": info["country"], "provider": info["provider"],
+            "kind": info["kind"], "kind_label": info["kind_label"], "ips": set(),
+            "visits": 0, "last_at": None,
+        })
+        p["ips"].add(ip)
+        p["visits"] += 1 if visit else 0
+        if at and (p["last_at"] is None or at > p["last_at"]):
+            p["last_at"] = at
+
+    for v in visits:
+        if v["counts_as_visit"]:
+            add(v["ip"], v["end"] or v["start"], True)
+    for d in devices:
+        add(d["ip"], d["last_seen_at"], False)
+    out = [{**p, "ips": sorted(p["ips"])} for p in places.values()]
+    out.sort(key=lambda p: p["last_at"] or "", reverse=True)
+    return out
+
+
+def location_flags(visits: list[dict], ip_info: dict) -> list[dict]:
+    """Location signals from the last 30 days of visits."""
+    cut = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    recent = sorted((v for v in visits if v["counts_as_visit"] and v["ip"]
+                     and (v["end"] or v["start"]) >= cut), key=lambda v: v["start"])
+    flags: list[dict] = []
+    hidden = [v for v in recent if ip_info.get(v["ip"], {}).get("kind") in ("vpn", "datacenter")]
+    if hidden:
+        flags.append({
+            "severity": "info",
+            "title": f"Used from a VPN or data-centre address ×{len(hidden)} in 30 days",
+            "detail": "Hides where the person really is. Company VPNs do this too.",
+            "at": hidden[-1]["start"],
+        })
+    countries = [ip_info[v["ip"]]["country"] for v in recent
+                 if ip_info.get(v["ip"], {}).get("country")]
+    distinct = sorted(set(countries))
+    if len(distinct) >= 2:
+        flags.append({
+            "severity": "info",
+            "title": f"Used from {len(distinct)} countries in 30 days: {', '.join(distinct)}",
+            "detail": "Travel or a VPN can explain it.",
+            "at": None,
+        })
+    # Two countries within an hour of each other: nobody travels that fast.
+    placed = [v for v in recent if ip_info.get(v["ip"], {}).get("country")
+              and ip_info[v["ip"]]["kind"] not in ("vpn", "datacenter")]
+    for a, b in zip(placed, placed[1:]):
+        ca, cb = ip_info[a["ip"]]["country"], ip_info[b["ip"]]["country"]
+        gap = (datetime.fromisoformat(b["start"]) - datetime.fromisoformat(a["end"] or a["start"]))
+        if ca != cb and gap < timedelta(hours=1):
+            flags.append({
+                "severity": "warn",
+                "title": f"Used in {ca} and {cb} within an hour",
+                "detail": "One person cannot travel that fast; two people sharing the login can.",
+                "at": b["start"],
+            })
+            break
+    return flags
