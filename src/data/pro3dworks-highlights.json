@@ -1,7 +1,8 @@
 {
-  "version": "2.68.0",
-  "name": "Reliable AI review, faster model workflows and improved photoreal rendering",
+  "version": "2.68.1",
+  "name": "OpenRouter connection fix and clearer AI diagnostics",
   "highlights": [
+    "AI output-token and request-time limits are user-configurable, with no application-imposed limit by default. OpenRouter connection tests explain provider, credit, authentication and browser-network failures.",
     "Model loading and cached reopening are more responsive, with stronger source-identity checks and safeguards against incomplete assembly imports.",
     "Photoreal rendering reuses shader preparation more effectively, recovers from interrupted GPU warm-up, and improves material scaling and smooth-glass behavior.",
     "AI design review links suggested checks to local measurements and component evidence, distinguishes facts from suggestions, and invalidates outdated results when the model changes.",
