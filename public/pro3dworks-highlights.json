@@ -1,8 +1,9 @@
 {
-  "version": "2.68.3",
-  "name": "Auto-orient diagnostics and cancellation",
+  "version": "2.68.4",
+  "name": "Reasoning exhaustion diagnostics and retry fix",
   "highlights": [
-    "Auto-orient shows elapsed waits and retry attempts, supports cancellation, and exports timing diagnostics for comparing providers without sharing API keys or CAD images.",
+    "AI requests no longer automatically repeat when the endpoint exhausts its output budget before answering. Errors explain reported reasoning usage and provider selection; active auto-orient diagnostics include elapsed timings.",
+    "Auto-orient shows elapsed waits and JSON repair attempts, supports cancellation, and exports timing diagnostics without sharing API keys or CAD images.",
     "AI batches preserve provider thinking defaults. Reasoning changes are explicit settings, and optional price lookups no longer delay auto-orient or component identification.",
     "AI output-token and request-time limits are user-configurable, with no application-imposed limit by default. OpenRouter connection tests explain provider, credit, authentication and browser-network failures.",
     "Model loading and cached reopening are more responsive, with stronger source-identity checks and safeguards against incomplete assembly imports.",
