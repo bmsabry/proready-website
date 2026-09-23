@@ -69,6 +69,8 @@ function describeCurrentView(): string {
       return view.learner
         ? `Admin → Student Activity, with learner id ${view.learner} expanded.`
         : 'Admin → Student Activity (visits, progress, certificates, integrity per trainee).';
+    case 'traffic':
+      return 'Admin → Website Traffic (visits and page views on proreadyengineer.com from Cloudflare Web Analytics).';
     case 'comms':
       return 'Admin → Comms (outbound email log and broadcasts).';
     case 'ai':

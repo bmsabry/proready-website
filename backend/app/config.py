@@ -227,6 +227,19 @@ class Settings(BaseSettings):
     # (functions/app/ip-lookup.js) and fall back to the direct URL.
     IP_LOOKUP_RELAY_URL: str = "https://proreadyengineer.com/app/ip-lookup"
 
+    # --- Website traffic for Admin → Website Traffic (app/traffic.py) -----
+    # Cloudflare Web Analytics, read with a read-only token (Account
+    # Analytics: Read + Zone Analytics: Read). The site tag is the Web
+    # Analytics property for proreadyengineer.com (automatic setup).
+    CF_ANALYTICS_TOKEN: str = ""
+    CF_ANALYTICS_ACCOUNT_ID: str = "aad152269e08fce6c2330f02888046ac"
+    CF_WEB_ANALYTICS_SITE_TAG: str = "6cabcb640027410d9d15f33a755ca9cb"
+    # How far back Cloudflare keeps Web Analytics on this plan (184 days,
+    # per its settings API); the previous period is compared only inside it.
+    CF_ANALYTICS_LOOKBACK_DAYS: int = 184
+    # Our own hostnames: a referrer among these is a click within the site.
+    CF_ANALYTICS_OWN_HOSTS: str = "proreadyengineer.com,proready-website.pages.dev"
+
     # --- Server-side simulator engine (app/sim_runtime.py) ----------------
     # The engine bundle lives in academy_asset_blobs under this key; it is
     # never in the repository. The thin client connects over a WebSocket on

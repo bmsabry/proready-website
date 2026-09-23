@@ -17,6 +17,7 @@ from .progress_guard import install as install_progress_guard
 from .routes import academy as academy_routes
 from .routes import academy_admin as academy_admin_routes
 from .routes import activity_admin as activity_admin_routes
+from .routes import traffic_admin as traffic_admin_routes
 from .routes import certification as certification_routes
 from .routes import certification_admin as certification_admin_routes
 from .routes import admin as admin_routes
@@ -374,6 +375,7 @@ app.include_router(seats_routes.router)
 app.include_router(sim_routes.router)
 app.include_router(sim_routes.admin_router)
 app.include_router(activity_admin_routes.router)
+app.include_router(traffic_admin_routes.router)
 app.include_router(register_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(admin_routes.router)

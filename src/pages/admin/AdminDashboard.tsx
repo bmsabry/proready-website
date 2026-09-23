@@ -2,7 +2,7 @@
  * Admin dashboard shell — persistent left sidebar + view router.
  *
  * The heavy lifting lives in the page modules (OverviewPage, CoursesPage,
- * CourseWorkspace, AcademyPage, SoftwarePage, CommsPage, AiPage); this file
+ * CourseWorkspace, AcademyPage, TrafficPage, SoftwarePage, CommsPage, AiPage); this file
  * only handles session, navigation, and the URL-hash sync that makes a
  * refresh land back on the same view (#courses/<code>/<tab>, #software/<slug>).
  */
@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   LogOut,
   LifeBuoy,
+  LineChart,
   Mail,
   MonitorDown,
   Sparkles,
@@ -27,6 +28,7 @@ import CoursesPage from './CoursesPage';
 import CourseWorkspace from './CourseWorkspace';
 import AcademyPage from './AcademyPage';
 import StudentActivityPage from './StudentActivityPage';
+import TrafficPage from './TrafficPage';
 import SoftwarePage from './SoftwarePage';
 import CommsPage from './CommsPage';
 import SupportPage from './SupportPage';
@@ -36,6 +38,7 @@ import ViewErrorBoundary from './ViewErrorBoundary';
 
 const NAV: { page: ViewState['page']; label: string; icon: LucideIcon }[] = [
   { page: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { page: 'traffic', label: 'Website Traffic', icon: LineChart },
   { page: 'courses', label: 'Courses', icon: BookOpen },
   { page: 'academy', label: 'Academy', icon: GraduationCap },
   { page: 'students', label: 'Student Activity', icon: Activity },
@@ -149,6 +152,9 @@ export default function AdminDashboard() {
           }
         />
       );
+      break;
+    case 'traffic':
+      content = <TrafficPage onAuthError={onAuthError} />;
       break;
     case 'software':
       content = (
