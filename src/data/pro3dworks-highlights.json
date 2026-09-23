@@ -1,7 +1,8 @@
 {
-  "version": "2.68.4",
-  "name": "Reasoning exhaustion diagnostics and retry fix",
+  "version": "2.68.5",
+  "name": "OpenRouter host selection and sampling controls",
   "highlights": [
+    "Choose the serving host within OpenRouter and set sampling temperature explicitly. Connection tests and AI tools share these settings; diagnostics record the sent route and temperature.",
     "AI requests no longer automatically repeat when the endpoint exhausts its output budget before answering. Errors explain reported reasoning usage and provider selection; active auto-orient diagnostics include elapsed timings.",
     "Auto-orient shows elapsed waits and JSON repair attempts, supports cancellation, and exports timing diagnostics without sharing API keys or CAD images.",
     "AI batches preserve provider thinking defaults. Reasoning changes are explicit settings, and optional price lookups no longer delay auto-orient or component identification.",
