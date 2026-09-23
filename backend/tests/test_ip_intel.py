@@ -208,14 +208,20 @@ def test_relay_first_then_direct_when_the_relay_is_down(enabled, monkeypatch):
     assert out["81.20.1.1"]["city"] == "Cairo"
 
 
-def test_the_network_operator_decides_home_or_company():
-    """A consumer ISP's block registered to a business customer is still a
-    home/office line; a company running its own network is a company
-    network."""
-    isp_block = keyed("41.35.1.1", ctype="isp")
-    isp_block["company"]["type"] = "business"
-    row = IpLookup(ip="41.35.1.1", **ip_intel.parse(isp_block, keyed=True))
-    assert ip_intel.describe(row, row.ip)["kind"] == "home"
-    own = keyed("161.19.64.5", ctype="business", org="Shell")
-    row = IpLookup(ip="161.19.64.5", **ip_intel.parse(own, keyed=True))
-    assert ip_intel.describe(row, row.ip)["kind"] == "business"
+def test_the_block_holder_decides_unless_it_is_the_registry():
+    """Real answers (2026-09-22): a block Shell holds, routed by TELUS, is
+    Shell's office network; Telecom Egypt's legacy AFRINIC block reads as
+    held by the registry itself, so its operator (a consumer ISP) decides."""
+    shell = keyed("161.19.64.5", ctype="isp", org="TELUS Communications Inc.")
+    shell["company"] = {"name": "Shell Information Technology International, Inc.",
+                        "type": "business"}
+    row = IpLookup(ip="161.19.64.5", **ip_intel.parse(shell, keyed=True))
+    d = ip_intel.describe(row, row.ip)
+    assert d["kind"] == "business"
+    assert d["provider"] == ("Shell Information Technology International, Inc. "
+                             "(via TELUS Communications Inc.)")
+    te = keyed("156.210.10.10", ctype="isp", org="TE AS")
+    te["company"] = {"name": "African Network Information Center", "type": "business"}
+    row = IpLookup(ip="156.210.10.10", **ip_intel.parse(te, keyed=True))
+    d = ip_intel.describe(row, row.ip)
+    assert d["kind"] == "home" and d["provider"] == "TE AS"

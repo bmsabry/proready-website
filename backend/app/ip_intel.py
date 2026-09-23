@@ -31,10 +31,13 @@ from .models import IpLookup
 
 log = logging.getLogger(__name__)
 
-# ":2" — network type read from the operator of the whole network (the
-# ASN), not from the customer a block is registered to; rows parsed the
-# older way are looked up again.
-SOURCE_KEYED = "ipapi.is:2"
+# ":3" — see _network_type; rows parsed an older way are looked up again.
+SOURCE_KEYED = "ipapi.is:3"
+# Blocks whose whois record names the registry itself rather than a holder
+# (legacy AFRINIC/RIPE "ERX" transfers, for instance): their company type
+# says nothing about who uses them.
+_REGISTRIES = ("network information cent", "afrinic", "ripe ncc", "arin", "apnic",
+               "lacnic", "internet assigned numbers")
 SOURCE_KEYLESS = "ipapi.is-keyless"
 # Addresses move between customers slowly; a quarter is fresh enough.
 FRESH_FOR = timedelta(days=90)
@@ -134,7 +137,7 @@ def parse(data: dict, keyed: bool) -> dict | None:
         loc = data.get("location") or {}
         company = data.get("company") or {}
         asn = data.get("asn") or {}
-        provider = asn.get("org") or company.get("name") or ""
+        ctype, provider = _network_type(company, asn)
         return {
             "city": (loc.get("city") or "")[:120],
             "region": (loc.get("state") or "")[:120],
@@ -143,10 +146,7 @@ def parse(data: dict, keyed: bool) -> dict | None:
             "provider": str(provider)[:200],
             "netname": str(company.get("netname") or company.get("name") or "")[:200],
             "asn": int(asn.get("asn") or 0),
-            # Who runs the network decides the kind: a Telecom Egypt block
-            # registered to a business customer is still a consumer ISP's
-            # line, while Shell's own ASN is a company network.
-            "company_type": str(asn.get("type") or company.get("type") or "")[:24],
+            "company_type": ctype[:24],
             "is_mobile": _truthy(data.get("is_mobile")),
             "is_datacenter": _truthy(data.get("is_datacenter")),
             "is_vpn": _truthy(data.get("is_vpn")),
@@ -175,6 +175,26 @@ def parse(data: dict, keyed: bool) -> dict | None:
         "is_proxy": None, "is_tor": None, "is_satellite": None,
         "source": SOURCE_KEYLESS,
     }
+
+
+def _network_type(company: dict, asn: dict) -> tuple[str, str]:
+    """(kind of network, who to name as the provider).
+
+    The block's holder decides: a block Shell holds, routed by TELUS, is
+    Shell's office network ("Shell … (via TELUS …)"). When the holder on
+    record is the registry itself (e.g. Telecom Egypt's legacy AFRINIC
+    blocks, which read "African Network Information Center", type
+    business), the operator of the network (the ASN) decides instead.
+    """
+    cname = str(company.get("name") or "")
+    ctype = str(company.get("type") or "")
+    org = str(asn.get("org") or "")
+    if not ctype or any(r in cname.lower() for r in _REGISTRIES):
+        return str(asn.get("type") or ""), org or cname
+    if ctype in ("business", "education", "government", "banking") and cname:
+        same = org and (org.lower() in cname.lower() or cname.lower() in org.lower())
+        return ctype, cname if same or not org else f"{cname} (via {org})"
+    return ctype, org or cname
 
 
 def _pause_until_midnight() -> None:
