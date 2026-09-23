@@ -222,6 +222,10 @@ class Settings(BaseSettings):
     IPAPI_KEY: str = ""
     IP_LOOKUP_ENABLED: bool = True
     IP_LOOKUP_URL: str = "https://api.ipapi.is"
+    # ipapi.is refuses connections from Render's shared outbound address, so
+    # keyed lookups go through a Cloudflare Pages Function on our own site
+    # (functions/app/ip-lookup.js) and fall back to the direct URL.
+    IP_LOOKUP_RELAY_URL: str = "https://proreadyengineer.com/app/ip-lookup"
 
     # --- Server-side simulator engine (app/sim_runtime.py) ----------------
     # The engine bundle lives in academy_asset_blobs under this key; it is

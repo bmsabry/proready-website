@@ -3,8 +3,9 @@ carrier, a data centre or a VPN — for the admin Student Activity page.
 
 Source: ipapi.is. With IPAPI_KEY (free account: 1,000 lookups a day,
 commercial use allowed) one POST resolves up to 100 addresses and returns
-the network flags. Without a key the keyless tier answers 30 lookups a day
-with location and provider only. Every answer is cached in ip_lookups, so
+the network flags; it is sent through our own Cloudflare relay because
+ipapi.is refuses Render's shared outbound address. Without a key the
+keyless tier answers 30 lookups a day with location and provider only. Every answer is cached in ip_lookups, so
 an address is looked up once; keyless rows are refreshed once a key exists.
 
 Lookups happen only when an admin opens a learner — never on a learner's
@@ -191,16 +192,28 @@ def fetch(ips: list[str], *, budget_s: float = 8.0) -> dict[str, dict]:
     try:
         with httpx.Client(timeout=6.0) as client:
             if key:
+                # Our Cloudflare relay first (Render's outbound address is
+                # refused by ipapi.is), the service itself as the fallback.
+                targets = [t for t in (settings.IP_LOOKUP_RELAY_URL, url) if t]
                 for k in range(0, len(ips), BULK):
                     if time.monotonic() > deadline:
                         break
-                    r = client.post(url, json={"ips": ips[k:k + BULK], "key": key})
-                    if r.status_code == 429:
-                        _pause_until_midnight()
+                    chunk = ips[k:k + BULK]
+                    body = None
+                    for target in targets:
+                        try:
+                            r = client.post(target, json={"ips": chunk, "key": key})
+                        except httpx.HTTPError:
+                            continue
+                        if r.status_code == 429:
+                            _pause_until_midnight()
+                            return out
+                        if r.status_code == 200:
+                            body = r.json()
+                            break
+                    if body is None:
                         break
-                    r.raise_for_status()
-                    body = r.json()
-                    for ip in ips[k:k + BULK]:
+                    for ip in chunk:
                         row = parse(body.get(ip), keyed=True)
                         if row is not None:
                             out[ip] = row

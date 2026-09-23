@@ -189,3 +189,20 @@ def test_detail_shows_locations_and_flags_two_countries_within_an_hour(monkeypat
     titles = [f["title"] for f in d["learner"]["flags"]]
     assert "Used in Egypt and Canada within an hour" in titles
     assert any(t.startswith("Used from 2 countries in 30 days") for t in titles)
+
+
+def test_relay_first_then_direct_when_the_relay_is_down(enabled, monkeypatch):
+    monkeypatch.setattr(enabled, "IPAPI_KEY", "k-test")
+    hosts = []
+
+    def handler(request):
+        hosts.append(request.url.host)
+        if request.url.host == "proreadyengineer.com":
+            raise httpx.ConnectError("relay down")
+        body = json.loads(request.content)
+        return httpx.Response(200, json={ip: keyed(ip) for ip in body["ips"]})
+
+    _client_with(monkeypatch, handler)
+    out = ip_intel.fetch(["81.20.1.1"])
+    assert hosts == ["proreadyengineer.com", "api.ipapi.is"]
+    assert out["81.20.1.1"]["city"] == "Cairo"
