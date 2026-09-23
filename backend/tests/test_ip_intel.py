@@ -206,3 +206,16 @@ def test_relay_first_then_direct_when_the_relay_is_down(enabled, monkeypatch):
     out = ip_intel.fetch(["81.20.1.1"])
     assert hosts == ["proreadyengineer.com", "api.ipapi.is"]
     assert out["81.20.1.1"]["city"] == "Cairo"
+
+
+def test_the_network_operator_decides_home_or_company():
+    """A consumer ISP's block registered to a business customer is still a
+    home/office line; a company running its own network is a company
+    network."""
+    isp_block = keyed("41.35.1.1", ctype="isp")
+    isp_block["company"]["type"] = "business"
+    row = IpLookup(ip="41.35.1.1", **ip_intel.parse(isp_block, keyed=True))
+    assert ip_intel.describe(row, row.ip)["kind"] == "home"
+    own = keyed("161.19.64.5", ctype="business", org="Shell")
+    row = IpLookup(ip="161.19.64.5", **ip_intel.parse(own, keyed=True))
+    assert ip_intel.describe(row, row.ip)["kind"] == "business"

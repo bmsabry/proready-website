@@ -31,7 +31,10 @@ from .models import IpLookup
 
 log = logging.getLogger(__name__)
 
-SOURCE_KEYED = "ipapi.is"
+# ":2" — network type read from the operator of the whole network (the
+# ASN), not from the customer a block is registered to; rows parsed the
+# older way are looked up again.
+SOURCE_KEYED = "ipapi.is:2"
 SOURCE_KEYLESS = "ipapi.is-keyless"
 # Addresses move between customers slowly; a quarter is fresh enough.
 FRESH_FOR = timedelta(days=90)
@@ -140,7 +143,10 @@ def parse(data: dict, keyed: bool) -> dict | None:
             "provider": str(provider)[:200],
             "netname": str(company.get("netname") or company.get("name") or "")[:200],
             "asn": int(asn.get("asn") or 0),
-            "company_type": str(company.get("type") or asn.get("type") or "")[:24],
+            # Who runs the network decides the kind: a Telecom Egypt block
+            # registered to a business customer is still a consumer ISP's
+            # line, while Shell's own ASN is a company network.
+            "company_type": str(asn.get("type") or company.get("type") or "")[:24],
             "is_mobile": _truthy(data.get("is_mobile")),
             "is_datacenter": _truthy(data.get("is_datacenter")),
             "is_vpn": _truthy(data.get("is_vpn")),
