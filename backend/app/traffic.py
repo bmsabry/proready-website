@@ -75,7 +75,8 @@ def _query(bucket: str, include_admin: bool, with_previous: bool) -> str:
         f"{{ count sum {{ visits }} dimensions {{ requestPath }} }}",
         f"referrers: {g}(limit: 40, orderBy: [sum_visits_DESC], filter: {f}) "
         f"{{ count sum {{ visits }} dimensions {{ refererHost }} }}",
-        f"countries: {g}(limit: 30, orderBy: [sum_visits_DESC], filter: {f}) "
+        # by page views: in sampled data a country's visits can read 0
+        f"countries: {g}(limit: 30, orderBy: [count_DESC], filter: {f}) "
         f"{{ count sum {{ visits }} dimensions {{ countryName }} }}",
         f"devices: {g}(limit: 10, orderBy: [sum_visits_DESC], filter: {f}) "
         f"{{ count sum {{ visits }} dimensions {{ deviceType }} }}",

@@ -200,8 +200,9 @@ export default function TrafficPage({ onAuthError }: { onAuthError: () => void }
   const countries = useMemo(
     () =>
       (data?.countries ?? [])
-        .filter((c) => c.visits > 0 || c.page_views > 0)
-        .map((c) => ({ label: countryName(c.country), count: c.visits })),
+        .filter((c) => c.page_views > 0)
+        .sort((a, b) => b.page_views - a.page_views)
+        .map((c) => ({ label: countryName(c.country), count: c.page_views })),
     [data],
   );
 
@@ -288,17 +289,17 @@ export default function TrafficPage({ onAuthError }: { onAuthError: () => void }
               icon={<Globe2 className="w-3.5 h-3.5" />}
               label="Countries"
               value={countries.length}
-              sub={countries[0] ? `Most visits: ${countries[0].label}` : 'No visits yet'}
+              sub={countries[0] ? `Most traffic: ${countries[0].label}` : 'No visitors yet'}
               accent="emerald"
             />
           </div>
 
           {data.sampled && (
-            <Notice kind="warn">
+            <p className="text-xs text-slate-400 -mt-1 mb-4">
               Cloudflare counts a small site from a sample (about one page load in ten, scaled back
               up), so these numbers move in steps of about ten. They are the same figures
               Cloudflare's own dashboard shows.
-            </Notice>
+            </p>
           )}
 
           <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 mb-4">
@@ -359,8 +360,8 @@ export default function TrafficPage({ onAuthError }: { onAuthError: () => void }
               />
             </Card>
 
-            <Card icon={<Globe2 className="w-4 h-4" />} title="Countries" sub="By visits">
-              <HBarList rows={countries} empty="No visits in this period." />
+            <Card icon={<Globe2 className="w-4 h-4" />} title="Countries" sub="By page views">
+              <HBarList rows={countries} empty="No page views in this period." />
             </Card>
 
             <Card icon={<Monitor className="w-4 h-4" />} title="Devices and browsers" sub="By visits">
