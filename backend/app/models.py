@@ -1339,6 +1339,30 @@ class EmailLog(Base):
     # Resend message id when the API accepted the send — empty otherwise.
     provider_id: Mapped[str] = mapped_column(String(64), default="")
 
+    # A copy of what was sent, so any email can be opened from the admin
+    # later: Resend itself keeps copies for 30 days only. Sign-in tokens are
+    # blanked before storing (email_copies.redact_secrets).
+    from_addr: Mapped[str] = mapped_column(String(320), default="")
+    reply_to: Mapped[str] = mapped_column(String(320), default="")
+    cc: Mapped[str] = mapped_column(String(640), default="")
+    bcc: Mapped[str] = mapped_column(String(640), default="")
+    body_html: Mapped[str] = mapped_column(Text, default="")
+    body_text: Mapped[str] = mapped_column(Text, default="")
+    # Attachment file names, comma-separated (the files themselves aren't kept).
+    attachments: Mapped[str] = mapped_column(String(1000), default="")
+    # Where the copy came from: 'sent' (kept when it was sent), 'resend'
+    # (fetched back from Resend later), 'gone' (Resend no longer has it),
+    # '' (not looked for yet).
+    copy_source: Mapped[str] = mapped_column(String(16), default="")
+    # Why a send failed, in words — empty when it went out.
+    error: Mapped[str] = mapped_column(String(500), default="")
+    # What happened after it left, as Resend last reported it ('delivered',
+    # 'bounced', 'opened', …), refreshed when the email is opened in admin.
+    delivery: Mapped[str] = mapped_column(String(32), default="")
+    delivery_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
 
 class AssetDelivery(Base):
     """One row per *download* of a protected HTML asset.

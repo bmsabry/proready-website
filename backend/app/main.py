@@ -262,6 +262,22 @@ def _run_column_migrations() -> None:
     # workbook, a .docx handout) are 65-71 characters; VARCHAR(64) refused
     # them.
     _widen_column("academy_asset_blobs", "content_type", 128)
+    # email_log keeps a copy of each email (Resend deletes its own after 30
+    # days), why a send failed, and the delivery status Resend reports.
+    for column, ddl in (
+        ("from_addr", "VARCHAR(320) NOT NULL DEFAULT ''"),
+        ("reply_to", "VARCHAR(320) NOT NULL DEFAULT ''"),
+        ("cc", "VARCHAR(640) NOT NULL DEFAULT ''"),
+        ("bcc", "VARCHAR(640) NOT NULL DEFAULT ''"),
+        ("body_html", "TEXT NOT NULL DEFAULT ''"),
+        ("body_text", "TEXT NOT NULL DEFAULT ''"),
+        ("attachments", "VARCHAR(1000) NOT NULL DEFAULT ''"),
+        ("copy_source", "VARCHAR(16) NOT NULL DEFAULT ''"),
+        ("error", "VARCHAR(500) NOT NULL DEFAULT ''"),
+        ("delivery", "VARCHAR(32) NOT NULL DEFAULT ''"),
+        ("delivery_checked_at", "TIMESTAMP WITH TIME ZONE"),
+    ):
+        _ensure_column("email_log", column, ddl)
 
 
 _run_column_migrations()

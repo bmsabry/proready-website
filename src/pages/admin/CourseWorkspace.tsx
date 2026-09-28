@@ -85,6 +85,7 @@ import {
   StatusBadge,
 } from './ui';
 import CertificationTab from './CertificationTab';
+import { EmailRow, EmailViewer, useEmailViewer } from './EmailViewer';
 import PastCohortsTab from './PastCohortsTab';
 
 type Props = {
@@ -1514,6 +1515,8 @@ type LogGroup = {
   total: number;
   ok: number;
   fail: number;
+  /** The individual emails, newest first — each one can be opened. */
+  rows: EmailLogRow[];
 };
 
 function groupLog(rows: EmailLogRow[]): LogGroup[] {
@@ -1527,6 +1530,7 @@ function groupLog(rows: EmailLogRow[]): LogGroup[] {
       g.total += 1;
       if (r.ok) g.ok += 1;
       else g.fail += 1;
+      g.rows.push(r);
     } else {
       map.set(key, {
         ts: r.ts,
@@ -1536,6 +1540,7 @@ function groupLog(rows: EmailLogRow[]): LogGroup[] {
         total: 1,
         ok: r.ok ? 1 : 0,
         fail: r.ok ? 0 : 1,
+        rows: [r],
       });
     }
   }
@@ -1672,6 +1677,15 @@ function CommsTab({
   }
 
   const groups = useMemo(() => groupLog(log ?? []), [log]);
+  // A send to several people is one line; opening it lists each person's
+  // copy, and any copy opens in the email viewer.
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [viewerRows, setViewerRows] = useState<EmailLogRow[]>([]);
+  const viewer = useEmailViewer(viewerRows);
+  const openEmail = (rows: EmailLogRow[], id: number) => {
+    setViewerRows(rows);
+    viewer.open(id);
+  };
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
@@ -1749,32 +1763,76 @@ function CommsTab({
           </div>
         )}
         {log !== null && groups.length > 0 && (
-          <ul className="divide-y divide-slate-800 max-h-[560px] overflow-y-auto">
-            {groups.map((g, i) => (
-              <li key={`${g.ts}-${i}`} className="px-5 py-3 text-xs">
-                <div className="flex items-center justify-between gap-3 mb-0.5">
-                  <span className="text-slate-400 whitespace-nowrap">{formatDate(g.ts)}</span>
-                  <span
-                    className={`px-2 py-0.5 rounded-full border text-[10px] ${
-                      g.fail === 0
-                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                        : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                    }`}
+          <ul className="divide-y divide-slate-800 max-h-[640px] overflow-y-auto">
+            {groups.map((g, i) => {
+              const key = `${g.ts}-${i}`;
+              const open = expanded === key;
+              return (
+                <li key={key} className="text-xs">
+                  <button
+                    onClick={() =>
+                      g.rows.length === 1 ? openEmail(g.rows, g.rows[0].id) : setExpanded(open ? null : key)
+                    }
+                    className="w-full text-left px-5 py-3 hover:bg-slate-800/40 transition-colors"
                   >
-                    {g.fail === 0 ? `${g.total} sent` : `${g.ok} ok · ${g.fail} failed`}
-                  </span>
-                </div>
-                <div className="text-slate-200 truncate" title={g.subject}>
-                  {g.subject}
-                </div>
-                <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-                  {g.audience || '—'} · {g.template || 'broadcast'}
-                </div>
-              </li>
-            ))}
+                    <div className="flex items-center justify-between gap-3 mb-0.5">
+                      <span className="text-slate-400 whitespace-nowrap">{formatDate(g.ts)}</span>
+                      {(() => {
+                        // Not sent, bounced, suppressed or marked as spam.
+                        const bad = g.rows.filter((r) => r.delivery.tone === 'bad').length;
+                        return (
+                          <span
+                            className={`px-2 py-0.5 rounded-full border text-[10px] whitespace-nowrap ${
+                              bad === 0
+                                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                                : 'bg-red-500/15 text-red-300 border-red-500/40'
+                            }`}
+                          >
+                            {bad === 0
+                              ? g.total === 1
+                                ? g.rows[0].delivery.label
+                                : `${g.total} sent`
+                              : g.total === 1
+                                ? g.rows[0].delivery.label
+                                : `${bad} of ${g.total} with a problem`}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <div className="text-sm text-slate-100 break-words">{g.subject}</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 break-words">
+                      {g.rows[0].kind_label}
+                      {g.rows.length === 1
+                        ? ` · to ${g.rows[0].to_me ? 'you' : g.rows[0].recipient}`
+                        : ` · ${g.rows.length} recipients — ${open ? 'hide' : 'show'} each one`}
+                    </div>
+                  </button>
+                  {open && (
+                    <div className="border-t border-slate-800/70 bg-slate-950/40 divide-y divide-slate-800/70">
+                      {g.rows.map((r) => (
+                        <EmailRow
+                          key={r.id}
+                          r={r}
+                          selected={viewer.openId === r.id}
+                          onOpen={() => openEmail(g.rows, r.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
+
+      <EmailViewer
+        emailId={viewer.openId}
+        onClose={viewer.close}
+        onNewer={viewer.newer}
+        onOlder={viewer.older}
+        onAuthError={onAuthError}
+      />
     </div>
   );
 }

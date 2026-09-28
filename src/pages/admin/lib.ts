@@ -246,6 +246,15 @@ export type Owners = {
   note: string;
 };
 
+/** What became of an email after it left, in words (from Resend). */
+export type EmailDelivery = {
+  state: string;
+  label: string;
+  tone: 'good' | 'neutral' | 'warn' | 'bad';
+  explanation: string;
+  checked_at: string | null;
+};
+
 export type EmailLogRow = {
   id: number;
   ts: string;
@@ -257,6 +266,30 @@ export type EmailLogRow = {
   recipient: string;
   ok: boolean;
   provider_id: string | null;
+  /** "Session reminder", "Support reply"… */
+  kind_label: string;
+  /** An alert to the admin himself rather than an email to a customer. */
+  to_me: boolean;
+  /** What it was about, and where that lives in the admin (hash link). */
+  about: { label: string; href: string };
+  delivery: EmailDelivery;
+  /** A copy of the email itself is available to open. */
+  has_copy: boolean;
+};
+
+/** One email in full — GET /api/admin/comms/log/{id}. */
+export type EmailDetail = EmailLogRow & {
+  from_addr: string;
+  reply_to: string;
+  cc: string;
+  bcc: string;
+  attachments: string[];
+  error: string;
+  html: string;
+  text: string;
+  copy: { available: boolean; source: string; note: string };
+  lookup_error: string;
+  learner: { id: number; name: string } | null;
 };
 
 export type ContentLesson = {

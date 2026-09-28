@@ -21,6 +21,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from .config import get_settings
+from .email_copies import redact_secrets
 from .models import EmailLog
 
 log = logging.getLogger(__name__)
@@ -66,12 +67,27 @@ def _log_email(
     recipient: str,
     ok: bool,
     provider_id: str = "",
+    from_addr: str = "",
+    reply_to: str = "",
+    cc: str = "",
+    bcc: str = "",
+    html: str = "",
+    text: str = "",
+    attachments: Optional[list] = None,
+    error: str = "",
 ) -> None:
     """Best-effort EmailLog write. Never raises — logging must not be the
-    reason a send (or the request around it) fails."""
+    reason a send (or the request around it) fails.
+
+    Keeps a copy of the email itself, so the admin can open it later
+    (Resend deletes its own copies after 30 days), minus any sign-in token.
+    """
     if db is None:
         return
     try:
+        names = ", ".join(
+            str(a.get("filename") or "attachment") for a in (attachments or []) if isinstance(a, dict)
+        )
         db.add(
             EmailLog(
                 scope_kind=scope_kind,
@@ -82,6 +98,15 @@ def _log_email(
                 recipient=recipient,
                 ok=ok,
                 provider_id=provider_id[:64],
+                from_addr=(from_addr or "")[:320],
+                reply_to=(reply_to or "")[:320],
+                cc=(cc or "")[:640],
+                bcc=(bcc or "")[:640],
+                body_html=redact_secrets(html or ""),
+                body_text=redact_secrets(text or ""),
+                attachments=names[:1000],
+                copy_source="sent" if (html or text) else "",
+                error=(error or "")[:500],
             )
         )
         db.commit()
@@ -182,6 +207,12 @@ def send_email(
 
     ok = False
     provider_id = ""
+    error = ""
+    sender = from_override or settings.EMAIL_FROM
+    reply_addr = reply_to or settings.EMAIL_REPLY_TO or ""
+    # Always send multipart. An explicit `text` wins (the support desk
+    # passes the customer's own wording); otherwise derive one.
+    body_text = text or html_to_text(html)
 
     if not settings.RESEND_API_KEY:
         # Deliberately False (changed 2026-08; used to fake success): a
@@ -192,20 +223,18 @@ def send_email(
             to,
             subject,
         )
+        error = "Not sent: the email service key (RESEND_API_KEY) is not set on the server."
     else:
         payload: dict = {
-            "from": from_override or settings.EMAIL_FROM,
+            "from": sender,
             "to": [to],
             "subject": subject,
             "html": html,
         }
-        # Always send multipart. An explicit `text` wins (the support desk
-        # passes the customer's own wording); otherwise derive one.
-        body_text = text or html_to_text(html)
         if body_text:
             payload["text"] = body_text
-        if reply_to or settings.EMAIL_REPLY_TO:
-            payload["reply_to"] = reply_to or settings.EMAIL_REPLY_TO
+        if reply_addr:
+            payload["reply_to"] = reply_addr
         if bcc:
             payload["bcc"] = [bcc]
         if cc:
@@ -223,11 +252,13 @@ def send_email(
 
         r = _resend_post(RESEND_URL, payload, settings.RESEND_API_KEY)
         if r is None:
-            pass  # network failure already logged by the seam
+            # network failure already logged by the seam
+            error = "Not sent: Resend could not be reached (network error)."
         elif r.status_code >= 300:
             log.error(
                 "Resend send failed: status=%s body=%s", r.status_code, r.text[:500]
             )
+            error = f"Resend refused it (HTTP {r.status_code}): {_resend_error(r)}"
         else:
             ok = True
             try:
@@ -245,8 +276,30 @@ def send_email(
         recipient=to,
         ok=ok,
         provider_id=provider_id,
+        from_addr=sender,
+        reply_to=reply_addr,
+        cc=cc or "",
+        bcc=bcc or "",
+        html=html,
+        text=body_text,
+        attachments=attachments,
+        error=error,
     )
     return ok
+
+
+def _resend_error(r: httpx.Response) -> str:
+    """Resend's own words for a refused send ({"message": …} or {"error": …})."""
+    try:
+        body = r.json()
+    except ValueError:
+        return (r.text or "")[:200]
+    if isinstance(body, dict):
+        msg = body.get("message") or body.get("error") or body.get("name") or ""
+        if isinstance(msg, dict):
+            msg = msg.get("message") or ""
+        return str(msg)[:200]
+    return ""
 
 
 def send_broadcast(
@@ -343,12 +396,17 @@ def send_broadcast(
             provider_id = ""
             if idx < len(ids) and isinstance(ids[idx], dict):
                 provider_id = str(ids[idx].get("id") or "")
+            item = payload[idx]
             _log_email(
                 db,
                 subject=subject,
                 recipient=addr,
                 ok=True,
                 provider_id=provider_id,
+                from_addr=item["from"],
+                reply_to=item.get("reply_to", ""),
+                html=item["html"],
+                text=html_to_text(item["html"]),
                 **scope_kwargs,
             )
             sent += 1

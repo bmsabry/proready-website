@@ -27,6 +27,7 @@ import {
   type ViewState,
 } from './lib';
 import { Kpi, Notice, RefreshButton, SeatsBar, Section, StatusBadge } from './ui';
+import { EmailRow, EmailViewer, useEmailViewer } from './EmailViewer';
 
 type Props = {
   onAuthError: () => void;
@@ -65,6 +66,8 @@ export default function OverviewPage({ onAuthError, go }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const emailViewer = useEmailViewer(emails ?? []);
 
   const totals = useMemo(() => {
     const t = { pending: 0, paid: 0, revTotal: 0, rev30: 0, dlTotal: 0, dl7: 0 };
@@ -206,41 +209,11 @@ export default function OverviewPage({ onAuthError, go }: Props) {
               <div className="p-5 text-sm text-slate-300">Nothing sent yet.</div>
             )}
             {emails !== null && emails.length > 0 && (
-              <table className="w-full text-xs">
-                <thead className="bg-slate-950/60 text-slate-300 uppercase tracking-wider">
-                  <tr>
-                    <th className="px-3 py-2 text-left">When</th>
-                    <th className="px-3 py-2 text-left">To</th>
-                    <th className="px-3 py-2 text-left">Subject</th>
-                    <th className="px-3 py-2 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {emails.map((r) => (
-                    <tr key={r.id}>
-                      <td className="px-3 py-2 text-slate-400 whitespace-nowrap">
-                        {formatDate(r.ts)}
-                      </td>
-                      <td className="px-3 py-2 text-slate-300 max-w-[160px] truncate" title={r.recipient}>
-                        {r.recipient}
-                      </td>
-                      <td className="px-3 py-2 text-slate-200 max-w-[220px] truncate" title={r.subject}>
-                        {r.subject}
-                        {r.scope_code && (
-                          <span className="block text-[10px] font-mono text-slate-500 truncate">
-                            {r.scope_code} · {r.audience}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <span className={r.ok ? 'text-emerald-300' : 'text-red-300'}>
-                          {r.ok ? 'ok' : 'failed'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="divide-y divide-slate-800/70">
+                {emails.map((r) => (
+                  <EmailRow key={r.id} r={r} showDate onOpen={() => emailViewer.open(r.id)} />
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -295,6 +268,14 @@ export default function OverviewPage({ onAuthError, go }: Props) {
           </div>
         </div>
       </div>
+
+      <EmailViewer
+        emailId={emailViewer.openId}
+        onClose={emailViewer.close}
+        onNewer={emailViewer.newer}
+        onOlder={emailViewer.older}
+        onAuthError={onAuthError}
+      />
     </div>
   );
 }

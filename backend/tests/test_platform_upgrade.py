@@ -318,8 +318,13 @@ def test_comms_log_endpoint(client):
     expected_keys = {
         "id", "ts", "scope_kind", "scope_code", "audience", "template",
         "subject", "recipient", "ok", "provider_id",
+        # for reading the log: what kind of email, to whom, about what,
+        # what became of it, and whether it can be opened
+        "kind_label", "to_me", "about", "delivery", "has_copy",
     }
     assert set(body["rows"][0]) == expected_keys
+    # The list stays light: the email itself comes from /comms/log/{id}.
+    assert "html" not in body["rows"][0]
 
     limited = client.get(
         f"/api/admin/comms/log?scope_code={COURSE_A}&limit=2", headers=ADMIN
