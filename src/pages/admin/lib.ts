@@ -456,14 +456,13 @@ export type SupportDraft = {
   suggested_status: string;
 };
 
+/** Support's own settings: the knowledge text. The model shown here is the
+ *  website's one AI connection (Admin → AI Settings), read-only. */
 export type SupportSettings = {
-  api_url: string;
-  model_name: string;
-  api_key_masked: string;
   kb_text: string;
-  is_configured: boolean;
-  using_own_credentials: boolean;
   llm_available: boolean;
+  model_name: string;
+  provider: string;
   categories: {
     key: string;
     label: string;

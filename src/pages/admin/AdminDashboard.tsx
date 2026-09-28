@@ -53,7 +53,7 @@ const NAV: { page: ViewState['page']; label: string; icon: LucideIcon }[] = [
   { page: 'software', label: 'Software', icon: MonitorDown },
   { page: 'comms', label: 'Comms', icon: Mail },
   { page: 'support', label: 'Support', icon: LifeBuoy },
-  { page: 'ai', label: 'AI Assistant', icon: Sparkles },
+  { page: 'ai', label: 'AI Settings', icon: Sparkles },
 ];
 
 export default function AdminDashboard() {

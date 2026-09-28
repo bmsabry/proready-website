@@ -1,11 +1,25 @@
 /**
- * AI Assistant — endpoint/model/key settings plus the audit activity log.
- * Both moved from the old single-file dashboard; the floating chat widget
- * itself is mounted by the shell on every admin page.
+ * AI Settings — the one AI connection the whole website uses (support
+ * triage and reply drafts, and the admin assistant's chat), a "Test the
+ * connection" check that makes one tiny real request of each kind, and the
+ * assistant's activity log. The floating chat widget itself is mounted by
+ * the shell on every admin page.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bot, KeyRound, Lock, MessageSquare, Save, Sparkles } from 'lucide-react';
-import { api, reportError, type AuditRow } from './lib';
+import {
+  Bot,
+  CheckCircle2,
+  CircleDashed,
+  KeyRound,
+  Loader2,
+  Lock,
+  MessageSquare,
+  Save,
+  Sparkles,
+  Stethoscope,
+  XCircle,
+} from 'lucide-react';
+import { api, formatDate, reportError, type AuditRow, type SupportAiHealth } from './lib';
 import { LabeledInput, Notice, RefreshButton, Section } from './ui';
 
 type AISettingsState = {
@@ -13,6 +27,25 @@ type AISettingsState = {
   model_name: string;
   api_key_masked: string;
   is_configured: boolean;
+  health?: SupportAiHealth | null;
+};
+
+type DiagnoseStep = {
+  key: string;
+  title: string;
+  status: 'pass' | 'fail' | 'skipped';
+  detail: string;
+  seconds: number | null;
+};
+
+type Diagnosis = {
+  ok: boolean;
+  model: string;
+  provider: string;
+  verdict: string;
+  steps: DiagnoseStep[];
+  checked_at: string;
+  health: SupportAiHealth;
 };
 
 export default function AiPage({ onAuthError }: { onAuthError: () => void }) {
@@ -22,6 +55,8 @@ export default function AiPage({ onAuthError }: { onAuthError: () => void }) {
   const [modelName, setModelName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<Diagnosis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -45,10 +80,29 @@ export default function AiPage({ onAuthError }: { onAuthError: () => void }) {
     void load();
   }, [load]);
 
+  async function test() {
+    setTesting(true);
+    setError(null);
+    setResult(null);
+    try {
+      const r = await api<Diagnosis>('/api/admin/ai/diagnose', { method: 'POST' });
+      setResult(r);
+      setState((s) => (s ? { ...s, health: r.health } : s));
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setTesting(false);
+    }
+  }
+
   async function save() {
     setError(null);
-    if (!apiUrl.trim() || !modelName.trim() || !apiKey.trim()) {
-      setError('All three fields are required to save.');
+    if (!apiUrl.trim() || !modelName.trim()) {
+      setError('The API URL and the model name are required.');
+      return;
+    }
+    if (!apiKey.trim() && !state?.api_key_masked) {
+      setError('Paste the API key — none is saved yet.');
       return;
     }
     setSaving(true);
@@ -57,14 +111,16 @@ export default function AiPage({ onAuthError }: { onAuthError: () => void }) {
         method: 'PUT',
         body: JSON.stringify({
           api_url: apiUrl.trim(),
-          api_key: apiKey.trim(),
+          api_key: apiKey.trim(), // blank keeps the stored key
           model_name: modelName.trim(),
         }),
       });
-      setState(body);
+      setState((s) => ({ ...body, health: s?.health ?? null }));
       setApiKey('');
-      setFlash('Saved. The chat widget will use the new credentials on the next message.');
-      window.setTimeout(() => setFlash(null), 5000);
+      setFlash('Saved. Testing the new settings…');
+      window.setTimeout(() => setFlash(null), 4000);
+      // A save is exactly when you want to know it works.
+      await test();
     } catch (e) {
       reportError(e, onAuthError, setError);
     } finally {
@@ -72,11 +128,13 @@ export default function AiPage({ onAuthError }: { onAuthError: () => void }) {
     }
   }
 
+  const health = result?.health ?? state?.health ?? null;
+
   return (
     <Section
       icon={<Sparkles className="w-5 h-5 text-cyan-300" />}
-      title="AI assistant"
-      sub="Connect any OpenAI-compatible endpoint — OpenAI, OpenRouter, Together, Groq, Cloudflare AI, or a self-hosted server. The key is encrypted at rest and never sent back to the browser after you save."
+      title="AI settings"
+      sub="One AI model for the whole website: automatic support replies, reply drafts and the AI Assistant chat all use this connection. Any OpenAI-compatible provider works (OpenRouter, OpenAI, DeepInfra, Groq…). The key is encrypted and never sent back to the browser."
     >
       {flash && <Notice kind="success">{flash}</Notice>}
       {error && <Notice kind="error">{error}</Notice>}
@@ -84,64 +142,167 @@ export default function AiPage({ onAuthError }: { onAuthError: () => void }) {
       {loading && !state ? (
         <div className="text-slate-300 text-sm">Loading…</div>
       ) : (
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 max-w-2xl space-y-4">
-          <LabeledInput
-            label="API URL (base or full /chat/completions)"
-            value={apiUrl}
-            onChange={setApiUrl}
-            icon={<KeyRound className="w-3 h-3 text-slate-300" />}
-          />
-          <LabeledInput
-            label="Model name (e.g. gpt-4o-mini, claude-3-5-sonnet, llama-3.3-70b)"
-            value={modelName}
-            onChange={setModelName}
-            icon={<Bot className="w-3 h-3 text-slate-300" />}
-          />
-          <label className="block">
-            <span className="text-[11px] uppercase tracking-wider text-slate-300 flex items-center gap-1 mb-1">
-              <Lock className="w-3 h-3 text-slate-300" />
-              API key
-              {state?.api_key_masked && (
-                <span className="ml-2 text-slate-300 normal-case tracking-normal">
-                  current: <span className="font-mono">{state.api_key_masked}</span>
-                </span>
-              )}
-            </span>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={state?.is_configured ? 'leave blank to keep, or paste new key' : 'sk-...'}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 font-mono"
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <h3 className="text-sm font-semibold text-white">Connection</h3>
+            <LabeledInput
+              label="API URL (base or full /chat/completions)"
+              value={apiUrl}
+              onChange={setApiUrl}
+              placeholder="https://openrouter.ai/api/v1/"
+              icon={<KeyRound className="w-3 h-3 text-slate-300" />}
             />
-            <span className="text-[11px] text-slate-300 mt-1 block">
-              Saving requires entering the key again — there's no way to recover the existing one
-              from the browser.
-            </span>
-          </label>
+            <LabeledInput
+              label="Model name (as the provider writes it)"
+              value={modelName}
+              onChange={setModelName}
+              placeholder="deepseek/deepseek-v4.1-flash"
+              icon={<Bot className="w-3 h-3 text-slate-300" />}
+            />
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-wider text-slate-300 flex items-center gap-1 mb-1">
+                <Lock className="w-3 h-3 text-slate-300" />
+                API key
+                {state?.api_key_masked && (
+                  <span className="ml-2 text-slate-300 normal-case tracking-normal">
+                    saved: <span className="font-mono">{state.api_key_masked}</span>
+                  </span>
+                )}
+              </span>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={state?.api_key_masked ? 'Leave blank to keep the saved key' : 'Paste the key'}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 font-mono"
+              />
+            </label>
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => void save()}
+                disabled={saving || testing}
+                className="btn-primary flex items-center gap-1 text-sm py-2 px-3 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {saving ? 'Saving…' : 'Save and test'}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <Stethoscope className="w-4 h-4 text-cyan-300" />
+              <h3 className="text-sm font-semibold text-white">Is it working?</h3>
+            </div>
+            {/* Once a test has run, its result says it all. */}
+            {!result && <HealthLine health={health} />}
             <button
-              onClick={() => void load()}
-              disabled={saving || loading}
-              className="btn-secondary text-sm py-2 px-3 disabled:opacity-50"
+              onClick={() => void test()}
+              disabled={testing || saving}
+              className="w-full inline-flex items-center justify-center gap-2 text-sm px-4 py-2.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-100 hover:bg-cyan-500/30 disabled:opacity-50 transition-colors"
             >
-              Reload
+              {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Stethoscope className="w-4 h-4" />}
+              {testing ? 'Testing — this takes a few seconds…' : 'Test the connection'}
             </button>
-            <button
-              onClick={() => void save()}
-              disabled={saving}
-              className="btn-primary flex items-center gap-1 text-sm py-2 px-3 disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              {saving ? 'Saving…' : 'Save'}
-            </button>
+            <p className="text-[11px] text-slate-400">
+              Sends one tiny real request of each kind the website makes, using the saved settings.
+              Costs a fraction of a cent. Emails nobody.
+            </p>
+            {result && <DiagnosisResult d={result} />}
           </div>
         </div>
       )}
 
       <AIActivitySection onAuthError={onAuthError} />
     </Section>
+  );
+}
+
+/** What real traffic says, before anyone presses the button. */
+function HealthLine({ health }: { health: SupportAiHealth | null }) {
+  if (!health) return null;
+  if (health.state === 'ok') {
+    return (
+      <p className="text-xs text-emerald-300 flex items-start gap-1.5">
+        <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <span>
+          Automatic support replies are on.
+          {health.last_ok_at ? ` Last successful answer ${formatDate(health.last_ok_at)}.` : ''}
+        </span>
+      </p>
+    );
+  }
+  if (health.state === 'down' || health.state === 'off') {
+    return (
+      <p className="text-xs text-red-300 flex items-start gap-1.5">
+        <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <span className="break-words">
+          Automatic support replies are off: {health.error}
+          {health.since ? ` (since ${formatDate(health.since)})` : ''}.
+        </span>
+      </p>
+    );
+  }
+  return (
+    <p className="text-xs text-slate-400">
+      No AI answers recorded yet — press the button to check.
+    </p>
+  );
+}
+
+function DiagnosisResult({ d }: { d: Diagnosis }) {
+  return (
+    <div className="space-y-3">
+      <div
+        className={`rounded-lg border px-3 py-2.5 text-sm flex items-start gap-2 ${
+          d.ok
+            ? 'border-emerald-500/40 bg-emerald-950/30 text-emerald-100'
+            : 'border-red-500/40 bg-red-950/30 text-red-100'
+        }`}
+      >
+        {d.ok ? (
+          <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-300" />
+        ) : (
+          <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-300" />
+        )}
+        <span className="break-words">{d.verdict}</span>
+      </div>
+      <ol className="space-y-2">
+        {d.steps.map((s) => (
+          <li key={s.key} className="flex items-start gap-2 text-xs">
+            {s.status === 'pass' ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            ) : s.status === 'fail' ? (
+              <XCircle className="w-4 h-4 shrink-0 text-red-400" />
+            ) : (
+              <CircleDashed className="w-4 h-4 shrink-0 text-slate-500" />
+            )}
+            <div className="min-w-0">
+              <div
+                className={
+                  s.status === 'pass'
+                    ? 'text-slate-200'
+                    : s.status === 'fail'
+                      ? 'text-red-200 font-medium'
+                      : 'text-slate-500'
+                }
+              >
+                {s.title}
+              </div>
+              {s.detail && (
+                <div
+                  className={`break-words ${s.status === 'fail' ? 'text-red-300' : 'text-slate-400'}`}
+                >
+                  {s.detail}
+                </div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="text-[11px] text-slate-500">Checked {formatDate(d.checked_at)}.</p>
+    </div>
   );
 }
 

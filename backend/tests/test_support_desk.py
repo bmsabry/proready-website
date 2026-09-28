@@ -650,79 +650,70 @@ def test_ticket_detail_carries_customer_context(client, db, monkeypatch):
     assert body["events"]
 
 
-def test_settings_roundtrip_keeps_the_key_when_left_blank(client, monkeypatch):
-    """Saving the knowledge base must not wipe the stored credential."""
+def test_saving_ai_settings_keeps_the_key_when_left_blank(client, monkeypatch):
+    """The page only shows the key's last four characters: saving a new
+    model must not require pasting the key again, nor wipe it."""
     monkeypatch.setenv("AI_SETTINGS_KEY", "u5Ml1_hZ8b7cQvVQ0M6RH8HRlqYRIbNJ0lWfR0dO5vE=")
     from app import crypto
 
     crypto._fernet.cache_clear()
-
     first = client.put(
-        "/api/admin/support/settings",
-        json={
-            "api_url": "https://api.deepinfra.com/v1/openai",
-            "api_key": "secret-key-1234",
-            "model_name": "moonshotai/Kimi-K2.5",
-            "kb_text": "Refunds within 14 days.",
-        },
+        "/api/admin/ai/settings",
+        json={"api_url": "https://openrouter.ai/api/v1/", "api_key": "secret-key-1234",
+              "model_name": "google/gemini-3.7-flash"},
         headers=AUTH,
     )
-    assert first.status_code == 200
-    assert first.json()["api_key_masked"].endswith("1234")
-    assert first.json()["is_configured"] is True
+    assert first.status_code == 200 and first.json()["api_key_masked"].endswith("1234")
 
     second = client.put(
-        "/api/admin/support/settings",
-        json={
-            "api_url": "https://api.deepinfra.com/v1/openai",
-            "api_key": "",  # untouched
-            "model_name": "moonshotai/Kimi-K2.5",
-            "kb_text": "Refunds within 30 days.",
-        },
+        "/api/admin/ai/settings",
+        json={"api_url": "https://openrouter.ai/api/v1/", "api_key": "",
+              "model_name": "deepseek/deepseek-v4.1-flash"},
         headers=AUTH,
     )
+    assert second.status_code == 200
     assert second.json()["api_key_masked"].endswith("1234")
-    assert second.json()["kb_text"] == "Refunds within 30 days."
+    assert second.json()["model_name"] == "deepseek/deepseek-v4.1-flash"
     assert second.json()["is_configured"] is True
+    crypto._fernet.cache_clear()
 
 
-def test_support_settings_do_not_collide_with_the_assistant(client, db, monkeypatch):
-    """Two rows, two scopes. Saving one must not overwrite the other."""
+def test_support_runs_on_the_one_ai_setting(client, db, monkeypatch):
+    """One model for the whole site. Credentials saved on the old support
+    row are ignored (kept, not deleted), and saving the support knowledge
+    text never touches the model."""
     monkeypatch.setenv("AI_SETTINGS_KEY", "u5Ml1_hZ8b7cQvVQ0M6RH8HRlqYRIbNJ0lWfR0dO5vE=")
     from app import crypto
     from app.models import AISettings
 
     crypto._fernet.cache_clear()
-
     client.put(
         "/api/admin/ai/settings",
-        json={
-            "api_url": "https://assistant.example/v1",
-            "api_key": "assistant-key",
-            "model_name": "assistant-model",
-        },
+        json={"api_url": "https://openrouter.ai/api/v1/", "api_key": "site-key",
+              "model_name": "deepseek/deepseek-v4.1-flash"},
         headers=AUTH,
     )
-    client.put(
-        "/api/admin/support/settings",
-        json={
-            "api_url": "https://support.example/v1",
-            "api_key": "support-key",
-            "model_name": "support-model",
-            "kb_text": "",
-        },
-        headers=AUTH,
+    # An old, separate support model left over from before.
+    row = db.execute(select(AISettings).where(AISettings.scope == "support")).scalar_one_or_none()
+    if row is None:
+        row = AISettings(scope="support")
+        db.add(row)
+    row.api_url, row.model_name, row.api_key_encrypted = (
+        "https://old.example/v1", "old-model", crypto.encrypt("old-key"),
     )
+    db.commit()
 
-    db.expire_all()
-    rows = {
-        r.scope: r for r in db.execute(select(AISettings)).scalars().all()
-    }
-    assert rows["assistant"].model_name == "assistant-model"
-    assert rows["support"].model_name == "support-model"
+    active = svc.get_support_settings(db)
+    assert active is not None and active.model_name == "deepseek/deepseek-v4.1-flash"
 
-    assert client.get("/api/admin/ai/settings", headers=AUTH).json()["model_name"] == "assistant-model"
-    assert client.get("/api/admin/support/settings", headers=AUTH).json()["model_name"] == "support-model"
+    r = client.put("/api/admin/support/settings", json={"kb_text": "Refunds within 14 days."}, headers=AUTH)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kb_text"] == "Refunds within 14 days."
+    assert body["model_name"] == "deepseek/deepseek-v4.1-flash" and body["provider"] == "openrouter.ai"
+    assert "api_key_masked" not in body, "support settings no longer hold a key"
+    assert client.get("/api/admin/ai/settings", headers=AUTH).json()["model_name"] == "deepseek/deepseek-v4.1-flash"
+    crypto._fernet.cache_clear()
 
 
 def test_support_falls_back_to_assistant_credentials(client, db, monkeypatch):
@@ -2410,12 +2401,11 @@ def live_model(client, db, monkeypatch):
     crypto._fernet.cache_clear()
     monkeypatch.setattr(svc, "_last_llm_call", None)
     client.put(
-        "/api/admin/support/settings",
+        "/api/admin/ai/settings",
         json={
             "api_url": "https://api.deepinfra.com/v1/openai",
             "api_key": "k-test-1234",
             "model_name": "google/gemini-3.7-flash",
-            "kb_text": "",
         },
         headers=AUTH,
     )
@@ -2505,12 +2495,11 @@ def test_no_model_configured_reads_as_off(client, db, monkeypatch):
 
 def _use_openrouter(client):
     client.put(
-        "/api/admin/support/settings",
+        "/api/admin/ai/settings",
         json={
             "api_url": "https://openrouter.ai/api/v1/",
             "api_key": "sk-or-test",
             "model_name": "google/gemini-3.7-flash",
-            "kb_text": "",
         },
         headers=AUTH,
     )
@@ -2577,3 +2566,79 @@ def test_an_error_inside_a_200_is_reported(client, db, live_model):
     live_model(lambda request: httpx.Response(200, json={"error": {"message": "Provider returned error", "code": 502}}))
     out = client.post("/api/admin/support/ai-check", headers=AUTH).json()
     assert out["ok"] is False and "Provider returned error" in out["error"]
+
+
+# Admin → AI Settings → "Test the connection": one real, tiny request of
+# each kind the website makes — a JSON answer (support) and a tool call
+# (the admin assistant).
+
+
+def _provider_that(json_answer=None, tool_answer=None, status=200):
+    import json as _json
+
+    def handle(request):
+        if status != 200:
+            return httpx.Response(status, json=OUT_OF_CREDIT)
+        body = _json.loads(request.content)
+        if "tools" in body:
+            return httpx.Response(200, json={"choices": [{"message": tool_answer, "finish_reason": "stop"}]})
+        return httpx.Response(200, json={"choices": [{"message": {"content": json_answer}, "finish_reason": "stop"}]})
+
+    return handle
+
+
+TOOL_CALLED = {"content": None, "tool_calls": [
+    {"id": "c1", "type": "function", "function": {"name": "ping", "arguments": '{"value": "ok"}'}}
+]}
+
+
+def _diagnose(client):
+    r = client.post("/api/admin/ai/diagnose", headers=AUTH)
+    assert r.status_code == 200
+    out = r.json()
+    return out, {s["key"]: s for s in out["steps"]}
+
+
+def test_the_ai_test_says_working_perfectly_when_everything_answers(client, db, live_model):
+    assert client.post("/api/admin/ai/diagnose").status_code == 401
+    live_model(_provider_that(json_answer='{"ok": true}', tool_answer=TOOL_CALLED))
+    out, steps = _diagnose(client)
+    assert out["ok"] is True and out["verdict"].startswith("Working perfectly")
+    assert [s["key"] for s in out["steps"]] == ["settings", "connect", "json", "tools"]
+    assert all(s["status"] == "pass" for s in out["steps"])
+    assert out["model"] == "google/gemini-3.7-flash" and out["provider"] == "deepinfra.com"
+    assert out["health"]["state"] == "ok", "a passing test clears the Support banner"
+
+
+def test_the_ai_test_stops_at_missing_settings(client, db, monkeypatch):
+    monkeypatch.setattr(svc, "get_support_settings", lambda db: None)
+    out, steps = _diagnose(client)
+    assert out["ok"] is False
+    assert steps["settings"]["status"] == "fail" and "API key" in steps["settings"]["detail"]
+    assert {steps[k]["status"] for k in ("connect", "json", "tools")} == {"skipped"}
+
+
+def test_the_ai_test_names_a_refused_connection(client, db, live_model):
+    live_model(_provider_that(status=402))
+    out, steps = _diagnose(client)
+    assert out["ok"] is False and "out of credit" in out["verdict"]
+    assert steps["settings"]["status"] == "pass"
+    assert steps["connect"]["status"] == "fail" and "HTTP 402" in steps["connect"]["detail"]
+    assert steps["json"]["status"] == steps["tools"]["status"] == "skipped"
+
+
+def test_the_ai_test_catches_a_model_that_cannot_use_tools(client, db, live_model):
+    live_model(_provider_that(json_answer='{"ok": true}', tool_answer={"content": "Pong! All good."}))
+    out, steps = _diagnose(client)
+    assert out["ok"] is False
+    assert steps["json"]["status"] == "pass"
+    assert steps["tools"]["status"] == "fail" and "tool calling" in steps["tools"]["detail"]
+
+
+def test_the_ai_test_catches_an_unreadable_answer_and_still_tries_tools(client, db, live_model):
+    live_model(_provider_that(json_answer="", tool_answer=TOOL_CALLED))
+    out, steps = _diagnose(client)
+    assert steps["connect"]["status"] == "pass"
+    assert steps["json"]["status"] == "fail" and "empty answer" in steps["json"]["detail"]
+    assert steps["tools"]["status"] == "pass"
+    assert out["ok"] is False

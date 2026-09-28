@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -343,15 +343,19 @@ class AISettingsOut(BaseModel):
     model_name: str = ""
     api_key_masked: str = ""  # e.g. "...kf2a" or "" if unset
     is_configured: bool = False
+    # Whether automatic replies are working, from recent real calls
+    # (support_service.ai_health). Filled on GET.
+    health: Optional[Dict[str, Any]] = None
 
 
 class AISettingsIn(BaseModel):
-    """Admin save payload. All three fields required when (re)configuring."""
+    """Admin save payload. URL and model are required; a blank key keeps
+    the stored one (the page only ever shows its last four characters)."""
 
     model_config = ConfigDict(protected_namespaces=())
 
     api_url: str = Field(min_length=1, max_length=500)
-    api_key: str = Field(min_length=1, max_length=500)
+    api_key: str = Field(default="", max_length=500)
     model_name: str = Field(min_length=1, max_length=200)
 
 

@@ -40,6 +40,7 @@ from ..ai_tools import (
     is_high_stakes,
     summarize_call,
 )
+from .. import ai_diagnose, support_service
 from ..crypto import CryptoNotConfigured, decrypt, encrypt
 from ..db import get_db
 from ..deps import require_admin
@@ -632,27 +633,44 @@ def _run_loop(
 # ---------------------------------------------------------------------------
 
 
+# One AI connection for the whole website: this row drives the assistant's
+# chat AND support triage and drafts (support_service.get_support_settings).
+
+
 @router.get("/settings", response_model=AISettingsOut)
 def get_settings_endpoint(db: Session = Depends(get_db)) -> AISettingsOut:
-    return _settings_to_out(_get_or_create_settings(db))
+    out = _settings_to_out(_get_or_create_settings(db))
+    out.health = support_service.ai_health(db)
+    return out
 
 
 @router.put("/settings", response_model=AISettingsOut)
 def put_settings(body: AISettingsIn, db: Session = Depends(get_db)) -> AISettingsOut:
-    try:
-        encrypted = encrypt(body.api_key)
-    except CryptoNotConfigured as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e),
-        ) from e
     row = _get_or_create_settings(db)
+    if body.api_key.strip():
+        try:
+            row.api_key_encrypted = encrypt(body.api_key.strip())
+        except CryptoNotConfigured as e:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(e),
+            ) from e
+    elif not row.api_key_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Paste the API key — none is saved yet.",
+        )
     row.api_url = body.api_url.strip()
-    row.api_key_encrypted = encrypted
     row.model_name = body.model_name.strip()
     db.commit()
     db.refresh(row)
     return _settings_to_out(row)
+
+
+@router.post("/diagnose")
+def diagnose_endpoint(db: Session = Depends(get_db)) -> dict:
+    """"Test the connection": a tiny real request of each kind the site makes."""
+    return ai_diagnose.diagnose(db)
 
 
 # ---------------------------------------------------------------------------

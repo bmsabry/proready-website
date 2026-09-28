@@ -17,8 +17,8 @@ Admin:
   POST  /api/admin/support/tickets/{ref}/draft — ask the AI for a draft
   PATCH /api/admin/support/tickets/{ref}       — status / category / priority
   POST  /api/admin/support/tickets/{ref}/retriage — re-run the classifier
-  GET   /api/admin/support/settings            — support AI config + KB
-  PUT   /api/admin/support/settings
+  GET   /api/admin/support/settings            — knowledge text (+ the site's model, read-only)
+  PUT   /api/admin/support/settings            — save the knowledge text
 
 Triage runs in a FastAPI background task with its own session: an LLM call
 plus an email send is several seconds, and a customer submitting a form
@@ -32,14 +32,13 @@ from typing import Any, Optional
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import case, desc, func, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from .. import support_service as svc
 from ..config import get_settings
-from ..crypto import CryptoNotConfigured, decrypt, encrypt
 from ..db import SessionLocal, get_db
 from ..deps import require_admin
 from ..learner_auth import require_learner
@@ -980,13 +979,9 @@ def bulk(
 
 
 class SupportSettingsIn(BaseModel):
-    """Save payload. An empty api_key means "keep the stored one"."""
+    """Save payload: the knowledge text only. The model, URL and key are the
+    website's one AI connection, set in Admin → AI Settings."""
 
-    model_config = ConfigDict(protected_namespaces=())
-
-    api_url: str = Field(default="", max_length=500)
-    api_key: str = Field(default="", max_length=500)
-    model_name: str = Field(default="", max_length=200)
     kb_text: str = Field(default="", max_length=60_000)
 
 
@@ -1003,25 +998,13 @@ def _support_settings_row(db: Session) -> AISettings:
 
 
 def _settings_out(db: Session, row: AISettings) -> dict:
-    masked = ""
-    if row.api_key_encrypted:
-        try:
-            plain = decrypt(row.api_key_encrypted)
-            masked = f"…{plain[-4:]}" if len(plain) >= 4 else "…"
-        except CryptoNotConfigured:
-            masked = "(unreadable — AI_SETTINGS_KEY changed)"
     active = svc.get_support_settings(db)
     return {
-        "api_url": row.api_url or "",
-        "model_name": row.model_name or "",
-        "api_key_masked": masked,
         "kb_text": row.kb_text or "",
-        "is_configured": bool(row.api_url and row.api_key_encrypted and row.model_name),
-        # False here means support is borrowing the assistant's credentials.
-        "using_own_credentials": bool(
-            active is not None and active.scope == "support"
-        ),
+        # The site-wide connection support runs on, shown read-only here.
         "llm_available": active is not None,
+        "model_name": active.model_name if active is not None else "",
+        "provider": svc._provider(active.api_url) if active is not None else "",
         "categories": [
             {
                 "key": k,
@@ -1045,16 +1028,7 @@ def put_support_settings(
     payload: SupportSettingsIn, db: Session = Depends(get_db)
 ) -> dict:
     row = _support_settings_row(db)
-    row.api_url = payload.api_url.strip()
-    row.model_name = payload.model_name.strip()
     row.kb_text = payload.kb_text
-    # An empty key means "leave the stored one alone" — the UI only ever
-    # shows the mask, so re-saving the KB must not wipe the credential.
-    if payload.api_key.strip():
-        try:
-            row.api_key_encrypted = encrypt(payload.api_key.strip())
-        except CryptoNotConfigured as e:
-            raise HTTPException(status_code=503, detail=str(e)) from e
     db.commit()
     db.refresh(row)
     return _settings_out(db, row)

@@ -389,7 +389,7 @@ function AiBanner({
               className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-800/60"
             >
               <Settings2 className="w-3.5 h-3.5" />
-              Model settings
+              AI settings
             </button>
           </div>
         </div>
@@ -475,14 +475,6 @@ function Inbox_({
     }
   }
 
-  function openSettings() {
-    setShowSettings(true);
-    window.setTimeout(
-      () => document.getElementById('support-settings')?.scrollIntoView({ behavior: 'smooth' }),
-      50,
-    );
-  }
-
   const rows = tickets ?? [];
   const allSelected = rows.length > 0 && selected.size === rows.length;
   const grouped = filter === 'inbox' && !query;
@@ -533,7 +525,7 @@ function Inbox_({
           <AiBanner
             ai={stats.ai}
             onChecked={() => void load(true)}
-            onSettings={openSettings}
+            onSettings={() => go({ page: 'ai' })}
             onAuthError={onAuthError}
           />
         )}
@@ -716,9 +708,7 @@ function Inbox_({
       </Section>
 
       {showSettings && (
-        <div id="support-settings">
-          <SupportSettingsPanel onAuthError={onAuthError} />
-        </div>
+        <SupportSettingsPanel onAuthError={onAuthError} onOpenAi={() => go({ page: 'ai' })} />
       )}
     </div>
   );
@@ -1457,11 +1447,14 @@ function TimelineCard({ detail }: { detail: SupportTicketDetail }) {
 // Settings
 // ---------------------------------------------------------------------------
 
-function SupportSettingsPanel({ onAuthError }: { onAuthError: () => void }) {
+function SupportSettingsPanel({
+  onAuthError,
+  onOpenAi,
+}: {
+  onAuthError: () => void;
+  onOpenAi: () => void;
+}) {
   const [s, setS] = useState<SupportSettings | null>(null);
-  const [apiUrl, setApiUrl] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('');
   const [kb, setKb] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1471,8 +1464,6 @@ function SupportSettingsPanel({ onAuthError }: { onAuthError: () => void }) {
     try {
       const data = await api<SupportSettings>('/api/admin/support/settings');
       setS(data);
-      setApiUrl(data.api_url);
-      setModel(data.model_name);
       setKb(data.kb_text);
     } catch (e) {
       reportError(e, onAuthError, setError);
@@ -1489,15 +1480,9 @@ function SupportSettingsPanel({ onAuthError }: { onAuthError: () => void }) {
     try {
       const data = await api<SupportSettings>('/api/admin/support/settings', {
         method: 'PUT',
-        body: JSON.stringify({
-          api_url: apiUrl,
-          api_key: apiKey, // blank keeps the stored key
-          model_name: model,
-          kb_text: kb,
-        }),
+        body: JSON.stringify({ kb_text: kb }),
       });
       setS(data);
-      setApiKey('');
       setFlash('Saved.');
       window.setTimeout(() => setFlash(null), 4000);
     } catch (e) {
@@ -1514,59 +1499,39 @@ function SupportSettingsPanel({ onAuthError }: { onAuthError: () => void }) {
     <Section
       icon={<Settings2 className="w-5 h-5 text-cyan-300" />}
       title="Support settings"
-      sub="What the assistant is allowed to say, and which model says it."
+      sub="What the assistant is allowed to tell customers."
     >
       {error && <Notice kind="error">{error}</Notice>}
       {flash && <Notice kind="success">{flash}</Notice>}
 
-      {s && !s.llm_available && (
-        <Notice kind="warn">
-          No AI provider is configured, so every ticket is acknowledged and escalated to you
-          rather than answered. Set a model below, or configure the AI Assistant and support
-          will borrow its credentials.
-        </Notice>
-      )}
-      {s?.llm_available && !s.using_own_credentials && (
-        <Notice kind="success">
-          Using the AI Assistant’s provider and model. Fill in the fields below only if you want
-          support triage to run on a different (cheaper or faster) model.
-        </Notice>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="space-y-3">
-          <label className="block">
-            <span className="text-xs text-slate-500">API base URL</span>
-            <input
-              value={apiUrl}
-              onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="https://api.deepinfra.com/v1/openai"
-              className="mt-1 w-full bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs text-slate-500">
-              API key {s?.api_key_masked ? `(stored: ${s.api_key_masked})` : ''}
-            </span>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={s?.api_key_masked ? 'Leave blank to keep the stored key' : 'Paste the key'}
-              className="mt-1 w-full bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs text-slate-500">Model</span>
-            <input
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="moonshotai/Kimi-K2.5"
-              className="mt-1 w-full bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
-            />
-          </label>
+        <div className="space-y-4">
+          {/* The model is the website's one AI connection, set and tested in
+              AI Settings — shown here so nobody hunts for a second copy. */}
+          <div className="rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-3 text-sm">
+            <div className="text-xs text-slate-500 mb-1">AI model</div>
+            {s?.llm_available ? (
+              <div className="text-slate-200 break-words">
+                {s.model_name} <span className="text-slate-500">via {s.provider}</span>
+              </div>
+            ) : (
+              <div className="text-red-300">
+                No AI model is set up, so every message is acknowledged and sent to you.
+              </div>
+            )}
+            <p className="text-[11px] text-slate-500 mt-1.5">
+              The same model runs support replies, drafts and the AI Assistant chat.
+            </p>
+            <button
+              onClick={onOpenAi}
+              className="mt-2 inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/10"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Change or test it in AI Settings
+            </button>
+          </div>
 
-          <div className="text-xs text-slate-500 space-y-1.5 pt-1">
+          <div className="text-xs text-slate-500 space-y-1.5">
             <div className="text-slate-400 font-medium">Routing</div>
             <p>
               <span className="text-red-300">Always you:</span>{' '}
@@ -1615,7 +1580,7 @@ function SupportSettingsPanel({ onAuthError }: { onAuthError: () => void }) {
           className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/30 disabled:opacity-40 transition-colors"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-          Save settings
+          Save
         </button>
       </div>
     </Section>

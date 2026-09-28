@@ -30,6 +30,7 @@ import json
 import logging
 import re
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
 from html import escape as html_escape
 from typing import Any, Optional
@@ -663,27 +664,19 @@ def platform_context(db: Session) -> dict[str, Any]:
 
 
 def get_support_settings(db: Session) -> Optional[AISettings]:
-    """The support LLM config, falling back to the admin assistant's.
+    """The website's one AI connection, or None when it isn't set up.
 
-    Support works the moment the assistant is configured; pointing support
-    at a cheaper model is an optional refinement, not a prerequisite.
+    There is a single model for the whole site — support triage, drafts and
+    the admin assistant's chat — set in Admin → AI Settings (the
+    "assistant" row). The support row only holds the knowledge text; any
+    URL, key or model saved on it before this became one setting is
+    ignored, not deleted.
     """
     row = db.execute(
-        select(AISettings).where(AISettings.scope == "support").limit(1)
+        select(AISettings).where(AISettings.scope == "assistant").limit(1)
     ).scalar_one_or_none()
     if row is not None and row.api_url and row.api_key_encrypted and row.model_name:
         return row
-    fallback = db.execute(
-        select(AISettings).where(AISettings.scope == "assistant").limit(1)
-    ).scalar_one_or_none()
-    if fallback is not None and (
-        fallback.api_url and fallback.api_key_encrypted and fallback.model_name
-    ):
-        # Carry the support row's knowledge base across even when the
-        # credentials come from the assistant.
-        if row is not None and row.kb_text and not fallback.kb_text:
-            fallback.kb_text = row.kb_text
-        return fallback
     return None
 
 
@@ -705,7 +698,7 @@ def _chat_url(api_url: str) -> str:
 # the triage history in ai_health(). A tuple swap is atomic, no lock needed.
 _last_llm_call: Optional[tuple[datetime, str]] = None  # (when, error or "")
 
-NOT_CONFIGURED = "not configured — no AI model is set up (Support → Settings)"
+NOT_CONFIGURED = "not configured — no AI model is set up (Admin → AI Settings)"
 
 
 def _call_support_llm(
@@ -728,7 +721,7 @@ def _call_support_llm(
     ("out of credit", "key refused") — it ends up on the admin banner.
     """
     global _last_llm_call
-    result, error = _llm_round_trip(db, messages, json_mode=json_mode, max_tokens=max_tokens)
+    result, error, _stage = _llm_round_trip(db, messages, json_mode=json_mode, max_tokens=max_tokens)
     _last_llm_call = (datetime.now(timezone.utc), error)
     if error and why is not None:
         why.append(error)
@@ -768,20 +761,25 @@ def _http_failure(provider: str, resp: httpx.Response) -> str:
 
 def _llm_round_trip(
     db: Session, messages: list[dict], *, json_mode: bool, max_tokens: int
-) -> tuple[Optional[dict], str]:
-    """The call itself: (parsed JSON, "") or (None, why it failed)."""
+) -> tuple[Optional[dict], str, str]:
+    """The call itself: (parsed JSON, "", "") or (None, why, stage).
+
+    `stage` says where it failed, for the AI Settings test: "config" (the
+    settings), "connect" (reaching the provider, key, credit) or "answer"
+    (it answered, but not in a usable form).
+    """
     row = get_support_settings(db)
     if row is None:
         log.warning("[support] no LLM configured — falling back to escalation")
-        return None, NOT_CONFIGURED
+        return None, NOT_CONFIGURED, "config"
     provider = _provider(row.api_url)
     try:
         api_key = decrypt(row.api_key_encrypted)
     except CryptoNotConfigured:
         log.warning("[support] stored LLM key cannot be decrypted")
-        return None, "the saved API key can't be read — enter it again in Support → Settings"
+        return None, "the saved API key can't be read — enter it again in Admin → AI Settings", "config"
     if not api_key:
-        return None, "no API key is saved — enter one in Support → Settings"
+        return None, "no API key is saved — enter one in Admin → AI Settings", "config"
 
     payload: dict[str, Any] = {
         "model": row.model_name,
@@ -812,7 +810,7 @@ def _llm_round_trip(
             )
     except httpx.HTTPError as e:
         log.error("[support] LLM transport error: %s", e)
-        return None, f"{provider}: could not be reached ({type(e).__name__})"
+        return None, f"{provider}: could not be reached ({type(e).__name__})", "connect"
 
     if resp.status_code >= 400:
         # Some OpenAI-compatible providers reject response_format. Retry
@@ -821,7 +819,7 @@ def _llm_round_trip(
             log.info("[support] provider rejected json mode; retrying plain")
             return _llm_round_trip(db, messages, json_mode=False, max_tokens=max_tokens)
         log.error("[support] LLM HTTP %s: %s", resp.status_code, resp.text[:400])
-        return None, _http_failure(provider, resp)
+        return None, _http_failure(provider, resp), "connect"
 
     try:
         body = resp.json()
@@ -831,9 +829,9 @@ def _llm_round_trip(
     if not choices or not isinstance(choices[0], dict):
         # OpenRouter reports some upstream failures as HTTP 200 + {"error": …}.
         if isinstance(body, dict) and body.get("error"):
-            return None, _http_failure(provider, resp)
+            return None, _http_failure(provider, resp), "connect"
         log.error("[support] unexpected LLM response shape: %s", resp.text[:300])
-        return None, f"{provider}: the answer came back in an unexpected shape"
+        return None, f"{provider}: the answer came back in an unexpected shape", "answer"
     choice = choices[0]
     content = (choice.get("message") or {}).get("content") or ""
     if isinstance(content, list):  # content as parts: [{"type": "text", "text": …}]
@@ -848,17 +846,19 @@ def _llm_round_trip(
             finish, len(content), content[:300],
         )
         if not content and finish == "length":
-            return None, (
+            why = (
                 f"{provider}: the model used up its token allowance before writing "
                 "an answer (finish_reason=length)"
             )
-        if not content:
-            return None, f"{provider}: the model sent back an empty answer (finish_reason={finish or 'none'})"
-        if finish == "length":
-            return None, f"{provider}: the model's answer was cut off at its token allowance (finish_reason=length)"
-        snippet = " ".join(content.split())[:80]
-        return None, f"{provider}: the model's answer was not JSON — “{snippet}”"
-    return parsed, ""
+        elif not content:
+            why = f"{provider}: the model sent back an empty answer (finish_reason={finish or 'none'})"
+        elif finish == "length":
+            why = f"{provider}: the model's answer was cut off at its token allowance (finish_reason=length)"
+        else:
+            snippet = " ".join(content.split())[:80]
+            why = f"{provider}: the model's answer was not JSON — “{snippet}”"
+        return None, why, "answer"
+    return parsed, "", ""
 
 
 def _parse_json_object(content: str) -> Optional[dict]:
@@ -956,19 +956,36 @@ def ai_health(db: Session) -> dict[str, Any]:
     }
 
 
-def check_ai(db: Session) -> dict[str, Any]:
-    """A tiny live call to the model — the "Check again" button."""
-    why: list[str] = []
-    raw = _call_support_llm(
+def probe_json(db: Session) -> dict[str, Any]:
+    """A tiny live call asking for JSON, as triage and drafts do.
+
+    Used by Support's "Check again" and by the AI Settings test. Its
+    outcome counts as the latest word on whether automatic replies work.
+    """
+    global _last_llm_call
+    started = time.monotonic()
+    raw, error, stage = _llm_round_trip(
         db,
         [
             {"role": "system", "content": 'Reply with exactly this JSON object: {"ok": true}'},
             {"role": "user", "content": "ping"},
         ],
+        json_mode=True,
         max_tokens=1000,
-        why=why,
     )
-    return {"ok": raw is not None, "error": "" if raw is not None else (why[-1] if why else "")}
+    _last_llm_call = (datetime.now(timezone.utc), error)
+    return {
+        "ok": raw is not None,
+        "error": error,
+        "stage": stage,
+        "seconds": round(time.monotonic() - started, 1),
+    }
+
+
+def check_ai(db: Session) -> dict[str, Any]:
+    """The Support banner's "Check again"."""
+    out = probe_json(db)
+    return {"ok": out["ok"], "error": out["error"]}
 
 
 # ---------------------------------------------------------------------------
@@ -1668,7 +1685,7 @@ Return ONLY a JSON object:
             "error": f"The support AI could not write a draft: {why[-1]}."
             if why
             else "The support AI is not configured or is unreachable. "
-            "Check Support → Settings.",
+            "Check Admin → AI Settings.",
         }
 
     reply = str(raw.get("reply_html", "") or "").strip()
