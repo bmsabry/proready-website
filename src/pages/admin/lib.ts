@@ -344,6 +344,12 @@ export type SupportTicket = {
   first_responded_at: string | null;
   resolved_at: string | null;
   needs_reply: boolean;
+  /** Whose move: needs_you (Bassam's), waiting (the customer's), ai_answered, closed… */
+  tray: 'needs_you' | 'waiting' | 'ai_answered' | 'closed' | string;
+  /** Still new / mid-triage long after it arrived — triage never finished. */
+  stuck: boolean;
+  /** Waiting on the customer for days — nudge them or close it. */
+  follow_up: boolean;
 };
 
 export type SupportMessage = {
@@ -420,12 +426,27 @@ export type SupportTicketDetail = {
   customer: SupportCustomer;
 };
 
+/** Are automatic replies working? Read from recent triage outcomes. */
+export type SupportAiHealth = {
+  state: 'ok' | 'down' | 'off' | 'unknown';
+  configured: boolean;
+  error: string;
+  since: string | null;
+  missed: number;
+  last_ok_at: string | null;
+};
+
 export type SupportStats = {
   by_status: Record<string, number>;
   by_category: Record<string, number>;
   open: number;
   needs_human: number;
+  needs_you: number;
+  waiting: number;
+  follow_up: number;
+  ai_answered_recent: number;
   total: number;
+  ai: SupportAiHealth;
 };
 
 export type SupportDraft = {
@@ -455,11 +476,11 @@ export type SupportSettings = {
 /** Human labels for the ticket lifecycle, used by the inbox and the thread. */
 export const SUPPORT_STATUS_LABEL: Record<string, string> = {
   new: 'New',
-  ai_handling: 'AI triaging',
-  awaiting_customer: 'Awaiting customer',
-  escalated: 'Needs you',
-  auto_resolved: 'Auto-resolved',
-  resolved: 'Resolved',
+  ai_handling: 'AI reading',
+  awaiting_customer: 'Waiting on customer',
+  escalated: 'Needs your reply',
+  auto_resolved: 'Answered by AI',
+  resolved: 'Closed',
   archived: 'Archived',
   spam: 'Spam',
 };

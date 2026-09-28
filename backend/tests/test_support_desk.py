@@ -16,7 +16,9 @@ is actually asserted:
 from __future__ import annotations
 
 import re
+from datetime import datetime, timedelta, timezone
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -509,29 +511,28 @@ def test_admin_endpoints_require_auth(client):
         assert getattr(client, method)(path).status_code == 401
 
 
-def test_admin_inbox_lists_and_sorts_by_priority(client, db, monkeypatch):
+def test_admin_inbox_puts_the_newest_message_on_top(client, db, monkeypatch):
+    """Newest first, not priority first: a P1 from last month must not bury
+    the enquiry that arrived this morning (it did, and it went unseen)."""
     fake_llm(monkeypatch, None)
-    client.post(
-        "/api/support/contact",
-        json={"email": "p8@example.com", "subject": "Chat", "message": "hi"},
-    )
-    # Force one ticket to P1 so ordering is observable.
-    low = client.post(
+    old_p1 = client.post(
         "/api/support/contact",
         json={"email": "p1@example.com", "subject": "Charged twice", "message": "help"},
     ).json()["ref"]
-    client.patch(
-        f"/api/admin/support/tickets/{low}",
-        json={"category": "payment"},
-        headers=AUTH,
-    )
+    client.patch(f"/api/admin/support/tickets/{old_p1}", json={"category": "payment"}, headers=AUTH)
+    t = ticket_by_ref(db, old_p1)
+    t.last_message_at = t.last_message_at - timedelta(days=30)
+    db.commit()
+
+    fresh = client.post(
+        "/api/support/contact",
+        json={"email": "lead@example.com", "subject": "Training for 12 engineers", "message": "hi"},
+    ).json()["ref"]
 
     r = client.get("/api/admin/support/tickets", headers=AUTH)
     assert r.status_code == 200
-    items = r.json()["items"]
-    assert items, "inbox should not be empty"
-    assert items[0]["priority"] <= items[-1]["priority"]
-    assert items[0]["ref"] == low
+    refs = [i["ref"] for i in r.json()["items"]]
+    assert refs.index(fresh) < refs.index(old_p1)
 
 
 def test_admin_reply_sends_and_records(client, db, monkeypatch, captured_mail):
@@ -2189,3 +2190,308 @@ def test_prompt_routes_timing_through_the_tool():
 
     assert "session_local_times" in SYSTEM_PROMPT
     assert "never do this arithmetic yourself" in SYSTEM_PROMPT.lower()
+
+
+# ---------------------------------------------------------------------------
+# Whose move is it? Inbox trays, hand-over to a human, and AI health
+# ---------------------------------------------------------------------------
+#
+# The failure these guard against happened: an enquiry arrived while the
+# model was out of credit, Bassam answered it from the alert email's link,
+# the reply closed the ticket by default, and the admin inbox never showed
+# it — nor that automatic replies had stopped.
+
+ANSWERABLE = {
+    "category": "course_info",
+    "priority": 6,
+    "is_spam": False,
+    "confidence": 0.95,
+    "summary": "Asks about the course.",
+    "reply_html": "<p>It runs five days.</p>",
+    "can_auto_resolve": True,
+    "escalation_reason": "",
+}
+
+
+def _inbox(client, status_filter="inbox"):
+    r = client.get(f"/api/admin/support/tickets?status_filter={status_filter}", headers=AUTH)
+    assert r.status_code == 200
+    return {i["ref"]: i for i in r.json()["items"]}, [i["ref"] for i in r.json()["items"]]
+
+
+def _stats(client):
+    return client.get("/api/admin/support/stats", headers=AUTH).json()
+
+
+def test_a_reply_keeps_the_conversation_open_until_you_close_it(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "zaur@plant.example", "subject": "DLE training", "message": "Price for 8?"},
+    ).json()["ref"]
+    assert _inbox(client)[0][ref]["tray"] == "needs_you"
+
+    # The admin page sends no status now; the default is "waiting on them".
+    r = client.post(
+        f"/api/admin/support/tickets/{ref}/reply", json={"body_html": "<p>Quote attached.</p>"},
+        headers=AUTH,
+    )
+    assert r.json()["status"] == "awaiting_customer"
+    by_ref, _ = _inbox(client)
+    assert by_ref[ref]["tray"] == "waiting", "an answered lead stays visible for follow-up"
+    assert ref in _inbox(client, "waiting")[0]
+    assert ref not in _inbox(client, "needs_you")[0]
+
+
+def test_the_customer_answering_bassam_goes_to_bassam_not_the_bot(
+    client, db, monkeypatch, captured_mail
+):
+    """Once he has written on a thread, their reply is for him — even if
+    the model would happily answer it, and even if he had closed it."""
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "handover@example.com", "subject": "Course", "message": "Question"},
+    ).json()["ref"]
+    for n, close in enumerate((False, True)):
+        client.post(
+            f"/api/admin/support/tickets/{ref}/reply",
+            json={"body_html": "<p>Answer.</p>", "set_status": "resolved" if close else "awaiting_customer"},
+            headers=AUTH,
+        )
+        fake_llm(monkeypatch, ANSWERABLE)  # a model that would answer if asked
+        captured_mail.clear()
+        _inbound(
+            client,
+            from_="handover@example.com",
+            subject=f"Re: Course [#{ref}]",
+            text="Thanks — one more thing.",
+            message_id=f"<handover-{n}@mail.example>",
+        )
+        db.expire_all()
+        t = ticket_by_ref(db, ref)
+        assert t.status == "escalated"
+        assert messages(db, t.id)[-1].sender_kind == "customer", "the bot did not answer"
+        assert [m["audience"] for m in captured_mail] == ["admin"]
+        assert _inbox(client)[0][ref]["tray"] == "needs_you"
+
+
+def test_the_bot_still_handles_threads_only_it_has_answered(client, db, monkeypatch):
+    fake_llm(monkeypatch, ANSWERABLE)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "botonly@example.com", "subject": "Course", "message": "How long?"},
+    ).json()["ref"]
+    _inbound(
+        client, from_="botonly@example.com", subject=f"Re: Course [#{ref}]",
+        text="And is it recorded?", message_id="<botonly-2@mail.example>",
+    )
+    db.expire_all()
+    t = ticket_by_ref(db, ref)
+    assert t.status == "auto_resolved"
+    assert [m.sender_kind for m in messages(db, t.id)] == ["customer", "ai", "customer", "ai"]
+
+
+def test_inbox_trays_and_what_they_leave_out(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    esc = client.post("/api/support/contact", json={"email": "t1@example.com", "message": "a"}).json()["ref"]
+    wait = client.post("/api/support/contact", json={"email": "t2@example.com", "message": "b"}).json()["ref"]
+    client.post(f"/api/admin/support/tickets/{wait}/reply", json={"body_html": "<p>x</p>"}, headers=AUTH)
+    closed = client.post("/api/support/contact", json={"email": "t3@example.com", "message": "c"}).json()["ref"]
+    client.patch(f"/api/admin/support/tickets/{closed}", json={"status": "resolved"}, headers=AUTH)
+    fake_llm(monkeypatch, ANSWERABLE)
+    ai_new = client.post("/api/support/contact", json={"email": "t4@example.com", "message": "d"}).json()["ref"]
+    ai_old = client.post("/api/support/contact", json={"email": "t5@example.com", "message": "e"}).json()["ref"]
+    t = ticket_by_ref(db, ai_old)
+    t.last_message_at = t.last_message_at - timedelta(days=20)
+    db.commit()
+
+    by_ref, order = _inbox(client)
+    assert by_ref[esc]["tray"] == "needs_you"
+    assert by_ref[wait]["tray"] == "waiting"
+    assert by_ref[ai_new]["tray"] == "ai_answered"
+    assert closed not in by_ref, "closed conversations leave the inbox"
+    assert ai_old not in by_ref, "the AI's answers are shown for two weeks, not forever"
+    # Trays in order: needs you, then waiting, then answered by the AI.
+    assert order.index(esc) < order.index(wait) < order.index(ai_new)
+    trays = [by_ref[r]["tray"] for r in order]
+    assert trays == sorted(trays, key=["needs_you", "waiting", "ai_answered"].index)
+
+
+def test_stuck_triage_and_overdue_follow_ups_are_flagged(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    stuck = client.post("/api/support/contact", json={"email": "stuck@example.com", "message": "a"}).json()["ref"]
+    t = ticket_by_ref(db, stuck)
+    t.status = "new"  # as if the server restarted mid-triage
+    t.last_customer_message_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    db.commit()
+
+    nudge = client.post("/api/support/contact", json={"email": "nudge@example.com", "message": "b"}).json()["ref"]
+    client.post(f"/api/admin/support/tickets/{nudge}/reply", json={"body_html": "<p>x</p>"}, headers=AUTH)
+    t = ticket_by_ref(db, nudge)
+    db.refresh(t)
+    t.last_message_at = datetime.now(timezone.utc) - timedelta(days=5)
+    db.commit()
+
+    by_ref, _ = _inbox(client)
+    assert by_ref[stuck]["tray"] == "needs_you" and by_ref[stuck]["stuck"] is True
+    assert by_ref[nudge]["tray"] == "waiting" and by_ref[nudge]["follow_up"] is True
+    s = _stats(client)
+    assert s["follow_up"] >= 1
+    assert s["needs_you"] >= 1 and s["needs_human"] == s["needs_you"]
+    assert s["needs_you"] == sum(s["by_status"].get(k, 0) for k in ("escalated", "new", "ai_handling"))
+
+
+@pytest.mark.parametrize(
+    "subject,body,expected",
+    [
+        ("Training & Workshops enquiry", "We need DLE training.\n\nInquiry type: Training & Workshops\nCompany: Plant Co", "business"),
+        ("Consulting Services enquiry", "Help with our combustor.\n\nInquiry type: Consulting Services", "business"),
+        ("Question", "I was charged twice for the course", "payment"),
+        ("Help", "I can't log in to the portal", "access"),
+        ("Dates", "Are there seats left in the next cohort?", "enrollment"),
+        ("Hello", "Just saying hi", "general"),
+    ],
+)
+def test_keyword_labels_when_the_model_is_down(subject, body, expected):
+    assert svc.guess_category(subject, body) == expected
+
+
+def test_a_lead_is_labelled_business_even_with_the_model_down(client, db, monkeypatch):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={
+            "name": "Zaur",
+            "email": "zaur2@plant.example",
+            "subject": "Training & Workshops enquiry",
+            "message": "Please send a proposal for DLE training.\n\nInquiry type: Training & Workshops",
+        },
+    ).json()["ref"]
+    t = ticket_by_ref(db, ref)
+    assert t.category == "business" and t.status == "escalated"
+    # The inbox line shows what they wrote, not "triage unavailable".
+    assert _inbox(client)[0][ref]["summary"].startswith("Please send a proposal")
+
+
+def test_the_admin_alert_does_not_render_what_the_customer_typed(client, db, monkeypatch, captured_mail):
+    fake_llm(monkeypatch, None)
+    client.post(
+        "/api/support/contact",
+        json={
+            "name": "<b>Eve</b>",
+            "email": "eve@example.com",
+            "subject": "<a href='https://evil.example'>Invoice</a>",
+            "message": "<img src=x onerror=alert(1)>",
+        },
+    )
+    alert = [m for m in captured_mail if m.get("audience") == "admin"][-1]["html"]
+    assert "evil.example'>Invoice" not in alert and "<img" not in alert and "<b>Eve" not in alert
+    assert "&lt;img" in alert
+
+
+REAL_HTTPX_CLIENT = httpx.Client
+OUT_OF_CREDIT = {
+    "error": {
+        "message": "You need positive balance to do inference. Please add balance manually or setup top-up",
+        "type": "invalid_request_error",
+        "param": None,
+        "code": None,
+    }
+}
+
+
+@pytest.fixture()
+def live_model(client, db, monkeypatch):
+    """The real model call, against a fake provider at DeepInfra's address."""
+    monkeypatch.setenv("AI_SETTINGS_KEY", "u5Ml1_hZ8b7cQvVQ0M6RH8HRlqYRIbNJ0lWfR0dO5vE=")
+    from app import crypto
+
+    crypto._fernet.cache_clear()
+    monkeypatch.setattr(svc, "_last_llm_call", None)
+    client.put(
+        "/api/admin/support/settings",
+        json={
+            "api_url": "https://api.deepinfra.com/v1/openai",
+            "api_key": "k-test-1234",
+            "model_name": "google/gemini-3.7-flash",
+            "kb_text": "",
+        },
+        headers=AUTH,
+    )
+
+    def use(handler):
+        monkeypatch.setattr(
+            svc.httpx, "Client",
+            lambda **kw: REAL_HTTPX_CLIENT(transport=httpx.MockTransport(handler), **kw),
+        )
+
+    yield use
+    crypto._fernet.cache_clear()
+
+
+def _model_says(obj):
+    return lambda request: httpx.Response(
+        200, json={"choices": [{"message": {"content": __import__("json").dumps(obj)}}]}
+    )
+
+
+def test_an_out_of_credit_model_is_reported_in_plain_words(client, db, live_model, captured_mail):
+    live_model(lambda request: httpx.Response(402, json=OUT_OF_CREDIT))
+    ref = client.post(
+        "/api/support/contact",
+        json={"name": "Sam", "email": "credit@example.com", "subject": "Dates?", "message": "When is the next cohort?"},
+    ).json()["ref"]
+
+    t = ticket_by_ref(db, ref)
+    assert t.status == "escalated"
+    assert (t.ai_result or {}).get("error", "").startswith("deepinfra.com: out of credit")
+    # The customer still heard back; the alert says why Bassam has to answer.
+    assert any(m["to"] == "credit@example.com" and "reached us" in m["html"] for m in captured_mail)
+    alert = [m for m in captured_mail if m.get("audience") == "admin"][-1]["html"]
+    assert "AI offline (deepinfra.com: out of credit" in alert
+
+    ai = _stats(client)["ai"]
+    assert ai["state"] == "down"
+    assert "out of credit" in ai["error"] and "HTTP 402" in ai["error"]
+    assert "positive balance" in ai["error"]
+    assert ai["missed"] >= 1 and ai["since"]
+
+    # Drafting says the same thing instead of a generic "unreachable".
+    r = client.post(f"/api/admin/support/tickets/{ref}/draft", json={"instruction": ""}, headers=AUTH)
+    assert r.status_code == 412 and "out of credit" in r.json()["detail"]
+
+
+def test_check_again_clears_the_banner_once_the_model_answers(client, db, live_model):
+    live_model(lambda request: httpx.Response(402, json=OUT_OF_CREDIT))
+    client.post("/api/support/contact", json={"email": "c1@example.com", "message": "hi"})
+    assert _stats(client)["ai"]["state"] == "down"
+
+    failed = client.post("/api/admin/support/ai-check", headers=AUTH).json()
+    assert failed["ok"] is False and "out of credit" in failed["error"]
+
+    live_model(_model_says({"ok": True}))
+    fixed = client.post("/api/admin/support/ai-check", headers=AUTH).json()
+    assert fixed["ok"] is True and fixed["ai"]["state"] == "ok"
+    assert _stats(client)["ai"]["state"] == "ok"
+
+
+@pytest.mark.parametrize(
+    "status,body,words",
+    [
+        (401, {"error": {"message": "Invalid API key"}}, "API key was refused"),
+        (404, {"detail": "Model not found"}, "model name or URL was not found"),
+        (429, {"error": {"message": "slow down"}}, "rate-limited"),
+        (503, {}, "provider is having trouble"),
+    ],
+)
+def test_other_provider_failures_say_what_to_fix(client, db, live_model, status, body, words):
+    live_model(lambda request: httpx.Response(status, json=body))
+    out = client.post("/api/admin/support/ai-check", headers=AUTH).json()
+    assert out["ok"] is False and words in out["error"] and f"HTTP {status}" in out["error"]
+
+
+def test_no_model_configured_reads_as_off(client, db, monkeypatch):
+    monkeypatch.setattr(svc, "get_support_settings", lambda db: None)
+    ai = _stats(client)["ai"]
+    assert ai["state"] == "off" and "not configured" in ai["error"]

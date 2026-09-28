@@ -31,7 +31,9 @@ import logging
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
+from html import escape as html_escape
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import httpx
 from sqlalchemy import desc, func, select
@@ -132,6 +134,30 @@ STATUSES = (
 
 # Statuses that mean "nobody is waiting on us".
 CLOSED_STATUSES = {"auto_resolved", "resolved", "archived", "spam"}
+
+# The admin inbox answers one question — whose move is it? — with three trays:
+#   needs_you    Bassam's move. Escalated, or still new / mid-triage (triage
+#                takes seconds, so one that stays there never finished).
+#   waiting      He has replied; the customer's move. It stays open until they
+#                answer (back to needs_you) or he closes it.
+#   ai_answered  The assistant answered and closed it; shown for a while so
+#                he can glance over what it said.
+NEEDS_YOU_STATUSES = ("escalated", "new", "ai_handling")
+WAITING_STATUSES = ("awaiting_customer",)
+TRIAGE_STUCK_AFTER = timedelta(minutes=10)
+FOLLOW_UP_AFTER = timedelta(days=3)
+AI_ANSWERED_WINDOW = timedelta(days=14)
+
+
+def tray(status: str) -> str:
+    """Which inbox tray a status belongs to."""
+    if status in NEEDS_YOU_STATUSES:
+        return "needs_you"
+    if status in WAITING_STATUSES:
+        return "waiting"
+    if status == "auto_resolved":
+        return "ai_answered"
+    return "closed" if status == "resolved" else status
 
 
 # ---------------------------------------------------------------------------
@@ -399,20 +425,25 @@ def notify_admin(db: Session, ticket: SupportTicket, reason: str) -> None:
     if not to:
         return
     try:
+        # Everything the customer typed is escaped: this mail goes to the
+        # admin inbox, and a form field must not be able to put links or
+        # markup in it.
+        e = html_escape
         preview = (ticket.body or "")[:600]
         html = (
-            f"<p><strong>{reason}</strong></p>"
+            f"<p><strong>{e(reason)}</strong></p>"
             f"<table style='font-family:sans-serif;font-size:14px;border-collapse:collapse'>"
             f"<tr><td style='padding:3px 12px 3px 0'><strong>Ref</strong></td><td>#{ticket.ref}</td></tr>"
             f"<tr><td style='padding:3px 12px 3px 0'><strong>From</strong></td>"
-            f"<td>{ticket.submitter_name or '—'} &lt;{ticket.submitter_email}&gt;</td></tr>"
-            f"<tr><td style='padding:3px 12px 3px 0'><strong>Subject</strong></td><td>{ticket.subject}</td></tr>"
+            f"<td>{e(ticket.submitter_name or '—')} &lt;{e(ticket.submitter_email)}&gt;</td></tr>"
+            f"<tr><td style='padding:3px 12px 3px 0'><strong>Subject</strong></td><td>{e(ticket.subject)}</td></tr>"
             f"<tr><td style='padding:3px 12px 3px 0'><strong>Category</strong></td>"
-            f"<td>{CATEGORY_LABEL.get(ticket.category, ticket.category)} (P{ticket.priority})</td></tr>"
+            f"<td>{e(CATEGORY_LABEL.get(ticket.category, ticket.category))} (P{ticket.priority})</td></tr>"
             f"</table>"
             f"<pre style='white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;"
-            f"padding:10px;border-radius:6px;font-size:13px'>{preview}</pre>"
-            f"<p><a href='{settings.SITE_URL}/admin#support/{ticket.ref}'>Open in the admin panel</a></p>"
+            f"padding:10px;border-radius:6px;font-size:13px'>{e(preview)}</pre>"
+            f"<p><a href='{settings.SITE_URL}/admin#support/{ticket.ref}'>Open and reply in the admin panel</a> "
+            f"— it is listed under <strong>Needs your reply</strong> until you answer.</p>"
         )
         send_email(
             to=to,
@@ -670,30 +701,84 @@ def _chat_url(api_url: str) -> str:
     return f"{url}/chat/completions"
 
 
+# The outcome of the last model call this process made, newest wins against
+# the triage history in ai_health(). A tuple swap is atomic, no lock needed.
+_last_llm_call: Optional[tuple[datetime, str]] = None  # (when, error or "")
+
+NOT_CONFIGURED = "not configured — no AI model is set up (Support → Settings)"
+
+
 def _call_support_llm(
     db: Session,
     messages: list[dict],
     *,
     json_mode: bool = True,
     max_tokens: int = 1100,
+    why: Optional[list[str]] = None,
 ) -> Optional[dict]:
     """One LLM round trip. Returns parsed JSON, or None on any failure.
 
     Every failure mode returns None rather than raising: a support desk
     whose classifier is down must still take the message and acknowledge
-    it. The caller's fallback path handles None.
+    it. The caller's fallback path handles None. When `why` is given, the
+    reason for a failure is appended to it in words Bassam can act on
+    ("out of credit", "key refused") — it ends up on the admin banner.
     """
+    global _last_llm_call
+    result, error = _llm_round_trip(db, messages, json_mode=json_mode, max_tokens=max_tokens)
+    _last_llm_call = (datetime.now(timezone.utc), error)
+    if error and why is not None:
+        why.append(error)
+    return result
+
+
+def _provider(api_url: str) -> str:
+    host = (urlparse(api_url or "").hostname or "the AI provider").lower()
+    return host.removeprefix("api.")
+
+
+def _http_failure(provider: str, resp: httpx.Response) -> str:
+    """An HTTP error from the provider, in words that say what to do."""
+    code = resp.status_code
+    detail = ""
+    try:
+        body = resp.json()
+        # OpenAI's shape {"error": {"message": …}}, and the flatter ones
+        # other providers use ({"detail": …}, {"message": …}).
+        if isinstance(body, dict):
+            found = body.get("error") or body.get("detail") or body.get("message") or ""
+            if isinstance(found, dict):
+                found = found.get("message") or found.get("error_message") or found.get("error") or ""
+            detail = str(found)
+    except ValueError:
+        detail = resp.text or ""
+    detail = " ".join(detail.split())[:160]
+    what = {
+        402: "out of credit — add balance to the account or switch provider",
+        401: "the API key was refused",
+        403: "the API key was refused",
+        404: "the model name or URL was not found",
+        429: "rate-limited or over quota",
+    }.get(code) or ("the provider is having trouble" if code >= 500 else "the request was rejected")
+    return f"{provider}: {what} (HTTP {code})" + (f" — “{detail}”" if detail else "")
+
+
+def _llm_round_trip(
+    db: Session, messages: list[dict], *, json_mode: bool, max_tokens: int
+) -> tuple[Optional[dict], str]:
+    """The call itself: (parsed JSON, "") or (None, why it failed)."""
     row = get_support_settings(db)
     if row is None:
         log.warning("[support] no LLM configured — falling back to escalation")
-        return None
+        return None, NOT_CONFIGURED
+    provider = _provider(row.api_url)
     try:
         api_key = decrypt(row.api_key_encrypted)
     except CryptoNotConfigured:
         log.warning("[support] stored LLM key cannot be decrypted")
-        return None
+        return None, "the saved API key can't be read — enter it again in Support → Settings"
     if not api_key:
-        return None
+        return None, "no API key is saved — enter one in Support → Settings"
 
     payload: dict[str, Any] = {
         "model": row.model_name,
@@ -717,26 +802,27 @@ def _call_support_llm(
             )
     except httpx.HTTPError as e:
         log.error("[support] LLM transport error: %s", e)
-        return None
+        return None, f"{provider}: could not be reached ({type(e).__name__})"
 
     if resp.status_code >= 400:
         # Some OpenAI-compatible providers reject response_format. Retry
         # once without it rather than dropping to the fallback reply.
         if json_mode and resp.status_code in (400, 422):
             log.info("[support] provider rejected json mode; retrying plain")
-            return _call_support_llm(
-                db, messages, json_mode=False, max_tokens=max_tokens
-            )
+            return _llm_round_trip(db, messages, json_mode=False, max_tokens=max_tokens)
         log.error("[support] LLM HTTP %s: %s", resp.status_code, resp.text[:400])
-        return None
+        return None, _http_failure(provider, resp)
 
     try:
         content = (resp.json()["choices"][0]["message"]["content"] or "").strip()
     except (KeyError, IndexError, TypeError, ValueError) as e:
         log.error("[support] unexpected LLM response shape: %s", e)
-        return None
+        return None, f"{provider}: the answer came back in an unexpected shape"
 
-    return _parse_json_object(content)
+    parsed = _parse_json_object(content)
+    if parsed is None:
+        return None, f"{provider}: the model's answer could not be read as JSON"
+    return parsed, ""
 
 
 def _parse_json_object(content: str) -> Optional[dict]:
@@ -768,6 +854,85 @@ def _parse_json_object(content: str) -> Optional[dict]:
         except ValueError:
             return None
     return None
+
+
+# ---------------------------------------------------------------------------
+# Is the assistant answering?
+# ---------------------------------------------------------------------------
+#
+# When the model is down the desk keeps working — every customer still gets
+# an acknowledgement — which is exactly why an outage is easy to miss: the
+# only symptom is that nothing gets answered automatically any more. So the
+# admin page says so in red, with the provider's own reason.
+
+
+def ai_health(db: Session) -> dict[str, Any]:
+    """State of automatic replies, for the admin banner.
+
+    Read from the recent triage outcomes (durable, survives restarts), with
+    the last live call from this process — a "Check again", a draft — taking
+    precedence when it is newer.
+    """
+    rows = db.execute(
+        select(SupportTicketEvent.created_at, SupportTicketEvent.payload)
+        .where(SupportTicketEvent.event_type == "ai_classified")
+        .order_by(desc(SupportTicketEvent.id))
+        .limit(50)
+    ).all()
+    # (when, error, counts as a customer message that missed out)
+    outcomes: list[tuple[datetime, str, bool]] = []
+    for at, payload in rows:
+        p = payload or {}
+        ok = p.get("source") == "llm"
+        outcomes.append(
+            (_aware(at), "" if ok else str(p.get("error") or "the AI did not answer"), True)
+        )
+    if _last_llm_call is not None:
+        outcomes.append((_last_llm_call[0], _last_llm_call[1], False))
+    outcomes.sort(key=lambda o: o[0], reverse=True)
+
+    configured = get_support_settings(db) is not None
+    base: dict[str, Any] = {
+        "configured": configured,
+        "error": "",
+        "since": None,
+        "missed": 0,
+        "last_ok_at": next((o[0].isoformat() for o in outcomes if not o[1]), None),
+    }
+    if not configured:
+        return {**base, "state": "off", "error": NOT_CONFIGURED}
+    if not outcomes:
+        return {**base, "state": "unknown"}
+    if not outcomes[0][1]:
+        return {**base, "state": "ok"}
+    since, missed = outcomes[0][0], 0
+    for at, error, is_ticket in outcomes:
+        if not error:
+            break
+        since = at
+        missed += int(is_ticket)
+    return {
+        **base,
+        "state": "down",
+        "error": outcomes[0][1],
+        "since": since.isoformat(),
+        "missed": missed,
+    }
+
+
+def check_ai(db: Session) -> dict[str, Any]:
+    """A tiny live call to the model — the "Check again" button."""
+    why: list[str] = []
+    raw = _call_support_llm(
+        db,
+        [
+            {"role": "system", "content": 'Reply with exactly this JSON object: {"ok": true}'},
+            {"role": "user", "content": "ping"},
+        ],
+        max_tokens=20,
+        why=why,
+    )
+    return {"ok": raw is not None, "error": "" if raw is not None else (why[-1] if why else "")}
 
 
 # ---------------------------------------------------------------------------
@@ -902,15 +1067,17 @@ def classify_ticket(
             "answer did not land — lean strongly toward can_auto_resolve=false.\n"
         )
 
+    why: list[str] = []
     raw = _call_support_llm(
         db,
         [
             {"role": "system", "content": _classify_system_prompt(db)},
             {"role": "user", "content": user_prompt},
         ],
+        why=why,
     )
     if raw is None:
-        return _fallback_classification(ticket)
+        return _fallback_classification(ticket, error=why[-1] if why else "")
 
     return _sanitize_classification(raw, ticket)
 
@@ -965,25 +1132,82 @@ def _sanitize_classification(raw: dict, ticket: SupportTicket) -> dict[str, Any]
     }
 
 
-def _fallback_classification(ticket: SupportTicket) -> dict[str, Any]:
-    """What we do when the model is unavailable: acknowledge and escalate."""
+# Used only when the model is down, to label a ticket well enough to sort
+# and read in the inbox. It never decides whether to answer: a fallback
+# ticket always goes to Bassam. First match wins, so money and access come
+# before "it mentions a course".
+_FALLBACK_KEYWORDS: list[tuple[str, re.Pattern[str]]] = [
+    ("payment", re.compile(
+        r"\b(refund\w*|invoice\w*|receipt|charged|double[- ]?charged|billing|paypal|stripe|"
+        r"payment\w*|paid twice)\b", re.I)),
+    ("access", re.compile(
+        r"(can'?t|cannot|unable to) (log ?in|sign ?in|access|open)|sign-?in link|login link|"
+        r"\blocked out\b|\bno access\b", re.I)),
+    ("bug", re.compile(
+        r"\b(error|broken|bug|crash\w*)\b|not working|doesn'?t work|does not work", re.I)),
+    ("business", re.compile(
+        r"inquiry type: (consulting services|training & workshops|ai & data analytics)|"
+        r"^company: \S|\b(consult\w*|in-?house|on-?site|corporate|quotation|quote|proposal|"
+        r"partnership|workshop\w*|trainees|delegates|our (team|engineers|staff|company))\b",
+        re.I | re.M)),
+    ("enrollment", re.compile(
+        r"\b(enrol\w*|register\w*|registration|seats?|cohort|sign ?up)\b", re.I)),
+    ("software", re.compile(r"\b(software|download\w*|pro3dworks|licen[cs]e|install\w*)\b", re.I)),
+    ("course_info", re.compile(
+        r"\b(course\w*|syllabus|curriculum|certificate\w*|training)\b", re.I)),
+]
+
+
+def guess_category(subject: str, body: str) -> str:
+    """A keyword guess at the category, for when the model can't be asked."""
+    text = f"{subject or ''}\n{body or ''}"
+    for cat, pattern in _FALLBACK_KEYWORDS:
+        if pattern.search(text):
+            return cat
+    return "general"
+
+
+def _fallback_classification(ticket: SupportTicket, error: str = "") -> dict[str, Any]:
+    """What we do when the model is unavailable: acknowledge and escalate.
+
+    The category comes from the form, else what the ticket already had,
+    else a keyword guess — so a training enquiry still reads as Business
+    in the inbox rather than General P9. The summary is the start of the
+    message itself, which is more use in the list than "triage failed".
+    """
     name = (ticket.submitter_name or "").strip().split(" ")[0]
     greeting = f"<p>Hi {name},</p>" if name else "<p>Hello,</p>"
-    cat = FORM_KINDS.get(str((ticket.meta or {}).get("kind") or "")) or ticket.category or "general"
+    cat = (
+        FORM_KINDS.get(str((ticket.meta or {}).get("kind") or ""))
+        or (ticket.category if ticket.category not in ("", None, "general") else "")
+        or guess_category(ticket.subject, ticket.body)
+    )
+    snippet = " ".join((ticket.body or "").split())
+    if len(snippet) > 160:
+        snippet = snippet[:157].rstrip() + "…"
     return {
         "category": cat,
         "priority": CATEGORY_PRIORITY.get(cat, 8),
         "is_spam": False,
         "confidence": 0.0,
-        "summary": "Automatic triage unavailable — needs manual review.",
+        "summary": snippet or "(no message text)",
         "reply_html": (
             f"{greeting}"
             "<p>Thanks for getting in touch with ProReadyEngineer. Your message has "
             "reached us and someone will reply personally within one business day.</p>"
         ),
         "can_auto_resolve": False,
-        "escalation_reason": "Automatic triage unavailable",
+        # Short: this line is the alert email's headline and the thread's
+        # note. The provider's own words are on the admin banner.
+        "escalation_reason": (
+            f"AI offline ({error.split(' — “')[0]}) — the customer got the "
+            "standard acknowledgement; please reply yourself"
+            if error
+            else "The AI did not answer — the customer got the standard "
+            "acknowledgement; please reply yourself"
+        ),
         "source": "fallback",
+        "error": error,
     }
 
 
@@ -1079,6 +1303,9 @@ def _process_ticket_inner(db: Session, ticket: SupportTicket) -> None:
             "summary": result["summary"],
             "attempt": attempt,
             "source": result["source"],
+            # Why the model could not be used, when it couldn't: this is
+            # what the admin banner reads to say "automatic replies are off".
+            "error": result.get("error", ""),
         },
     )
 
@@ -1392,16 +1619,20 @@ Return ONLY a JSON object:
             f"judgement:\n{instruction.strip()}\n"
         )
 
+    why: list[str] = []
     raw = _call_support_llm(
         db,
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
         max_tokens=1400,
+        why=why,
     )
     if raw is None:
         return {
             "ok": False,
-            "error": "The support AI is not configured or is unreachable. "
-            "Check /admin → AI Assistant → Support settings.",
+            "error": f"The support AI could not write a draft: {why[-1]}."
+            if why
+            else "The support AI is not configured or is unreachable. "
+            "Check Support → Settings.",
         }
 
     reply = str(raw.get("reply_html", "") or "").strip()
@@ -1667,11 +1898,33 @@ def ingest_inbound(
 
     # A reply on a ticket a human already took over goes straight to that
     # human. Re-triaging it would have the bot talk over Bassam mid-thread.
-    needs_triage = ticket.status not in ("escalated", "spam")
-    if not needs_triage and ticket.status == "escalated":
+    if ticket.status == "spam":
+        return ticket, False
+    if ticket.status == "escalated":
         notify_admin(db, ticket, "Customer replied on an escalated ticket")
+        return ticket, False
+    # The same holds once Bassam has written on the thread himself, whatever
+    # its status now (waiting on the customer, or closed and reopened by
+    # this reply): the customer is answering him, so it comes back to him.
+    if not is_new and human_replied(db, ticket):
+        escalate(db, ticket, "The customer replied to your message")
+        return ticket, False
+    return ticket, True
 
-    return ticket, needs_triage
+
+def human_replied(db: Session, ticket: SupportTicket) -> bool:
+    """Has Bassam (or the admin assistant on his behalf) written on this thread?"""
+    return (
+        db.execute(
+            select(SupportTicketMessage.id)
+            .where(
+                SupportTicketMessage.ticket_id == ticket.id,
+                SupportTicketMessage.sender_kind == "admin",
+            )
+            .limit(1)
+        ).first()
+        is not None
+    )
 
 
 def _readable_subject(subject: str) -> str:

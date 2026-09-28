@@ -21,7 +21,15 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { API_BASE, AuthError, api, hashFor, parseHash, type ViewState } from './lib';
+import {
+  API_BASE,
+  AuthError,
+  api,
+  hashFor,
+  parseHash,
+  type SupportStats,
+  type ViewState,
+} from './lib';
 import { Notice } from './ui';
 import OverviewPage from './OverviewPage';
 import CoursesPage from './CoursesPage';
@@ -55,6 +63,10 @@ export default function AdminDashboard() {
   );
   const [adminEmail, setAdminEmail] = useState<string | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
+  // Support's badge: conversations where it is your move, and whether
+  // automatic replies are working. Refreshed on every navigation and each
+  // minute, so a new enquiry shows up without opening Support.
+  const [support, setSupport] = useState<{ needsYou: number; aiDown: boolean } | null>(null);
 
   const onAuthError = useCallback(() => {
     navigate('/admin/login', { replace: true });
@@ -106,6 +118,33 @@ export default function AdminDashboard() {
       cancelled = true;
     };
   }, [onAuthError]);
+
+  const page = view.page;
+  const ref = view.page === 'support' ? view.ref : undefined;
+  useEffect(() => {
+    if (!adminEmail) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const s = await api<SupportStats>('/api/admin/support/stats');
+        if (!cancelled)
+          setSupport({
+            needsYou: s.needs_you ?? s.needs_human ?? 0,
+            aiDown: s.ai?.state === 'down' || s.ai?.state === 'off',
+          });
+      } catch {
+        /* a badge is not worth an error banner */
+      }
+    };
+    void refresh();
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refresh();
+    }, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [adminEmail, page, ref]);
 
   async function handleLogout() {
     if (API_BASE) {
@@ -191,11 +230,17 @@ export default function AdminDashboard() {
           {NAV.map((item) => {
             const Icon = item.icon;
             const active = view.page === item.page;
+            const badge = item.page === 'support' && support ? support : null;
+            const title = badge
+              ? `${item.label} — ${badge.needsYou} need${badge.needsYou === 1 ? 's' : ''} your reply${
+                  badge.aiDown ? '; automatic replies are off' : ''
+                }`
+              : item.label;
             return (
               <button
                 key={item.page}
                 onClick={() => go({ page: item.page } as ViewState)}
-                title={item.label}
+                title={title}
                 className={`w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors border ${
                   active
                     ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
@@ -203,8 +248,32 @@ export default function AdminDashboard() {
                 }`}
                 aria-current={active ? 'page' : undefined}
               >
-                <Icon className="w-4 h-4 shrink-0" />
+                <span className="relative shrink-0">
+                  <Icon className="w-4 h-4" />
+                  {badge && (badge.needsYou > 0 || badge.aiDown) && (
+                    // Icon-only sidebar (below lg): a dot on the icon.
+                    <span
+                      className={`lg:hidden absolute -top-1 -right-1 w-2 h-2 rounded-full ${
+                        badge.needsYou > 0 ? 'bg-red-500' : 'bg-amber-400'
+                      }`}
+                    />
+                  )}
+                </span>
                 <span className="hidden lg:inline truncate">{item.label}</span>
+                {badge && (badge.needsYou > 0 || badge.aiDown) && (
+                  <span className="hidden lg:inline-flex ml-auto items-center gap-1">
+                    {badge.aiDown && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-amber-500/40 text-amber-300">
+                        AI off
+                      </span>
+                    )}
+                    {badge.needsYou > 0 && (
+                      <span className="min-w-[1.25rem] text-center text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-red-500/90 text-white">
+                        {badge.needsYou}
+                      </span>
+                    )}
+                  </span>
+                )}
               </button>
             );
           })}

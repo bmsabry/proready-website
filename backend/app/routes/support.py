@@ -9,7 +9,8 @@ Learner (learner session):
 
 Admin:
   GET   /api/admin/support/tickets             — inbox, filtered
-  GET   /api/admin/support/stats               — counts for the badges
+  GET   /api/admin/support/stats               — counts for the badges, AI health
+  POST  /api/admin/support/ai-check            — try the model now
   GET   /api/admin/support/tickets/{ref}       — one thread, full
   POST  /api/admin/support/tickets/{ref}/reply — send a reply
   POST  /api/admin/support/tickets/{ref}/note  — internal note (never emailed)
@@ -32,7 +33,7 @@ from typing import Any, Optional
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
-from sqlalchemy import desc, func, select
+from sqlalchemy import case, desc, func, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -92,7 +93,17 @@ def _iso(dt: Optional[datetime]) -> Optional[str]:
 
 
 def _ticket_row(t: SupportTicket, *, unread_from_customer: bool = False) -> dict:
+    now = datetime.now(timezone.utc)
+    tray = svc.tray(t.status)
+    since_customer = svc._aware(t.last_customer_message_at or t.created_at or now)
+    last_activity = svc._aware(t.last_message_at or t.created_at or now)
     return {
+        "tray": tray,
+        # Still new or mid-triage long after it arrived: triage never finished.
+        "stuck": t.status in ("new", "ai_handling")
+        and now - since_customer > svc.TRIAGE_STUCK_AFTER,
+        # Waiting on the customer long enough to nudge them, or close it.
+        "follow_up": tray == "waiting" and now - last_activity > svc.FOLLOW_UP_AFTER,
         "ref": t.ref,
         "subject": t.subject,
         "submitter_email": t.submitter_email,
@@ -571,15 +582,44 @@ def support_stats(db: Session = Depends(get_db)) -> dict:
         .group_by(SupportTicket.category)
     ).all()
 
+    now = datetime.now(timezone.utc)
+    activity = func.coalesce(SupportTicket.last_message_at, SupportTicket.created_at)
+    follow_up = db.execute(
+        select(func.count(SupportTicket.id)).where(
+            SupportTicket.status.in_(svc.WAITING_STATUSES),
+            activity < now - svc.FOLLOW_UP_AFTER,
+        )
+    ).scalar() or 0
+    ai_answered = db.execute(
+        select(func.count(SupportTicket.id)).where(
+            SupportTicket.status == "auto_resolved",
+            activity >= now - svc.AI_ANSWERED_WINDOW,
+        )
+    ).scalar() or 0
+
     open_statuses = ["new", "ai_handling", "escalated", "awaiting_customer"]
+    needs_you = sum(by_status.get(s, 0) for s in svc.NEEDS_YOU_STATUSES)
     return {
         "by_status": by_status,
         "by_category": {str(c): int(n) for c, n in cat_rows},
         "open": sum(by_status.get(s, 0) for s in open_statuses),
-        # The number that actually matters: tickets a human has to answer.
-        "needs_human": by_status.get("escalated", 0),
+        # The number that actually matters, and the sidebar badge: tickets
+        # where it is Bassam's move.
+        "needs_you": needs_you,
+        "needs_human": needs_you,
+        "waiting": sum(by_status.get(s, 0) for s in svc.WAITING_STATUSES),
+        "follow_up": int(follow_up),
+        "ai_answered_recent": int(ai_answered),
         "total": sum(by_status.values()),
+        "ai": svc.ai_health(db),
     }
+
+
+@admin_router.post("/ai-check")
+def ai_check(db: Session = Depends(get_db)) -> dict:
+    """Try the model now — after topping up credit or changing the key."""
+    result = svc.check_ai(db)
+    return {**result, "ai": svc.ai_health(db)}
 
 
 @admin_router.get("/tickets")
@@ -593,14 +633,32 @@ def list_tickets(
 ) -> dict:
     """Inbox listing.
 
-    Default view (no status filter) hides archived and spam — an inbox
-    that shows everything ever received is not an inbox. Sorted by
-    priority then recency so P1 payment problems sit at the top.
+    `inbox` is the admin page's default: whose move is it? Everything that
+    needs Bassam, then what is waiting on the customer, then what the
+    assistant answered in the last two weeks — each tray newest first, so
+    a message that just arrived is at the top rather than under a stale
+    P1 from last month. `needs_you` and `waiting` are those trays alone.
+
+    With no status filter, archived and spam are hidden — an inbox that
+    shows everything ever received is not an inbox.
     """
     limit = max(1, min(limit, 500))
     stmt = select(SupportTicket)
+    activity = func.coalesce(SupportTicket.last_message_at, SupportTicket.created_at)
 
-    if status_filter == "open":
+    if status_filter == "inbox":
+        stmt = stmt.where(
+            SupportTicket.status.in_(svc.NEEDS_YOU_STATUSES + svc.WAITING_STATUSES)
+            | (
+                (SupportTicket.status == "auto_resolved")
+                & (activity >= datetime.now(timezone.utc) - svc.AI_ANSWERED_WINDOW)
+            )
+        )
+    elif status_filter == "needs_you":
+        stmt = stmt.where(SupportTicket.status.in_(svc.NEEDS_YOU_STATUSES))
+    elif status_filter == "waiting":
+        stmt = stmt.where(SupportTicket.status.in_(svc.WAITING_STATUSES))
+    elif status_filter == "open":
         stmt = stmt.where(
             SupportTicket.status.in_(["new", "ai_handling", "escalated", "awaiting_customer"])
         )
@@ -625,12 +683,15 @@ def list_tickets(
         select(func.count()).select_from(stmt.subquery())
     ).scalar() or 0
 
+    tray_rank = case(
+        (SupportTicket.status.in_(svc.NEEDS_YOU_STATUSES), 0),
+        (SupportTicket.status.in_(svc.WAITING_STATUSES), 1),
+        (SupportTicket.status == "auto_resolved", 2),
+        else_=3,
+    )
     rows = (
         db.execute(
-            stmt.order_by(
-                SupportTicket.priority.asc(),
-                desc(func.coalesce(SupportTicket.last_message_at, SupportTicket.created_at)),
-            )
+            stmt.order_by(tray_rank, desc(activity), desc(SupportTicket.id))
             .offset(max(0, offset))
             .limit(limit)
         )

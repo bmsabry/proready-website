@@ -895,6 +895,8 @@ def add_ticket_note(db: Session, ref: str, note: str) -> Dict[str, Any]:
 
 
 def get_support_stats(db: Session, **_: Any) -> Dict[str, Any]:
+    from . import support_service as svc
+
     rows = db.execute(
         select(SupportTicket.status, func.count(SupportTicket.id)).group_by(
             SupportTicket.status
@@ -904,7 +906,8 @@ def get_support_stats(db: Session, **_: Any) -> Dict[str, Any]:
     return {
         "ok": True,
         "by_status": by_status,
-        "needs_human": by_status.get("escalated", 0),
+        # Tickets where it is Bassam's move (escalated, or triage unfinished).
+        "needs_human": sum(by_status.get(s, 0) for s in svc.NEEDS_YOU_STATUSES),
         "open": sum(
             by_status.get(s, 0)
             for s in ("new", "ai_handling", "escalated", "awaiting_customer")

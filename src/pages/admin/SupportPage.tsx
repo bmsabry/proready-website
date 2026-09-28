@@ -40,6 +40,7 @@ import {
   plainTextToEmailHtml,
   reportError,
   SUPPORT_STATUS_LABEL,
+  type SupportAiHealth,
   type SupportDraft,
   type SupportSettings,
   type SupportStats,
@@ -99,7 +100,7 @@ function relative(iso: string | null): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.round(hours / 24);
   if (days < 30) return `${days}d ago`;
-  return formatDate(iso);
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 
@@ -164,16 +165,238 @@ export default function SupportPage({
 // ---------------------------------------------------------------------------
 // Inbox
 // ---------------------------------------------------------------------------
+//
+// The inbox answers one question: whose move is it? Three trays, newest
+// first in each, so a message that just arrived is at the top of "Needs your
+// reply" rather than under a stale ticket from last month:
+//   Needs your reply     — escalated to you, or triage never finished
+//   Waiting on customer  — you replied; their answer brings it back up
+//   Answered by AI       — what the assistant handled alone (last 14 days)
+// Replying keeps a conversation open (Waiting on customer); closing it is a
+// separate, deliberate click.
 
 const FILTERS: { key: string; label: string }[] = [
-  { key: 'open', label: 'Open' },
-  { key: 'escalated', label: 'Needs you' },
-  { key: 'awaiting_customer', label: 'Awaiting reply' },
-  { key: 'auto_resolved', label: 'Auto-resolved' },
-  { key: 'resolved', label: 'Resolved' },
+  { key: 'inbox', label: 'Inbox' },
+  { key: 'needs_you', label: 'Needs your reply' },
+  { key: 'waiting', label: 'Waiting on customer' },
+  { key: 'auto_resolved', label: 'Answered by AI' },
+  { key: 'resolved', label: 'Closed' },
   { key: 'archived', label: 'Archived' },
   { key: 'spam', label: 'Spam' },
 ];
+
+const TRAYS: { key: string; title: string; hint: string; empty: string; tone: string }[] = [
+  {
+    key: 'needs_you',
+    title: 'Needs your reply',
+    hint: 'Your move. Each of these already got an automatic “we received your message” reply.',
+    empty: 'Nothing needs you right now.',
+    tone: 'text-red-300',
+  },
+  {
+    key: 'waiting',
+    title: 'Waiting on customer',
+    hint: 'You replied — their move. When they answer it comes back up to Needs your reply. Close it once it’s done.',
+    empty: 'No conversations waiting on a customer.',
+    tone: 'text-amber-300',
+  },
+  {
+    key: 'ai_answered',
+    title: 'Answered by AI · last 14 days',
+    hint: 'The assistant answered and closed these on its own. Open one to check or correct it.',
+    empty: 'The assistant has not answered anything on its own in the last 14 days.',
+    tone: 'text-emerald-300',
+  },
+];
+
+/** "3h", "2d" — how long something has been waiting. */
+function ageOf(iso: string | null): string {
+  if (!iso) return '';
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+/** Whose move it is, and for how long — the label the inbox is read by. */
+function MoveLabel({ t }: { t: SupportTicket }) {
+  const pill = (cls: string, text: string, title?: string) => (
+    <span
+      title={title}
+      className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full border whitespace-nowrap ${cls}`}
+    >
+      {text}
+    </span>
+  );
+  if (t.tray === 'needs_you') {
+    if (t.status !== 'escalated') {
+      return t.stuck
+        ? pill(
+            'bg-amber-500/15 text-amber-300 border-amber-500/30',
+            'Stuck — reply yourself',
+            'Automatic triage never finished on this one.',
+          )
+        : pill('bg-violet-500/15 text-violet-300 border-violet-500/30', 'AI reading…');
+    }
+    return pill(
+      'bg-red-500/15 text-red-300 border-red-500/35',
+      `Reply needed · ${ageOf(t.last_customer_message_at ?? t.created_at)}`,
+      'Waiting for you since their last message',
+    );
+  }
+  if (t.tray === 'waiting') {
+    return t.follow_up
+      ? pill(
+          'bg-amber-500/15 text-amber-200 border-amber-500/40',
+          `No answer ${ageOf(t.last_message_at)} · follow up?`,
+          'They have not replied for a few days — nudge them, or close it.',
+        )
+      : pill(
+          'bg-amber-500/10 text-amber-300 border-amber-500/25',
+          `Waiting ${ageOf(t.last_message_at)}`,
+        );
+  }
+  return <StatusPill status={t.status} />;
+}
+
+function TicketRow({
+  t,
+  checked,
+  onCheck,
+  onOpen,
+}: {
+  t: SupportTicket;
+  checked: boolean;
+  onCheck: (on: boolean) => void;
+  onOpen: () => void;
+}) {
+  const bold = t.tray === 'needs_you';
+  return (
+    <div
+      className={`flex items-center gap-3 px-3 py-2.5 hover:bg-slate-800/40 transition-colors ${
+        bold ? 'bg-slate-900/40' : ''
+      }`}
+    >
+      <input
+        type="checkbox"
+        aria-label={`Select ticket ${t.ref}`}
+        checked={checked}
+        onChange={(e) => onCheck(e.target.checked)}
+        className="accent-cyan-500 shrink-0"
+      />
+      <button onClick={onOpen} className="flex-1 min-w-0 text-left">
+        <div className="flex items-center gap-2">
+          {bold && (
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" title="Your move" />
+          )}
+          <span className={`truncate text-sm ${bold ? 'text-white font-medium' : 'text-slate-200'}`}>
+            {t.subject}
+          </span>
+          <span className="text-[10px] text-slate-600 font-mono shrink-0">#{t.ref}</span>
+        </div>
+        <div className="text-xs text-slate-500 truncate">
+          {t.submitter_name ? `${t.submitter_name} · ` : ''}
+          {t.submitter_email}
+          {t.summary ? ` — ${t.summary}` : ''}
+        </div>
+        {/* On a phone the pill columns are hidden; keep whose-move visible. */}
+        <div className="sm:hidden mt-1">
+          <MoveLabel t={t} />
+        </div>
+      </button>
+      <div className="hidden md:block w-36 shrink-0">
+        <PriorityPill priority={t.priority} label={t.category_label} />
+      </div>
+      <div className="hidden sm:block w-48 shrink-0">
+        <MoveLabel t={t} />
+      </div>
+      <div className="hidden sm:block w-16 text-right text-xs text-slate-500 shrink-0">
+        {relative(t.last_message_at)}
+      </div>
+    </div>
+  );
+}
+
+/** Red when automatic replies have stopped — the desk keeps acknowledging
+ *  customers, so without this an outage is invisible. */
+function AiBanner({
+  ai,
+  onChecked,
+  onSettings,
+  onAuthError,
+}: {
+  ai: SupportAiHealth;
+  onChecked: () => void;
+  onSettings: () => void;
+  onAuthError: () => void;
+}) {
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function check() {
+    setChecking(true);
+    setResult(null);
+    setError(null);
+    try {
+      const r = await api<{ ok: boolean; error: string }>('/api/admin/support/ai-check', {
+        method: 'POST',
+      });
+      setResult(r.ok ? 'The model answered — automatic replies are back on.' : `Still failing: ${r.error}`);
+      onChecked();
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  if (ai.state !== 'down' && ai.state !== 'off') {
+    return result ? <Notice kind="success">{result}</Notice> : null;
+  }
+  return (
+    <div className="mb-4 rounded-lg border border-red-500/40 bg-red-950/30 px-3.5 py-3 text-sm text-red-100">
+      <div className="flex items-start gap-2">
+        <Bot className="w-4 h-4 mt-0.5 shrink-0 text-red-300" />
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="font-semibold text-red-200">Automatic replies are OFF</div>
+          <p className="text-red-100/90 break-words">
+            {ai.error}.
+            {ai.since ? ` Since ${formatDate(ai.since)}` : ''}
+            {ai.missed > 0
+              ? `${ai.since ? ',' : ''} ${ai.missed} message${ai.missed === 1 ? '' : 's'} got only the standard “we received your message” reply.`
+              : ai.since
+                ? '.'
+                : ''}{' '}
+            Customers are still acknowledged, and every new message comes to <strong>Needs your
+            reply</strong> until this is fixed.
+          </p>
+          {result && <p className="text-amber-200">{result}</p>}
+          {error && <p className="text-amber-200">{error}</p>}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              onClick={() => void check()}
+              disabled={checking}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-red-400/40 text-red-100 hover:bg-red-900/40 disabled:opacity-50"
+            >
+              {checking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Check again
+            </button>
+            <button
+              onClick={onSettings}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-800/60"
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+              Model settings
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Inbox_({
   go,
@@ -184,7 +407,7 @@ function Inbox_({
 }) {
   const [tickets, setTickets] = useState<SupportTicket[] | null>(null);
   const [stats, setStats] = useState<SupportStats | null>(null);
-  const [filter, setFilter] = useState('open');
+  const [filter, setFilter] = useState('inbox');
   const [queryInput, setQueryInput] = useState('');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -193,40 +416,51 @@ function Inbox_({
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ limit: '200' });
-      // A search should look everywhere, including archived and spam —
-      // "where did that email go?" is exactly when you search.
-      if (query.trim()) params.set('q', query.trim());
-      else params.set('status_filter', filter);
-      const [list, s] = await Promise.all([
-        api<{ total: number; items: SupportTicket[] }>(
-          `/api/admin/support/tickets?${params.toString()}`,
-        ),
-        api<SupportStats>('/api/admin/support/stats'),
-      ]);
-      setTickets(list.items);
-      setStats(s);
-      setSelected(new Set());
-    } catch (e) {
-      reportError(e, onAuthError, setError);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, query, onAuthError]);
+  const load = useCallback(
+    async (quiet = false) => {
+      if (!quiet) setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams({ limit: '300' });
+        // A search should look everywhere, including archived and spam —
+        // "where did that email go?" is exactly when you search.
+        if (query.trim()) params.set('q', query.trim());
+        else params.set('status_filter', filter);
+        const [list, s] = await Promise.all([
+          api<{ total: number; items: SupportTicket[] }>(
+            `/api/admin/support/tickets?${params.toString()}`,
+          ),
+          api<SupportStats>('/api/admin/support/stats'),
+        ]);
+        setTickets(list.items);
+        setStats(s);
+        if (!quiet) setSelected(new Set());
+      } catch (e) {
+        reportError(e, onAuthError, setError);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filter, query, onAuthError],
+  );
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  // New mail arrives while the page is open; keep it current.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void load(true);
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, [load]);
+
   async function bulk(action: 'archive' | 'resolve' | 'spam') {
     const refs = [...selected];
     if (!refs.length) return;
-    const verb = action === 'spam' ? 'mark as spam' : action;
-    if (!window.confirm(`${verb} ${refs.length} ticket${refs.length === 1 ? '' : 's'}?`)) return;
+    const verb = action === 'spam' ? 'mark as spam' : action === 'resolve' ? 'close' : action;
+    if (!window.confirm(`${verb} ${refs.length} conversation${refs.length === 1 ? '' : 's'}?`)) return;
     setBusy(true);
     try {
       await api('/api/admin/support/tickets/bulk', {
@@ -241,8 +475,32 @@ function Inbox_({
     }
   }
 
+  function openSettings() {
+    setShowSettings(true);
+    window.setTimeout(
+      () => document.getElementById('support-settings')?.scrollIntoView({ behavior: 'smooth' }),
+      50,
+    );
+  }
+
   const rows = tickets ?? [];
   const allSelected = rows.length > 0 && selected.size === rows.length;
+  const grouped = filter === 'inbox' && !query;
+  const toggle = (ref: string, on: boolean) => {
+    const next = new Set(selected);
+    if (on) next.add(ref);
+    else next.delete(ref);
+    setSelected(next);
+  };
+  const renderRow = (t: SupportTicket) => (
+    <TicketRow
+      key={t.ref}
+      t={t}
+      checked={selected.has(t.ref)}
+      onCheck={(on) => toggle(t.ref, on)}
+      onOpen={() => go({ page: 'support', ref: t.ref })}
+    />
+  );
 
   return (
     <div className="space-y-6">
@@ -251,7 +509,9 @@ function Inbox_({
         title="Support"
         sub={
           stats
-            ? `${stats.open} open · ${stats.needs_human} waiting on you · ${stats.total} all time`
+            ? `${stats.needs_you} need${stats.needs_you === 1 ? 's' : ''} your reply · ${stats.waiting} waiting on customers · ${stats.total} all time${
+                stats.ai.state === 'ok' ? ' · automatic replies on' : ''
+              }`
             : 'Customer conversations, triaged automatically.'
         }
         actions={
@@ -269,16 +529,24 @@ function Inbox_({
       >
         {error && <Notice kind="error">{error}</Notice>}
 
-        {stats && stats.needs_human > 0 && filter !== 'escalated' && !query && (
+        {stats && (
+          <AiBanner
+            ai={stats.ai}
+            onChecked={() => void load(true)}
+            onSettings={openSettings}
+            onAuthError={onAuthError}
+          />
+        )}
+
+        {stats && stats.needs_you > 0 && !grouped && filter !== 'needs_you' && !query && (
           <button
-            onClick={() => setFilter('escalated')}
+            onClick={() => setFilter('needs_you')}
             className="w-full mb-4 flex items-center gap-2 text-left text-sm px-3 py-2.5 rounded-lg border border-red-500/30 bg-red-950/25 text-red-200 hover:bg-red-950/40 transition-colors"
           >
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>
-              <strong>{stats.needs_human}</strong>{' '}
-              {stats.needs_human === 1 ? 'ticket needs' : 'tickets need'} a human reply — the
-              assistant escalated them rather than guess.
+              <strong>{stats.needs_you}</strong>{' '}
+              {stats.needs_you === 1 ? 'conversation needs' : 'conversations need'} your reply →
             </span>
           </button>
         )}
@@ -287,7 +555,13 @@ function Inbox_({
         <div className="flex flex-wrap items-center gap-2 mb-4">
           {FILTERS.map((f) => {
             const count =
-              f.key === 'open' ? stats?.open : stats?.by_status?.[f.key];
+              f.key === 'needs_you'
+                ? stats?.needs_you
+                : f.key === 'waiting'
+                  ? stats?.waiting
+                  : f.key === 'inbox'
+                    ? undefined
+                    : stats?.by_status?.[f.key];
             const active = filter === f.key && !query;
             return (
               <button
@@ -304,7 +578,13 @@ function Inbox_({
                 }`}
               >
                 {f.label}
-                {count ? <span className="ml-1.5 opacity-70">{count}</span> : null}
+                {count ? (
+                  <span
+                    className={`ml-1.5 ${f.key === 'needs_you' ? 'text-red-300 font-semibold' : 'opacity-70'}`}
+                  >
+                    {count}
+                  </span>
+                ) : null}
               </button>
             );
           })}
@@ -351,7 +631,7 @@ function Inbox_({
                 onClick={() => void bulk('resolve')}
                 className="px-2 py-1 rounded border border-emerald-600/40 text-emerald-300 hover:bg-emerald-950/40 disabled:opacity-50"
               >
-                Resolve
+                Close
               </button>
               <button
                 disabled={busy}
@@ -376,6 +656,33 @@ function Inbox_({
             <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
             Loading tickets…
           </div>
+        ) : grouped ? (
+          <div className="space-y-5">
+            {TRAYS.map((tray) => {
+              const items = rows.filter((t) => t.tray === tray.key);
+              return (
+                <div key={tray.key}>
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <h3 className={`text-sm font-semibold ${tray.tone}`}>
+                      {tray.title}
+                      <span className="ml-1.5 text-slate-500 font-normal">{items.length}</span>
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mb-2">{tray.hint}</p>
+                  {items.length === 0 ? (
+                    <div className="flex items-center gap-2 text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl px-3 py-3">
+                      {tray.key === 'needs_you' && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                      {tray.empty}
+                    </div>
+                  ) : (
+                    <div className="border border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800/70">
+                      {items.map(renderRow)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         ) : rows.length === 0 ? (
           <EmptyState
             icon={<Inbox className="w-6 h-6 text-slate-600" />}
@@ -383,9 +690,7 @@ function Inbox_({
             hint={
               query
                 ? 'Try the ticket ref, or part of the sender’s email address.'
-                : filter === 'open'
-                  ? 'No open conversations. Customer messages from the contact form, the learner portal and inbound email land here automatically.'
-                  : 'No tickets with this status.'
+                : 'No conversations in this list.'
             }
           />
         ) : (
@@ -401,78 +706,20 @@ function Inbox_({
                 className="accent-cyan-500"
               />
               <span className="flex-1">Conversation</span>
-              <span className="hidden md:block w-40">Category</span>
-              <span className="hidden sm:block w-36">Status</span>
-              <span className="w-20 text-right">Last</span>
+              <span className="hidden md:block w-36">Category</span>
+              <span className="hidden sm:block w-48">Whose move</span>
+              <span className="hidden sm:block w-16 text-right">Last</span>
             </div>
-
-            <div className="divide-y divide-slate-800/70">
-              {rows.map((t) => (
-                <div
-                  key={t.ref}
-                  className={`flex items-center gap-3 px-3 py-2.5 hover:bg-slate-800/40 transition-colors ${
-                    t.needs_reply ? 'bg-slate-900/40' : ''
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    aria-label={`Select ticket ${t.ref}`}
-                    checked={selected.has(t.ref)}
-                    onChange={(e) => {
-                      const next = new Set(selected);
-                      if (e.target.checked) next.add(t.ref);
-                      else next.delete(t.ref);
-                      setSelected(next);
-                    }}
-                    className="accent-cyan-500 shrink-0"
-                  />
-
-                  <button
-                    onClick={() => go({ page: 'support', ref: t.ref })}
-                    className="flex-1 min-w-0 text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      {t.needs_reply && (
-                        <span
-                          className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0"
-                          title="The customer spoke last"
-                        />
-                      )}
-                      <span
-                        className={`truncate text-sm ${
-                          t.needs_reply ? 'text-white font-medium' : 'text-slate-200'
-                        }`}
-                      >
-                        {t.subject}
-                      </span>
-                      <span className="text-[10px] text-slate-600 font-mono shrink-0">
-                        #{t.ref}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-500 truncate">
-                      {t.submitter_name ? `${t.submitter_name} · ` : ''}
-                      {t.submitter_email}
-                      {t.summary ? ` — ${t.summary}` : ''}
-                    </div>
-                  </button>
-
-                  <div className="hidden md:block w-40 shrink-0">
-                    <PriorityPill priority={t.priority} label={t.category_label} />
-                  </div>
-                  <div className="hidden sm:block w-36 shrink-0">
-                    <StatusPill status={t.status} />
-                  </div>
-                  <div className="w-20 text-right text-xs text-slate-500 shrink-0">
-                    {relative(t.last_message_at)}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <div className="divide-y divide-slate-800/70">{rows.map(renderRow)}</div>
           </div>
         )}
       </Section>
 
-      {showSettings && <SupportSettingsPanel onAuthError={onAuthError} />}
+      {showSettings && (
+        <div id="support-settings">
+          <SupportSettingsPanel onAuthError={onAuthError} />
+        </div>
+      )}
     </div>
   );
 }
@@ -497,8 +744,10 @@ function TicketThread({
 
   const [reply, setReply] = useState('');
   const [rawHtml, setRawHtml] = useState(false);
-  const [closeAfter, setCloseAfter] = useState(true);
-  const [sending, setSending] = useState(false);
+  // Which button is sending: 'open' keeps the conversation (Waiting on
+  // customer), 'close' closes it. Keeping it open is the default: a reply is
+  // rarely the end of it, and a closed conversation leaves the inbox.
+  const [sending, setSending] = useState<'open' | 'close' | null>(null);
 
   const [instruction, setInstruction] = useState('');
   const [drafting, setDrafting] = useState(false);
@@ -533,9 +782,9 @@ function TicketThread({
     window.setTimeout(() => setFlash(null), 6000);
   }
 
-  async function send() {
+  async function send(close: boolean) {
     if (!reply.trim()) return;
-    setSending(true);
+    setSending(close ? 'close' : 'open');
     setError(null);
     try {
       const res = await api<{ delivered: boolean; status: string; warning: string }>(
@@ -544,14 +793,18 @@ function TicketThread({
           method: 'POST',
           body: JSON.stringify({
             body_html: rawHtml ? reply : plainTextToEmailHtml(reply),
-            set_status: closeAfter ? 'resolved' : 'awaiting_customer',
+            set_status: close ? 'resolved' : 'awaiting_customer',
           }),
         },
       );
       if (res.delivered) {
         setReply('');
         setGaps([]);
-        flashFor(closeAfter ? 'Reply sent and ticket resolved.' : 'Reply sent.');
+        flashFor(
+          close
+            ? 'Reply sent and the conversation closed.'
+            : 'Reply sent. It stays under Waiting on customer until they answer or you close it.',
+        );
       } else {
         setError(res.warning || 'The email could not be sent.');
       }
@@ -559,7 +812,7 @@ function TicketThread({
     } catch (e) {
       reportError(e, onAuthError, setError);
     } finally {
-      setSending(false);
+      setSending(null);
     }
   }
 
@@ -693,18 +946,24 @@ function TicketThread({
             {data.ai_result?.summary && (
               <div className="flex items-start gap-2 text-xs text-slate-400 bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2">
                 <Bot className="w-3.5 h-3.5 mt-0.5 shrink-0 text-violet-300" />
-                <span>
-                  {data.ai_result.summary}
-                  {data.ai_result.escalation_reason ? (
-                    <span className="text-slate-500"> — {data.ai_result.escalation_reason}</span>
-                  ) : null}
-                  {typeof data.ai_result.confidence === 'number' && (
-                    <span className="text-slate-600">
-                      {' '}
-                      ({Math.round(data.ai_result.confidence * 100)}% confidence)
-                    </span>
-                  )}
-                </span>
+                {data.ai_result.source === 'fallback' ? (
+                  // The model was down: the "summary" is only the start of the
+                  // message shown right below, so say why it came to you.
+                  <span className="text-amber-200/90">{data.ai_result.escalation_reason}</span>
+                ) : (
+                  <span>
+                    {data.ai_result.summary}
+                    {data.ai_result.escalation_reason ? (
+                      <span className="text-slate-500"> — {data.ai_result.escalation_reason}</span>
+                    ) : null}
+                    {typeof data.ai_result.confidence === 'number' && (
+                      <span className="text-slate-600">
+                        {' '}
+                        ({Math.round(data.ai_result.confidence * 100)}% confidence)
+                      </span>
+                    )}
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -779,27 +1038,37 @@ function TicketThread({
                 />
                 Send as raw HTML
               </label>
-              <label className="inline-flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={closeAfter}
-                  onChange={(e) => setCloseAfter(e.target.checked)}
-                  className="accent-cyan-500"
-                />
-                Mark resolved after sending
-              </label>
-              <button
-                onClick={() => void send()}
-                disabled={sending || !reply.trim()}
-                className="ml-auto inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                Send reply
-              </button>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => void send(true)}
+                  disabled={sending !== null || !reply.trim()}
+                  title="Send, and close the conversation — nothing more to follow up"
+                  className="inline-flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {sending === 'close' ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
+                  Send &amp; close
+                </button>
+                <button
+                  onClick={() => void send(false)}
+                  disabled={sending !== null || !reply.trim()}
+                  title="Send, and keep it under Waiting on customer until they answer"
+                  className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {sending === 'open' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Send reply
+                </button>
+              </div>
             </div>
             <p className="text-[11px] text-slate-600">
-              Goes out from info@mail.proreadyengineer.com with ticket #{t.ref} in the subject —
-              their reply comes back to this thread.
+              Goes out from info@mail.proreadyengineer.com with ticket #{t.ref} in the subject.
+              <strong className="text-slate-500"> Send reply</strong> keeps the conversation under
+              Waiting on customer; their answer comes back to Needs your reply (never to the
+              automatic assistant). <strong className="text-slate-500">Send &amp; close</strong> is
+              for when nothing more is expected.
             </p>
           </div>
 
@@ -951,19 +1220,19 @@ function ActionsCard({
       <div className="grid grid-cols-2 gap-2">
         <button
           disabled={busy || ticket.status === 'resolved'}
-          onClick={() => void onPatch({ status: 'resolved' }, 'Marked resolved.')}
+          onClick={() => void onPatch({ status: 'resolved' }, 'Conversation closed.')}
           className="inline-flex items-center justify-center gap-1.5 text-xs px-2 py-2 rounded-lg border border-emerald-600/40 text-emerald-300 hover:bg-emerald-950/40 disabled:opacity-40"
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
-          Resolve
+          Close
         </button>
         <button
           disabled={busy || ticket.status === 'escalated'}
-          onClick={() => void onPatch({ status: 'escalated' }, 'Flagged for follow-up.')}
+          onClick={() => void onPatch({ status: 'escalated' }, 'Moved to Needs your reply.')}
           className="inline-flex items-center justify-center gap-1.5 text-xs px-2 py-2 rounded-lg border border-red-600/40 text-red-300 hover:bg-red-950/40 disabled:opacity-40"
         >
           <AlertTriangle className="w-3.5 h-3.5" />
-          Needs me
+          Needs my reply
         </button>
         <button
           disabled={busy}
@@ -1136,8 +1405,8 @@ const EVENT_LABEL: Record<string, string> = {
   created: 'Ticket opened',
   ai_classified: 'Classified by AI',
   ai_replied: 'AI replied',
-  auto_resolved: 'Auto-resolved',
-  escalated: 'Escalated to you',
+  auto_resolved: 'Answered by AI',
+  escalated: 'Moved to Needs your reply',
   admin_reply: 'You replied',
   customer_reply: 'Customer replied',
   status_change: 'Status changed',
