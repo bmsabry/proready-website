@@ -713,7 +713,10 @@ def _call_support_llm(
     messages: list[dict],
     *,
     json_mode: bool = True,
-    max_tokens: int = 1100,
+    # Room for a model's thinking as well as the answer: a reasoning model
+    # given only what the answer needs returns nothing. Billing is for what
+    # is used, not for the cap.
+    max_tokens: int = 4000,
     why: Optional[list[str]] = None,
 ) -> Optional[dict]:
     """One LLM round trip. Returns parsed JSON, or None on any failure.
@@ -789,6 +792,13 @@ def _llm_round_trip(
     }
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
+    if provider == "openrouter.ai":
+        # Most models there now think before they answer, and the thinking
+        # counts against max_tokens: left alone, a short allowance is spent
+        # on it and the answer comes back empty. Keep the thinking short and
+        # out of the response (OpenRouter's own parameter; other providers
+        # don't get it).
+        payload["reasoning"] = {"effort": "low", "exclude": True}
 
     try:
         with httpx.Client(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
@@ -814,14 +824,40 @@ def _llm_round_trip(
         return None, _http_failure(provider, resp)
 
     try:
-        content = (resp.json()["choices"][0]["message"]["content"] or "").strip()
-    except (KeyError, IndexError, TypeError, ValueError) as e:
-        log.error("[support] unexpected LLM response shape: %s", e)
+        body = resp.json()
+    except ValueError:
+        body = None
+    choices = body.get("choices") if isinstance(body, dict) else None
+    if not choices or not isinstance(choices[0], dict):
+        # OpenRouter reports some upstream failures as HTTP 200 + {"error": …}.
+        if isinstance(body, dict) and body.get("error"):
+            return None, _http_failure(provider, resp)
+        log.error("[support] unexpected LLM response shape: %s", resp.text[:300])
         return None, f"{provider}: the answer came back in an unexpected shape"
+    choice = choices[0]
+    content = (choice.get("message") or {}).get("content") or ""
+    if isinstance(content, list):  # content as parts: [{"type": "text", "text": …}]
+        content = "".join(str(p.get("text") or "") for p in content if isinstance(p, dict))
+    content = str(content).strip()
+    finish = str(choice.get("finish_reason") or "")
 
     parsed = _parse_json_object(content)
     if parsed is None:
-        return None, f"{provider}: the model's answer could not be read as JSON"
+        log.error(
+            "[support] unreadable model answer (finish_reason=%s, %d chars): %r",
+            finish, len(content), content[:300],
+        )
+        if not content and finish == "length":
+            return None, (
+                f"{provider}: the model used up its token allowance before writing "
+                "an answer (finish_reason=length)"
+            )
+        if not content:
+            return None, f"{provider}: the model sent back an empty answer (finish_reason={finish or 'none'})"
+        if finish == "length":
+            return None, f"{provider}: the model's answer was cut off at its token allowance (finish_reason=length)"
+        snippet = " ".join(content.split())[:80]
+        return None, f"{provider}: the model's answer was not JSON — “{snippet}”"
     return parsed, ""
 
 
@@ -929,7 +965,7 @@ def check_ai(db: Session) -> dict[str, Any]:
             {"role": "system", "content": 'Reply with exactly this JSON object: {"ok": true}'},
             {"role": "user", "content": "ping"},
         ],
-        max_tokens=20,
+        max_tokens=1000,
         why=why,
     )
     return {"ok": raw is not None, "error": "" if raw is not None else (why[-1] if why else "")}
@@ -1623,7 +1659,7 @@ Return ONLY a JSON object:
     raw = _call_support_llm(
         db,
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        max_tokens=1400,
+        max_tokens=4000,
         why=why,
     )
     if raw is None:

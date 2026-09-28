@@ -2495,3 +2495,85 @@ def test_no_model_configured_reads_as_off(client, db, monkeypatch):
     monkeypatch.setattr(svc, "get_support_settings", lambda db: None)
     ai = _stats(client)["ai"]
     assert ai["state"] == "off" and "not configured" in ai["error"]
+
+
+# OpenRouter, and models that think before they answer. The first switch to
+# OpenRouter (google/gemini-3.7-flash) read "could not be read as JSON": the
+# check allowed 20 tokens, the model spent them thinking, and the answer
+# came back empty.
+
+
+def _use_openrouter(client):
+    client.put(
+        "/api/admin/support/settings",
+        json={
+            "api_url": "https://openrouter.ai/api/v1/",
+            "api_key": "sk-or-test",
+            "model_name": "google/gemini-3.7-flash",
+            "kb_text": "",
+        },
+        headers=AUTH,
+    )
+
+
+def test_openrouter_gets_room_to_think_and_short_thinking(client, db, live_model):
+    seen = []
+
+    def answer(request):
+        seen.append(__import__("json").loads(request.content))
+        return _model_says({"ok": True})(request)
+
+    _use_openrouter(client)
+    live_model(answer)
+    assert client.post("/api/admin/support/ai-check", headers=AUTH).json()["ok"] is True
+    assert str(seen[-1]["model"]) == "google/gemini-3.7-flash"
+    assert seen[-1]["reasoning"] == {"effort": "low", "exclude": True}
+    assert seen[-1]["max_tokens"] >= 1000, "a thinking model needs room before it answers"
+
+    # Triage and drafts get the same headroom.
+    client.post("/api/support/contact", json={"email": "room@example.com", "message": "When?"})
+    assert seen[-1]["max_tokens"] >= 4000
+
+
+def test_other_providers_do_not_get_openrouter_parameters(client, db, live_model):
+    seen = []
+
+    def answer(request):
+        seen.append(__import__("json").loads(request.content))
+        return _model_says({"ok": True})(request)
+
+    live_model(answer)  # DeepInfra's address
+    client.post("/api/admin/support/ai-check", headers=AUTH)
+    assert "reasoning" not in seen[-1]
+
+
+@pytest.mark.parametrize(
+    "choice,words",
+    [
+        ({"message": {"content": ""}, "finish_reason": "length"}, "used up its token allowance"),
+        ({"message": {"content": None}, "finish_reason": "stop"}, "empty answer"),
+        ({"message": {"content": '{"category": "gen'}, "finish_reason": "length"}, "cut off"),
+        ({"message": {"content": "Sure! Here you go."}, "finish_reason": "stop"}, "was not JSON — “Sure! Here you go.”"),
+    ],
+)
+def test_an_unreadable_answer_says_why(client, db, live_model, choice, words):
+    _use_openrouter(client)
+    live_model(lambda request: httpx.Response(200, json={"choices": [choice]}))
+    out = client.post("/api/admin/support/ai-check", headers=AUTH).json()
+    assert out["ok"] is False and out["error"].startswith("openrouter.ai: ") and words in out["error"]
+
+
+def test_answer_in_content_parts_is_read(client, db, live_model):
+    _use_openrouter(client)
+    live_model(lambda request: httpx.Response(200, json={"choices": [{
+        "message": {"content": [{"type": "text", "text": '{"ok": '}, {"type": "text", "text": "true}"}]},
+        "finish_reason": "stop",
+    }]}))
+    assert client.post("/api/admin/support/ai-check", headers=AUTH).json()["ok"] is True
+
+
+def test_an_error_inside_a_200_is_reported(client, db, live_model):
+    _use_openrouter(client)
+    live_model(lambda request: httpx.Response(200, json={"error": {"message": "Provider returned error", "code": 502}}))
+    out = client.post("/api/admin/support/ai-check", headers=AUTH).json()
+    assert out["ok"] is False and "Provider returned error" in out["error"]
