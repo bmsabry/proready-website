@@ -85,6 +85,12 @@ import {
   StatusBadge,
 } from './ui';
 import CertificationTab from './CertificationTab';
+import {
+  clockTime,
+  INSTRUCTOR_ZONE,
+  timesByPlace,
+  wallClockToUtcMs,
+} from '../../lib/sessionTimes';
 import { EmailRow, EmailViewer, useEmailViewer } from './EmailViewer';
 import { HistoryLine } from './CourseSummary';
 import PastCohortsTab from './PastCohortsTab';
@@ -2523,7 +2529,9 @@ function LiveSessionCard({
   onSaved: (c: Course) => void;
   onAuthError: () => void;
 }) {
-  const [timeText, setTimeText] = useState(course.session_time_utc ?? '');
+  // The start on Bassam's own clock (New York). Every other country's time is
+  // derived from it per session date — see lib/sessionTimes.
+  const [timeText, setTimeText] = useState(course.session_time_local ?? '');
   const [durationText, setDurationText] = useState(String(course.session_duration_minutes ?? 0));
   const [meetingText, setMeetingText] = useState('');
   const [overview, setOverview] = useState<MeetingOverview | null>(null);
@@ -2541,7 +2549,7 @@ function LiveSessionCard({
       );
       setOverview(m);
       setMeetingText(m.meeting_info);
-      setTimeText(m.session_time_utc);
+      setTimeText(m.session_time_local);
       setDurationText(String(m.session_duration_minutes));
     } catch (e) {
       reportError(e, onAuthError, setError);
@@ -2554,14 +2562,14 @@ function LiveSessionCard({
     void load();
   }, [load]);
 
-  const savedTime = overview?.session_time_utc ?? course.session_time_utc ?? '';
+  const savedTime = overview?.session_time_local ?? course.session_time_local ?? '';
   const savedDuration = overview?.session_duration_minutes ?? course.session_duration_minutes ?? 0;
   const savedMeeting = overview?.meeting_info ?? '';
   const parsedDuration = parseInt(durationText, 10);
   const timeOk = timeText === '' || /^([01]\d|2[0-3]):[0-5]\d$/.test(timeText);
 
   const patch: CoursePatch = {};
-  if (timeText !== savedTime && timeOk) patch.session_time_utc = timeText;
+  if (timeText !== savedTime && timeOk) patch.session_time_local = timeText;
   if (!Number.isNaN(parsedDuration) && parsedDuration !== savedDuration)
     patch.session_duration_minutes = parsedDuration;
   if (meetingText.trim() !== savedMeeting) patch.meeting_info = meetingText.trim();
@@ -2612,10 +2620,27 @@ function LiveSessionCard({
     }
   }
 
-  // "14:00" UTC on the next session day, in the browser's own zone, e.g.
-  // "10:00 AM EDT" — so the admin never has to do the offset in their head.
-  const nextDay = course.day_dates.find((d) => d >= new Date().toISOString().slice(0, 10)) ?? course.day_dates[0];
-  const localHint = timeOk && timeText && nextDay ? utcToLocal(nextDay, timeText) : '';
+  // Preview of what the website and the emails will say for the typed time,
+  // on the upcoming session dates, with each country's own clock rules.
+  const clockZone = overview?.session_timezone || course.session_timezone || INSTRUCTOR_ZONE;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const upcoming = course.day_dates.filter((d) => d >= todayIso);
+  const previewDays = upcoming.length > 0 ? upcoming : course.day_dates;
+  const previewRows =
+    timeOk && timeText
+      ? timesByPlace(
+          {
+            local: timeText,
+            zone: clockZone,
+            utc: '',
+            durationMinutes: Number.isNaN(parsedDuration) ? 0 : parsedDuration,
+          },
+          previewDays,
+        )
+      : [];
+  const previewUtc = timeOk && timeText && previewDays[0]
+    ? clockTime(wallClockToUtcMs(previewDays[0], timeText, clockZone), 'UTC', '24h')
+    : '';
 
   const stateLabel: Record<MeetingOverview['sessions'][number]['state'], { text: string; cls: string }> = {
     sent: { text: 'Sent', cls: 'bg-emerald-500/10 border-emerald-500/40 text-emerald-200' },
@@ -2667,19 +2692,17 @@ function LiveSessionCard({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
           <LabeledInput
-            label="Session start (UTC, 24-hour)"
+            label={`Start — ${clockZone === INSTRUCTOR_ZONE ? 'New York' : clockZone} time`}
             value={timeText}
             onChange={setTimeText}
-            placeholder="14:00"
+            placeholder="09:00"
             mono
             icon={<Clock className="w-3 h-3 text-slate-300" />}
           />
           <p className={`text-[11px] mt-1 ${timeOk ? 'text-slate-400' : 'text-rose-300'}`}>
             {!timeOk
-              ? 'Use HH:MM, e.g. 14:00'
-              : localHint
-                ? `= ${localHint} in your browser's time zone`
-                : 'Registrants also see their own local time in the email.'}
+              ? 'Use 24-hour HH:MM, e.g. 09:00'
+              : '24-hour, on your own clock. Every other country is worked out for each session date, with its own daylight-saving rules.'}
           </p>
         </div>
         <LabeledInput
@@ -2694,6 +2717,37 @@ function LiveSessionCard({
           {course.day_dates.length === 1 ? 'day' : 'days'}).
         </div>
       </div>
+
+      {previewRows.length > 0 && (
+        <div className="rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2.5">
+          <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">
+            What the course page and emails will show
+            {previewDays[0] ? ` · cohort from ${previewDays[0]}` : ''}
+            {previewUtc ? ` · Day 1 = ${previewUtc} UTC` : ''}
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-[12px] text-slate-300">
+            {previewRows.map((r) =>
+              r.periods.map((p, i) => (
+                <span key={`${r.place}-${p.fromDayIso}`}>
+                  <span className="text-slate-100 font-medium">{r.place}</span>{' '}
+                  {i > 0 ? <span className="text-amber-200">from {p.fromDayIso}: </span> : null}
+                  <span className="font-mono">
+                    {p.start}
+                    {p.end ? ` → ${p.end}` : ''}
+                  </span>{' '}
+                  {i === 0 ? <span className="text-slate-500">{r.offsetLabel}</span> : null}
+                  {p.dayNote ? <span className="text-amber-200"> ({p.dayNote})</span> : null}
+                </span>
+              )),
+            )}
+          </div>
+          {previewRows.some((r) => r.periods.length > 1) && (
+            <div className="text-[11px] text-amber-200 mt-1.5">
+              A clock change falls inside this cohort, so some countries' times move part-way through.
+            </div>
+          )}
+        </div>
+      )}
 
       <label className="block">
         <span className="text-[11px] uppercase tracking-wider text-slate-300 flex items-center gap-1 mb-1">
@@ -2898,17 +2952,6 @@ function LiveSessionCard({
       ) : null}
     </div>
   );
-}
-
-/** "14:00" UTC on an ISO day → "10:00 AM EDT" in the browser's zone. */
-function utcToLocal(isoDay: string, hhmm: string): string {
-  try {
-    const d = new Date(`${isoDay}T${hhmm}:00Z`);
-    if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
-  } catch {
-    return '';
-  }
 }
 
 function DayDatesEditor({
