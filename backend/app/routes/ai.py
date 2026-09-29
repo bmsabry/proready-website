@@ -188,9 +188,14 @@ CONVENTIONS
   registrants have already been told, so it is the version that must appear
   in any email you write. Only if the page does not say it either are you
   entitled to ask.
-- session_time_utc on the course is the canonical start time once set;
-  day_dates are the dates. If the DB and the site disagree, do not silently
-  pick one — tell Bassam they disagree and which is which.
+- session_time_local on the course is the canonical start time once set: it
+  is Bassam's own New York clock time (session_timezone), and it is how he
+  states times ("9:00 AM Eastern"). When he tells you a time, set
+  session_time_local, not session_time_utc. The UTC instant of each date is
+  derived from it (session_starts_utc) — it can differ by an hour between
+  dates when a clock change falls inside a cohort; session_time_utc is only
+  Day 1's. day_dates are the dates. If the DB and the site disagree, do not
+  silently pick one — tell Bassam they disagree and which is which.
 - Telling people when to attend: call session_local_times(course_code). It
   converts the session into each registrant's OWN local zone using the real
   timezone database, so daylight saving on that specific date is already

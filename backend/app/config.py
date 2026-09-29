@@ -42,8 +42,8 @@ class Settings(BaseSettings):
 
     # --- Live-session reminders ------------------------------------------
     # The joining-instructions email goes to every confirmed registrant this
-    # many minutes before each session day starts (course.day_dates at
-    # course.session_time_utc). A Render cron job calls
+    # many minutes before each session day starts (course.day_dates at the
+    # start set on the instructor's clock, per date). A Render cron job calls
     # POST /api/admin/session-reminders/run every 10 minutes with
     # X-Cron-Secret: CRON_SECRET; the admin token works there too.
     SESSION_REMINDER_LEAD_MINUTES: int = 60

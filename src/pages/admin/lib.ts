@@ -104,7 +104,11 @@ export type Course = {
   currency: string;
   /** Academy product carrying this course's recorded counterpart, or null. */
   recorded_product_code: string | null;
-  /** Session start "HH:MM" in UTC ("" = not set) and length in minutes (0 = not set). */
+  /** Session start "HH:MM" on Bassam's own clock ("" = not set) — the source of truth. */
+  session_time_local: string;
+  /** IANA zone of that clock, e.g. "America/New_York". */
+  session_timezone: string;
+  /** Day 1's start "HH:MM" UTC (later days can differ across a clock change) and length in minutes. */
   session_time_utc: string;
   session_duration_minutes: number;
 };
@@ -118,6 +122,9 @@ export type CoursePatch = {
   price_cents?: number;
   currency?: string;
   recorded_product_code?: string | null;
+  /** "HH:MM" on Bassam's own clock; "" clears. */
+  session_time_local?: string;
+  session_timezone?: string;
   session_time_utc?: string;
   session_duration_minutes?: number;
   /** Joining instructions, verbatim. "" turns the session reminders off. */
@@ -127,6 +134,8 @@ export type CoursePatch = {
 /** GET /api/admin/courses/{code}/meeting — joining instructions + reminder state. */
 export type MeetingOverview = {
   meeting_info: string;
+  session_time_local: string;
+  session_timezone: string;
   session_time_utc: string;
   session_duration_minutes: number;
   lead_minutes: number;

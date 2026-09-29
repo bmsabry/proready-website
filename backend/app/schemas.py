@@ -155,8 +155,14 @@ class CourseOut(BaseModel):
     currency: str = "usd"
     # Academy product carrying this course's recorded counterpart, or None.
     recorded_product_code: Optional[str] = None
-    # Session start time in UTC as "HH:MM", and length in minutes.
-    # Empty/0 mean "not scheduled yet" — never guess a time from these.
+    # Session start on the instructor's clock ("HH:MM" in session_timezone,
+    # New York) — the source of truth. Every other place's time is derived
+    # from it per session date, with that date's DST rules. Empty = not set.
+    session_time_local: str = ""
+    session_timezone: str = "America/New_York"
+    # Day 1's start in UTC as "HH:MM" (a mirror for older readers — later days
+    # can differ by an hour when a clock change falls inside the cohort), and
+    # the session length in minutes. Empty/0 mean "not scheduled yet".
     session_time_utc: str = ""
     session_duration_minutes: int = 0
 
@@ -191,7 +197,15 @@ class CoursePatchIn(BaseModel):
     # Online seat price. Set to 0 to switch the cohort back to invoice-only.
     price_cents: Optional[int] = Field(default=None, ge=0)
     currency: Optional[str] = Field(default=None, min_length=3, max_length=8)
-    # "HH:MM" UTC. Send "" to clear.
+    # Start on the instructor's clock, "HH:MM" in session_timezone (New York
+    # unless changed). Send "" to clear. Preferred over session_time_utc.
+    session_time_local: Optional[str] = Field(
+        default=None, max_length=5, pattern=r"^$|^([01]\d|2[0-3]):[0-5]\d$"
+    )
+    # IANA zone the instructor's clock is in, e.g. "America/New_York".
+    session_timezone: Optional[str] = Field(default=None, max_length=64)
+    # Legacy: "HH:MM" UTC, read as Day 1's instant and stored as the
+    # equivalent instructor-clock time. Send "" to clear.
     session_time_utc: Optional[str] = Field(
         default=None, max_length=5, pattern=r"^$|^([01]\d|2[0-3]):[0-5]\d$"
     )
@@ -241,6 +255,8 @@ class MeetingOut(BaseModel):
     """Admin-only view of a course's live-session setup and reminder state."""
 
     meeting_info: str
+    session_time_local: str = ""
+    session_timezone: str = "America/New_York"
     session_time_utc: str
     session_duration_minutes: int
     lead_minutes: int

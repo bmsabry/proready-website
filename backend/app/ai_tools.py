@@ -50,6 +50,16 @@ from .routes import courses as courses_routes
 from .routes import interest as interest_routes
 from .routes import software as software_routes
 from .schemas import NotifyIn
+from .local_times import (
+    day_one_utc_hhmm,
+    has_session_time,
+    instructor_hhmm,
+    refresh_utc_mirror,
+    session_starts_utc,
+    session_timezone,
+    set_session_time,
+    set_session_time_from_utc,
+)
 from .seats import count_active, count_paid
 from .stats_queries import course_funnel_stats, software_telemetry_stats
 
@@ -117,9 +127,14 @@ def _course_summary(c: Course, db: Session) -> Dict[str, Any]:
         "start_date": c.start_date.isoformat() if c.start_date else None,
         "total_seats": c.total_seats,
         "status": c.status,
-        "session_time_utc": c.session_time_utc or "",
+        # Bassam's own start time, on his clock (New York). The source of truth.
+        "session_time_local": instructor_hhmm(c),
+        "session_timezone": session_timezone(c),
+        # Day 1 in UTC; later days can differ by an hour across a clock change.
+        "session_time_utc": day_one_utc_hhmm(c),
+        "session_starts_utc": [_iso(d) for d in session_starts_utc(c)],
         "session_duration_minutes": c.session_duration_minutes or 0,
-        "session_time_note": ("" if c.session_time_utc else "NO SESSION TIME IS SET for this course. You do not know what time of day it runs. Do not state or guess one — ask Bassam, or set it with update_course."),
+        "session_time_note": ("" if has_session_time(c) else "NO SESSION TIME IS SET for this course. You do not know what time of day it runs. Do not state or guess one — ask Bassam, or set it with update_course."),
         "day_dates": list(c.day_dates or []),
         "price_cents": c.price_cents,
         "currency": c.currency,
@@ -177,6 +192,7 @@ def update_course(
     total_seats: Optional[int] = None,
     status: Optional[str] = None,
     day_dates: Optional[List[str]] = None,
+    session_time_local: Optional[str] = None,
     session_time_utc: Optional[str] = None,
     session_duration_minutes: Optional[int] = None,
 ) -> Dict[str, Any]:
@@ -211,14 +227,24 @@ def update_course(
             return {"ok": False, "error": f"day_dates contains invalid date: {e}"}
         course.day_dates = parsed
         changed.append("day_dates")
-    if session_time_utc is not None:
+        refresh_utc_mirror(course)
+    if session_time_local is not None:
+        t = session_time_local.strip()
+        if t and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t):
+            return {
+                "ok": False,
+                "error": f"session_time_local must be 24-hour 'HH:MM' on Bassam's New York clock, got '{t}'",
+            }
+        set_session_time(course, t)
+        changed.append("session_time_local")
+    elif session_time_utc is not None:
         t = session_time_utc.strip()
         if t and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t):
             return {
                 "ok": False,
                 "error": f"session_time_utc must be 24-hour 'HH:MM' UTC, got '{t}'",
             }
-        course.session_time_utc = t
+        set_session_time_from_utc(course, t)
         changed.append("session_time_utc")
     if session_duration_minutes is not None:
         if not 0 <= int(session_duration_minutes) <= 1440:
@@ -1105,12 +1131,18 @@ def session_local_times(db: Session, course_code: str, **_: Any) -> Dict[str, An
         return resolve_zone(r.location or "") or resolve_zone(r.company or "")
 
     zones_from_company = [z for z in (_zone_for(r) for r in regs) if z]
+    starts = session_starts_utc(course)
     out = local_schedule(
         session_time_utc=course.session_time_utc or "",
         duration_minutes=course.session_duration_minutes or 0,
         day_dates=[str(d) for d in (course.day_dates or [])],
         locations=[r.location or "" for r in regs],
         extra_zones=zones_from_company,
+        starts_utc=starts if starts else None,
+        instructor_time=(
+            f"{instructor_hhmm(course)} {session_timezone(course)} (Bassam's clock)"
+            if has_session_time(course) else ""
+        ),
     )
     if not out.get("ok"):
         return out
@@ -1235,7 +1267,8 @@ TOOL_SPECS = [
             "properties": {
                 "code": {"type": "string"},
                 "title": {"type": "string"},
-                "session_time_utc": {"type": "string", "description": "Session start time in 24-hour UTC 'HH:MM'. Send '' to clear."},
+                "session_time_local": {"type": "string", "description": "Session start on Bassam's own New York clock, 24-hour 'HH:MM' (e.g. '09:00'). This is how he states times; every other country's time is derived from it per date. Send '' to clear."},
+                "session_time_utc": {"type": "string", "description": "Legacy: start in 24-hour UTC 'HH:MM', read on Day 1. Prefer session_time_local."},
                 "session_duration_minutes": {"type": "integer", "description": "How long one session runs, in minutes."},
                 "start_date": {"type": "string", "description": "YYYY-MM-DD"},
                 "total_seats": {"type": "integer", "minimum": 1},
