@@ -25,6 +25,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import support_service as svc
+from ..local_times import (
+    day_one_utc_hhmm,
+    instructor_hhmm,
+    is_known_zone,
+    refresh_utc_mirror,
+    session_timezone,
+    set_session_time,
+    set_session_time_from_utc,
+)
 from .. import registrants
 from ..db import get_db
 from ..deps import require_admin
@@ -104,7 +113,9 @@ def _to_out(course: Course, db: Session) -> CourseOut:
         price_cents=course.price_cents,
         currency=course.currency,
         recorded_product_code=course.recorded_product_code,
-        session_time_utc=course.session_time_utc or "",
+        session_time_local=instructor_hhmm(course),
+        session_timezone=session_timezone(course),
+        session_time_utc=day_one_utc_hhmm(course),
         session_duration_minutes=course.session_duration_minutes or 0,
     )
 
@@ -240,8 +251,25 @@ def patch_course(
         course.price_cents = body.price_cents
     if body.currency is not None:
         course.currency = body.currency.lower()
-    if body.session_time_utc is not None:
-        course.session_time_utc = body.session_time_utc.strip()
+    # Session start. The instructor's clock is the source of truth; a UTC
+    # time (older clients, the assistant) is converted to it on Day 1. Runs
+    # after day_dates so the Day 1 mirror reads the new schedule.
+    if body.session_timezone is not None and not is_known_zone(body.session_timezone):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown time zone '{body.session_timezone}'. Use an IANA name like America/New_York.",
+        )
+    if body.session_time_local is not None:
+        set_session_time(course, body.session_time_local, body.session_timezone)
+    elif body.session_time_utc is not None:
+        if body.session_timezone is not None:
+            course.session_timezone = body.session_timezone.strip()
+        set_session_time_from_utc(course, body.session_time_utc)
+    elif body.session_timezone is not None:
+        course.session_timezone = body.session_timezone.strip()
+        refresh_utc_mirror(course)
+    elif body.day_dates is not None:
+        refresh_utc_mirror(course)
     if body.session_duration_minutes is not None:
         course.session_duration_minutes = body.session_duration_minutes
     if body.meeting_info is not None:
