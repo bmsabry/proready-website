@@ -75,6 +75,13 @@ async function fetchCourse(code) {
         dayDates,
         totalSeats: Number.isFinite(data.total_seats) ? data.total_seats : 0,
         status: data.status === 'closed' ? 'closed' : 'open',
+        // Start on the instructor's clock + its zone: the source of truth the
+        // pages derive every country's time from, per date.
+        sessionTimeLocal: typeof data.session_time_local === 'string' ? data.session_time_local : '',
+        sessionTimezone:
+          typeof data.session_timezone === 'string' && data.session_timezone
+            ? data.session_timezone
+            : 'America/New_York',
         sessionTimeUtc: typeof data.session_time_utc === 'string' ? data.session_time_utc : '',
         sessionDurationMinutes: Number.isFinite(data.session_duration_minutes)
           ? data.session_duration_minutes
