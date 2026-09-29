@@ -8,13 +8,37 @@ import { usePageMeta } from '../lib/meta';
 const Testimonials = () => {
   usePageMeta(
     'Testimonials: What Leaders, Engineers & Clients Say',
-    'Thirty first-hand testimonials from chief engineers, principal engineers, technicians, and industry partners on the dedication, technical excellence, and impact of working with ProReadyEngineer.'
+    'Thirty-four first-hand testimonials from chief engineers, principal engineers, technicians, industry partners, and course graduates on the dedication, technical excellence, and impact of working with ProReadyEngineer.'
   );
 
   const [activeFeatured, setActiveFeatured] = useState(0);
 
   // All testimonials from the combined document
   const allTestimonials = [
+    {
+      name: "Halim Benaissa",
+      role: "Gas Turbine Controls Engineer — HDGT & ADGT",
+      statement: "Thank you for the excellent training session\n\nThe training was truly rich and in-depth. It helped me organize my understanding of DLE mapping and gave me a much clearer and more structured view of the subject.\n\nOne of the things I appreciated most was how you made many technical details that I previously found complex or did not fully understand much easier to grasp. Your clear explanations and practical approach helped me understand the reasoning behind these details and connect the different aspects of DLE mapping in a much simpler way.\n\nI particularly appreciated your teaching approach, your strong command of the subject, and your ability to explain even the most detailed aspects in a clear and practical way. Your knowledge and experience made the session very valuable and enjoyable.\nIt was a great learning experience for me, and I would definitely recommend it to other engineers working with DLE/DLN gas turbines.",
+      category: "Emissions Mapping Graduate"
+    },
+    {
+      name: "Abdelrahman Shiekhidriss",
+      role: "MSc Control Systems Engineering — TÜV Rheinland Functional Safety Engineer",
+      statement: "I sincerely appreciate Dr. Bassam for his strong ownership of the subject matter, his willingness to share and clarify detailed technical information, and his effective use of hands-on simulator examples to reinforce complex gas turbine emissions control principles.\nAfter attending courses in control systems, I found this gas turbine emissions control course highly valuable in strengthening my understanding of dry emissions control technologies and their role in supporting GHG reduction initiatives and regulatory compliance.\nThanks for professional technically engaging and effectively connected emissions control concepts with practical control system considerations, operating requirements, and compliance expectations.",
+      category: "Emissions Mapping Graduate"
+    },
+    {
+      name: "Mahmoud Aboughoushe, EIT",
+      role: "Turbomachinery & Process Control",
+      statement: "Thank you Dr Bassam for the excellent course delivery. It is because of this course that I now have a confident understanding of how DLE mapping is done, and how all the essential concepts are used together to make important decisions. Your passion for DLE/DLN systems was what energized me to pay closer attention to every lesson, and I really hope to continue learning from you as my career progresses.",
+      category: "Emissions Mapping Graduate"
+    },
+    {
+      name: "Gas Turbine Field Mapper",
+      role: "Name withheld for privacy",
+      statement: "This course doesn't even compare to the mapping course I received as a mapper in my own company.",
+      category: "Emissions Mapping Graduate"
+    },
     {
       name: "Mark Mueller",
       role: "Senior Product Manager - LM2500 Fleet",
@@ -283,7 +307,7 @@ const Testimonials = () => {
       <PageHero
         eyebrow="Client Voices"
         title={<>What People <span className="text-gradient">Say</span></>}
-        subtitle="Genuine feedback from chief engineers, principal engineers, technicians, and industry partners who've experienced the passion, dedication, and impact of working together."
+        subtitle="Genuine feedback from chief engineers, principal engineers, technicians, industry partners, and course graduates who've experienced the passion, dedication, and impact of working together."
       />
 
       {/* Featured carousel + sentiment chart */}
@@ -429,7 +453,7 @@ const Testimonials = () => {
           <SectionHeading
             eyebrow="The Full Record"
             title={<>All <span className="text-gradient">Testimonials</span></>}
-            subtitle="Every word, unedited, from leadership, peers, technicians, and clients."
+            subtitle="In their own words, from leadership, peers, technicians, clients, and course graduates."
           />
 
           <div className="columns-1 md:columns-2 xl:columns-3 gap-6 [column-fill:_balance]">
@@ -443,7 +467,7 @@ const Testimonials = () => {
                     </span>
                   </div>
 
-                  <blockquote className="text-slate-300 text-sm leading-relaxed mb-5">
+                  <blockquote className="text-slate-300 text-sm leading-relaxed mb-5 whitespace-pre-line">
                     "{testimonial.statement}"
                   </blockquote>
 
