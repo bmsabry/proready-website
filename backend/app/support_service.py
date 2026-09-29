@@ -44,6 +44,7 @@ from .config import get_settings
 from .crypto import CryptoNotConfigured, decrypt
 from .emailer import send_email
 from .models import (
+    AICallLog,
     AISettings,
     Course,
     Enrollment,
@@ -694,9 +695,22 @@ def _chat_url(api_url: str) -> str:
     return f"{url}/chat/completions"
 
 
-# The outcome of the last model call this process made, newest wins against
-# the triage history in ai_health(). A tuple swap is atomic, no lock needed.
-_last_llm_call: Optional[tuple[datetime, str]] = None  # (when, error or "")
+def record_llm_outcome(db: Session, error: str, purpose: str) -> None:
+    """Keep the outcome of one model call, for the ON/OFF status.
+
+    Added to the caller's session, not committed here: triage and drafts
+    commit their own work, and this row goes with it.
+    """
+    row = get_support_settings(db)
+    db.add(
+        AICallLog(
+            ts=datetime.now(timezone.utc),
+            ok=not error,
+            error=(error or "")[:500],
+            purpose=purpose[:32],
+            model=(row.model_name if row is not None else "")[:200],
+        )
+    )
 
 NOT_CONFIGURED = "not configured — no AI model is set up (Admin → AI Settings)"
 
@@ -711,6 +725,7 @@ def _call_support_llm(
     # is used, not for the cap.
     max_tokens: int = 4000,
     why: Optional[list[str]] = None,
+    purpose: str = "triage",
 ) -> Optional[dict]:
     """One LLM round trip. Returns parsed JSON, or None on any failure.
 
@@ -720,9 +735,8 @@ def _call_support_llm(
     reason for a failure is appended to it in words Bassam can act on
     ("out of credit", "key refused") — it ends up on the admin banner.
     """
-    global _last_llm_call
     result, error, _stage = _llm_round_trip(db, messages, json_mode=json_mode, max_tokens=max_tokens)
-    _last_llm_call = (datetime.now(timezone.utc), error)
+    record_llm_outcome(db, error, purpose)
     if error and why is not None:
         why.append(error)
     return result
@@ -905,26 +919,37 @@ def _parse_json_object(content: str) -> Optional[dict]:
 def ai_health(db: Session) -> dict[str, Any]:
     """State of automatic replies, for the admin banner.
 
-    Read from the recent triage outcomes (durable, survives restarts), with
-    the last live call from this process — a "Check again", a draft — taking
-    precedence when it is newer.
+    The newest outcome wins, from two durable records: every model call
+    (ai_call_log — triage, drafts, "Check again", the AI Settings test) and
+    the triage result on each ticket (which is also what counts the
+    customers who only got the standard acknowledgement). Both live in the
+    database, so a restart changes nothing.
     """
-    rows = db.execute(
-        select(SupportTicketEvent.created_at, SupportTicketEvent.payload)
-        .where(SupportTicketEvent.event_type == "ai_classified")
-        .order_by(desc(SupportTicketEvent.id))
-        .limit(50)
-    ).all()
     # (when, error, counts as a customer message that missed out)
     outcomes: list[tuple[datetime, str, bool]] = []
-    for at, payload in rows:
+    for at, ok, error, purpose in db.execute(
+        select(AICallLog.ts, AICallLog.ok, AICallLog.error, AICallLog.purpose)
+        .order_by(desc(AICallLog.id))
+        .limit(50)
+    ).all():
+        outcomes.append(
+            (_aware(at), "" if ok else (error or "the AI did not answer"), purpose == "triage")
+        )
+    # Ticket events cover the time before calls were logged (every triage
+    # since then has its own call row; counting both would count each
+    # missed customer twice).
+    first_logged = db.execute(select(func.min(AICallLog.ts))).scalar()
+    events = select(SupportTicketEvent.created_at, SupportTicketEvent.payload).where(
+        SupportTicketEvent.event_type == "ai_classified"
+    )
+    if first_logged is not None:
+        events = events.where(SupportTicketEvent.created_at < first_logged)
+    for at, payload in db.execute(events.order_by(desc(SupportTicketEvent.id)).limit(50)).all():
         p = payload or {}
         ok = p.get("source") == "llm"
         outcomes.append(
             (_aware(at), "" if ok else str(p.get("error") or "the AI did not answer"), True)
         )
-    if _last_llm_call is not None:
-        outcomes.append((_last_llm_call[0], _last_llm_call[1], False))
     outcomes.sort(key=lambda o: o[0], reverse=True)
 
     configured = get_support_settings(db) is not None
@@ -956,13 +981,12 @@ def ai_health(db: Session) -> dict[str, Any]:
     }
 
 
-def probe_json(db: Session) -> dict[str, Any]:
+def probe_json(db: Session, purpose: str = "check") -> dict[str, Any]:
     """A tiny live call asking for JSON, as triage and drafts do.
 
     Used by Support's "Check again" and by the AI Settings test. Its
-    outcome counts as the latest word on whether automatic replies work.
+    outcome is stored as the latest word on whether automatic replies work.
     """
-    global _last_llm_call
     started = time.monotonic()
     raw, error, stage = _llm_round_trip(
         db,
@@ -973,7 +997,8 @@ def probe_json(db: Session) -> dict[str, Any]:
         json_mode=True,
         max_tokens=1000,
     )
-    _last_llm_call = (datetime.now(timezone.utc), error)
+    record_llm_outcome(db, error, purpose)
+    db.commit()
     return {
         "ok": raw is not None,
         "error": error,
@@ -1678,6 +1703,7 @@ Return ONLY a JSON object:
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
         max_tokens=4000,
         why=why,
+        purpose="draft",
     )
     if raw is None:
         return {

@@ -2399,7 +2399,6 @@ def live_model(client, db, monkeypatch):
     from app import crypto
 
     crypto._fernet.cache_clear()
-    monkeypatch.setattr(svc, "_last_llm_call", None)
     client.put(
         "/api/admin/ai/settings",
         json={
@@ -2642,3 +2641,53 @@ def test_the_ai_test_catches_an_unreadable_answer_and_still_tries_tools(client, 
     assert steps["json"]["status"] == "fail" and "empty answer" in steps["json"]["detail"]
     assert steps["tools"]["status"] == "pass"
     assert out["ok"] is False
+
+
+
+# The ON/OFF status must not depend on the server process. It did: a passing
+# "Check again" was kept in memory, so every restart (each deploy, and each
+# time the idle server spun down) brought back an old failure and the banner
+# said OFF although the model was answering.
+
+
+def test_the_ai_status_is_kept_in_the_database_not_in_memory(client, db, live_model):
+    from app.db import SessionLocal
+    from app.models import AICallLog
+
+    fake_llm_down = lambda request: httpx.Response(402, json=OUT_OF_CREDIT)  # noqa: E731
+    live_model(fake_llm_down)
+    client.post("/api/support/contact", json={"email": "gap@example.com", "message": "hi"})
+    assert _stats(client)["ai"]["state"] == "down"
+
+    live_model(_model_says({"ok": True}))
+    assert client.post("/api/admin/support/ai-check", headers=AUTH).json()["ok"] is True
+
+    # Nothing about it lives in the process any more…
+    assert not hasattr(svc, "_last_llm_call")
+    # …the check is a row, and a fresh session (as after a restart) sees ON.
+    fresh = SessionLocal()
+    try:
+        last = fresh.query(AICallLog).order_by(AICallLog.id.desc()).first()
+        assert last.ok is True and last.purpose == "check" and last.model == "google/gemini-3.7-flash"
+        assert svc.ai_health(fresh)["state"] == "ok"
+    finally:
+        fresh.close()
+    assert _stats(client)["ai"]["state"] == "ok"
+
+
+def test_the_newest_outcome_wins_both_ways(client, db, live_model):
+    live_model(_model_says({"ok": True}))
+    client.post("/api/admin/support/ai-check", headers=AUTH)
+    assert _stats(client)["ai"]["state"] == "ok"
+
+    # A real message that then fails turns it OFF again, with the reason.
+    live_model(lambda request: httpx.Response(402, json=OUT_OF_CREDIT))
+    client.post("/api/support/contact", json={"email": "later@example.com", "message": "hi"})
+    ai = _stats(client)["ai"]
+    assert ai["state"] == "down" and "out of credit" in ai["error"] and ai["missed"] >= 1
+
+    # And a draft that works is evidence too.
+    ref = client.post("/api/support/contact", json={"email": "draftok@example.com", "message": "hi"}).json()["ref"]
+    live_model(_model_says({"reply_html": "<p>Hi</p>", "needs_from_admin": [], "suggested_status": "resolved"}))
+    assert client.post(f"/api/admin/support/tickets/{ref}/draft", json={"instruction": ""}, headers=AUTH).status_code == 200
+    assert _stats(client)["ai"]["state"] == "ok"

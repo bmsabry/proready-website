@@ -1310,6 +1310,28 @@ class SoftwareProduct(Base):
     )
 
 
+class AICallLog(Base):
+    """One row per call the support desk makes to the AI model.
+
+    What "Automatic replies are ON/OFF" is read from (with the triage
+    events on tickets). It has to live in the database: the server restarts
+    on every deploy and whenever it has been idle, and a status kept in
+    memory silently fell back to an old failure each time — the banner
+    said OFF although the model had answered minutes before.
+    """
+
+    __tablename__ = "ai_call_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    ok: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Why it failed, in words ("openrouter.ai: out of credit (HTTP 402)").
+    error: Mapped[str] = mapped_column(String(500), default="")
+    # 'triage' | 'draft' | 'check' (Support's "Check again") | 'test' (AI Settings)
+    purpose: Mapped[str] = mapped_column(String(32), default="")
+    model: Mapped[str] = mapped_column(String(200), default="")
+
+
 class EmailLog(Base):
     """One row per outbound email attempt, success or failure.
 

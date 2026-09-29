@@ -127,7 +127,7 @@ def diagnose(db: Session) -> dict[str, Any]:
         for key, title in (("connect", connect_title), ("json", json_title), ("tools", tools_title)):
             steps.append(_step(key, title, "skipped", "Needs the settings first."))
     else:
-        probe = svc.probe_json(db)
+        probe = svc.probe_json(db, purpose="test")
         reached = probe["ok"] or probe["stage"] == "answer"
         steps.append(_step(
             "connect", connect_title, "pass" if reached else "fail",
