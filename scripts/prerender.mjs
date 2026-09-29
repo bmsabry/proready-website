@@ -163,6 +163,21 @@ const SCHEDULE_PAGES = {
   '/training': { code: 'gas-turbine-emissions-mapping-2026-05', days: 'start' },
 };
 
+// Session times: the page's time cards are derived from the start Bassam sets
+// on his New York clock. The New York card must show exactly that time; if a
+// page ever goes back to hand-typed times, it would stop matching the admin.
+const to12h = (hhmm) => {
+  const [h, m] = String(hhmm).split(':').map((x) => parseInt(x, 10));
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+};
+const timeShown = (course, html) => {
+  const local = course.sessionTimeLocal ?? '';
+  const zone = course.sessionTimezone || 'America/New_York';
+  // Older snapshots (no instructor time yet) and other zones: nothing to pin.
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(local) || zone !== 'America/New_York') return true;
+  return html.includes(to12h(local));
+};
+
 const todayIso = new Date().toISOString().slice(0, 10);
 for (const [route, spec] of Object.entries(SCHEDULE_PAGES)) {
   const course = courseSnapshot.courses?.[spec.code];
@@ -186,6 +201,13 @@ for (const [route, spec] of Object.entries(SCHEDULE_PAGES)) {
       `  ✗ ${route}: prerendered HTML is missing ${missing.length} live cohort date(s) ` +
         `(${missing.join(', ')}). Something is publishing a hardcoded schedule instead of ` +
         `the build-time snapshot.`,
+    );
+  } else if (spec.days === 'all' && !timeShown(course, html)) {
+    failures++;
+    console.error(
+      `  ✗ ${route}: prerendered HTML does not show the New York start ` +
+        `(${to12h(course.sessionTimeLocal)}) set in the admin. Something is publishing ` +
+        `hardcoded session times instead of deriving them from the course record.`,
     );
   } else if ((course.dayDates[course.dayDates.length - 1] ?? course.startDate) < todayIso) {
     // Not a build failure: an unrelated deploy shouldn't be blocked because a
