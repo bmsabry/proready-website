@@ -26,10 +26,14 @@ import { Reveal } from '../../components/ui';
 import PayPalButtons, { fetchPaymentsConfig, PaymentsConfig } from '../../components/PayPalButtons';
 import { usePageMeta } from '../../lib/meta';
 import {
+  courseSnapshot,
   formatIsoDate as formatStartDate,
+  snapshotClock,
   snapshotDayLabels,
   snapshotStartLabel,
 } from '../../data/courseSnapshot';
+import { clockFromApi, EMPTY_CLOCK, SessionClock } from '../../lib/sessionTimes';
+import SessionTimes from './SessionTimes';
 import { MODULES, COURSE_SUBTITLE } from './microGasTurbineCurriculum';
 import FormatSwitcher from './FormatSwitcher';
 import IndependenceNotice from './IndependenceNotice';
@@ -161,6 +165,11 @@ const DEFAULT_DAY_DATES: string[] = snapshotDayLabels(COURSE_CODE, [
   'October 9, 2026',
 ]);
 
+// The session clock (Bassam's New York start) and ISO day dates for the
+// prerendered time cards; the live fetch replaces both.
+const DEFAULT_CLOCK: SessionClock = snapshotClock(COURSE_CODE) ?? EMPTY_CLOCK;
+const DEFAULT_DAY_ISOS: string[] = courseSnapshot(COURSE_CODE)?.dayDates ?? [];
+
 const MicroGasTurbineDesignLive = () => {
   usePageMeta(
     'Micro Gas Turbine Design: Live Online Cohort',
@@ -199,6 +208,9 @@ const MicroGasTurbineDesignLive = () => {
   // Per-day dates (formatted "October 1, 2026"). Defaults to the snapshot
   // schedule above; replaced by the API list when day_dates is non-empty.
   const [dayDates, setDayDates] = useState<string[]>(DEFAULT_DAY_DATES);
+  // ISO dates + the session clock drive the per-country time cards.
+  const [dayIsos, setDayIsos] = useState<string[]>(DEFAULT_DAY_ISOS);
+  const [clock, setClock] = useState<SessionClock>(DEFAULT_CLOCK);
   const [formState, setFormState] = useState<'idle' | 'loading' | 'success' | 'duplicate' | 'error'>(
     'idle',
   );
@@ -244,8 +256,13 @@ const MicroGasTurbineDesignLive = () => {
           day_dates?: string[];
           price_cents?: number;
           currency?: string;
+          session_time_local?: string;
+          session_timezone?: string;
+          session_time_utc?: string;
+          session_duration_minutes?: number;
         };
         if (!cancelled) {
+          setClock(clockFromApi(data));
           setSeatsTaken(data.seats_taken);
           setCapacity(data.total_seats);
           setCourseStatus(data.status);
@@ -257,6 +274,7 @@ const MicroGasTurbineDesignLive = () => {
           // Fall back to start_date only if day_dates is missing or empty.
           if (Array.isArray(data.day_dates) && data.day_dates.length > 0) {
             setDayDates(data.day_dates.map(formatStartDate));
+            setDayIsos(data.day_dates);
             setCohortDate(formatStartDate(data.day_dates[0]));
           } else {
             setCohortDate(formatStartDate(data.start_date));
@@ -668,10 +686,9 @@ const MicroGasTurbineDesignLive = () => {
           </div>
         </div>
 
-        {/* DAILY SCHEDULE — applies to every cohort day. Times are fixed (no */}
-        {/* DST drift handling): the course runs early October 2026 when North */}
-        {/* America is still on DST, while Algeria + Saudi Arabia are DST-free */}
-        {/* — the same offsets as the Emissions Mapping cohort. */}
+        {/* DAILY SCHEDULE — applies to every cohort day. The time cards are */}
+        {/* derived from Bassam's New York start (admin) for the cohort's real */}
+        {/* dates, with each country's own DST rules: see SessionTimes. */}
         <Reveal className="mb-16">
           <span className="eyebrow mb-4">Daily Schedule</span>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-3">
@@ -683,57 +700,7 @@ const MicroGasTurbineDesignLive = () => {
             stream live for all four time zones below.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {[
-              { city: 'Vancouver', label: 'Pacific Time', start: '7:00 AM', end: '11:30 AM' },
-              { city: 'New York', label: 'Eastern Time', start: '10:00 AM', end: '2:30 PM' },
-              { city: 'Algeria', label: 'UTC+1', start: '3:00 PM', end: '7:30 PM' },
-              { city: 'Saudi Arabia', label: 'UTC+3', start: '5:00 PM', end: '9:30 PM' },
-            ].map((tz) => (
-              <div
-                key={tz.city}
-                className="card card-hover p-5"
-              >
-                <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-1">
-                  {tz.label}
-                </div>
-                <div className="text-base font-semibold text-cyan-400 mb-3">{tz.city}</div>
-                <div className="flex items-baseline gap-2 flex-wrap font-mono">
-                  <span className="text-xl font-bold text-white tabular-nums">{tz.start}</span>
-                  <span className="text-slate-500">→</span>
-                  <span className="text-xl font-bold text-white tabular-nums">{tz.end}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Hour-by-hour ruler — anchored to Eastern Time so it stays compact */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <div className="text-xs font-mono uppercase tracking-wider text-slate-300">
-                Hour-by-hour · Eastern Time
-              </div>
-              <div className="text-[11px] text-slate-300">10-minute break between hours</div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {[
-                { n: 1, time: '10:00 – 11:00' },
-                { n: 2, time: '11:10 – 12:10' },
-                { n: 3, time: '12:20 – 13:20' },
-                { n: 4, time: '13:30 – 14:30' },
-              ].map(({ n, time }) => (
-                <div
-                  key={n}
-                  className="px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-800 flex items-center gap-2"
-                >
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300 shrink-0">
-                    Hr {n}
-                  </span>
-                  <span className="text-slate-200 font-mono tabular-nums text-xs">{time}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <SessionTimes clock={clock} dayIsos={dayIsos} rulerGridClass="grid-cols-2 sm:grid-cols-4" />
         </Reveal>
 
         {/* PRICING — live seat with the recorded course included */}
