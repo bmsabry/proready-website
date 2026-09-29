@@ -69,6 +69,14 @@ class Course(Base):
     # than invent a time, which is exactly what it did before this existed.
     session_time_utc: Mapped[str] = mapped_column(String(5), default="")
     session_duration_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    # The start as set on the instructor's own clock ("HH:MM" in
+    # session_timezone). This is the source of truth: each session date's UTC
+    # instant is derived from it with that date's DST rules (local_times.
+    # session_start_utc), so a US clock change never moves his start and every
+    # other country follows its own rules. session_time_utc above is kept as
+    # the Day 1 mirror for older readers.
+    session_time_local: Mapped[str] = mapped_column(String(5), default="")
+    session_timezone: Mapped[str] = mapped_column(String(64), default="America/New_York")
 
     # Joining instructions for the live sessions, exactly as the admin pasted
     # them (video link, dial-in number, PIN). Admin-only: it is never part of
