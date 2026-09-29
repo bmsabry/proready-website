@@ -12,6 +12,7 @@
  * only supplies what to show before that fetch lands.
  */
 import snapshotJson from './course-snapshot.json';
+import { INSTRUCTOR_ZONE, SessionClock } from '../lib/sessionTimes';
 
 export type CourseSnapshot = {
   title: string;
@@ -21,7 +22,11 @@ export type CourseSnapshot = {
   dayDates: string[];
   totalSeats: number;
   status: 'open' | 'closed';
-  /** "HH:MM" UTC, empty when the admin hasn't set a session time */
+  /** "HH:MM" on the instructor's clock (the source of truth); absent in older snapshots */
+  sessionTimeLocal?: string;
+  /** IANA zone of that clock, e.g. "America/New_York" */
+  sessionTimezone?: string;
+  /** Day 1's "HH:MM" UTC, empty when the admin hasn't set a session time */
   sessionTimeUtc: string;
   sessionDurationMinutes: number;
 };
@@ -65,6 +70,18 @@ export const courseSnapshot = (code: string): CourseSnapshot | null =>
 export const snapshotDayLabels = (code: string, fallback: string[] = []): string[] => {
   const dates = courseSnapshot(code)?.dayDates ?? [];
   return dates.length > 0 ? dates.map(formatIsoDate) : fallback;
+};
+
+/** Session clock for the prerendered HTML, or null if the build has no snapshot. */
+export const snapshotClock = (code: string): SessionClock | null => {
+  const c = courseSnapshot(code);
+  if (!c) return null;
+  return {
+    local: c.sessionTimeLocal ?? '',
+    zone: c.sessionTimezone || INSTRUCTOR_ZONE,
+    utc: c.sessionTimeUtc ?? '',
+    durationMinutes: c.sessionDurationMinutes ?? 0,
+  };
 };
 
 /** Formatted cohort start date for the prerendered HTML. */
