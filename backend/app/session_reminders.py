@@ -6,7 +6,9 @@ pending — never cancelled) AND has answered the "confirm your seat" ask
 for; an unconfirmed registrant is not sent a link.
 
 When: SESSION_REMINDER_LEAD_MINUTES (60) before the session starts, where a
-session is one entry of course.day_dates at course.session_time_utc. The job
+session is one entry of course.day_dates at the instructor-clock start
+(local_times.session_start_utc — per date, so a clock change inside a
+cohort moves the UTC instant, never his New York start). The job
 is called every 10 minutes by a Render cron job, so a reminder lands between
 60 and 50 minutes ahead. The window stays open until the session starts, so
 a cron hiccup delays a reminder rather than dropping it; after the start
@@ -24,8 +26,7 @@ in the joining instructions, and that is what turns the reminders on.
 from __future__ import annotations
 
 import logging
-import re
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Iterable, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -34,7 +35,14 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .emailer import send_email, session_reminder_html
-from .local_times import resolve_zone
+from .local_times import (
+    day_one_utc_hhmm,
+    has_session_time,
+    instructor_hhmm,
+    resolve_zone,
+    session_start_utc,
+    session_timezone,
+)
 from .models import Course, EmailLog, Registration
 
 log = logging.getLogger(__name__)
@@ -42,7 +50,6 @@ log = logging.getLogger(__name__)
 TEMPLATE = "session_reminder"
 TEST_TEMPLATE = "session_reminder_test"
 LIVE_STATUSES = ("paid", "pending")
-_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
 def _aware(dt: Optional[datetime]) -> Optional[datetime]:
@@ -56,7 +63,7 @@ def blocked_by(course: Course) -> list[str]:
     reasons = []
     if not (course.meeting_info or "").strip():
         reasons.append("no meeting info")
-    if not _TIME_RE.match(course.session_time_utc or ""):
+    if not has_session_time(course):
         reasons.append("no session start time")
     if not course.day_dates:
         reasons.append("no session days")
@@ -65,16 +72,17 @@ def blocked_by(course: Course) -> list[str]:
 
 def session_starts(course: Course) -> list[tuple[int, date, datetime]]:
     """(day number, date, start datetime UTC) for every scheduled day."""
-    if not _TIME_RE.match(course.session_time_utc or ""):
+    if not has_session_time(course):
         return []
-    hh, mm = (int(x) for x in course.session_time_utc.split(":"))
     out = []
     for i, d in enumerate(course.day_dates or [], start=1):
         try:
             day = date.fromisoformat(str(d))
         except (TypeError, ValueError):
             continue
-        out.append((i, day, datetime.combine(day, time(hh, mm), tzinfo=timezone.utc)))
+        start = session_start_utc(course, day)
+        if start is not None:
+            out.append((i, day, start))
     return out
 
 
@@ -285,7 +293,9 @@ def overview(db: Session, course: Course, now: Optional[datetime] = None) -> dic
 
     return {
         "meeting_info": course.meeting_info or "",
-        "session_time_utc": course.session_time_utc or "",
+        "session_time_local": instructor_hhmm(course),
+        "session_timezone": session_timezone(course),
+        "session_time_utc": day_one_utc_hhmm(course),
         "session_duration_minutes": course.session_duration_minutes or 0,
         "lead_minutes": settings.SESSION_REMINDER_LEAD_MINUTES,
         "armed": not reasons,
