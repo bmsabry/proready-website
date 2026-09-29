@@ -94,6 +94,35 @@ def _ensure_column(table: str, column: str, ddl: str) -> None:
     log.info("Migrated: added %s.%s column", table, column)
 
 
+def _backfill_session_time_local() -> None:
+    """Give every course that only has a UTC start an instructor-clock start.
+
+    The UTC time is read on the course's FIRST session date, so the instant
+    registrants were told for that cohort does not move. Only rows with an
+    empty session_time_local are touched, and clearing a course's time
+    clears session_time_utc too, so this can never bring a cleared time back.
+    """
+    from .local_times import set_session_time_from_utc, valid_hhmm
+
+    with SessionLocal() as db:
+        rows = db.execute(
+            select(Course).where(Course.session_time_local == "", Course.session_time_utc != "")
+        ).scalars().all()
+        changed = 0
+        for course in rows:
+            if not valid_hhmm(course.session_time_utc):
+                continue
+            before = course.session_time_utc
+            set_session_time_from_utc(course, before)
+            changed += 1
+            log.info(
+                "Backfilled %s: %s UTC -> %s %s",
+                course.code, before, course.session_time_local, course.session_timezone,
+            )
+        if changed:
+            db.commit()
+
+
 def _widen_column(table: str, column: str, length: int) -> None:
     """Grow a VARCHAR(n) column to VARCHAR(length) if it is narrower.
 
@@ -214,6 +243,13 @@ def _run_column_migrations() -> None:
     _ensure_column(
         "courses", "session_duration_minutes", "INTEGER NOT NULL DEFAULT 0"
     )
+    # Session start on the instructor's own clock (2026-09). Backfilled from
+    # session_time_utc so every existing session keeps its exact instant.
+    _ensure_column("courses", "session_time_local", "VARCHAR(5) NOT NULL DEFAULT ''")
+    _ensure_column(
+        "courses", "session_timezone", "VARCHAR(64) NOT NULL DEFAULT 'America/New_York'"
+    )
+    _backfill_session_time_local()
     # Joining instructions for the live sessions (2026-09). Empty = no
     # meeting set, so the reminder job leaves the course alone.
     _ensure_column("courses", "meeting_info", "TEXT NOT NULL DEFAULT ''")
