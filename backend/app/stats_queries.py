@@ -17,6 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import academy as svc
+from . import registrants
 from .models import (
     AppLaunch,
     AppUsage,
@@ -107,22 +108,73 @@ def product_headline_stats(db: Session, product_code: str = "") -> dict:
     }
 
 
-def course_funnel_stats(db: Session, course: Course) -> dict:
-    """One course's funnel, split by registration type (live vs recorded).
+def _past_cohorts(db: Session, course: Course, past: list[Registration]) -> list[dict]:
+    """The cohorts this course has already delivered, newest first.
 
-    Body moved verbatim from routes/stats.py GET /courses so the stats
-    dashboard and the AI assistant's get_course_stats agree exactly.
+    A cohort's dates come from the Certificate of Attendance its people
+    received (it records the span it was issued for). Without one, the day
+    attendance was marked stands in for both ends.
     """
-    counts = dict(
-        db.execute(
-            select(Registration.status, func.count(Registration.id))
-            .where(Registration.course_code == course.code)
-            .group_by(Registration.status)
-        ).all()
+    from . import certificates as certs
+
+    spans: dict[tuple, int] = {}
+    for reg in past:
+        start = end = None
+        if course.recorded_product_code:
+            learner = db.execute(
+                select(Learner).where(Learner.email == (reg.email or "").lower().strip())
+            ).scalar_one_or_none()
+            cert = (
+                certs.get_certificate(db, learner, course.recorded_product_code, "attendance")
+                if learner is not None
+                else None
+            )
+            if cert is not None and cert.cohort_start:
+                start, end = cert.cohort_start, cert.cohort_end or cert.cohort_start
+        if start is None and reg.attended_at is not None:
+            start = end = reg.attended_at.date()
+        key = (start.isoformat() if start else "", end.isoformat() if end else "")
+        spans[key] = spans.get(key, 0) + 1
+    return [
+        {"start": s or None, "end": e or None, "trained": n}
+        for (s, e), n in sorted(spans.items(), reverse=True)
+    ]
+
+
+def course_funnel_stats(db: Session, course: Course) -> dict:
+    """One course: its current offering, and everything it has done so far.
+
+    live     — the CURRENT cohort (the next or running delivery): who holds
+               a seat now, by the one registrant rule (app/registrants.py).
+               Someone who already attended a previous cohort is history,
+               not a paid seat in this one.
+    cohort   — the current cohort's dates.
+    history  — all-time: the cohorts delivered, people trained, paid seats
+               and any fees recorded with them.
+    recorded — the linked recorded product's sales and learners (all time),
+               null when the course has no recorded twin.
+
+    The admin Overview, the Courses page and the AI assistant's
+    get_course_stats all read this, so they cannot disagree.
+    """
+    rows = db.execute(
+        select(Registration).where(Registration.course_code == course.code)
+    ).scalars().all()
+    active = [r for r in rows if registrants.is_active(r)]
+    past = [r for r in rows if registrants.is_past(r)]
+    pending = sum(1 for r in active if r.status == "pending")
+    paid = sum(1 for r in active if r.status == "paid")
+
+    # Cancellations since the last cohort was signed off belong to the
+    # current one; earlier ones are history.
+    marked = [a for a in (svc._aware(r.attended_at) for r in past) if a is not None]
+    last_signed_off = max(marked) if marked else None
+    cancelled_rows = [r for r in rows if r.status == "cancelled"]
+    cancelled_now = sum(
+        1
+        for r in cancelled_rows
+        if last_signed_off is None or (svc._aware(r.created_at) or last_signed_off) > last_signed_off
     )
-    pending = int(counts.get("pending", 0))
-    paid = int(counts.get("paid", 0))
-    cancelled = int(counts.get("cancelled", 0))
 
     day = func.date(Registration.created_at)
     by_day = db.execute(
@@ -152,6 +204,10 @@ def course_funnel_stats(db: Session, course: Course) -> dict:
         else None
     )
 
+    days = sorted(course.day_dates or [])
+    paid_ever = [r for r in rows if r.status == "paid"]
+    cohorts = _past_cohorts(db, course, past)
+
     return {
         "code": course.code,
         "title": course.title,
@@ -160,7 +216,7 @@ def course_funnel_stats(db: Session, course: Course) -> dict:
         "live": {
             "pending": pending,
             "paid": paid,
-            "cancelled": cancelled,
+            "cancelled": cancelled_now,
             "seats_total": course.total_seats,
             # Active seats (paid + pending) — same definition as the
             # public counter in routes/courses.py.
@@ -171,6 +227,25 @@ def course_funnel_stats(db: Session, course: Course) -> dict:
             "by_company": [
                 {"company": c, "count": int(n)} for c, n in by_company
             ],
+        },
+        "cohort": {
+            "start": days[0] if days else course.start_date.isoformat(),
+            "end": days[-1] if days else course.start_date.isoformat(),
+            "days": len(days),
+            "price_cents": course.price_cents,
+            "currency": course.currency,
+        },
+        "history": {
+            "cohorts_run": len(cohorts),
+            "cohorts": cohorts,
+            "trained": len(past),
+            "paid_seats": len(paid_ever),
+            # Fees are only known where a payment recorded its amount
+            # (online payments); seats marked paid by hand carry none.
+            "fees_cents": sum(r.amount_cents or 0 for r in paid_ever),
+            "paid_without_amount": sum(1 for r in paid_ever if r.amount_cents is None),
+            "registrations": len(rows),
+            "cancelled": len(cancelled_rows),
         },
         "recorded": recorded,
     }

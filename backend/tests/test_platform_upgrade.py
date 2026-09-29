@@ -556,7 +556,7 @@ def test_stats_courses_shape_and_numbers(client):
     assert get_settings().COURSE_CODE in by_code  # legacy course listed too
 
     a = by_code[COURSE_A]
-    assert set(a) == {"code", "title", "start_date", "status", "live", "recorded"}
+    assert set(a) == {"code", "title", "start_date", "status", "live", "cohort", "history", "recorded"}
     assert a["title"] == COURSE_A_TITLE and a["start_date"] == "2027-03-01"
     live = a["live"]
     assert live["pending"] == 2 and live["paid"] == 0 and live["cancelled"] == 1

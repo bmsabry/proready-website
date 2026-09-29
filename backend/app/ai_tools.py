@@ -1334,7 +1334,7 @@ TOOL_SPECS = [
     ),
     _fn(
         "get_course_stats",
-        "Per-course stats: live funnel (pending/paid/cancelled, seats, registrations by day, top companies) plus the linked recorded product's revenue/enrollments (null when no recorded twin). Omit course_code for all courses.",
+        "Per-course stats. `live` is the CURRENT cohort only (the next or running delivery): pending/paid/cancelled seats, seats left, registrations by day, top companies — people who attended a previous cohort are NOT counted there. `cohort` gives the current cohort's dates and price. `history` is all-time: cohorts delivered (with dates and people trained), paid seats and fees recorded. `recorded` is the linked recorded product's revenue/enrollments (null when no recorded twin). Omit course_code for all courses.",
         {
             "type": "object",
             "properties": {"course_code": {"type": "string"}},

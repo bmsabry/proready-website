@@ -326,7 +326,7 @@ def test_get_course_stats_shape(db):
     out = ai_tools.get_course_stats(db, course_code=COURSE_X)
     assert out["ok"] is True and len(out["courses"]) == 1
     row = out["courses"][0]
-    assert set(row) == {"code", "title", "start_date", "status", "live", "recorded"}
+    assert set(row) == {"code", "title", "start_date", "status", "live", "cohort", "history", "recorded"}
     live = row["live"]
     assert set(live) == {
         "pending", "paid", "cancelled", "seats_total", "seats_taken", "by_day", "by_company",

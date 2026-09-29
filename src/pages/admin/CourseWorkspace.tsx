@@ -86,6 +86,7 @@ import {
 } from './ui';
 import CertificationTab from './CertificationTab';
 import { EmailRow, EmailViewer, useEmailViewer } from './EmailViewer';
+import { HistoryLine } from './CourseSummary';
 import PastCohortsTab from './PastCohortsTab';
 
 type Props = {
@@ -1901,7 +1902,7 @@ function StatsTab({ course, stats }: { course: Course; stats: CourseStats | null
 
         {/* Seats */}
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-          <p className="text-sm font-semibold text-slate-200 mb-3">Seats</p>
+          <p className="text-sm font-semibold text-slate-200 mb-3">Seats — current cohort</p>
           <SeatsBar
             paid={stats.live.paid}
             taken={stats.live.seats_taken}
@@ -1929,6 +1930,11 @@ function StatsTab({ course, stats }: { course: Course; stats: CourseStats | null
               {course.day_dates.length}-day cohort · {formatDay(course.day_dates[0])} →{' '}
               {formatDay(course.day_dates[course.day_dates.length - 1])}
             </p>
+          )}
+          {stats.history && (
+            <div className="mt-4 pt-3 border-t border-slate-800">
+              <HistoryLine s={stats} />
+            </div>
           )}
         </div>
       </div>

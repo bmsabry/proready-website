@@ -40,6 +40,7 @@ import {
   Section,
   StatusBadge,
 } from './ui';
+import { CurrentLine, HistoryLine } from './CourseSummary';
 
 type Props = {
   onAuthError: () => void;
@@ -156,20 +157,34 @@ export default function CoursesPage({ onAuthError, openCourse }: Props) {
                     </div>
                     <StatusBadge status={c.status} />
                   </div>
-                  <div className="text-xs text-slate-300 mb-3">
-                    Starts {formatDay(c.start_date)}
-                    {c.day_dates.length > 0 && (
-                      <span className="text-slate-400"> · {c.day_dates.length} days</span>
-                    )}
-                  </div>
+                  {/* Line 1: the current offering. Line 2: all time. */}
+                  {s ? (
+                    <div className="mt-2 mb-2">
+                      <CurrentLine s={s} />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-xs text-slate-300 mb-3">
+                        Starts {formatDay(c.start_date)}
+                        {c.day_dates.length > 0 && (
+                          <span className="text-slate-400"> · {c.day_dates.length} days</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-300 mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="text-emerald-300">{c.seats_paid} paid</span>
+                        <span className="text-slate-500">·</span>
+                        <span className="text-amber-300">{pending} pending</span>
+                        <span className="text-slate-500">·</span>
+                        <span>{c.seats_remaining} seats remaining</span>
+                      </div>
+                    </>
+                  )}
                   <SeatsBar paid={c.seats_paid} taken={c.seats_taken} total={c.total_seats} />
-                  <div className="text-xs text-slate-300 mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className="text-emerald-300">{c.seats_paid} paid</span>
-                    <span className="text-slate-500">·</span>
-                    <span className="text-amber-300">{pending} pending</span>
-                    <span className="text-slate-500">·</span>
-                    <span>{c.seats_remaining} seats remaining</span>
-                  </div>
+                  {s && (
+                    <div className="mt-3">
+                      <HistoryLine s={s} />
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs mt-3 pt-3 border-t border-slate-800">
                     <span className="text-slate-300">
                       {c.price_cents > 0 ? (
@@ -185,10 +200,7 @@ export default function CoursesPage({ onAuthError, openCourse }: Props) {
                     </span>
                     {c.recorded_product_code ? (
                       <span className="text-cyan-300">
-                        Recorded: {c.recorded_product_code}
-                        {s?.recorded && (
-                          <> · {money(s.recorded.revenue_cents_total)} · {s.recorded.active_enrollments} learners</>
-                        )}
+                        Recorded course: {c.recorded_product_code}
                       </span>
                     ) : (
                       <span className="text-slate-500">No recorded product linked</span>

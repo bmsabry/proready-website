@@ -9,15 +9,16 @@ import {
   Clock,
   CreditCard,
   Download,
+  GraduationCap,
   LayoutDashboard,
   Mail,
   Sparkles,
+  Users,
 } from 'lucide-react';
 import {
   api,
   reportError,
   formatDate,
-  formatDay,
   fmtInt,
   money,
   type AuditRow,
@@ -28,6 +29,7 @@ import {
 } from './lib';
 import { Kpi, Notice, RefreshButton, SeatsBar, Section, StatusBadge } from './ui';
 import { EmailRow, EmailViewer, useEmailViewer } from './EmailViewer';
+import { CurrentLine, HistoryLine } from './CourseSummary';
 
 type Props = {
   onAuthError: () => void;
@@ -70,10 +72,13 @@ export default function OverviewPage({ onAuthError, go }: Props) {
   const emailViewer = useEmailViewer(emails ?? []);
 
   const totals = useMemo(() => {
-    const t = { pending: 0, paid: 0, revTotal: 0, rev30: 0, dlTotal: 0, dl7: 0 };
+    const t = { pending: 0, paid: 0, left: 0, trained: 0, revTotal: 0, rev30: 0, dlTotal: 0, dl7: 0 };
     for (const c of courses ?? []) {
+      // Current cohorts only (live), and history kept apart.
       t.pending += c.live.pending;
       t.paid += c.live.paid;
+      t.left += Math.max(0, c.live.seats_total - c.live.seats_taken);
+      t.trained += c.history?.trained ?? 0;
       if (c.recorded) {
         t.revTotal += c.recorded.revenue_cents_total;
         t.rev30 += c.recorded.revenue_cents_30d;
@@ -99,45 +104,45 @@ export default function OverviewPage({ onAuthError, go }: Props) {
         {/* Cross-platform KPI row */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-8">
           <Kpi
-            icon={<Clock className="w-4 h-4" />}
-            label="Live pending"
-            value={courses ? fmtInt(totals.pending) : '—'}
-            sub="across all cohorts"
-            accent="amber"
-          />
-          <Kpi
             icon={<CheckCircle2 className="w-4 h-4" />}
-            label="Live paid"
+            label="Paid seats"
             value={courses ? fmtInt(totals.paid) : '—'}
-            sub="across all cohorts"
+            sub="current cohorts"
             accent="emerald"
           />
           <Kpi
-            icon={<CreditCard className="w-4 h-4" />}
-            label="Recorded 30d"
-            value={courses ? money(totals.rev30) : '—'}
-            sub="revenue, linked products"
+            icon={<Clock className="w-4 h-4" />}
+            label="Pending"
+            value={courses ? fmtInt(totals.pending) : '—'}
+            sub="current cohorts"
+            accent="amber"
+          />
+          <Kpi
+            icon={<Users className="w-4 h-4" />}
+            label="Seats left"
+            value={courses ? fmtInt(totals.left) : '—'}
+            sub="current cohorts"
             accent="cyan"
           />
           <Kpi
+            icon={<GraduationCap className="w-4 h-4" />}
+            label="Trained"
+            value={courses ? fmtInt(totals.trained) : '—'}
+            sub="all cohorts, all time"
+            accent="slate"
+          />
+          <Kpi
             icon={<CreditCard className="w-4 h-4" />}
-            label="Recorded total"
+            label="Recorded sales"
             value={courses ? money(totals.revTotal) : '—'}
-            sub="revenue, all time"
-            accent="cyan"
+            sub={courses ? `all time · ${money(totals.rev30)} in 30 days` : 'all time'}
+            accent="slate"
           />
           <Kpi
             icon={<Download className="w-4 h-4" />}
-            label="Downloads 7d"
-            value={software ? fmtInt(totals.dl7) : '—'}
-            sub="all software"
-            accent="cyan"
-          />
-          <Kpi
-            icon={<Download className="w-4 h-4" />}
-            label="Downloads total"
+            label="Downloads"
             value={software ? fmtInt(totals.dlTotal) : '—'}
-            sub="all software"
+            sub={software ? `all time · ${fmtInt(totals.dl7)} in 7 days` : 'all time'}
             accent="slate"
           />
         </div>
@@ -166,24 +171,15 @@ export default function OverviewPage({ onAuthError, go }: Props) {
                   <span className="text-[11px] font-mono text-slate-400 truncate">{c.code}</span>
                   <StatusBadge status={c.status} />
                 </div>
-                <div className="text-white font-semibold truncate">{c.title}</div>
-                <div className="text-xs text-slate-300 mt-0.5 mb-3">
-                  Starts {formatDay(c.start_date)}
+                <div className="text-white font-semibold mb-3 break-words">{c.title}</div>
+                {/* Line 1: the current offering. Line 2: all time. */}
+                <CurrentLine s={c} />
+                <div className="mt-2 mb-3">
+                  <SeatsBar paid={c.live.paid} taken={c.live.seats_taken} total={c.live.seats_total} />
                 </div>
-                <SeatsBar paid={c.live.paid} taken={c.live.seats_taken} total={c.live.seats_total} />
-                <div className="text-xs text-slate-300 mt-2 flex flex-wrap gap-x-2 gap-y-0.5">
-                  <span className="text-emerald-300">{c.live.paid} paid</span>
-                  <span className="text-slate-500">·</span>
-                  <span className="text-amber-300">{c.live.pending} pending</span>
-                  <span className="text-slate-500">·</span>
-                  <span>{Math.max(0, c.live.seats_total - c.live.seats_taken)} seats left</span>
+                <div className="pt-2 border-t border-slate-800">
+                  <HistoryLine s={c} />
                 </div>
-                {c.recorded && (
-                  <div className="text-xs text-cyan-300 mt-2">
-                    {money(c.recorded.revenue_cents_total)} recorded revenue ·{' '}
-                    {c.recorded.active_enrollments} learners
-                  </div>
-                )}
               </button>
             ))}
           </div>

@@ -175,6 +175,25 @@ export type CourseStats = {
     by_day: { date: string; count: number }[];
     by_company: { company: string; count: number }[];
   };
+  /** The current cohort's dates (live = the current cohort's seats). */
+  cohort: {
+    start: string;
+    end: string;
+    days: number;
+    price_cents: number;
+    currency: string;
+  };
+  /** All time: cohorts delivered, people trained, paid seats, fees recorded. */
+  history: {
+    cohorts_run: number;
+    cohorts: { start: string | null; end: string | null; trained: number }[];
+    trained: number;
+    paid_seats: number;
+    fees_cents: number;
+    paid_without_amount: number;
+    registrations: number;
+    cancelled: number;
+  };
   recorded: RecordedStats | null;
 };
 
