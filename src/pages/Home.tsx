@@ -256,7 +256,7 @@ const Home = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
             <StatCounter value={100} suffix="+" label="Years Combined Experience" />
             <StatCounter value={12} suffix="+" label="Sample Case Studies" />
-            <StatCounter value={31} label="Expert Testimonials" />
+            <StatCounter value={34} label="Expert Testimonials" />
             <StatCounter value={7} label="Senior Experts" />
           </div>
         </div>
