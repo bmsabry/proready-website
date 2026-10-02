@@ -35,6 +35,7 @@ from datetime import datetime, timedelta, timezone
 from html import escape as html_escape
 from typing import Any, Optional
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 import httpx
 from sqlalchemy import desc, func, select
@@ -43,6 +44,7 @@ from sqlalchemy.orm import Session
 from .config import get_settings
 from .crypto import CryptoNotConfigured, decrypt
 from .emailer import send_email
+from .local_times import INSTRUCTOR_ZONE
 from .models import (
     AICallLog,
     AISettings,
@@ -420,8 +422,58 @@ def _wrap_email_html(ticket: SupportTicket, inner: str) -> str:
     )
 
 
+def _message_text(m: SupportTicketMessage) -> str:
+    return (m.body_text or _html_to_text(m.body_html or "")).strip()
+
+
+def latest_customer_text(ticket: SupportTicket, messages: list[SupportTicketMessage]) -> str:
+    """What the customer said most recently — the thing to read and answer.
+
+    ticket.body is only the FIRST message. On a conversation that has gone
+    back and forth it is the wrong thing to show, to alert on, or to answer.
+    """
+    for m in reversed(messages):
+        if m.sender_kind == "customer":
+            text = _message_text(m)
+            if text:
+                return text
+    return (ticket.body or "").strip()
+
+
+def _ticket_messages(db: Session, ticket: SupportTicket) -> list[SupportTicketMessage]:
+    return list(
+        db.execute(
+            select(SupportTicketMessage)
+            .where(SupportTicketMessage.ticket_id == ticket.id)
+            .order_by(SupportTicketMessage.created_at, SupportTicketMessage.id)
+        )
+        .scalars()
+        .all()
+    )
+
+
+def _owner_time(dt: datetime, with_time: bool = True) -> str:
+    """A time as the owner reads it: US Eastern, where he works."""
+    local = _aware(dt).astimezone(ZoneInfo(INSTRUCTOR_ZONE))
+    day = f"{local.strftime('%b')} {local.day}, {local.year}"
+    if not with_time:
+        return day
+    hour = local.hour % 12 or 12
+    return f"{day}, {hour}:{local.strftime('%M')} {'AM' if local.hour < 12 else 'PM'} ET"
+
+
+# How much of the latest message the alert carries — enough to read it there.
+ALERT_LATEST_CHARS = 4000
+ALERT_EARLIER_CHARS = 500
+
+
 def notify_admin(db: Session, ticket: SupportTicket, reason: str) -> None:
-    """Tell Bassam a ticket needs him. Never raises — this is a courtesy."""
+    """Tell Bassam a ticket needs him. Never raises — this is a courtesy.
+
+    The alert shows the customer's LATEST message in full (not the one that
+    opened the ticket), and when the conversation has history, the last
+    couple of messages before it, so the alert can be read on its own.
+    """
     settings = get_settings()
     to = (settings.ADMIN_NOTIFY_EMAIL or "").strip()
     if not to:
@@ -431,7 +483,51 @@ def notify_admin(db: Session, ticket: SupportTicket, reason: str) -> None:
         # admin inbox, and a form field must not be able to put links or
         # markup in it.
         e = html_escape
-        preview = (ticket.body or "")[:600]
+        messages = [m for m in _ticket_messages(db, ticket) if m.sender_kind != "note"]
+        customer_msgs = [m for m in messages if m.sender_kind == "customer"]
+        latest_msg = customer_msgs[-1] if customer_msgs else None
+        latest = latest_customer_text(ticket, messages)
+        follow_up = len(customer_msgs) > 1
+        name = (ticket.submitter_name or ticket.submitter_email or "The customer").strip()
+
+        shown = latest[:ALERT_LATEST_CHARS]
+        more = (
+            "<p style='font-size:12px;color:#64748b'>… the message continues in the admin panel.</p>"
+            if len(latest) > ALERT_LATEST_CHARS
+            else ""
+        )
+        when = (
+            _owner_time(latest_msg.created_at)
+            if latest_msg is not None and latest_msg.created_at
+            else ""
+        )
+        heading = (
+            f"Latest message from {e(name)}" + (f" · {when}" if when else "")
+            if follow_up
+            else f"Message from {e(name)}"
+        )
+
+        earlier_html = ""
+        if follow_up and latest_msg is not None:
+            before = [m for m in messages if m.id != latest_msg.id and m.id < latest_msg.id][-2:]
+            if before:
+                who = {"customer": name, "ai": "Automatic reply", "admin": "You"}
+                items = "".join(
+                    "<div style='margin:0 0 10px'>"
+                    f"<div style='font-size:12px;color:#64748b'>{e(who.get(m.sender_kind, m.sender_kind))}"
+                    + (f" · {_owner_time(m.created_at)}" if m.created_at else "")
+                    + "</div>"
+                    "<div style='white-space:pre-wrap;font-size:13px;color:#475569'>"
+                    f"{e(_message_text(m)[:ALERT_EARLIER_CHARS])}"
+                    f"{'…' if len(_message_text(m)) > ALERT_EARLIER_CHARS else ''}</div></div>"
+                    for m in before
+                )
+                earlier_html = (
+                    "<p style='margin:18px 0 6px;font-size:13px;color:#334155'><strong>"
+                    "Earlier in this conversation</strong></p>"
+                    f"<div style='border-left:3px solid #e2e8f0;padding-left:10px'>{items}</div>"
+                )
+
         html = (
             f"<p><strong>{e(reason)}</strong></p>"
             f"<table style='font-family:sans-serif;font-size:14px;border-collapse:collapse'>"
@@ -442,14 +538,24 @@ def notify_admin(db: Session, ticket: SupportTicket, reason: str) -> None:
             f"<tr><td style='padding:3px 12px 3px 0'><strong>Category</strong></td>"
             f"<td>{e(CATEGORY_LABEL.get(ticket.category, ticket.category))} (P{ticket.priority})</td></tr>"
             f"</table>"
+            f"<p style='margin:16px 0 6px;font-size:13px;color:#0f172a'><strong>{heading}</strong></p>"
             f"<pre style='white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;"
-            f"padding:10px;border-radius:6px;font-size:13px'>{e(preview)}</pre>"
-            f"<p><a href='{settings.SITE_URL}/admin#support/{ticket.ref}'>Open and reply in the admin panel</a> "
-            f"— it is listed under <strong>Needs your reply</strong> until you answer.</p>"
+            f"padding:10px;border-radius:6px;font-size:13px;margin:0'>{e(shown)}</pre>"
+            f"{more}"
+            f"{earlier_html}"
+            f"<p style='margin-top:18px'><a href='{settings.SITE_URL}/admin#support/{ticket.ref}'>"
+            f"Open and reply in the admin panel</a> "
+            f"— it is listed under <strong>Needs your reply</strong> until you answer. "
+            f"<span style='color:#64748b'>Replying to this email does not reach the customer.</span></p>"
+        )
+        subject = (
+            f"[Support #{ticket.ref}] {name} replied: {ticket.subject}"
+            if follow_up
+            else f"[Support #{ticket.ref}] {ticket.subject}"
         )
         send_email(
             to=to,
-            subject=f"[Support #{ticket.ref}] {ticket.subject}",
+            subject=subject,
             html=html,
             db=db,
             scope_kind="support",
@@ -1126,10 +1232,14 @@ def classify_ticket(
     """
     ctx = customer_context(db, ticket.submitter_email)
     plat = platform_context(db)
+    # The customer's newest message is what needs answering — on a reply,
+    # ticket.body is only how the conversation started.
+    latest = latest_customer_text(ticket, messages)
 
     user_prompt = (
         f"SUBJECT (may be misleading): {ticket.subject}\n\n"
-        f"MESSAGE BODY (classify from this):\n{ticket.body or '(empty)'}\n\n"
+        f"MESSAGE BODY — the customer's latest message (classify and answer this):\n"
+        f"{latest or '(empty)'}\n\n"
         f"ACCOUNT CONTEXT for {ticket.submitter_email}:\n"
         f"{json.dumps(ctx, indent=2, default=str)}\n\n"
         f"PLATFORM CONTEXT (authoritative for dates, seats, prices):\n"
@@ -1155,7 +1265,7 @@ def classify_ticket(
         why=why,
     )
     if raw is None:
-        return _fallback_classification(ticket, error=why[-1] if why else "")
+        return _fallback_classification(ticket, error=why[-1] if why else "", latest=latest)
 
     return _sanitize_classification(raw, ticket)
 
@@ -1245,22 +1355,25 @@ def guess_category(subject: str, body: str) -> str:
     return "general"
 
 
-def _fallback_classification(ticket: SupportTicket, error: str = "") -> dict[str, Any]:
+def _fallback_classification(
+    ticket: SupportTicket, error: str = "", latest: str = ""
+) -> dict[str, Any]:
     """What we do when the model is unavailable: acknowledge and escalate.
 
     The category comes from the form, else what the ticket already had,
     else a keyword guess — so a training enquiry still reads as Business
     in the inbox rather than General P9. The summary is the start of the
-    message itself, which is more use in the list than "triage failed".
+    customer's latest message, which is more use in the list than "triage
+    failed".
     """
     name = (ticket.submitter_name or "").strip().split(" ")[0]
     greeting = f"<p>Hi {name},</p>" if name else "<p>Hello,</p>"
     cat = (
         FORM_KINDS.get(str((ticket.meta or {}).get("kind") or ""))
         or (ticket.category if ticket.category not in ("", None, "general") else "")
-        or guess_category(ticket.subject, ticket.body)
+        or guess_category(ticket.subject, f"{ticket.body or ''}\n{latest}")
     )
-    snippet = " ".join((ticket.body or "").split())
+    snippet = " ".join((latest or ticket.body or "").split())
     if len(snippet) > 160:
         snippet = snippet[:157].rstrip() + "…"
     return {

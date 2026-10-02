@@ -2691,3 +2691,109 @@ def test_the_newest_outcome_wins_both_ways(client, db, live_model):
     live_model(_model_says({"reply_html": "<p>Hi</p>", "needs_from_admin": [], "suggested_status": "resolved"}))
     assert client.post(f"/api/admin/support/tickets/{ref}/draft", json={"instruction": ""}, headers=AUTH).status_code == 200
     assert _stats(client)["ai"]["state"] == "ok"
+
+
+# The owner's alert for Zaur's reply showed the message that OPENED the ticket
+# two days earlier, not what Zaur had just written. Alerts, the AI and the
+# inbox line all read the customer's latest message now.
+
+
+def _admin_alerts(captured_mail):
+    return [m for m in captured_mail if m.get("audience") == "admin"]
+
+
+def test_a_reply_alert_shows_the_latest_message_with_its_context(client, db, monkeypatch, captured_mail):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"name": "Zaur Asadov", "email": "zaur.alert@example.com", "subject": "Consulting Services enquiry",
+              "message": "FIRST: Hello, we are interested in DLE training."},
+    ).json()["ref"]
+    client.post(
+        f"/api/admin/support/tickets/{ref}/reply",
+        json={"body_html": "<p>YOUR REPLY: Thanks Zaur, here are the details.</p>"},
+        headers=AUTH,
+    )
+    captured_mail.clear()
+    _inbound(
+        client,
+        from_="Zaur Asadov <zaur.alert@example.com>",
+        subject=f"Re: Consulting Services enquiry [#{ref}]",
+        text="LATEST: Will there be a certificate? Could I get a catalog?\n\nOn Mon, Support wrote:\n> old quoted text",
+        message_id="<zaur-latest@mail.example>",
+    )
+    alerts = _admin_alerts(captured_mail)
+    assert len(alerts) == 1
+    html = alerts[0]["html"]
+    assert "LATEST: Will there be a certificate?" in html
+    assert "Latest message from Zaur Asadov" in html
+    # The latest comes first; the history is labelled, below it.
+    assert html.index("LATEST:") < html.index("Earlier in this conversation")
+    assert "YOUR REPLY" in html.split("Earlier in this conversation")[1]
+    assert "old quoted text" not in html, "the quoted history in the email is not repeated"
+    assert alerts[0]["subject"] == f"[Support #{ref}] Zaur Asadov replied: Consulting Services enquiry"
+
+
+def test_a_reply_on_an_escalated_ticket_alerts_with_the_new_words(client, db, monkeypatch, captured_mail):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"name": "Ana", "email": "ana.alert@example.com", "subject": "Refund",
+              "message": "ORIGINAL: please refund my seat."},
+    ).json()["ref"]
+    captured_mail.clear()
+    _inbound(client, from_="ana.alert@example.com", subject=f"Re: Refund [#{ref}]",
+             text="NEWEST: any update on this?", message_id="<ana-chase@mail.example>")
+    html = _admin_alerts(captured_mail)[-1]["html"]
+    latest_block = html.split("Earlier in this conversation")[0]
+    assert "NEWEST: any update on this?" in latest_block
+    assert "ORIGINAL" not in latest_block
+
+
+def test_a_first_message_alert_is_unchanged_in_shape(client, db, monkeypatch, captured_mail):
+    fake_llm(monkeypatch, None)
+    ref = client.post(
+        "/api/support/contact",
+        json={"name": "Lee", "email": "lee.alert@example.com", "subject": "Dates", "message": "When is the next cohort?"},
+    ).json()["ref"]
+    alert = _admin_alerts(captured_mail)[-1]
+    assert alert["subject"] == f"[Support #{ref}] Dates"
+    assert "Message from Lee" in alert["html"] and "Earlier in this conversation" not in alert["html"]
+    assert "When is the next cohort?" in alert["html"]
+    assert "Replying to this email does not reach the customer" in alert["html"]
+
+
+def test_the_ai_reads_and_answers_the_latest_message(client, db, monkeypatch):
+    prompts = []
+
+    def model(db, messages, **kw):
+        prompts.append(messages[-1]["content"])
+        return {"category": "course_info", "priority": 6, "is_spam": False, "confidence": 0.95,
+                "summary": "s", "reply_html": "<p>a</p>", "can_auto_resolve": True, "escalation_reason": ""}
+
+    monkeypatch.setattr(svc, "_call_support_llm", model)
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "ai.latest@example.com", "subject": "Course", "message": "OPENING question about length"},
+    ).json()["ref"]
+    _inbound(client, from_="ai.latest@example.com", subject=f"Re: Course [#{ref}]",
+             text="FOLLOW-UP: is it recorded?", message_id="<ai-latest@mail.example>")
+    body = prompts[-1].split("ACCOUNT CONTEXT")[0]
+    assert "FOLLOW-UP: is it recorded?" in body and "OPENING" not in body
+    assert "OPENING question" in prompts[-1], "the earlier message is still there as conversation"
+
+
+def test_with_the_ai_down_the_inbox_line_shows_the_latest_message(client, db, monkeypatch):
+    fake_llm(monkeypatch, {"category": "course_info", "priority": 6, "is_spam": False, "confidence": 0.95,
+                           "summary": "s", "reply_html": "<p>a</p>", "can_auto_resolve": True,
+                           "escalation_reason": ""})
+    ref = client.post(
+        "/api/support/contact",
+        json={"email": "down.latest@example.com", "subject": "Course", "message": "OPENING words"},
+    ).json()["ref"]
+    fake_llm(monkeypatch, None)
+    _inbound(client, from_="down.latest@example.com", subject=f"Re: Course [#{ref}]",
+             text="NEWER words from the customer", message_id="<down-latest@mail.example>")
+    row = next(i for i in client.get("/api/admin/support/tickets?status_filter=inbox", headers=AUTH).json()["items"]
+               if i["ref"] == ref)
+    assert row["summary"].startswith("NEWER words")
