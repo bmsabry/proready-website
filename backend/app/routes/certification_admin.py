@@ -3,6 +3,9 @@
   GET  /api/admin/academy/certification/{product_code}          overview
   POST /api/admin/academy/certification/{product_code}/exam-items load the
                                                                   written bank
+  POST /api/admin/academy/certification/{product_code}/invite-examined
+                                                                  tell finishers
+                                                                  the tier is open
   GET  /api/admin/academy/certification/{product_code}/sample.pdf preview
   POST /api/admin/academy/certification/signature               upload PNG
   POST /api/admin/academy/certification/comp                    comp a candidate
@@ -23,7 +26,7 @@ from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from .. import academy as svc
@@ -168,6 +171,49 @@ def load_exam_items(
     n = len(adv.exam_items(db, product_code))
     log.info("Advanced exam bank loaded for %s: %d items", product_code, n)
     return {"ok": True, "product_code": product_code, "items_total": n}
+
+
+class InviteIn(BaseModel):
+    emails: list[EmailStr] = Field(min_length=1, max_length=200)
+    dry_run: bool = True
+
+
+@router.post("/{product_code}/invite-examined")
+def invite_examined(
+    product_code: str,
+    body: InviteIn,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin),
+) -> dict:
+    """Email named finishers that the examined tier is open on this course.
+
+    For learners whose Certificate of Completion was issued before the tier
+    opened: their completion email could only offer to request it. Each
+    address must be able to register today (adv.eligibility — access, an
+    issued completion certificate, no verified certificate, no examination in
+    progress); anything else is reported with the reason and not sent.
+    `dry_run` (the default) only lists who would receive it."""
+    product = _product(db, product_code)
+    if not (adv.offered(db, product) and (product.advanced_cert_price_cents or 0) > 0):
+        raise HTTPException(status_code=409, detail="The examined tier is not open on this course.")
+    results = []
+    for email in dict.fromkeys(e.strip().lower() for e in body.emails):
+        learner = db.execute(
+            select(Learner).where(func.lower(Learner.email) == email).order_by(Learner.id)
+        ).scalars().first()
+        if learner is None:
+            results.append({"email": email, "sent": False, "reason": "no learner with this email"})
+            continue
+        ok, why = adv.eligibility(db, learner, product)
+        if not ok:
+            results.append({"email": email, "sent": False, "reason": why})
+            continue
+        if body.dry_run:
+            results.append({"email": email, "sent": False, "reason": "dry run: would send"})
+            continue
+        sent = certs.email_examined_invitation(db, learner, product)
+        results.append({"email": email, "sent": bool(sent), "reason": "" if sent else "send failed"})
+    return {"product_code": product_code, "dry_run": body.dry_run, "results": results}
 
 
 # -----------------------------------------------------------------------------
