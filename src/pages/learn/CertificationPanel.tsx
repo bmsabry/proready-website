@@ -18,6 +18,7 @@ import {
   ApiError,
   certificateFileUrl,
   CertificationStatus,
+  CompetencyScore,
   IssuedCertificate,
 } from '../../lib/academyApi';
 
@@ -279,6 +280,35 @@ const SlotsForm = ({
     </form>
   );
 };
+
+/* The per-competency result of the written examination. The candidate sees it
+ * once the journey has an outcome; the instructor sees the same breakdown in
+ * the admin panel before the oral examination. */
+const CompetencyBreakdown = ({ rows }: { rows: CompetencyScore[] }) => (
+  <div className="mt-4">
+    <div className="text-xs uppercase tracking-wider text-slate-400">
+      Your written examination, competency by competency
+    </div>
+    <ul className="mt-2 space-y-2">
+      {rows.map((r) => (
+        <li key={r.id}>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-sm text-slate-200">{r.label}</span>
+            <span className="text-xs font-mono text-slate-300 shrink-0">
+              {r.correct}/{r.total} · {r.pct}%
+            </span>
+          </div>
+          <div className="mt-1 h-1.5 rounded-full bg-slate-700/60 overflow-hidden">
+            <div
+              className={`h-full rounded-full ${r.pct >= 80 ? 'bg-emerald-400' : r.pct >= 60 ? 'bg-amber-400' : 'bg-rose-400'}`}
+              style={{ width: `${Math.max(2, Math.min(100, r.pct))}%` }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
 
 const Step = ({
   n,
@@ -674,6 +704,9 @@ const CertificationPanel: React.FC<{
                   )}
                   {state && state.status === 'cancelled' && (
                     <p className="mt-3 text-sm text-slate-300">This examination was cancelled.</p>
+                  )}
+                  {state && state.exam_breakdown.length > 0 && (
+                    <CompetencyBreakdown rows={state.exam_breakdown} />
                   )}
                 </>
               )}
