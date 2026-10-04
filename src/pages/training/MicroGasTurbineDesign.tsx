@@ -110,7 +110,7 @@ const INCLUDED: { icon: React.ElementType; title: string; body: string }[] = [
   {
     icon: Sparkles,
     title: 'Two interactive tools',
-    body: 'A rotor training lab and a radial-compressor optimisation simulator you can run against your own numbers.',
+    body: 'A rotor training lab for Campbell diagrams and disc stresses, and a radial-compressor optimisation lab that walks through a redesign driven by CFD and a genetic algorithm.',
   },
   {
     icon: GraduationCap,
