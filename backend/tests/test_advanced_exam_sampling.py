@@ -73,6 +73,20 @@ def test_bank_is_two_hundred_questions():
     db.close()
 
 
+def test_the_completion_email_offer_quotes_one_paper_not_the_bank():
+    """The invitation in the completion email states how many questions the
+    candidate will sit, which is one drawn paper, not the size of the bank."""
+    from app import certificates as certs
+
+    db = SessionLocal()
+    learner = db.query(Learner).filter(Learner.email == "sampling.candidate@example.com").one()
+    offer = certs.examined_tier_offer(db, learner, db.get(Product, CODE))
+    assert offer is not None and offer["bookable"] is True
+    assert offer["exam_item_count"] == 100
+    assert len(adv.exam_items(db, CODE)) == 200
+    db.close()
+
+
 def test_a_paper_is_one_hundred_balanced_across_the_competencies():
     db = SessionLocal()
     learner = db.query(Learner).filter(Learner.email == "sampling.candidate@example.com").one()
