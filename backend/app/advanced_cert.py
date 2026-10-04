@@ -164,7 +164,9 @@ def exam_open(row: AdvancedCertification | None) -> bool:
     return row is not None and row.status == "purchased"
 
 
-def _balanced_draw(items: list[QuizItem], target: int) -> list[QuizItem]:
+def _balanced_draw(
+    items: list[QuizItem], target: int, avoid: frozenset[str] | set[str] = frozenset()
+) -> list[QuizItem]:
     """Draw `target` items, spread across the competencies the bank is tagged with.
 
     Items carry the competency in `outcome_id`, so every paper has the same
@@ -172,6 +174,11 @@ def _balanced_draw(items: list[QuizItem], target: int) -> list[QuizItem]:
     comparable with the next, which is what the instructor reads before the
     oral examination. Seats are allocated by largest remainder, so a competency
     with a bigger share of the bank gets a bigger share of the paper.
+
+    Within each competency the questions in `avoid` (those the candidate has
+    already sat) are drawn only when there are not enough unseen ones, so with
+    a bank twice the size of the paper a retake shares no question with the
+    first paper.
     """
     if target <= 0 or target >= len(items):
         return list(items)
@@ -187,9 +194,29 @@ def _balanced_draw(items: list[QuizItem], target: int) -> list[QuizItem]:
     rng = random.SystemRandom()
     drawn: list[QuizItem] = []
     for g, members in groups.items():
-        drawn.extend(rng.sample(members, min(seats.get(g, 0), len(members))))
+        want = min(seats.get(g, 0), len(members))
+        fresh = [m for m in members if m.code not in avoid]
+        if len(fresh) >= want:
+            drawn.extend(rng.sample(fresh, want))
+        else:
+            seen = [m for m in members if m.code in avoid]
+            drawn.extend(fresh + rng.sample(seen, want - len(fresh)))
     drawn.sort(key=lambda i: i.position)
     return drawn
+
+
+def _codes_already_sat(db: Session, learner_id: int, product_code: str) -> set[str]:
+    """Every question this candidate was served on a paper already handed in."""
+    seen: set[str] = set()
+    for responses in db.execute(
+        select(QuizAttempt.responses).where(
+            QuizAttempt.learner_id == learner_id,
+            QuizAttempt.product_code == product_code,
+            QuizAttempt.item_set == "advanced",
+        )
+    ).scalars():
+        seen.update((responses or {}).keys())
+    return seen
 
 
 def served_items(db: Session, product_code: str, row: AdvancedCertification) -> list[QuizItem]:
@@ -202,7 +229,10 @@ def served_items(db: Session, product_code: str, row: AdvancedCertification) -> 
             return kept
         # The bank was edited under an open paper; draw a fresh one rather than
         # grading the candidate on questions that no longer exist.
-    drawn = _balanced_draw(pool, get_settings().ADVANCED_EXAM_SERVE_COUNT)
+    drawn = _balanced_draw(
+        pool, get_settings().ADVANCED_EXAM_SERVE_COUNT,
+        avoid=_codes_already_sat(db, row.learner_id, product_code),
+    )
     row.exam_item_codes = [i.code for i in drawn]
     db.commit()
     return drawn
