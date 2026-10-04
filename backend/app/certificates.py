@@ -33,7 +33,13 @@ from . import academy as svc
 from . import certificate_signing as signing
 from .certificate_render import CertificateSpec, Instructor, render_certificate
 from .config import get_settings
-from .emailer import certificate_issued_html, first_name, send_email, sender_as
+from .emailer import (
+    certificate_issued_html,
+    examined_tier_invitation_html,
+    first_name,
+    send_email,
+    sender_as,
+)
 from .models import AssetBlob, Certificate, Learner, Lesson, Module, Product
 
 log = logging.getLogger(__name__)
@@ -492,6 +498,34 @@ def email_certificate(db: Session, cert: Certificate, learner: Learner, product:
     if ok:
         cert.email_sent_at = datetime.now(timezone.utc)
         db.commit()
+
+
+def email_examined_invitation(db: Session, learner: Learner, product: Product) -> bool:
+    """Tell a finisher that the examined tier is now open on their course —
+    sent under the instructor's name with him on cc, like the certificate.
+    Sends nothing (False) unless the course can take the registration today."""
+    settings = get_settings()
+    offer = examined_tier_offer(db, learner, product)
+    if not offer or not offer.get("bookable"):
+        return False
+    return send_email(
+        to=learner.email,
+        subject=f"Your Certificate of Verified Competency examination is open — {product.title}",
+        html=examined_tier_invitation_html(
+            learner.full_name or "",
+            product.title,
+            offer,
+            instructor_name=settings.INSTRUCTOR_NAME,
+            instructor_credentials=settings.INSTRUCTOR_CREDENTIALS,
+            instructor_title=settings.INSTRUCTOR_TITLE,
+        ),
+        from_override=sender_as(settings.INSTRUCTOR_NAME, mailbox=settings.INSTRUCTOR_MAILBOX),
+        cc=settings.ADMIN_NOTIFY_EMAIL or None,
+        db=db,
+        scope_kind="product",
+        scope_code=product.code,
+        template="examined_invitation",
+    )
 
 
 def maybe_issue_completion(db: Session, learner: Learner, product_code: str) -> Certificate | None:
