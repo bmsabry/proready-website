@@ -18,6 +18,8 @@ Invariants that matter:
 from __future__ import annotations
 
 import logging
+import random
+import re
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -162,11 +164,117 @@ def exam_open(row: AdvancedCertification | None) -> bool:
     return row is not None and row.status == "purchased"
 
 
+def _balanced_draw(items: list[QuizItem], target: int) -> list[QuizItem]:
+    """Draw `target` items, spread across the competencies the bank is tagged with.
+
+    Items carry the competency in `outcome_id`, so every paper has the same
+    number from each one: the per-competency score of one attempt is then
+    comparable with the next, which is what the instructor reads before the
+    oral examination. Seats are allocated by largest remainder, so a competency
+    with a bigger share of the bank gets a bigger share of the paper.
+    """
+    if target <= 0 or target >= len(items):
+        return list(items)
+    groups: dict[str, list[QuizItem]] = {}
+    for it in items:
+        groups.setdefault(it.outcome_id or "", []).append(it)
+    total = len(items)
+    exact = {g: len(v) * target / total for g, v in groups.items()}
+    seats = {g: int(q) for g, q in exact.items()}
+    short = target - sum(seats.values())
+    for g in sorted(exact, key=lambda k: (exact[k] - seats[k], len(groups[k])), reverse=True)[:short]:
+        seats[g] += 1
+    rng = random.SystemRandom()
+    drawn: list[QuizItem] = []
+    for g, members in groups.items():
+        drawn.extend(rng.sample(members, min(seats.get(g, 0), len(members))))
+    drawn.sort(key=lambda i: i.position)
+    return drawn
+
+
+def served_items(db: Session, product_code: str, row: AdvancedCertification) -> list[QuizItem]:
+    """The paper for the attempt that is open, drawing one if there is none yet."""
+    pool = exam_items(db, product_code)
+    if row.exam_item_codes:
+        by_code = {i.code: i for i in pool}
+        kept = [by_code[c] for c in row.exam_item_codes if c in by_code]
+        if len(kept) == len(row.exam_item_codes):
+            return kept
+        # The bank was edited under an open paper; draw a fresh one rather than
+        # grading the candidate on questions that no longer exist.
+    drawn = _balanced_draw(pool, get_settings().ADVANCED_EXAM_SERVE_COUNT)
+    row.exam_item_codes = [i.code for i in drawn]
+    db.commit()
+    return drawn
+
+
+def serve_count(db: Session, product_code: str) -> int:
+    return min(get_settings().ADVANCED_EXAM_SERVE_COUNT, len(exam_items(db, product_code))) or 0
+
+
+_COMPETENCY_CODE = re.compile(r"^C(\d+)$")
+
+
+def best_attempt(db: Session, learner_id: int, product_code: str) -> QuizAttempt | None:
+    return db.execute(
+        select(QuizAttempt)
+        .where(
+            QuizAttempt.learner_id == learner_id,
+            QuizAttempt.product_code == product_code,
+            QuizAttempt.item_set == "advanced",
+        )
+        .order_by(QuizAttempt.score_pct.desc(), QuizAttempt.id.desc())
+    ).scalars().first()
+
+
+def competency_breakdown(db: Session, product: Product, attempt: QuizAttempt | None) -> list[dict]:
+    """Score per certificate competency for one attempt, weakest first.
+
+    This is the diagnosis the examined tier exists to produce: the instructor
+    sees which competency a candidate is thin in before the oral examination,
+    and the candidate sees the same breakdown once the outcome is recorded.
+    """
+    if attempt is None:
+        return []
+    items = exam_items(db, product.code)
+    # Only a bank whose questions are tagged to the certificate's competencies
+    # (C1, C2, ...) can produce this diagnosis. An older bank tagged to module
+    # outcomes gets no breakdown rather than a list of one-question groups.
+    if not any(_COMPETENCY_CODE.match(i.outcome_id or "") for i in items):
+        return []
+    pool = {i.code: i for i in items}
+    labels = certs.course_competencies(db, product)
+    tally: dict[str, list[int]] = {}
+    for code, detail in (attempt.responses or {}).items():
+        item = pool.get(code)
+        if item is None or not isinstance(detail, dict) or detail.get("correct") is None:
+            continue
+        slot = tally.setdefault(item.outcome_id or "", [0, 0])
+        slot[1] += 1
+        if detail.get("correct"):
+            slot[0] += 1
+    rows = []
+    for key, (correct, total) in tally.items():
+        label = key
+        match = _COMPETENCY_CODE.match(key or "")
+        if match and 1 <= int(match.group(1)) <= len(labels):
+            label = labels[int(match.group(1)) - 1]
+        rows.append({
+            "id": key,
+            "label": label,
+            "correct": correct,
+            "total": total,
+            "pct": round(100.0 * correct / total, 1) if total else 0.0,
+        })
+    rows.sort(key=lambda r: (r["pct"], r["id"]))
+    return rows
+
+
 def grade_exam(
     db: Session, learner: Learner, product: Product, row: AdvancedCertification, responses: dict
 ) -> QuizAttempt:
     settings = get_settings()
-    items = exam_items(db, product.code)
+    items = served_items(db, product.code, row)
     detail: dict = {}
     auto_total = auto_correct = 0
     for item in items:
@@ -192,6 +300,8 @@ def grade_exam(
         responses=detail,
     )
     db.add(attempt)
+    # The paper is handed in: the next attempt draws its own.
+    row.exam_item_codes = []
     row.exam_attempts = (row.exam_attempts or 0) + 1
     row.exam_best_pct = max(row.exam_best_pct or 0.0, score)
     if passed:
@@ -458,7 +568,8 @@ def learner_out(db: Session, learner: Learner, product: Product, row: AdvancedCe
         "interview_minutes": settings.ADVANCED_INTERVIEW_MINUTES,
         "exam_threshold": settings.ADVANCED_EXAM_THRESHOLD_PCT,
         "exam_max_attempts": settings.ADVANCED_EXAM_MAX_ATTEMPTS,
-        "exam_item_count": len(exam_items(db, product.code)),
+        "exam_item_count": serve_count(db, product.code),
+        "exam_bank_size": len(exam_items(db, product.code)),
         "can_purchase": ok,
         "purchase_blocked_reason": reason,
         "competencies": certs.course_competencies(db, product),
@@ -467,6 +578,9 @@ def learner_out(db: Session, learner: Learner, product: Product, row: AdvancedCe
     if row is None:
         return out
     can_prop, why = can_propose(row)
+    # The candidate sees their own competency breakdown once the journey has
+    # reached an outcome — never while a paper or an interview is still open.
+    show_breakdown = row.status in ("passed", "failed", "exam_failed")
     out["state"] = {
         "id": row.id,
         "status": row.status,
@@ -483,6 +597,9 @@ def learner_out(db: Session, learner: Learner, product: Product, row: AdvancedCe
         "interview_no": row.interview_no,
         "retake_after": row.retake_after,
         "created_at": row.created_at,
+        "exam_breakdown": competency_breakdown(
+            db, product, best_attempt(db, learner.id, product.code)
+        ) if show_breakdown else [],
     }
     return out
 
@@ -490,6 +607,9 @@ def learner_out(db: Session, learner: Learner, product: Product, row: AdvancedCe
 def admin_out(db: Session, row: AdvancedCertification) -> dict:
     learner = db.get(Learner, row.learner_id)
     cert = db.get(certs.Certificate, row.certificate_id) if row.certificate_id else None
+    product = db.execute(
+        select(Product).where(Product.code == row.product_code)
+    ).scalars().first()
     return {
         "id": row.id,
         "learner_id": row.learner_id,
@@ -503,6 +623,10 @@ def admin_out(db: Session, row: AdvancedCertification) -> dict:
         "exam_attempts": row.exam_attempts,
         "exam_best_pct": row.exam_best_pct,
         "exam_passed_at": row.exam_passed_at,
+        # Read this before the oral examination: weakest competency first.
+        "exam_breakdown": competency_breakdown(
+            db, product, best_attempt(db, row.learner_id, row.product_code)
+        ) if product else [],
         "proposed_slots": [
             {"iso": iso, "lines": when_lines(datetime.fromisoformat(iso), row.learner_timezone)}
             for iso in (row.proposed_slots or [])
