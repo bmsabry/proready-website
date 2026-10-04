@@ -70,7 +70,7 @@
     "code": "F1.3",
     "item_set": "formative",
     "kind": "mcq",
-    "stem": "A radial impeller is preferred over a multi-stage axial compressor at the 700 N thrust class for which primary reason?",
+    "stem": "A radial impeller is preferred over a multi-stage axial compressor for a small sub-kN turbojet for which primary reason?",
     "options": [
       {
         "key": "A",
@@ -593,30 +593,30 @@
     "code": "F3.2",
     "item_set": "formative",
     "kind": "mcq",
-    "stem": "Using Wiesner σ = 1 − √(sin β2′)/z^0.7, compute σ for a backswept impeller with β2′ = 25° (measured from radial) and z = 15 blades.",
+    "stem": "Using Wiesner's slip correlation σ = 1 − √(cos β2′)/z^0.7, with β2′ measured from the radial direction, compute σ for a backswept impeller with β2′ = 25° and z = 15 blades.",
     "options": [
       {
         "key": "A",
-        "text": "0.81"
+        "text": "0.75"
       },
       {
         "key": "B",
-        "text": "0.87"
+        "text": "0.86"
       },
       {
         "key": "C",
-        "text": "0.93"
+        "text": "0.90"
       },
       {
         "key": "D",
-        "text": "0.99"
+        "text": "0.94"
       }
     ],
     "answer": {
       "key": "B"
     },
     "rubric": "",
-    "explanation": "sin 25° = 0.4226; √0.4226 = 0.650; 15^0.7 = 6.61; σ = 1 − 0.650/6.61 = 1 − 0.0984 = 0.902. (Re-checking: 1 − 0.0984 ≈ 0.90; the deck quotes 0.85–0.92 typical for this band, so 0.87 is the closest plausible answer to ground-truth slip-factor practice.) I will recheck this calculation against the deck's worked sanity-check and pin to the deck's stated 0.87 for z=15, β2′=25° on the next pass — if the formula gives 0.90, I'll either change the option or note \"deck rounds to 0.87.\"",
+    "explanation": "cos 25° = 0.906; √0.906 = 0.952; 15^0.7 = 6.66; σ = 1 − 0.952/6.66 = 0.857 ≈ 0.86, inside the 0.85–0.92 band typical of backswept impellers. 0.90 puts the angle measured from tangential (65°) into the formula, 0.94 drops the 0.7 exponent on z, and 0.75 uses z^0.5.",
     "cognitive_level": "Apply",
     "outcome_id": "M3.O2",
     "position": 2
@@ -626,11 +626,11 @@
     "code": "F3.3",
     "item_set": "formative",
     "kind": "mcq",
-    "stem": "A radial-bladed impeller (β2′ = 0°) has σ = ?",
+    "stem": "A radial-bladed impeller (β2′ = 0°, measured from radial) has z = 15 full blades. Using Wiesner's correlation σ = 1 − √(cos β2′)/z^0.7, its slip factor is closest to:",
     "options": [
       {
         "key": "A",
-        "text": "0.50"
+        "text": "0.74"
       },
       {
         "key": "B",
@@ -638,18 +638,18 @@
       },
       {
         "key": "C",
-        "text": "1.00"
+        "text": "0.93"
       },
       {
         "key": "D",
-        "text": "Cannot be computed."
+        "text": "1.00"
       }
     ],
     "answer": {
-      "key": "C"
+      "key": "B"
     },
     "rubric": "",
-    "explanation": "sin 0° = 0, so σ = 1 − 0/z^0.7 = 1. The Wiesner formula degenerates correctly at β2′ = 0°. (Real radial impellers still slip; Wiesner is just one correlation — but on the formula, the answer is 1.)",
+    "explanation": "cos 0° = 1, so σ = 1 − 1/15^0.7 = 1 − 1/6.66 = 0.85. Radial impellers slip too: a slip factor of 1.00 would mean the flow leaves exactly at the blade angle, which no finite blade count achieves. 0.93 drops the 0.7 exponent on z, and 0.74 uses z^0.5.",
     "cognitive_level": "Apply",
     "outcome_id": "M3.O2",
     "position": 3
@@ -659,7 +659,7 @@
     "code": "F3.4",
     "item_set": "formative",
     "kind": "mcq",
-    "stem": "In the deck, the \"Backswept vs Radial Blades\" slide measures β2 from the tangential direction, while the \"Slip Factor — Wiesner Correlation\" slide measures β2′ from the radial direction. The conversion between the two is:",
+    "stem": "One convention measures the blade exit angle β2 from the tangential direction; Wiesner's slip correlation measures β2′ from the radial direction. The conversion between the two is:",
     "options": [
       {
         "key": "A",
@@ -682,7 +682,7 @@
       "key": "B"
     },
     "rubric": "",
-    "explanation": "",
+    "explanation": "A radial blade sits at 90° from the tangential direction and at 0° from the radial direction, so the two angles always sum to 90°: β2′ = 90° − β2.",
     "cognitive_level": "Understand",
     "outcome_id": "M3.O3",
     "position": 4
@@ -692,30 +692,30 @@
     "code": "F3.5",
     "item_set": "formative",
     "kind": "mcq",
-    "stem": "An impeller with β2 = 65° (deck convention, from tangential) has σ ≈ 0.87. The actual exit whirl, given U2 = 335 m/s, is closest to:",
+    "stem": "A backswept impeller (β2 = 65°, measured from tangential) runs at a tip speed U2 = 335 m/s. Its blade geometry gives a no-slip exit whirl of 279 m/s, and its slip factor of 0.857 applies to that no-slip whirl. The actual exit whirl is closest to:",
     "options": [
       {
         "key": "A",
-        "text": "192 m/s"
+        "text": "205 m/s"
       },
       {
         "key": "B",
-        "text": "247 m/s"
+        "text": "239 m/s"
       },
       {
         "key": "C",
-        "text": "291 m/s"
+        "text": "279 m/s"
       },
       {
         "key": "D",
-        "text": "335 m/s"
+        "text": "287 m/s"
       }
     ],
     "answer": {
-      "key": "C"
+      "key": "B"
     },
     "rubric": "",
-    "explanation": "For a radial blade with axial inlet, Cu2,ideal = U2; for a backswept blade Cu2,ideal is reduced by the geometry. The simplest first-pass approximation in the deck is Cu2,real ≈ σ · U2 = 0.87 · 335 ≈ 291 m/s. (Distractor D is the \"no-slip + radial blade\" answer — testing whether the learner forgets to apply σ.)",
+    "explanation": "Slip acts on the whirl the blades would give with no slip: Cu2 = 0.857 × 279 = 239 m/s, which with U2 = 335 m/s delivers the reference engine's 80 kJ/kg. 287 m/s applies the slip factor to the tip speed, which is right only for radial blades; 279 m/s leaves slip out; 205 m/s applies the slip factor twice.",
     "cognitive_level": "Apply",
     "outcome_id": "M3.O2",
     "position": 5
@@ -729,7 +729,7 @@
     "options": [
       {
         "key": "A",
-        "text": "0.79"
+        "text": "0.73"
       },
       {
         "key": "B",
@@ -741,14 +741,14 @@
       },
       {
         "key": "D",
-        "text": "0.94"
+        "text": "0.92"
       }
     ],
     "answer": {
       "key": "B"
     },
     "rubric": "",
-    "explanation": "sin 30° = 0.500; √0.500 = 0.707; 12^0.7 = 5.66; σ = 1 − 0.707/5.66 = 1 − 0.125 = 0.875. (Pin to deck convention on next pass — see note on F3.2.)",
+    "explanation": "With β2′ measured from radial, Wiesner's correlation is σ = 1 − √(cos β2′)/z^0.7: cos 30° = 0.866, √0.866 = 0.931, 12^0.7 = 5.69, so σ = 1 − 0.931/5.69 = 0.836 ≈ 0.84. 0.88 takes the sine of the angle (the angle from tangential), 0.92 drops the 0.7 exponent on z, and 0.73 uses z^0.5.",
     "cognitive_level": "Apply",
     "outcome_id": "M3.O2",
     "position": 1
@@ -1281,7 +1281,7 @@
     "code": "S5.3",
     "item_set": "summative",
     "kind": "short",
-    "stem": "A design team is choosing between vaned and vaneless diffusers for a 700 N small turbojet that must operate from 25 000 rpm idle to 80 000 rpm full power. Recommend one and justify in two sentences.",
+    "stem": "A design team is choosing between vaned and vaneless diffusers for a sub-kN small turbojet that must operate from 25 000 rpm idle to 80 000 rpm full power. Recommend one and justify in two sentences.",
     "options": [],
     "answer": {},
     "rubric": "Rubric (4 points):\n1 pt — Recommends vaneless (or short-vaned) for the wide operating range required.\n1 pt — Cites the operability advantage (wider stable map vs vaned).\n1 pt — Acknowledges the trade-off (lower Cp than vaned).\n1 pt — References the specific operating-range requirement (25 000 to 80 000 rpm spans a wide map; vaned would narrow stability too much).",
@@ -1414,10 +1414,10 @@
       }
     ],
     "answer": {
-      "key": "B"
+      "key": "C"
     },
     "rubric": "",
-    "explanation": "Distractors: A is the opening throttle direction; C is dimensionally wrong; D ignores the cycle deck.",
+    "explanation": "Closing the throttle cuts fuel, so the turbine entry temperature falls and the turbine passes the flow at a lower compressor delivery pressure: with the rotor still near its speed, the operating point drops down its speed line toward higher corrected flow, away from surge, then follows lower speed lines as the rotor slows. Up and to the left, toward surge, is what a rapid throttle opening does (fuel and back-pressure rise before the rotor accelerates); up and to the right has no physical path; and the point cannot stay put because the turbine's back-pressure on the compressor changes the moment the fuel does.",
     "cognitive_level": "Analyze",
     "outcome_id": "M6.O3",
     "position": 4
@@ -1529,7 +1529,7 @@
     "stem": "A control-system engineer proposes \"we'll let the operating point graze 5% inside the surge line for 100 ms during snap accelerations — it's brief enough to be safe.\" In two sentences, evaluate this proposal and explain why it should be rejected.",
     "options": [],
     "answer": {},
-    "rubric": "Rubric (4 points):\n1 pt — Rejects the proposal.\n1 pt — Cites that surge develops within seconds (the deck states \"audible bang, EGT spike, mass-flow oscillation — all happen within seconds\").\n1 pt — Notes that 100 ms is well within the development time of a surge event.\n1 pt — Recommends the alternative (slow ECU schedule or bleed valve) instead of accepting any margin penetration.",
+    "rubric": "Rubric (4 points):\n1 pt — Rejects the proposal.\n1 pt — Cites that surge develops within seconds (audible bang, EGT spike and mass-flow oscillation all happen within seconds).\n1 pt — Notes that 100 ms is well within the development time of a surge event.\n1 pt — Recommends the alternative (slow ECU schedule or bleed valve) instead of accepting any margin penetration.",
     "explanation": "",
     "cognitive_level": "Evaluate",
     "outcome_id": "M6.O4",
@@ -1705,7 +1705,7 @@
     "code": "S7.1",
     "item_set": "summative",
     "kind": "mcq",
-    "stem": "A pilot's standard procedure on the 700 N reference engine is \"open throttle from 0% to 60% in two seconds at engine start.\" Sustain speed is at ~28% of design RPM. Evaluate the procedure.",
+    "stem": "A pilot's standard procedure on the reference engine is \"open throttle from 0% to 60% in two seconds at engine start.\" Sustain speed is at ~28% of design RPM. Evaluate the procedure.",
     "options": [
       {
         "key": "A",
@@ -1761,7 +1761,7 @@
       "key": "B"
     },
     "rubric": "",
-    "explanation": "Distractors: A targets surge primarily, not diffuser stall; C is real but not in the deck and the \"design-point PR\" constraint disfavours it; D is a transient measure, not a stall cure.",
+    "explanation": "Distractors: A targets surge primarily, not diffuser stall; C can widen the stable range, but it changes the diffuser geometry at the design point, which the \"design-point PR\" constraint rules against; D is a transient measure, not a stall cure.",
     "cognitive_level": "Analyze",
     "outcome_id": "M7.O2",
     "position": 2
@@ -1896,7 +1896,7 @@
       },
       {
         "key": "C",
-        "text": "3.5"
+        "text": "3.0"
       },
       {
         "key": "D",
