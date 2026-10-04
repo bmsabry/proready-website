@@ -268,6 +268,10 @@ def _run_column_migrations() -> None:
     _ensure_column(
         "academy_products", "advanced_cert_price_cents", "INTEGER NOT NULL DEFAULT 30000"
     )
+    _ensure_column(
+        "academy_advanced_certifications", "exam_item_codes",
+        f"JSON NOT NULL DEFAULT {json_empty_list}",
+    )
     _ensure_column("academy_orders", "kind", "VARCHAR(16) NOT NULL DEFAULT 'course'")
     _ensure_column("academy_quiz_items", "product_code", "VARCHAR(64) NOT NULL DEFAULT ''")
     _ensure_column("academy_quiz_attempts", "product_code", "VARCHAR(64) NOT NULL DEFAULT ''")
