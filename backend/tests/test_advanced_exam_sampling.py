@@ -141,17 +141,40 @@ def test_grading_scores_the_paper_that_was_sat_and_ignores_the_rest():
     db.close()
 
 
-def test_the_retake_is_a_different_paper_of_the_same_shape():
+def test_the_retake_is_new_questions_in_the_same_shape():
+    """With a bank twice the paper, the retake repeats nothing from paper one."""
     db = SessionLocal()
     learner = db.query(Learner).filter(Learner.email == "sampling.candidate@example.com").one()
     row = adv.current(db, learner, CODE)
-    first = set(db.get(AdvancedCertification, row.id).exam_item_codes or [])
+    first = set(adv.best_attempt(db, learner.id, CODE).responses)
+    assert len(first) == 100
     retake = adv.served_items(db, CODE, row)
-    assert len(retake) == 100
-    # A fresh draw from a 200-question bank: identical papers are vanishingly
-    # unlikely, and the overlap must leave real new ground.
     codes = {i.code for i in retake}
-    assert codes != first
+    assert len(retake) == 100 and not codes & first
+    seats: dict[str, int] = {}
+    for item in retake:
+        seats[item.outcome_id] = seats.get(item.outcome_id, 0) + 1
+    assert seats == {"C1": 12, "C2": 11, "C3": 13, "C4": 12,
+                     "C5": 11, "C6": 15, "C7": 15, "C8": 11}
+    db.close()
+
+
+def test_a_third_paper_reuses_questions_only_when_it_has_to():
+    """After both papers, every question has been seen: the draw still fills
+    each competency's seats, from questions already sat."""
+    db = SessionLocal()
+    pool = adv.exam_items(db, CODE)
+    seen = {i.code for i in pool}
+    paper = adv._balanced_draw(pool, 100, avoid=seen)
+    assert len(paper) == 100 and len({i.code for i in paper}) == 100
+    # Half the bank seen: the unseen half is drawn first, in every competency.
+    half = {i.code for i in pool if int(i.code.split("-")[1]) % 2 == 0}
+    paper = adv._balanced_draw(pool, 100, avoid=half)
+    fresh = [i for i in paper if i.code not in half]
+    for comp, count in POOL.items():
+        unseen = sum(1 for i in pool if i.outcome_id == comp and i.code not in half)
+        took = sum(1 for i in fresh if i.outcome_id == comp)
+        assert took == min(unseen, count // 2)
     db.close()
 
 
