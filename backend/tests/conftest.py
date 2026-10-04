@@ -68,3 +68,50 @@ def _load_test_advanced_bank() -> None:
 
 
 _load_test_advanced_bank()
+
+
+# The GT-05 module quiz is no longer shipped in this public repository either:
+# production keeps it in the database. The tests run against a synthetic bank
+# with the same shape — 41 formative MCQs in eight sections, and a summative
+# set of 17 MCQs plus 9 rubric-graded short answers — key always B.
+TEST_GT05_FORMATIVE = {1: 5, 2: 6, 3: 5, 4: 5, 5: 5, 6: 5, 7: 5, 8: 5}
+TEST_GT05_SUMMATIVE_MCQ = {1: 2, 2: 3, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 2, 9: 0}
+
+
+def _load_test_gt05_bank() -> None:
+    from app.db import SessionLocal
+    from app.models import Module, QuizItem
+
+    db = SessionLocal()
+    try:
+        module = db.query(Module).filter(
+            Module.product_code == TEST_ADVANCED_PRODUCT, Module.code == "GT-05"
+        ).one_or_none()
+        if module is None or db.query(QuizItem).filter(QuizItem.module_id == module.id).count():
+            return
+
+        def add(code, item_set, kind, section, n):
+            mcq = kind == "mcq"
+            db.add(QuizItem(
+                module_id=module.id, code=code, item_set=item_set, kind=kind,
+                position=section * 100 + n, outcome_id=f"M{section}.O1", cognitive_level="Apply",
+                stem=f"Synthetic GT-05 {item_set} item {code}: which statement holds?",
+                options=[{"key": k, "text": f"Option {k} of {code}"} for k in "ABCD"] if mcq else [],
+                answer={"key": "B"} if mcq else {},
+                rubric="" if mcq else f"Rubric for {code}: 1 pt for the correct reasoning.",
+                explanation=f"Synthetic explanation for {code}.",
+            ))
+
+        for section, count in TEST_GT05_FORMATIVE.items():
+            for n in range(1, count + 1):
+                add(f"F{section}.{n}", "formative", "mcq", section, n)
+        for section, count in TEST_GT05_SUMMATIVE_MCQ.items():
+            for n in range(1, count + 1):
+                add(f"S{section}.{n}", "summative", "mcq", section, n)
+            add(f"S{section}.{count + 1}", "summative", "short", section, count + 1)
+        db.commit()
+    finally:
+        db.close()
+
+
+_load_test_gt05_bank()
