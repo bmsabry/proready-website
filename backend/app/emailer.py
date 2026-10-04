@@ -959,6 +959,87 @@ def first_name(full_name: str) -> str:
     return ""
 
 
+def examined_tier_rows(offer: dict) -> "list[tuple[str, str]]":
+    """The facts of the Certificate of Verified Competency as the course page
+    publishes them — one table for every email that offers the tier."""
+    n = offer.get("exam_item_count") or 0
+    written = (
+        f"{n} analysis-level questions, taken from your course page. "
+        if n else "Analysis-level questions, taken from your course page. "
+    ) + f"Pass mark {offer['exam_threshold_pct']:g}%, {offer['exam_max_attempts']} attempts."
+    rows = [
+        ("Written examination", written),
+        (
+            "Oral examination",
+            f"{offer['interview_minutes']} minutes, live and one-on-one with me by "
+            "video, scheduled around your time zone. Questions without notice, "
+            "design cases not covered in the material, reasoning out loud.",
+        ),
+        (
+            "Certificate",
+            "Signed by me after the examination, naming every key principle you "
+            "demonstrated. Digitally signed, publicly verifiable, LinkedIn-ready.",
+        ),
+    ]
+    if offer.get("price_display"):
+        rows.append(
+            (
+                "Fee",
+                f"<strong>{offer['price_display']}</strong>. It pays for the "
+                "examination, not the outcome; if mastery is not shown the first "
+                "time, one complimentary re-examination is offered after a study "
+                "period.",
+            )
+        )
+    return rows
+
+
+def examined_tier_invitation_html(
+    full_name: str,
+    course_title: str,
+    offer: dict,
+    *,
+    instructor_name: str,
+    instructor_credentials: str,
+    instructor_title: str,
+) -> str:
+    """The instructor's note to a finisher whose course opened the examined
+    tier after their Certificate of Completion was issued (their completion
+    email could only offer to request it): the examination is open now, with
+    the same facts and the same button as the completion email."""
+    name = escape_html(first_name(full_name))
+    body = _p(f"Dear {name}," if name else "Dear learner,")
+    body += _p(
+        f"When you completed <strong>{course_title}</strong>, I mentioned the second "
+        "credential I offer on it, the <strong>Certificate of Verified Competency</strong> — "
+        "the one a hiring manager can trust, because it is examined rather than completed. "
+        "Its examination is now open, and your Certificate of Completion is the "
+        "prerequisite, so you can register whenever you are ready. Here is what it involves:"
+    )
+    body += _kv_table(examined_tier_rows(offer))
+    body += _p(
+        "Getting started takes a minute. The button below opens the examination section "
+        "of your course page; register there and the written examination opens "
+        "immediately. When you pass it, you propose three windows that suit you, and I "
+        "confirm one and send the meeting link."
+    )
+    body += _cta_button("Book my examination", offer["booking_url"])
+    body += _p(
+        "There is no deadline on this. Your course access and your Certificate of "
+        "Completion are yours either way.",
+        size=13,
+        color=MUTED,
+    )
+    body += _p(
+        "With best regards,<br>"
+        f"<strong>{instructor_name}</strong><br>"
+        f"{instructor_credentials}<br>"
+        f"{instructor_title}",
+        margin="26px 0 0",
+    )
+    return _shell("Certificate of Verified Competency", "Your examination is open", body)
+
+
 def certificate_issued_html(
     full_name: str,
     course_title: str,
@@ -1079,36 +1160,7 @@ def certificate_issued_html(
             "course — the one a hiring manager can trust, because it is examined "
             "rather than completed. Here is what it involves:"
         )
-        n = offer.get("exam_item_count") or 0
-        written = (
-            f"{n} analysis-level questions, taken from your course page. "
-            if n else "Analysis-level questions, taken from your course page. "
-        ) + f"Pass mark {offer['exam_threshold_pct']:g}%, {offer['exam_max_attempts']} attempts."
-        rows = [
-            ("Written examination", written),
-            (
-                "Oral examination",
-                f"{offer['interview_minutes']} minutes, live and one-on-one with me by "
-                "video, scheduled around your time zone. Questions without notice, "
-                "design cases not covered in the material, reasoning out loud.",
-            ),
-            (
-                "Certificate",
-                "Signed by me after the examination, naming every key principle you "
-                "demonstrated. Digitally signed, publicly verifiable, LinkedIn-ready.",
-            ),
-        ]
-        if offer.get("price_display"):
-            rows.append(
-                (
-                    "Fee",
-                    f"<strong>{offer['price_display']}</strong>. It pays for the "
-                    "examination, not the outcome; if mastery is not shown the first "
-                    "time, one complimentary re-examination is offered after a study "
-                    "period.",
-                )
-            )
-        body += _kv_table(rows)
+        body += _kv_table(examined_tier_rows(offer))
         if offer.get("bookable"):
             body += _p(
                 "Getting started takes a minute. The button below opens the examination "
