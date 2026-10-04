@@ -432,7 +432,8 @@ def examined_tier_offer(db: Session, learner: Learner, product: Product) -> dict
     return {
         "bookable": bookable,
         "price_display": _price_display(price, product.currency) if price > 0 else "",
-        "exam_item_count": len(adv.exam_items(db, product.code)),
+        # One paper, not the bank: each attempt draws a fixed number from it.
+        "exam_item_count": adv.serve_count(db, product.code),
         "exam_threshold_pct": settings.ADVANCED_EXAM_THRESHOLD_PCT,
         "exam_max_attempts": settings.ADVANCED_EXAM_MAX_ATTEMPTS,
         "interview_minutes": settings.ADVANCED_INTERVIEW_MINUTES,
