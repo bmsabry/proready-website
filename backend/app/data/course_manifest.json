@@ -16,8 +16,7 @@
         "Compressor performance maps: speed lines, surge margin and operating-line placement",
         "CFD for turbomachinery: RANS set-up, interpretation and validation of results",
         "Combustor design analysis: heat release, pattern factor, liner cooling and start-sequence fuel scheduling"
-      ],
-      "advanced_exam_file": "mgt_advanced_exam.json"
+      ]
     }
   },
   "modules": [
