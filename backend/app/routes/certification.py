@@ -316,7 +316,7 @@ def advanced_exam(
             else "The written examination attempts are used up. Contact info@proreadyengineer.com.",
         )
     settings = get_settings()
-    items = adv.exam_items(db, code)
+    items = adv.served_items(db, code, row)
     return {
         "product": {"code": product.code, "title": product.title},
         "item_set": "advanced",
@@ -342,8 +342,9 @@ def submit_advanced_exam(
     row = _advanced_row(db, learner, code)
     if not adv.exam_open(row):
         raise HTTPException(status_code=409, detail="The written examination is not open at this step.")
+    sat = {i.code for i in adv.served_items(db, code, row)}
     attempt = adv.grade_exam(db, learner, product, row, body.responses or {})
-    items = {i.code: i for i in adv.exam_items(db, code)}
+    items = {c: True for c in sat}
     settings = get_settings()
     return {
         "score_pct": attempt.score_pct,

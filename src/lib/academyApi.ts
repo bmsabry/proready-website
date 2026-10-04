@@ -384,6 +384,17 @@ export type CompletionModuleStatus = {
   summative: { passed: boolean; best_score: number | null } | null;
 };
 
+/* One certificate competency's score on the written examination. The paper is
+ * drawn so that every attempt carries the same number of questions from each
+ * competency, which is what makes these percentages comparable. */
+export type CompetencyScore = {
+  id: string;
+  label: string;
+  correct: number;
+  total: number;
+  pct: number;
+};
+
 export type AdvancedState = {
   id: number;
   status:
@@ -409,6 +420,8 @@ export type AdvancedState = {
   interview_no: number;
   retake_after: string | null;
   created_at: string;
+  // Weakest competency first; empty until the journey reaches an outcome.
+  exam_breakdown: CompetencyScore[];
 };
 
 export type CertificationStatus = {
@@ -432,6 +445,7 @@ export type CertificationStatus = {
     exam_threshold: number;
     exam_max_attempts: number;
     exam_item_count: number;
+    exam_bank_size: number;
     can_purchase: boolean;
     purchase_blocked_reason: string;
     competencies: string[];

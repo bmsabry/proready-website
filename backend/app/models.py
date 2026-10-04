@@ -1140,6 +1140,12 @@ class AdvancedCertification(Base):
     exam_passed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+    # The item codes drawn for the attempt currently open, in the order they
+    # are served. Each attempt draws its own balanced paper from the bank, so
+    # the codes are stored the moment the paper is handed out and cleared when
+    # it is handed in — a reload must not reshuffle the questions, and grading
+    # must score the paper the candidate actually sat.
+    exam_item_codes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
 
     # Learner's proposed 60-minute windows, ISO-8601 UTC, plus their IANA zone
     # so the admin sees both clocks.

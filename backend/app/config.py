@@ -117,6 +117,11 @@ class Settings(BaseSettings):
     ADVANCED_EXAM_THRESHOLD_PCT: float = 80.0
     ADVANCED_EXAM_MAX_ATTEMPTS: int = 2
     ADVANCED_INTERVIEW_MINUTES: int = 60
+    # Questions served per written-exam attempt. The bank may hold more: each
+    # attempt then draws this many at random, balanced across the certificate's
+    # competencies, so a retake is a different paper of the same shape. A bank
+    # at or below this size is served whole.
+    ADVANCED_EXAM_SERVE_COUNT: int = 100
     # LinkedIn "Add to profile" pre-fill. The numeric Company Page id makes
     # the issuer show with the ProReadyEngineer logo; empty falls back to the
     # organisation name as text.

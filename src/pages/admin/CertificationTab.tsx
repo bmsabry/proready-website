@@ -29,6 +29,7 @@ type Candidate = {
   currency: string;
   exam_attempts: number;
   exam_best_pct: number;
+  exam_breakdown: { id: string; label: string; correct: number; total: number; pct: number }[];
   proposed_slots: { iso: string; lines: string[] }[];
   learner_timezone: string;
   learner_note: string;
@@ -494,6 +495,29 @@ function CandidateCard({
             Written exam: {c.exam_attempts} attempt{c.exam_attempts === 1 ? '' : 's'}
             {c.exam_attempts > 0 && <> · best {c.exam_best_pct}%</>}
           </div>
+          {/* Read before the oral examination: weakest competency first, so the
+              interview can be aimed at what the paper says is thin. */}
+          {c.exam_breakdown?.length > 0 && (
+            <div className="mt-2">
+              <div className="text-xs uppercase tracking-wider text-slate-400">
+                Where this candidate is weak
+              </div>
+              <ul className="mt-1 space-y-1">
+                {c.exam_breakdown.map((b) => (
+                  <li key={b.id} className="flex items-baseline justify-between gap-3">
+                    <span className="text-xs text-slate-300">{b.label}</span>
+                    <span
+                      className={`text-xs font-mono shrink-0 ${
+                        b.pct >= 80 ? 'text-emerald-300' : b.pct >= 60 ? 'text-amber-300' : 'text-rose-300'
+                      }`}
+                    >
+                      {b.correct}/{b.total} · {b.pct}%
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {c.proposed_slots.length > 0 && (
             <div>
               <div className="text-xs uppercase tracking-wider text-slate-400 mt-2">Proposed windows{c.learner_timezone ? ` (${c.learner_timezone})` : ''}</div>
