@@ -1120,6 +1120,20 @@ class AdvancedCertification(Base):
       failed           did not demonstrate mastery on the re-examination
       exam_failed      written exam attempts exhausted; admin may reset
       cancelled        refunded / withdrawn
+
+    Fee waivers (2026-10) — a candidate may ask the instructor to waive the
+    fee instead of paying at registration. The request is a row of its own:
+
+      waiver_requested the instructor has not decided yet; the candidate may
+                       still pay by card, which closes the request
+      waiver_declined  the instructor asked them to pay; nothing opened
+      waiver_withdrawn they paid (or were comped) while the request waited
+
+    Waive or "pay before the interview" turns the request row itself into an
+    open examination ('purchased'), so the decision stays on the row that
+    carries it. `fee_status` says where the money stands on an open row:
+    '' (rows from before waivers: settled at registration) | 'paid' |
+    'waived' | 'due' (written exam open, interview locked until paid).
     """
 
     __tablename__ = "academy_advanced_certifications"
@@ -1167,6 +1181,29 @@ class AdvancedCertification(Base):
         DateTime(timezone=True), default=None
     )
     certificate_id: Mapped[int | None] = mapped_column(Integer, default=None)
+
+    # Where the fee stands — see the docstring. For 'due', amount_cents holds
+    # the amount owed (fixed when the instructor deferred it); once paid it
+    # holds the amount paid, as on every paid row.
+    fee_status: Mapped[str] = mapped_column(String(8), default="")
+    # The candidate's request: 'employer' | 'training_contract' | 'other'.
+    waiver_reason: Mapped[str] = mapped_column(String(32), default="")
+    waiver_note: Mapped[str] = mapped_column(Text, default="")
+    waiver_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    # The instructor's answer: 'waived' | 'deferred' | 'declined', or how the
+    # request closed without one: 'paid' | 'comped'.
+    waiver_decision: Mapped[str] = mapped_column(String(16), default="")
+    waiver_decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    waiver_decided_by: Mapped[str] = mapped_column(String(320), default="")
+    # The instructor's message to the candidate (it goes into their email).
+    waiver_admin_note: Mapped[str] = mapped_column(Text, default="")
+    # Every money event on this row, oldest first: {at, event, by, note,
+    # amount_cents}. The record of who waived what, when and why.
+    fee_log: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True

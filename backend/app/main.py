@@ -272,6 +272,20 @@ def _run_column_migrations() -> None:
         "academy_advanced_certifications", "exam_item_codes",
         f"JSON NOT NULL DEFAULT {json_empty_list}",
     )
+    # Fee waivers (2026-10). Existing rows get fee_status '' — settled at
+    # registration — so nothing that is open today becomes "fee due".
+    for column, ddl in (
+        ("fee_status", "VARCHAR(8) NOT NULL DEFAULT ''"),
+        ("waiver_reason", "VARCHAR(32) NOT NULL DEFAULT ''"),
+        ("waiver_note", "TEXT NOT NULL DEFAULT ''"),
+        ("waiver_requested_at", "TIMESTAMP WITH TIME ZONE"),
+        ("waiver_decision", "VARCHAR(16) NOT NULL DEFAULT ''"),
+        ("waiver_decided_at", "TIMESTAMP WITH TIME ZONE"),
+        ("waiver_decided_by", "VARCHAR(320) NOT NULL DEFAULT ''"),
+        ("waiver_admin_note", "TEXT NOT NULL DEFAULT ''"),
+        ("fee_log", f"JSON NOT NULL DEFAULT {json_empty_list}"),
+    ):
+        _ensure_column("academy_advanced_certifications", column, ddl)
     _ensure_column("academy_orders", "kind", "VARCHAR(16) NOT NULL DEFAULT 'course'")
     _ensure_column("academy_quiz_items", "product_code", "VARCHAR(64) NOT NULL DEFAULT ''")
     _ensure_column("academy_quiz_attempts", "product_code", "VARCHAR(64) NOT NULL DEFAULT ''")

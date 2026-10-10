@@ -1304,51 +1304,79 @@ def request_declined_html(full_name: str, course_title: str, what: str, note: st
     return _shell("Learner request", f"About your request for {escape_html(what)}", body)
 
 
-def advanced_purchased_html(
-    full_name: str, course_title: str, exam_url: str, price_display: str
-) -> str:
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
-    body = _p(greeting)
-    body += _p(
-        f"Thank you. Your payment for the <strong>instructor-examined "
-        f"certification</strong> in <strong>{course_title}</strong> went through."
-    )
-    body += _p("<strong>What happens next</strong>", margin="0 0 8px")
-    body += _p(
-        "1. Pass the advanced written examination from your course page.<br>"
-        "2. Propose three 60-minute windows for your live oral examination.<br>"
-        "3. Your examiner confirms one and sends the meeting link.<br>"
-        "4. After the examination, a pass issues your signed "
-        "Certificate of Verified Competency.",
-        margin="0 0 22px",
-    )
-    if price_display:
-        body += _kv_table([("Amount", price_display)])
-    body += _cta_button("Start the written examination", exam_url)
-    body += _p(
-        "The fee pays for the examination, not the outcome. If you do not "
-        "demonstrate mastery at the first session, one complimentary "
-        "re-examination is offered after a study period.",
+_ADVANCED_NEXT_STEPS = (
+    "1. Pass the advanced written examination from your course page.<br>"
+    "2. Propose three 60-minute windows for your live oral examination.<br>"
+    "3. Your examiner confirms one and sends the meeting link.<br>"
+    "4. After the examination, a pass issues your signed "
+    "Certificate of Verified Competency."
+)
+
+
+def _advanced_retake_footnote(paid: bool = True) -> str:
+    lead = "The fee pays for the examination, not the outcome. " if paid else ""
+    return _p(
+        f"{lead}If you do not demonstrate mastery at the first session, one "
+        "complimentary re-examination is offered after a study period.",
         size=13,
         color=MUTED,
         margin="0",
     )
+
+
+def advanced_purchased_html(
+    full_name: str, course_title: str, exam_url: str, price_display: str
+) -> str:
+    """Registration confirmed. With no price this is a complimentary place
+    the instructor opened — it must not thank anyone for a payment."""
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    body = _p(greeting)
+    if price_display:
+        body += _p(
+            f"Thank you. Your payment for the <strong>instructor-examined "
+            f"certification</strong> in <strong>{course_title}</strong> went through."
+        )
+    else:
+        body += _p(
+            f"The instructor has opened the <strong>instructor-examined "
+            f"certification</strong> in <strong>{course_title}</strong> for you, "
+            "at no charge."
+        )
+    body += _p("<strong>What happens next</strong>", margin="0 0 8px")
+    body += _p(_ADVANCED_NEXT_STEPS, margin="0 0 22px")
+    if price_display:
+        body += _kv_table([("Amount", price_display)])
+    body += _cta_button("Start the written examination", exam_url)
+    body += _advanced_retake_footnote(paid=bool(price_display))
     return _shell("Instructor-examined certification", "You're registered for the examination", body)
 
 
-def advanced_exam_passed_html(full_name: str, course_title: str, score: float, slots_url: str) -> str:
+def advanced_exam_passed_html(
+    full_name: str, course_title: str, score: float, slots_url: str, fee_due_display: str = ""
+) -> str:
     greeting = f"Hi {full_name}," if full_name else "Hi,"
     body = _p(greeting)
     body += _p(
         f"You passed the advanced written examination for <strong>{course_title}</strong> "
         f"with <strong>{score:g}%</strong>. The next step is your live oral examination."
     )
-    body += _p(
-        "From your course page, propose three 60-minute windows that suit you. "
-        "Your examiner will confirm one and you will receive the meeting link by email.",
-        margin="0 0 22px",
-    )
-    body += _cta_button("Propose your interview times", slots_url)
+    if fee_due_display:
+        # The instructor let them start before paying: the fee is due now.
+        body += _p(
+            f"Your <strong>{fee_due_display}</strong> examination fee is due before you "
+            "book: pay it from your course page, then propose three 60-minute windows "
+            "that suit you. Your examiner will confirm one and you will receive the "
+            "meeting link by email.",
+            margin="0 0 22px",
+        )
+        body += _cta_button("Pay and book your interview", slots_url)
+    else:
+        body += _p(
+            "From your course page, propose three 60-minute windows that suit you. "
+            "Your examiner will confirm one and you will receive the meeting link by email.",
+            margin="0 0 22px",
+        )
+        body += _cta_button("Propose your interview times", slots_url)
     return _shell("Written examination passed", "Now book your oral examination", body)
 
 
@@ -1429,6 +1457,219 @@ def advanced_outcome_failed_html(full_name: str, course_title: str) -> str:
         margin="0",
     )
     return _shell("Oral examination", "Outcome of your re-examination", body)
+
+
+# -----------------------------------------------------------------------------
+# Examined tier — fee waivers
+# -----------------------------------------------------------------------------
+
+def _hi(full_name: str) -> str:
+    first = first_name(full_name)
+    return _p(f"Hi {escape_html(first)}," if first else "Hi,")
+
+
+def _from_instructor(note: str) -> str:
+    return _p(f"From the instructor: <em>{escape_html(note)}</em>") if note else ""
+
+
+def advanced_waiver_request_admin_html(
+    *,
+    learner_name: str,
+    learner_email: str,
+    course_title: str,
+    price_display: str,
+    reason_label: str,
+    note: str,
+    completion_line: str,
+    request_id: int,
+    review_url: str,
+) -> str:
+    """To the instructor. The email decides nothing: the three choices are
+    buttons in the admin panel, never links here (a mail scanner opening a
+    link must not waive a fee)."""
+    who = (
+        f"<strong>{escape_html(learner_name)}</strong> ({escape_html(learner_email)})"
+        if learner_name else f"<strong>{escape_html(learner_email)}</strong>"
+    )
+    body = _p(
+        f"{who} asks you to waive the {escape_html(price_display)} fee for the "
+        f"instructor-examined certification in <strong>{escape_html(course_title)}</strong>."
+    )
+    rows = [("Reason", escape_html(reason_label))]
+    if note:
+        rows.append(("Their note", f"<em>{escape_html(note)}</em>"))
+    if completion_line:
+        rows.append(("Completion", escape_html(completion_line)))
+    rows.append(("Request", f"#{request_id}"))
+    body += _kv_table(rows)
+    body += _p("<strong>Your three choices in the admin panel</strong>", margin="0 0 8px")
+    body += _p(
+        "<strong>Waive</strong>: the written examination opens at no charge.<br>"
+        "<strong>Pay before the interview</strong>: the written examination opens now; "
+        "they pay the fee before they can book the oral examination.<br>"
+        "<strong>Ask them to pay now</strong>: they get an email with a link to register "
+        "and pay; nothing opens until they do.",
+        margin="0 0 16px",
+    )
+    body += _p(
+        "Until you decide, they can still pay by card themselves, which closes the request.",
+        size=14,
+        color=MUTED,
+    )
+    body += _cta_button("Decide in the admin panel", review_url)
+    return _shell("Fee-waiver request", "A candidate asks you to waive the fee", body)
+
+
+def advanced_fee_waived_html(
+    full_name: str,
+    course_title: str,
+    price_display: str,
+    note: str,
+    course_url: str,
+    *,
+    stage: str,
+) -> str:
+    """The instructor waived the fee.
+
+    stage 'exam'      — on the candidate's request: the written exam opens now
+    stage 'book'      — a fee that was due; they can book the interview now
+    stage 'continue'  — a fee that was due; still sitting the written exam
+    """
+    fee = f"the {escape_html(price_display)} fee" if price_display else "the fee"
+    course = f"<strong>{escape_html(course_title)}</strong>"
+    body = _hi(full_name)
+    if stage == "exam":
+        body += _p(
+            f"Good news: the instructor has waived {fee} for the instructor-examined "
+            f"certification in {course}. Your written examination is open now."
+        )
+    else:
+        body += _p(
+            f"Good news: the instructor has waived {fee} that was due for your "
+            f"instructor-examined certification in {course}. Nothing is owed."
+        )
+    body += _from_instructor(note)
+    if stage == "exam":
+        body += _p("<strong>What happens next</strong>", margin="0 0 8px")
+        body += _p(_ADVANCED_NEXT_STEPS, margin="0 0 22px")
+        body += _cta_button("Start the written examination", course_url)
+    elif stage == "book":
+        body += _p(
+            "You can now propose your interview windows from your course page. Your "
+            "examiner confirms one and sends the meeting link.",
+            margin="0 0 22px",
+        )
+        body += _cta_button("Propose your interview times", course_url)
+    else:
+        body += _p(
+            "Once you pass the written examination you can book your oral examination "
+            "straight away.",
+            margin="0 0 22px",
+        )
+        body += _cta_button("Open your course page", course_url)
+    body += _advanced_retake_footnote(paid=False)
+    return _shell("Instructor-examined certification", "Your examination fee is waived", body)
+
+
+def advanced_fee_deferred_html(
+    full_name: str, course_title: str, price_display: str, note: str, course_url: str
+) -> str:
+    """'Pay before the interview': the written exam opens now, the fee waits."""
+    body = _hi(full_name)
+    body += _p(
+        "The instructor has agreed that you can start now and pay the examination fee "
+        "later. Your written examination for the instructor-examined certification in "
+        f"<strong>{escape_html(course_title)}</strong> is open."
+    )
+    body += _from_instructor(note)
+    body += _kv_table(
+        [("Fee", f"{escape_html(price_display)}, due before you book your oral examination")]
+    )
+    body += _p(
+        "When you pass the written examination, your course page asks you to pay the "
+        "fee and then lets you propose your interview times. You can also pay it any "
+        "time before that.",
+        margin="0 0 22px",
+    )
+    body += _cta_button("Start the written examination", course_url)
+    body += _advanced_retake_footnote()
+    return _shell("Instructor-examined certification", "Your written examination is open", body)
+
+
+def advanced_waiver_declined_html(
+    full_name: str, course_title: str, price_display: str, note: str, register_url: str
+) -> str:
+    """'Ask them to pay now'. The button opens the course page, where the
+    candidate registers with a click; nothing is charged by the link."""
+    body = _hi(full_name)
+    body += _p(
+        f"Thank you for your request. The instructor could not waive the "
+        f"{escape_html(price_display)} fee for the instructor-examined certification in "
+        f"<strong>{escape_html(course_title)}</strong>."
+    )
+    body += _from_instructor(note)
+    body += _p(
+        "You can still take the examination: register and pay from your course page, "
+        "and your written examination opens as soon as the payment goes through.",
+        margin="0 0 22px",
+    )
+    body += _cta_button("Register for the examination", register_url)
+    return _shell("Fee-waiver request", "About your fee-waiver request", body)
+
+
+def advanced_fee_paid_html(
+    full_name: str, course_title: str, price_display: str, course_url: str, *, can_book: bool
+) -> str:
+    """A fee the instructor had deferred has been paid."""
+    body = _hi(full_name)
+    body += _p(
+        f"Thank you. Your {escape_html(price_display)} payment for the instructor-examined "
+        f"certification in <strong>{escape_html(course_title)}</strong> went through."
+    )
+    if can_book:
+        body += _p(
+            "You can now propose your interview windows from your course page. Your "
+            "examiner confirms one and sends the meeting link.",
+            margin="0 0 22px",
+        )
+        body += _cta_button("Propose your interview times", course_url)
+    else:
+        body += _p(
+            "Once you pass the written examination you can book your oral examination "
+            "straight away.",
+            margin="0 0 22px",
+        )
+        body += _cta_button("Open your course page", course_url)
+    return _shell("Instructor-examined certification", "Payment received", body)
+
+
+def advanced_extra_payment_admin_html(
+    *,
+    learner_name: str,
+    learner_email: str,
+    course_title: str,
+    amount_display: str,
+    fee_state: str,
+    order_ref: str,
+    admin_url: str,
+) -> str:
+    """To the instructor: money arrived for an examination that owed none."""
+    who = (
+        f"<strong>{escape_html(learner_name)}</strong> ({escape_html(learner_email)})"
+        if learner_name else f"<strong>{escape_html(learner_email)}</strong>"
+    )
+    body = _p(
+        f"{who} paid <strong>{escape_html(amount_display)}</strong> for the "
+        f"instructor-examined certification in <strong>{escape_html(course_title)}</strong>, "
+        f"but nothing was owed: the fee on their examination was already {escape_html(fee_state)}."
+    )
+    body += _kv_table([("Payment", escape_html(amount_display)), ("Order", escape_html(order_ref))])
+    body += _p(
+        "Refund it in Stripe if it should not stand. Refunding this payment does not "
+        "cancel their examination."
+    )
+    body += _cta_button("Open the candidate", admin_url)
+    return _shell("Examination fee", "A payment arrived that nothing was owed for", body)
 
 
 # -----------------------------------------------------------------------------
