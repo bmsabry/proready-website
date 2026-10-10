@@ -440,6 +440,17 @@ def fulfil_advanced_cert(db: Session, session_obj: dict) -> None:
     order.paid_at = datetime.now(_tz.utc)
     db.commit()
     db.refresh(order)
+    # A fee the instructor deferred names its examination; any payment that
+    # finds an examination already open settles on it rather than opening a
+    # second one (see adv.record_fee_payment).
+    row = adv.row_for_payment(
+        db, learner.id, product.code, (session_obj.get("metadata") or {}).get("row_id")
+    )
+    if row is not None:
+        adv.record_fee_payment(db, learner, product, row, order)
+        log.info("Examination fee for %s (%s) settled on row %s, order %s",
+                 learner.email, product_code, row.id, order.id)
+        return
     adv.create(
         db, learner, product,
         source="stripe", order_id=order.id,

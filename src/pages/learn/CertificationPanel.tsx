@@ -7,9 +7,11 @@ import {
   Check,
   ClipboardCheck,
   Copy,
+  CreditCard,
   Download,
   ExternalLink,
   Linkedin,
+  MailQuestion,
   ShieldCheck,
   Video,
 } from 'lucide-react';
@@ -281,6 +283,143 @@ const SlotsForm = ({
   );
 };
 
+/* "Request a fee waiver" — the candidate asks; only the instructor decides,
+ * in the admin panel. Sending it opens nothing and charges nothing. */
+const WaiverForm = ({
+  code,
+  reasons,
+  price,
+  onDone,
+  onCancel,
+}: {
+  code: string;
+  reasons: { key: string; label: string }[];
+  price: string;
+  onDone: (adv: CertificationStatus['advanced']) => void;
+  onCancel: () => void;
+}) => {
+  const [reason, setReason] = useState(reasons[0]?.key ?? 'employer');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const needsNote = reason === 'other';
+  return (
+    <form
+      className="mt-4 rounded-lg border border-slate-700/70 bg-slate-950/40 p-4"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (needsNote && !note.trim()) {
+          setError('Tell the instructor a little about your situation.');
+          return;
+        }
+        setBusy(true);
+        setError('');
+        try {
+          onDone(await academy.requestFeeWaiver(code, reason, note.trim()));
+        } catch (err) {
+          setError(err instanceof ApiError ? err.message : 'Could not send your request.');
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <p className="text-sm text-slate-300">
+        Ask the instructor to waive the {price} fee. Every request is reviewed personally and
+        answered by email. Nothing is charged, and you can still register and pay while you wait.
+      </p>
+      <fieldset className="mt-3 space-y-2">
+        <legend className="text-xs font-mono uppercase tracking-widest text-slate-400">
+          Why are you asking?
+        </legend>
+        {reasons.map((r) => (
+          <label key={r.key} className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer">
+            <input
+              type="radio"
+              name="waiver-reason"
+              value={r.key}
+              checked={reason === r.key}
+              onChange={() => setReason(r.key)}
+              className="accent-cyan-400"
+            />
+            {r.label}
+          </label>
+        ))}
+      </fieldset>
+      <label className="block mt-3">
+        <span className="text-xs font-mono uppercase tracking-widest text-slate-400">
+          {needsNote ? 'Your note to the instructor' : 'Note for the instructor (optional)'}
+        </span>
+        <textarea
+          rows={3}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={1000}
+          required={needsNote}
+          className="mt-1 w-full rounded-lg bg-slate-950/70 border border-slate-700 px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          placeholder="e.g. My employer, Acme Turbines, sponsors my training and pays for certifications."
+        />
+      </label>
+      {error && <p className="text-sm text-red-300 mt-2">{error}</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button type="submit" className="btn-primary text-sm py-2 px-4" disabled={busy}>
+          <MailQuestion className="w-4 h-4" aria-hidden="true" />
+          {busy ? 'Sending…' : 'Send my request'}
+        </button>
+        <button type="button" className="btn-ghost text-sm" onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+};
+
+/* "Pay before the interview": the instructor let the candidate start unpaid.
+ * The written examination is open; the interview waits for this payment. */
+const FeeDue = ({
+  code,
+  amount,
+  confirming,
+}: {
+  code: string;
+  amount: string;
+  confirming: boolean;
+}) => {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  return (
+    <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+      <p className="text-sm text-amber-100">
+        <span className="font-semibold">Examination fee: {amount}</span>, due before you book your
+        oral examination. You can pay it now or after the written examination.
+      </p>
+      {confirming ? (
+        <p className="mt-2 text-sm text-cyan-300 animate-pulse">Confirming your payment…</p>
+      ) : (
+        <button
+          type="button"
+          className="btn-primary text-sm py-2 px-4 mt-3"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError('');
+            try {
+              const { url } = await academy.payExamFee(code);
+              window.location.href = url;
+            } catch (err) {
+              setError(err instanceof ApiError ? err.message : 'Could not start checkout.');
+              setBusy(false);
+            }
+          }}
+        >
+          <CreditCard className="w-4 h-4" aria-hidden="true" />
+          {busy ? 'Opening checkout…' : `Pay ${amount}`}
+        </button>
+      )}
+      {error && <p className="text-sm text-red-300 mt-2">{error}</p>}
+    </div>
+  );
+};
+
 /* The per-competency result of the written examination. The candidate sees it
  * once the journey has an outcome; the instructor sees the same breakdown in
  * the admin panel before the oral examination. */
@@ -348,6 +487,7 @@ const CertificationPanel: React.FC<{
   const [showAll, setShowAll] = useState(false);
   const verifiedRef = useRef<HTMLElement | null>(null);
   const [spotlight, setSpotlight] = useState(false);
+  const [asking, setAsking] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -362,13 +502,20 @@ const CertificationPanel: React.FC<{
   }, [load]);
 
   // Back from Stripe: the webhook may land a few seconds after the redirect.
+  // `confirming` covers the polling window only, so a deferred fee whose
+  // confirmation is slow shows its Pay button again rather than a spinner
+  // that never ends.
+  const [confirming, setConfirming] = useState(!!paidReturn);
   useEffect(() => {
     if (!paidReturn) return;
     let tries = 0;
     const t = window.setInterval(async () => {
       tries += 1;
       await load();
-      if (tries >= 10) window.clearInterval(t);
+      if (tries >= 10) {
+        window.clearInterval(t);
+        setConfirming(false);
+      }
     }, 3000);
     return () => window.clearInterval(t);
   }, [paidReturn, load]);
@@ -396,6 +543,35 @@ const CertificationPanel: React.FC<{
 
   const { completion, advanced } = data;
   const state = advanced.state;
+  const price = money(advanced.price_cents, advanced.currency);
+  const feeDue = state?.fee_status === 'due';
+  const reasonLabel = (key: string) =>
+    advanced.waiver?.reasons.find((r) => r.key === key)?.label ?? '';
+
+  // The one way to register with payment: before any request, while a
+  // request waits, and after the instructor asked for payment.
+  const registerButton = advanced.can_purchase ? (
+    <button
+      type="button"
+      className="btn-primary"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const { url } = await academy.advancedCheckout(code);
+          window.location.href = url;
+        } catch (err) {
+          setError(err instanceof ApiError ? err.message : 'Could not start checkout.');
+          setBusy(false);
+        }
+      }}
+    >
+      <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+      {busy ? 'Opening checkout…' : `Register for the examination, ${price}`}
+    </button>
+  ) : (
+    <p className="text-sm text-amber-200">{advanced.purchase_blocked_reason}</p>
+  );
 
   return (
     <>
@@ -566,34 +742,43 @@ const CertificationPanel: React.FC<{
                           ))}
                         </ol>
                       )}
+                      {advanced.waiver?.declined && (
+                        <div className="mt-5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+                          <p className="text-sm text-amber-100">
+                            The instructor could not waive the fee. Register below to take the
+                            examination.
+                          </p>
+                          {advanced.waiver.message && (
+                            <p className="text-sm text-slate-300 mt-1">
+                              From the instructor: <em>{advanced.waiver.message}</em>
+                            </p>
+                          )}
+                        </div>
+                      )}
                       <div className="mt-5 flex flex-wrap items-center gap-3">
-                        {advanced.can_purchase ? (
+                        {registerButton}
+                        {advanced.waiver?.can_request && !asking && (
                           <button
                             type="button"
-                            className="btn-primary"
-                            disabled={busy}
-                            onClick={async () => {
-                              setBusy(true);
-                              try {
-                                const { url } = await academy.advancedCheckout(code);
-                                window.location.href = url;
-                              } catch (err) {
-                                setError(
-                                  err instanceof ApiError ? err.message : 'Could not start checkout.'
-                                );
-                                setBusy(false);
-                              }
-                            }}
+                            className="text-sm text-cyan-400 hover:text-cyan-300 underline-offset-2 hover:underline"
+                            onClick={() => setAsking(true)}
                           >
-                            <ShieldCheck className="w-4 h-4" aria-hidden="true" />
-                            {busy
-                              ? 'Opening checkout…'
-                              : `Register for the examination, ${money(advanced.price_cents, advanced.currency)}`}
+                            Request a fee waiver
                           </button>
-                        ) : (
-                          <p className="text-sm text-amber-200">{advanced.purchase_blocked_reason}</p>
                         )}
                       </div>
+                      {asking && advanced.waiver?.can_request && (
+                        <WaiverForm
+                          code={code}
+                          reasons={advanced.waiver.reasons}
+                          price={price}
+                          onCancel={() => setAsking(false)}
+                          onDone={(adv) => {
+                            setAsking(false);
+                            setData({ ...data, advanced: { ...advanced, ...adv } });
+                          }}
+                        />
+                      )}
                       <p className="text-xs text-slate-500 mt-3">
                         The fee pays for the examination, not the outcome. If mastery is not
                         demonstrated at the first session, one complimentary re-examination is
@@ -601,6 +786,30 @@ const CertificationPanel: React.FC<{
                         examination.
                       </p>
                     </>
+                  )}
+
+                  {state && state.status === 'waiver_requested' && (
+                    <div className="mt-3">
+                      <div className="flex gap-3">
+                        <MailQuestion className="w-5 h-5 text-cyan-300 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div>
+                          <div className="text-sm font-semibold text-white">
+                            Your fee-waiver request is with the instructor
+                          </div>
+                          <p className="text-sm text-slate-300 mt-0.5">
+                            Sent {fmtDate(state.waiver_requested_at)}
+                            {reasonLabel(state.waiver_reason) && (
+                              <> · {reasonLabel(state.waiver_reason)}</>
+                            )}
+                            . You will hear back by email, and nothing has been charged.
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-slate-400 mt-4">
+                        Prefer not to wait? Registering and paying now closes the request.
+                      </p>
+                      <div className="mt-3">{registerButton}</div>
+                    </div>
                   )}
 
                   {state && state.status === 'purchased' && (
@@ -617,6 +826,18 @@ const CertificationPanel: React.FC<{
                         <ClipboardCheck className="w-4 h-4" aria-hidden="true" />
                         {state.exam_attempts > 0 ? 'Retake the written examination' : 'Start the written examination'}
                       </Link>
+                      {state.fee_status === 'waived' && (
+                        <p className="text-xs text-slate-400 mt-3">
+                          No fee to pay: the instructor waived it.
+                        </p>
+                      )}
+                      {feeDue && (
+                        <FeeDue
+                          code={code}
+                          amount={money(state.fee_due_cents, advanced.currency)}
+                          confirming={confirming}
+                        />
+                      )}
                     </div>
                   )}
 
@@ -661,6 +882,13 @@ const CertificationPanel: React.FC<{
                           <SlotsForm
                             code={code}
                             onDone={(adv) => setData({ ...data, advanced: { ...advanced, ...adv } })}
+                          />
+                        ) : feeDue ? (
+                          // "Pay before the interview": the payment is the next step.
+                          <FeeDue
+                            code={code}
+                            amount={money(state.fee_due_cents, advanced.currency)}
+                            confirming={confirming}
                           />
                         ) : (
                           <p className="mt-2 text-sm text-amber-200">{state.propose_blocked_reason}</p>

@@ -348,6 +348,20 @@ export const academy = {
       body: JSON.stringify({ slots, timezone, note }),
     }),
 
+  /* Ask the instructor to waive the examination fee. Opens nothing by
+   * itself: he decides, and the candidate can still pay meanwhile. */
+  requestFeeWaiver: (code: string, reason: string, note: string) =>
+    request<CertificationStatus['advanced']>(`/api/academy/advanced/${code}/waiver`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, note }),
+    }),
+
+  /* Pay a fee the instructor deferred ("pay before the interview"). */
+  payExamFee: (code: string) =>
+    request<{ url: string; session_id: string }>(`/api/academy/advanced/${code}/pay`, {
+      method: 'POST',
+    }),
+
   /* Public — no session needed. */
   verifyCertificate: (certCode: string) =>
     request<VerifyResult>(`/api/academy/verify/${encodeURIComponent(certCode)}`),
@@ -398,6 +412,7 @@ export type CompetencyScore = {
 export type AdvancedState = {
   id: number;
   status:
+    | 'waiver_requested'
     | 'purchased'
     | 'exam_passed'
     | 'slots_proposed'
@@ -407,6 +422,12 @@ export type AdvancedState = {
     | 'failed'
     | 'exam_failed'
     | 'cancelled';
+  /* '' (settled at registration) | 'paid' | 'waived' | 'due' — 'due' means
+   * the instructor let them start unpaid: the interview waits for the fee. */
+  fee_status: '' | 'paid' | 'waived' | 'due';
+  fee_due_cents: number;
+  waiver_reason: string;
+  waiver_requested_at: string | null;
   exam_attempts: number;
   exam_best_pct: number;
   exam_open: boolean;
@@ -449,6 +470,14 @@ export type CertificationStatus = {
     can_purchase: boolean;
     purchase_blocked_reason: string;
     competencies: string[];
+    /* The "Request a fee waiver" link under the register button. */
+    waiver: {
+      can_request: boolean;
+      reasons: { key: string; label: string }[];
+      /* The last request was answered "please register and pay". */
+      declined: boolean;
+      message: string;
+    };
     state: AdvancedState | null;
     certificate: IssuedCertificate | null;
   };

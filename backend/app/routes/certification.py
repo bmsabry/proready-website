@@ -7,6 +7,9 @@
   GET  /api/academy/verify/{cert_code}/certificate.pdf
   GET  /api/academy/verify/{cert_code}/certificate.png
   POST /api/academy/advanced/{code}/checkout        — buy the examined tier
+  POST /api/academy/advanced/{code}/waiver          — ask the instructor to
+                                                      waive the fee
+  POST /api/academy/advanced/{code}/pay             — pay a deferred fee
   GET  /api/academy/advanced/{code}/exam            — written exam items
   POST /api/academy/advanced/{code}/exam            — submit written exam
   POST /api/academy/advanced/{code}/slots           — propose interview windows
@@ -217,21 +220,16 @@ def certificate_png(cert_code: str, db: Session = Depends(get_db)) -> Response:
 # Examined tier — purchase
 # -----------------------------------------------------------------------------
 
-@router.post("/advanced/{code}/checkout")
-def advanced_checkout(
-    code: str,
-    db: Session = Depends(get_db),
-    learner: Learner = Depends(require_learner),
+def _advanced_checkout_session(
+    db: Session, learner: Learner, product: Product, amount_cents: int, currency: str,
+    extra_metadata: dict | None = None,
 ) -> dict:
+    """One Stripe Checkout Session for the examined-tier fee, plus its
+    pending Order. The webhook (checkout.fulfil_advanced_cert) opens the
+    examination, or settles a deferred fee when the metadata names a row."""
     from .checkout import _stripe  # noqa: PLC0415 — lazy SDK import lives there
 
     settings = get_settings()
-    product = _product_or_404(db, code)
-    ok, reason = adv.eligibility(db, learner, product)
-    if not ok:
-        raise HTTPException(status_code=409, detail=reason)
-    if product.advanced_cert_price_cents <= 0:
-        raise HTTPException(status_code=409, detail="No price is set for the examined tier.")
     stripe = _stripe()
     try:
         session = stripe.checkout.Session.create(
@@ -240,8 +238,8 @@ def advanced_checkout(
                 {
                     "quantity": 1,
                     "price_data": {
-                        "currency": product.currency,
-                        "unit_amount": product.advanced_cert_price_cents,
+                        "currency": currency,
+                        "unit_amount": amount_cents,
                         "product_data": {
                             "name": f"Instructor-examined certification — {product.title}",
                             "description": (
@@ -261,6 +259,7 @@ def advanced_checkout(
                 "kind": "advanced_cert",
                 "product_code": product.code,
                 "learner_id": str(learner.id),
+                **(extra_metadata or {}),
             },
             billing_address_collection="auto",
             allow_promotion_codes=True,
@@ -280,13 +279,77 @@ def advanced_checkout(
             provider="stripe",
             kind="advanced_cert",
             provider_ref=session.id,
-            amount_cents=product.advanced_cert_price_cents,
-            currency=product.currency,
+            amount_cents=amount_cents,
+            currency=currency,
             status="pending",
         )
     )
     db.commit()
     return {"url": session.url, "session_id": session.id}
+
+
+@router.post("/advanced/{code}/checkout")
+def advanced_checkout(
+    code: str,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> dict:
+    product = _product_or_404(db, code)
+    ok, reason = adv.eligibility(db, learner, product)
+    if not ok:
+        raise HTTPException(status_code=409, detail=reason)
+    if product.advanced_cert_price_cents <= 0:
+        raise HTTPException(status_code=409, detail="No price is set for the examined tier.")
+    return _advanced_checkout_session(
+        db, learner, product, product.advanced_cert_price_cents, product.currency
+    )
+
+
+# -----------------------------------------------------------------------------
+# Examined tier — fee waivers
+# -----------------------------------------------------------------------------
+
+class WaiverIn(BaseModel):
+    reason: str = Field(max_length=32)
+    note: str = Field(default="", max_length=1000)
+
+
+@router.post("/advanced/{code}/waiver")
+def request_fee_waiver(
+    code: str,
+    body: WaiverIn,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> dict:
+    """Ask the instructor to waive the fee. Opens nothing by itself: the
+    instructor decides in the admin panel, and the candidate may still pay
+    in the meantime."""
+    product = _product_or_404(db, code)
+    try:
+        adv.request_waiver(db, learner, product, body.reason, body.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return certification_payload(db, learner, product)["advanced"]
+
+
+@router.post("/advanced/{code}/pay")
+def pay_examination_fee(
+    code: str,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> dict:
+    """Pay a fee the instructor deferred ("pay before the interview")."""
+    product = _product_or_404(db, code)
+    row = adv.current(db, learner, code)
+    if not adv.fee_due(row):
+        raise HTTPException(status_code=409, detail="No examination fee is due.")
+    amount = row.amount_cents or product.advanced_cert_price_cents
+    if amount <= 0:
+        raise HTTPException(status_code=409, detail="No examination fee is due.")
+    return _advanced_checkout_session(
+        db, learner, product, amount, row.currency or product.currency,
+        extra_metadata={"row_id": str(row.id)},
+    )
 
 
 # -----------------------------------------------------------------------------
