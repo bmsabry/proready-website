@@ -67,6 +67,36 @@ TEMPLATES = {
         "Otherwise, to join by phone, dial +1 321-430-1922 and enter this PIN: 316 913 670#",
         60,
     ),
+    # Examined tier: comps and fee waivers (2026-10).
+    "advanced_purchased_comp": lambda: E.advanced_purchased_html("Ada", "Course X", LINK, ""),
+    "advanced_exam_passed_fee_due": lambda: E.advanced_exam_passed_html(
+        "Ada", "Course X", 91.0, LINK, fee_due_display="$300"
+    ),
+    "advanced_waiver_request_admin": lambda: E.advanced_waiver_request_admin_html(
+        learner_name="Ada Lovelace", learner_email="ada@example.com", course_title="Course X",
+        price_display="$300", reason_label="Their employer is paying",
+        note="My employer, Acme, is paying.", completion_line="Certificate PRE-C-1, issued May 1, 2026",
+        request_id=7, review_url=LINK,
+    ),
+    "advanced_fee_waived_exam": lambda: E.advanced_fee_waived_html(
+        "Ada", "Course X", "$300", "Good luck.", LINK, stage="exam"
+    ),
+    "advanced_fee_waived_book": lambda: E.advanced_fee_waived_html(
+        "Ada", "Course X", "$300", "", LINK, stage="book"
+    ),
+    "advanced_fee_deferred": lambda: E.advanced_fee_deferred_html(
+        "Ada", "Course X", "$300", "Pay when the invoice clears.", LINK
+    ),
+    "advanced_waiver_declined": lambda: E.advanced_waiver_declined_html(
+        "Ada", "Course X", "$300", "I cannot waive it.", LINK
+    ),
+    "advanced_fee_paid": lambda: E.advanced_fee_paid_html(
+        "Ada", "Course X", "$300", LINK, can_book=True
+    ),
+    "advanced_extra_payment_admin": lambda: E.advanced_extra_payment_admin_html(
+        learner_name="Ada", learner_email="ada@example.com", course_title="Course X",
+        amount_display="$300", fee_state="waived", order_ref="#12 (cs_test)", admin_url=LINK,
+    ),
 }
 
 IGNORED_TEXT_TAGS = {"title", "style", "script", "head", "meta"}
