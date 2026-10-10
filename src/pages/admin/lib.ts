@@ -601,6 +601,7 @@ export type ViewState =
   | { page: 'overview' }
   | { page: 'courses'; course?: string; tab?: CourseTab }
   | { page: 'academy' }
+  | { page: 'certification' }
   | { page: 'students'; learner?: number }
   | { page: 'traffic' }
   | { page: 'software'; slug?: string }
@@ -618,6 +619,8 @@ export function hashFor(v: ViewState): string {
       return v.slug ? `#software/${encodeURIComponent(v.slug)}` : '#software';
     case 'academy':
       return '#academy';
+    case 'certification':
+      return '#certification';
     case 'students':
       return v.learner ? `#students/${v.learner}` : '#students';
     case 'traffic':
@@ -658,6 +661,8 @@ export function parseHash(raw: string): ViewState {
       return a ? { page: 'software', slug: a } : { page: 'software' };
     case 'academy':
       return { page: 'academy' };
+    case 'certification':
+      return { page: 'certification' };
     case 'students': {
       const id = Number(a);
       return Number.isInteger(id) && id > 0 ? { page: 'students', learner: id } : { page: 'students' };

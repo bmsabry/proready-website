@@ -5,12 +5,13 @@ import {
   CalendarClock,
   ExternalLink,
   FileSignature,
+  MailQuestion,
   RefreshCw,
   Settings2,
   Users,
 } from 'lucide-react';
 import { api, API_BASE, reportError, type Course } from './lib';
-import { EmptyState, Kpi, Notice } from './ui';
+import { ConfirmButton, EmptyState, Kpi, Notice } from './ui';
 
 /* Certification tab — the one place the instructor-examined tier is decided.
  *
@@ -19,10 +20,19 @@ import { EmptyState, Kpi, Notice } from './ui';
  * giving a written exam back, comping a candidate, revoking or re-issuing a
  * certificate. Nothing on this tab happens automatically. */
 
-type Candidate = {
+export type FeeEvent = {
+  at: string;
+  event: string;
+  by: string;
+  note: string;
+  amount_cents?: number;
+};
+
+export type Candidate = {
   id: number;
   email: string;
   full_name: string;
+  product_code: string;
   status: string;
   source: string;
   amount_cents: number;
@@ -40,6 +50,19 @@ type Candidate = {
   retake_after: string | null;
   outcome_note: string;
   certificate_code: string;
+  // Fee waivers (2026-10). fee_status: '' (settled at registration) |
+  // 'paid' | 'waived' | 'due'; amount_cents is the amount owed while due.
+  fee_status: '' | 'paid' | 'waived' | 'due';
+  fee_due: boolean;
+  waiver_reason: string;
+  waiver_reason_label: string;
+  waiver_note: string;
+  waiver_requested_at: string | null;
+  waiver_decision: string;
+  waiver_decided_at: string | null;
+  waiver_decided_by: string;
+  waiver_admin_note: string;
+  fee_log: FeeEvent[];
   created_at: string;
 };
 
@@ -77,10 +100,19 @@ type Overview = {
   interview_minutes: number;
   candidates: Candidate[];
   certificates: CertRow[];
-  counts: { completion: number; verified: number; awaiting_action: number };
+  counts: {
+    completion: number;
+    verified: number;
+    awaiting_action: number;
+    waiver_requests: number;
+    fees_due: number;
+  };
 };
 
 const STATUS_LABEL: Record<string, string> = {
+  waiver_requested: 'Fee-waiver request — decide',
+  waiver_declined: 'Waiver declined — asked to pay',
+  waiver_withdrawn: 'Waiver request closed',
   purchased: 'Written exam open',
   exam_passed: 'Awaiting learner windows',
   slots_proposed: 'Windows proposed — confirm one',
@@ -95,7 +127,7 @@ const STATUS_LABEL: Record<string, string> = {
 const badgeCls = (status: string) =>
   status === 'passed'
     ? 'border-emerald-700 text-emerald-200 bg-emerald-950/40'
-    : status === 'slots_proposed' || status === 'scheduled'
+    : status === 'slots_proposed' || status === 'scheduled' || status === 'waiver_requested'
       ? 'border-amber-700 text-amber-200 bg-amber-950/40'
       : status === 'failed' || status === 'cancelled' || status === 'exam_failed'
         ? 'border-red-900 text-red-300 bg-red-950/30'
@@ -103,6 +135,37 @@ const badgeCls = (status: string) =>
 
 const fmt = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+
+export const money = (cents: number, currency = 'usd') =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: (currency || 'usd').toUpperCase(),
+    maximumFractionDigits: cents % 100 === 0 ? 0 : 2,
+  }).format(cents / 100);
+
+const FEE_EVENT_LABEL: Record<string, string> = {
+  requested: 'Fee waiver requested',
+  waived: 'Fee waived',
+  deferred: 'Pay before the interview',
+  declined: 'Asked to pay now',
+  paid: 'Paid',
+  comped: 'Comped (no charge)',
+  fee_waived: 'Due fee waived',
+  withdrawn: 'Request closed',
+  extra_payment: 'Payment not owed (refund it in Stripe)',
+};
+
+/** One line on the card for where the money stands. */
+function feeSummary(c: Candidate): string {
+  if (c.status === 'waiver_requested') return 'asks for a fee waiver';
+  if (c.status === 'waiver_declined') return 'waiver declined, asked to pay';
+  if (c.status === 'waiver_withdrawn')
+    return c.waiver_decision === 'comped' ? 'waiver request closed (comped)' : 'waiver request closed (paid)';
+  if (c.fee_status === 'due') return `fee due ${money(c.amount_cents, c.currency)}`;
+  if (c.fee_status === 'waived') return c.source === 'manual' ? 'comped' : 'fee waived';
+  if (c.source === 'manual') return 'comped';
+  return `${c.source} · ${money(c.amount_cents, c.currency)}`;
+}
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -206,7 +269,15 @@ export default function CertificationTab({
         ) : (
           <div className="space-y-4 mt-4">
             {data.candidates.map((c) => (
-              <CandidateCard key={c.id} c={c} minutes={data.interview_minutes} busy={busy} run={run} />
+              <CandidateCard
+                key={c.id}
+                c={c}
+                minutes={data.interview_minutes}
+                priceCents={data.product.advanced_cert_price_cents}
+                currency={data.product.currency}
+                busy={busy}
+                run={run}
+              />
             ))}
           </div>
         )}
@@ -453,16 +524,24 @@ function CompForm({
 
 // ----- Candidate card ------------------------------------------------------------
 
-function CandidateCard({
+export function CandidateCard({
   c,
   minutes,
+  priceCents,
+  currency,
   busy,
   run,
+  context,
 }: {
   c: Candidate;
   minutes: number;
+  /** The course's current examined-tier price, for the waiver choices. */
+  priceCents: number;
+  currency: string;
   busy: string | null;
   run: (key: string, fn: () => Promise<unknown>, done: string) => Promise<void>;
+  /** Shown above the name — the Certification page says which course. */
+  context?: React.ReactNode;
 }) {
   const [pick, setPick] = useState<string>(c.proposed_slots[0]?.iso ?? '');
   const [custom, setCustom] = useState('');
@@ -470,31 +549,58 @@ function CandidateCard({
   const [outcomeNote, setOutcomeNote] = useState('');
   const [retakeAfter, setRetakeAfter] = useState('');
   const [cancelNote, setCancelNote] = useState('');
+  const [message, setMessage] = useState('');
   const key = `cand-${c.id}`;
-  const canSchedule = ['slots_proposed', 'exam_passed', 'retake_pending', 'scheduled'].includes(c.status);
+  // A deferred fee keeps the interview locked until it is paid or waived.
+  const canSchedule =
+    ['slots_proposed', 'exam_passed', 'retake_pending', 'scheduled'].includes(c.status) && !c.fee_due;
+  const who = c.full_name || c.email;
+  const price = money(priceCents, currency);
+  const isRequest = c.status === 'waiver_requested';
+  const closed = ['passed', 'failed', 'cancelled', 'waiver_declined', 'waiver_withdrawn'].includes(c.status);
 
   return (
     <div className="card p-5">
+      {context}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-white font-semibold">{c.full_name || c.email}</div>
+          <div className="text-white font-semibold">{who}</div>
           <div className="text-xs text-slate-400">
-            {c.email} · {c.source === 'manual' ? 'comped' : `${c.source} · $${(c.amount_cents / 100).toFixed(0)}`} ·
-            opened {fmt(c.created_at)}
+            {c.email} · {feeSummary(c)} · {isRequest ? 'asked' : 'opened'} {fmt(c.created_at)}
           </div>
         </div>
-        <span className={`text-xs px-2 py-1 rounded-full border ${badgeCls(c.status)}`}>
-          {STATUS_LABEL[c.status] ?? c.status}
-          {c.interview_no > 1 && c.status !== 'passed' ? ' · re-exam' : ''}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {c.fee_due && (
+            <span className="text-xs px-2 py-1 rounded-full border border-amber-700 text-amber-200 bg-amber-950/40">
+              Fee due {money(c.amount_cents, c.currency)}
+            </span>
+          )}
+          <span className={`text-xs px-2 py-1 rounded-full border ${badgeCls(c.status)}`}>
+            {STATUS_LABEL[c.status] ?? c.status}
+            {c.interview_no > 1 && c.status !== 'passed' ? ' · re-exam' : ''}
+          </span>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4 mt-4 text-sm">
         <div className="space-y-1 text-slate-300">
-          <div>
-            Written exam: {c.exam_attempts} attempt{c.exam_attempts === 1 ? '' : 's'}
-            {c.exam_attempts > 0 && <> · best {c.exam_best_pct}%</>}
-          </div>
+          {(isRequest || c.waiver_requested_at) && (
+            <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3 mb-2">
+              <div className="text-xs uppercase tracking-wider text-slate-400">Fee-waiver request</div>
+              <div className="mt-1">{c.waiver_reason_label || 'No reason given'}</div>
+              {c.waiver_note && <div className="text-xs text-slate-300 mt-1">“{c.waiver_note}”</div>}
+              <div className="text-xs text-slate-500 mt-1">Asked {fmt(c.waiver_requested_at)}</div>
+              {c.waiver_admin_note && (
+                <div className="text-xs text-slate-400 mt-1">Your message: {c.waiver_admin_note}</div>
+              )}
+            </div>
+          )}
+          {!isRequest && c.status !== 'waiver_declined' && c.status !== 'waiver_withdrawn' && (
+            <div>
+              Written exam: {c.exam_attempts} attempt{c.exam_attempts === 1 ? '' : 's'}
+              {c.exam_attempts > 0 && <> · best {c.exam_best_pct}%</>}
+            </div>
+          )}
           {/* Read before the oral examination: weakest competency first, so the
               interview can be aimed at what the paper says is thin. */}
           {c.exam_breakdown?.length > 0 && (
@@ -562,9 +668,139 @@ function CandidateCard({
               Certificate <span className="font-mono text-slate-200">{c.certificate_code}</span>
             </div>
           )}
+          {/* The record of every money decision on this candidate: who, when, why. */}
+          {c.fee_log?.length > 0 && (
+            <div className="mt-3">
+              <div className="text-xs uppercase tracking-wider text-slate-400">Fee record</div>
+              <ul className="mt-1 space-y-0.5">
+                {c.fee_log.map((e, i) => (
+                  <li key={i} className="text-xs text-slate-400">
+                    {fmt(e.at)} · <span className="text-slate-200">{FEE_EVENT_LABEL[e.event] ?? e.event}</span>
+                    {e.amount_cents ? <> {money(e.amount_cents, c.currency)}</> : null}
+                    {e.by ? <> · {e.by}</> : null}
+                    {/* The request's own note is shown in the box above. */}
+                    {e.note && e.event !== 'requested' ? <> — “{e.note}”</> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">
+          {isRequest && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 space-y-2">
+              <div className="text-xs uppercase tracking-wider text-amber-200 flex items-center gap-1">
+                <MailQuestion className="w-3.5 h-3.5" /> Decide the {price} fee
+              </div>
+              <textarea
+                rows={2}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                maxLength={2000}
+                placeholder="Message to the candidate (optional, goes into their email)"
+                className="w-full rounded-lg bg-slate-950/70 border border-slate-700 px-2 py-1.5 text-white text-xs"
+              />
+              <div className="flex flex-wrap gap-2">
+                <ConfirmButton
+                  disabled={busy === key}
+                  className="btn-primary text-xs py-1.5 px-3"
+                  title="The written examination opens at no charge"
+                  message={`Waive the ${price} fee for ${who}? Their written examination opens now and they are emailed.`}
+                  onConfirm={() =>
+                    void run(
+                      key,
+                      () =>
+                        api(`/api/admin/academy/certification/advanced/${c.id}/waiver`, {
+                          method: 'POST',
+                          body: JSON.stringify({ decision: 'waive', note: message }),
+                        }),
+                      `Fee waived. ${who} has been emailed and the written examination is open.`
+                    )
+                  }
+                >
+                  Waive
+                </ConfirmButton>
+                <ConfirmButton
+                  disabled={busy === key}
+                  className="btn-secondary text-xs py-1.5 px-3"
+                  title="The written examination opens now; the interview waits for the fee"
+                  message={`Open ${who}'s written examination now, with the ${price} fee due before the interview? They are emailed.`}
+                  onConfirm={() =>
+                    void run(
+                      key,
+                      () =>
+                        api(`/api/admin/academy/certification/advanced/${c.id}/waiver`, {
+                          method: 'POST',
+                          body: JSON.stringify({ decision: 'defer', note: message }),
+                        }),
+                      `Written examination opened for ${who}; the ${price} fee is due before the interview. They have been emailed.`
+                    )
+                  }
+                >
+                  Pay before the interview
+                </ConfirmButton>
+                <ConfirmButton
+                  disabled={busy === key}
+                  className="btn-ghost text-xs text-amber-200"
+                  title="Nothing opens until they register and pay"
+                  message={`Ask ${who} to register and pay ${price}? Nothing opens until they do; they are emailed.`}
+                  onConfirm={() =>
+                    void run(
+                      key,
+                      () =>
+                        api(`/api/admin/academy/certification/advanced/${c.id}/waiver`, {
+                          method: 'POST',
+                          body: JSON.stringify({ decision: 'decline', note: message }),
+                        }),
+                      `${who} has been asked to register and pay.`
+                    )
+                  }
+                >
+                  Ask them to pay now
+                </ConfirmButton>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Until you decide, they can still pay by card themselves, which closes the request.
+              </p>
+            </div>
+          )}
+
+          {c.fee_due && (
+            <div className="rounded-lg border border-amber-500/30 p-3 space-y-2">
+              <div className="text-xs text-amber-200">
+                The {money(c.amount_cents, c.currency)} fee is due before the interview. The
+                candidate is asked to pay before booking; until then interview times cannot be
+                confirmed.
+              </div>
+              <input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                maxLength={2000}
+                placeholder="Message to the candidate (optional)"
+                className="w-full rounded-lg bg-slate-950/70 border border-slate-700 px-2 py-1.5 text-white text-xs"
+              />
+              <ConfirmButton
+                disabled={busy === key}
+                className="btn-secondary text-xs py-1.5 px-3"
+                message={`Waive the ${money(c.amount_cents, c.currency)} fee ${who} still owes? They are emailed.`}
+                onConfirm={() =>
+                  void run(
+                    key,
+                    () =>
+                      api(`/api/admin/academy/certification/advanced/${c.id}/waive-fee`, {
+                        method: 'POST',
+                        body: JSON.stringify({ note: message }),
+                      }),
+                    `Fee waived. ${who} has been emailed.`
+                  )
+                }
+              >
+                Waive the fee
+              </ConfirmButton>
+            </div>
+          )}
+
           {canSchedule && c.status !== 'scheduled' && (
             <div className="rounded-lg border border-slate-800 p-3 space-y-2">
               <div className="text-xs uppercase tracking-wider text-slate-400 flex items-center gap-1">
@@ -725,7 +961,7 @@ function CandidateCard({
             </button>
           )}
 
-          {!['passed', 'failed', 'cancelled'].includes(c.status) && (
+          {!closed && !isRequest && (
             <div className="flex items-center gap-2">
               <input
                 value={cancelNote}

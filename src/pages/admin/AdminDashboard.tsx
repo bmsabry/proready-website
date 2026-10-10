@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity,
+  Award,
   BookOpen,
   GraduationCap,
   LayoutDashboard,
@@ -35,6 +36,7 @@ import OverviewPage from './OverviewPage';
 import CoursesPage from './CoursesPage';
 import CourseWorkspace from './CourseWorkspace';
 import AcademyPage from './AcademyPage';
+import CertificationPage, { type CertificationSummary } from './CertificationPage';
 import StudentActivityPage from './StudentActivityPage';
 import TrafficPage from './TrafficPage';
 import SoftwarePage from './SoftwarePage';
@@ -48,6 +50,7 @@ const NAV: { page: ViewState['page']; label: string; icon: LucideIcon }[] = [
   { page: 'overview', label: 'Overview', icon: LayoutDashboard },
   { page: 'traffic', label: 'Website Traffic', icon: LineChart },
   { page: 'courses', label: 'Courses', icon: BookOpen },
+  { page: 'certification', label: 'Certification', icon: Award },
   { page: 'academy', label: 'Academy', icon: GraduationCap },
   { page: 'students', label: 'Student Activity', icon: Activity },
   { page: 'software', label: 'Software', icon: MonitorDown },
@@ -67,6 +70,9 @@ export default function AdminDashboard() {
   // automatic replies are working. Refreshed on every navigation and each
   // minute, so a new enquiry shows up without opening Support.
   const [support, setSupport] = useState<{ needsYou: number; aiDown: boolean } | null>(null);
+  // Certification's badge: fee-waiver requests, interview windows to confirm
+  // and outcomes to record, across every course.
+  const [certNeeds, setCertNeeds] = useState(0);
 
   const onAuthError = useCallback(() => {
     navigate('/admin/login', { replace: true });
@@ -119,6 +125,15 @@ export default function AdminDashboard() {
     };
   }, [onAuthError]);
 
+  const refreshCert = useCallback(async () => {
+    try {
+      const c = await api<CertificationSummary>('/api/admin/academy/certification');
+      setCertNeeds(c.needs_you ?? 0);
+    } catch {
+      /* a badge is not worth an error banner */
+    }
+  }, []);
+
   const page = view.page;
   const ref = view.page === 'support' ? view.ref : undefined;
   useEffect(() => {
@@ -135,6 +150,7 @@ export default function AdminDashboard() {
       } catch {
         /* a badge is not worth an error banner */
       }
+      await refreshCert();
     };
     void refresh();
     const id = window.setInterval(() => {
@@ -144,7 +160,7 @@ export default function AdminDashboard() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [adminEmail, page, ref]);
+  }, [adminEmail, page, ref, refreshCert]);
 
   async function handleLogout() {
     if (API_BASE) {
@@ -180,6 +196,11 @@ export default function AdminDashboard() {
     }
     case 'academy':
       content = <AcademyPage onAuthError={onAuthError} />;
+      break;
+    case 'certification':
+      content = (
+        <CertificationPage onAuthError={onAuthError} go={go} onChanged={() => void refreshCert()} />
+      );
       break;
     case 'students':
       content = (
@@ -230,11 +251,18 @@ export default function AdminDashboard() {
           {NAV.map((item) => {
             const Icon = item.icon;
             const active = view.page === item.page;
-            const badge = item.page === 'support' && support ? support : null;
+            const badge =
+              item.page === 'support' && support
+                ? support
+                : item.page === 'certification' && certNeeds > 0
+                  ? { needsYou: certNeeds, aiDown: false }
+                  : null;
             const title = badge
-              ? `${item.label} — ${badge.needsYou} need${badge.needsYou === 1 ? 's' : ''} your reply${
-                  badge.aiDown ? '; automatic replies are off' : ''
-                }`
+              ? item.page === 'certification'
+                ? `${item.label} — ${badge.needsYou} waiting on you`
+                : `${item.label} — ${badge.needsYou} need${badge.needsYou === 1 ? 's' : ''} your reply${
+                    badge.aiDown ? '; automatic replies are off' : ''
+                  }`
               : item.label;
             return (
               <button
