@@ -1,5 +1,8 @@
 """Admin API for certification — the only place the examined tier is decided.
 
+  GET  /api/admin/academy/certification                         every course:
+                                                                  what waits on
+                                                                  the instructor
   GET  /api/admin/academy/certification/{product_code}          overview
   POST /api/admin/academy/certification/{product_code}/exam-items load the
                                                                   written bank
@@ -14,6 +17,11 @@
   POST /api/admin/academy/certification/advanced/{id}/reopen
   POST /api/admin/academy/certification/advanced/{id}/reset-exam
   POST /api/admin/academy/certification/advanced/{id}/cancel
+  POST /api/admin/academy/certification/advanced/{id}/waiver    waive|defer|
+                                                                  decline a
+                                                                  fee-waiver
+                                                                  request
+  POST /api/admin/academy/certification/advanced/{id}/waive-fee a fee left due
   POST /api/admin/academy/certification/certificates/{code}/revoke
   POST /api/admin/academy/certification/certificates/{code}/reissue
 """
@@ -22,7 +30,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
@@ -71,6 +79,92 @@ def _cert_admin_out(db: Session, cert: Certificate) -> dict:
     }
 
 
+# What waits on the instructor, in the order he should take it.
+_WAITING_ORDER = {"waiver_requested": 0, "slots_proposed": 1, "scheduled": 2}
+
+
+def _waiting_reason(row: AdvancedCertification, now: datetime) -> str:
+    if row.status == "waiver_requested":
+        return "Fee-waiver request: decide"
+    if row.status == "slots_proposed":
+        return "Interview windows proposed: confirm one"
+    if row.status == "scheduled" and row.scheduled_at and svc._aware(row.scheduled_at) <= now:
+        return "Interview time has passed: record the outcome"
+    return ""
+
+
+@router.get("")
+def summary(db: Session = Depends(get_db), _: str = Depends(require_admin)) -> dict:
+    """Every course with the examined tier, and every candidate waiting on
+    the instructor across them — the admin panel's Certification page and
+    the count on its menu item."""
+    now = datetime.now(timezone.utc)
+    rows = db.execute(
+        select(AdvancedCertification).order_by(AdvancedCertification.id)
+    ).scalars().all()
+    by_product: dict[str, list[AdvancedCertification]] = {}
+    for r in rows:
+        by_product.setdefault(r.product_code, []).append(r)
+    verified: dict[str, int] = {}
+    for code, n in db.execute(
+        select(Certificate.product_code, func.count())
+        .where(Certificate.tier == "verified", Certificate.status == "issued")
+        .group_by(Certificate.product_code)
+    ).all():
+        verified[code] = n
+
+    courses, waiting = [], []
+    for product in db.execute(select(Product).order_by(Product.title)).scalars().all():
+        mine = by_product.get(product.code, [])
+        if not (product.advanced_cert_enabled or mine):
+            continue
+        course = adv.course_for_product(db, product.code)
+        counts = {
+            "waiver_requests": sum(1 for r in mine if r.status == "waiver_requested"),
+            "windows_to_confirm": sum(1 for r in mine if r.status == "slots_proposed"),
+            "outcomes_to_record": sum(
+                1 for r in mine
+                if r.status == "scheduled" and r.scheduled_at and svc._aware(r.scheduled_at) <= now
+            ),
+            "upcoming_interviews": sum(
+                1 for r in mine
+                if r.status == "scheduled" and r.scheduled_at and svc._aware(r.scheduled_at) > now
+            ),
+            "fees_due": sum(1 for r in mine if adv.fee_due(r)),
+            "in_progress": sum(1 for r in mine if r.status in adv.OPEN_STATES),
+            "verified": verified.get(product.code, 0),
+        }
+        needs = counts["waiver_requests"] + counts["windows_to_confirm"] + counts["outcomes_to_record"]
+        courses.append({
+            "product_code": product.code,
+            "product_title": product.title,
+            "course_code": course.code if course else "",
+            "course_title": course.title if course else "",
+            "enabled": bool(product.advanced_cert_enabled),
+            "price_cents": product.advanced_cert_price_cents,
+            "currency": product.currency,
+            "exam_item_count": len(adv.exam_items(db, product.code)),
+            "counts": counts,
+            "needs_you": needs,
+        })
+        for r in mine:
+            why = _waiting_reason(r, now)
+            if why:
+                waiting.append({
+                    **adv.admin_out(db, r),
+                    "waiting_reason": why,
+                    "product_title": product.title,
+                    "course_code": course.code if course else "",
+                })
+    waiting.sort(key=lambda w: (_WAITING_ORDER.get(w["status"], 9), w["id"]))
+    return {
+        "needs_you": sum(c["needs_you"] for c in courses),
+        "interview_minutes": get_settings().ADVANCED_INTERVIEW_MINUTES,
+        "courses": courses,
+        "waiting": waiting,
+    }
+
+
 @router.get("/{product_code}")
 def overview(
     product_code: str, db: Session = Depends(get_db), _: str = Depends(require_admin)
@@ -79,8 +173,11 @@ def overview(
     rows = db.execute(
         select(AdvancedCertification)
         .where(AdvancedCertification.product_code == product_code)
-        .order_by(AdvancedCertification.created_at.desc())
+        .order_by(AdvancedCertification.created_at.desc(), AdvancedCertification.id.desc())
     ).scalars().all()
+    # Fee-waiver requests first: they are the one thing a candidate cannot
+    # move past without the instructor.
+    rows = sorted(rows, key=lambda r: r.status != "waiver_requested")
     issued = db.execute(
         select(Certificate)
         .where(Certificate.product_code == product_code)
@@ -110,7 +207,11 @@ def overview(
             "completion": sum(1 for c in issued if c.tier == "completion" and c.status == "issued"),
             "verified": sum(1 for c in issued if c.tier == "verified" and c.status == "issued"),
             "attendance": sum(1 for c in issued if c.tier == "attendance" and c.status == "issued"),
-            "awaiting_action": sum(1 for r in rows if r.status in ("slots_proposed", "scheduled")),
+            "awaiting_action": sum(
+                1 for r in rows if r.status in ("waiver_requested", "slots_proposed", "scheduled")
+            ),
+            "waiver_requests": sum(1 for r in rows if r.status == "waiver_requested"),
+            "fees_due": sum(1 for r in rows if adv.fee_due(r)),
         },
     }
 
@@ -320,7 +421,7 @@ class CompIn(BaseModel):
 
 @router.post("/comp")
 def comp_candidate(
-    body: CompIn, db: Session = Depends(get_db), _: str = Depends(require_admin)
+    body: CompIn, db: Session = Depends(get_db), admin: str = Depends(require_admin)
 ) -> dict:
     """Open the examined tier for someone without a payment."""
     product = _product(db, body.product_code)
@@ -337,6 +438,7 @@ def comp_candidate(
     row = adv.create(
         db, learner, product, source="manual", order_id=None,
         amount_cents=0, currency=product.currency, send_welcome=body.send_email,
+        by=admin,
     )
     if body.note:
         row.outcome_note = body.note
@@ -415,6 +517,42 @@ def cancel(
     row, _learner, _product = _row(db, row_id)
     try:
         adv.cancel(db, row, body.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return adv.admin_out(db, row)
+
+
+class WaiverDecisionIn(BaseModel):
+    decision: str  # 'waive' | 'defer' | 'decline'
+    # Goes into the candidate's email ("From the instructor: …").
+    note: str = Field(default="", max_length=2000)
+
+
+@router.post("/advanced/{row_id}/waiver")
+def decide_waiver(
+    row_id: int,
+    body: WaiverDecisionIn,
+    db: Session = Depends(get_db),
+    admin: str = Depends(require_admin),
+) -> dict:
+    """Answer a fee-waiver request. The only way one is answered: the
+    instructor's email links here and decides nothing itself."""
+    row, learner, product = _row(db, row_id)
+    try:
+        adv.decide_waiver(db, learner, product, row, body.decision, body.note, admin)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return adv.admin_out(db, row)
+
+
+@router.post("/advanced/{row_id}/waive-fee")
+def waive_fee(
+    row_id: int, body: NoteIn, db: Session = Depends(get_db), admin: str = Depends(require_admin)
+) -> dict:
+    """Waive a fee that was left due ("pay before the interview")."""
+    row, learner, product = _row(db, row_id)
+    try:
+        adv.waive_fee(db, learner, product, row, body.note, admin)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return adv.admin_out(db, row)
