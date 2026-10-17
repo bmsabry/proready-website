@@ -356,6 +356,19 @@ export const academy = {
       body: JSON.stringify({ reason, note }),
     }),
 
+  /* Open interview slots, straight from the instructor's calendar. mode
+   * 'propose' means the calendar is not in use right now: propose windows. */
+  bookingSlots: (code: string) =>
+    request<BookingSlots>(`/api/academy/advanced/${code}/booking`),
+
+  /* Book one of those slots. 409: it has just gone, pick another. 503: the
+   * calendar cannot be reached, propose windows instead. */
+  bookSlot: (code: string, start: string, timezone: string) =>
+    request<CertificationStatus['advanced']>(`/api/academy/advanced/${code}/book`, {
+      method: 'POST',
+      body: JSON.stringify({ start, timezone }),
+    }),
+
   /* Pay a fee the instructor deferred ("pay before the interview"). */
   payExamFee: (code: string) =>
     request<{ url: string; session_id: string }>(`/api/academy/advanced/${code}/pay`, {
@@ -426,6 +439,12 @@ export type AdvancedState = {
    * the instructor let them start unpaid: the interview waits for the fee. */
   fee_status: '' | 'paid' | 'waived' | 'due';
   fee_due_cents: number;
+  /* How the scheduling step books: 'calendar' (pick an open slot on the
+   * instructor's calendar) or 'propose' (propose windows for him to confirm);
+   * '' when not at that step. */
+  booking: '' | 'calendar' | 'propose';
+  /* The booking is on his Google Calendar and Google sent the invitation. */
+  calendar_invite: boolean;
   waiver_reason: string;
   waiver_requested_at: string | null;
   exam_attempts: number;
@@ -470,6 +489,9 @@ export type CertificationStatus = {
     can_purchase: boolean;
     purchase_blocked_reason: string;
     competencies: string[];
+    /* How the interview is booked: 'calendar' (open slots on the instructor's
+     * calendar) or 'propose' (windows he confirms). */
+    booking_mode: 'calendar' | 'propose';
     /* The "Request a fee waiver" link under the register button. */
     waiver: {
       can_request: boolean;
@@ -485,6 +507,15 @@ export type CertificationStatus = {
   attendance?: {
     certificate: IssuedCertificate | null;
   };
+};
+
+export type BookingSlots = {
+  mode: 'calendar' | 'propose';
+  minutes: number;
+  examiner_timezone?: string;
+  /* UTC start times, ISO 8601. */
+  slots: string[];
+  notice?: string;
 };
 
 export type AdvancedExamSet = {
