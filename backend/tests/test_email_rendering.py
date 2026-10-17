@@ -93,6 +93,34 @@ TEMPLATES = {
     "advanced_fee_paid": lambda: E.advanced_fee_paid_html(
         "Ada", "Course X", "$300", LINK, can_book=True
     ),
+    # Oral examination from the instructor's calendar (2026-10).
+    "advanced_scheduled_invite": lambda: E.advanced_scheduled_html(
+        "Ada", "Course X", ["Monday, November 02, 2026 at 15:00 (Europe/Berlin)"], LINK, 60, 1, LINK,
+        invite_from="bassam.abdelnabi@proreadyengineer.com",
+    ),
+    "advanced_scheduled_moved": lambda: E.advanced_scheduled_html(
+        "Ada", "Course X", ["Monday, November 02, 2026 at 15:00 (UTC)"], "", 60, 2, LINK, moved=True,
+    ),
+    "advanced_exam_passed_admin": lambda: E.advanced_exam_passed_admin_html(
+        learner_name="Ada Lovelace", learner_email="ada@example.com", course_title="Course X",
+        score=86.0, attempt_no=1,
+        breakdown=[{"label": "Surge margin", "correct": 9, "total": 14, "pct": 64.3}],
+        next_step="they choose an interview time from the open slots on your calendar.",
+        admin_url=LINK,
+    ),
+    "advanced_booked_admin": lambda: E.advanced_booked_admin_html(
+        learner_name="Ada Lovelace", learner_email="ada@example.com", course_title="Course X",
+        when_lines=["Monday, November 02, 2026 at 09:00 (US Eastern)"], meeting_url=LINK,
+        interview_no=1, calendar_account="bassam.abdelnabi@proreadyengineer.com",
+        breakdown=[], admin_url=LINK,
+    ),
+    "exam_calendar_problem": lambda: E.exam_calendar_problem_html("notFound", LINK),
+    "advanced_purchased_self_booking": lambda: E.advanced_purchased_html(
+        "Ada", "Course X", LINK, "$300", self_booking=True
+    ),
+    "advanced_exam_passed_self_booking": lambda: E.advanced_exam_passed_html(
+        "Ada", "Course X", 91.0, LINK, self_booking=True
+    ),
     "advanced_extra_payment_admin": lambda: E.advanced_extra_payment_admin_html(
         learner_name="Ada", learner_email="ada@example.com", course_title="Course X",
         amount_display="$300", fee_state="waived", order_ref="#12 (cs_test)", admin_url=LINK,
