@@ -18,6 +18,7 @@ import {
 import {
   academy,
   ApiError,
+  BookingSlots,
   certificateFileUrl,
   CertificationStatus,
   CompetencyScore,
@@ -280,6 +281,162 @@ const SlotsForm = ({
         {busy ? 'Sending…' : 'Send my windows'}
       </button>
     </form>
+  );
+};
+
+/* Book the oral examination from the instructor's open calendar slots. The
+ * times come from his own calendars with busy time removed, and are shown on
+ * the candidate's clock. If the calendar cannot be used right now the server
+ * answers mode 'propose', and the windows form takes over. */
+const SlotPicker = ({
+  code,
+  onDone,
+}: {
+  code: string;
+  onDone: (adv: CertificationStatus['advanced']) => void;
+}) => {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const [data, setData] = useState<BookingSlots | null>(null);
+  const [error, setError] = useState('');
+  const [day, setDay] = useState('');
+  const [pick, setPick] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setData(await academy.bookingSlots(code));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not load the open times.');
+    }
+  }, [code]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (!data) {
+    return error ? (
+      <p className="mt-3 text-sm text-red-300">{error}</p>
+    ) : (
+      <p className="mt-3 text-sm text-slate-400 animate-pulse">Loading the instructor's open times…</p>
+    );
+  }
+  if (data.mode === 'propose') {
+    return (
+      <>
+        {data.notice && <p className="mt-3 text-sm text-amber-200">{data.notice}</p>}
+        <SlotsForm code={code} onDone={onDone} />
+      </>
+    );
+  }
+  if (data.slots.length === 0) {
+    return (
+      <p className="mt-3 text-sm text-amber-200">
+        There are no open times in the coming weeks. Please check again in a few days, or write
+        to info@proreadyengineer.com.
+      </p>
+    );
+  }
+
+  // Group the open times by day on the candidate's own clock.
+  const groups = new Map<string, string[]>();
+  for (const iso of data.slots) {
+    const key = new Date(iso).toLocaleDateString('en-CA', { timeZone: tz });
+    groups.set(key, [...(groups.get(key) ?? []), iso]);
+  }
+  const days = [...groups.keys()];
+  const activeDay = day && groups.has(day) ? day : days[0];
+  const times = groups.get(activeDay) ?? [];
+  const dayLabel = (key: string) =>
+    new Date(groups.get(key)![0]).toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      timeZone: tz,
+    });
+  const timeLabel = (iso: string) =>
+    new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: tz });
+  const fullLabel = (iso: string) =>
+    new Date(iso).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short', timeZone: tz });
+
+  async function book() {
+    if (!pick) return;
+    setBusy(true);
+    setError('');
+    try {
+      onDone(await academy.bookSlot(code, pick, tz));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 503) {
+        // The calendar is unreachable: propose windows instead.
+        setData({ mode: 'propose', minutes: data!.minutes, slots: [], notice: err.message });
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Could not book that time.');
+        setPick('');
+        void load(); // the time may have just gone: show what is open now
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-4">
+      <p className="text-sm text-slate-300">
+        Choose a {data.minutes}-minute time that suits you. These are the instructor's open
+        times, shown on your clock ({tz}).
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2" aria-label="Day">
+        {days.map((k) => (
+          <button
+            type="button"
+            key={k}
+            onClick={() => {
+              setDay(k);
+              setPick('');
+            }}
+            aria-pressed={k === activeDay}
+            className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+              k === activeDay
+                ? 'border-cyan-400 bg-cyan-500/15 text-cyan-200'
+                : 'border-slate-700 text-slate-300 hover:border-slate-500'
+            }`}
+          >
+            {dayLabel(k)}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2" aria-label="Time">
+        {times.map((iso) => (
+          <button
+            type="button"
+            key={iso}
+            onClick={() => setPick(iso)}
+            aria-pressed={iso === pick}
+            className={`px-2 py-2 rounded-lg text-sm tabular-nums border transition-colors ${
+              iso === pick
+                ? 'border-cyan-400 bg-cyan-500/20 text-white'
+                : 'border-slate-700 text-slate-200 hover:border-slate-500'
+            }`}
+          >
+            {timeLabel(iso)}
+          </button>
+        ))}
+      </div>
+      {pick && (
+        <div className="mt-4 rounded-lg border border-cyan-500/30 bg-cyan-500/5 px-4 py-3">
+          <p className="text-sm text-white">{fullLabel(pick)}</p>
+          <p className="text-xs text-slate-400 mt-0.5">Your time zone: {tz}</p>
+          <button type="button" className="btn-primary text-sm py-2 px-4 mt-3" disabled={busy} onClick={() => void book()}>
+            <CalendarClock className="w-4 h-4" aria-hidden="true" />
+            {busy ? 'Booking…' : 'Book this time'}
+          </button>
+          <p className="text-xs text-slate-500 mt-2">
+            The calendar invitation with the video link arrives by email straight away.
+          </p>
+        </div>
+      )}
+      {error && <p className="text-sm text-red-300 mt-2">{error}</p>}
+    </div>
   );
 };
 
@@ -717,9 +874,16 @@ const CertificationPanel: React.FC<{
                           {advanced.exam_item_count} analysis-level questions, pass mark{' '}
                           {advanced.exam_threshold}%, {advanced.exam_max_attempts} attempts.
                         </Step>
-                        <Step n={2} title="Propose your interview windows" active>
-                          Three 60-minute windows in your own time zone.
-                        </Step>
+                        {advanced.booking_mode === 'calendar' ? (
+                          <Step n={2} title="Book your interview time" active>
+                            Pick an open 60-minute time from the instructor's calendar, shown in your
+                            own time zone.
+                          </Step>
+                        ) : (
+                          <Step n={2} title="Propose your interview windows" active>
+                            Three 60-minute windows in your own time zone.
+                          </Step>
+                        )}
                         <Step n={3} title="Live oral examination" active>
                           One-on-one by video conference. Camera on, photo ID at the start.
                         </Step>
@@ -853,12 +1017,27 @@ const CertificationPanel: React.FC<{
                       state.status === 'slots_proposed' ||
                       state.status === 'retake_pending') && (
                       <div className="mt-3">
-                        <Step n={2} title={state.interview_no > 1 ? 'Propose windows for your re-examination' : 'Propose your interview windows'} active>
+                        <Step
+                          n={2}
+                          title={
+                            state.booking === 'calendar'
+                              ? state.interview_no > 1
+                                ? 'Book your re-examination'
+                                : 'Book your interview time'
+                              : state.interview_no > 1
+                                ? 'Propose windows for your re-examination'
+                                : 'Propose your interview windows'
+                          }
+                          active
+                        >
                           {state.status === 'retake_pending' && state.retake_after && (
-                            <>Your complimentary re-examination can be proposed on or after {fmtDate(state.retake_after)}. </>
+                            <>Your complimentary re-examination can be booked on or after {fmtDate(state.retake_after)}. </>
                           )}
                           {state.status === 'slots_proposed' && (
-                            <>Sent. Waiting for your examiner to confirm one of your windows. You will receive the meeting link by email.</>
+                            <>
+                              Sent. Waiting for your examiner to confirm one of your windows. You will
+                              receive the meeting link by email.
+                            </>
                           )}
                         </Step>
                         {state.status === 'slots_proposed' && (
@@ -875,14 +1054,23 @@ const CertificationPanel: React.FC<{
                         )}
                         {state.status === 'slots_proposed' && (
                           <p className="mt-3 text-xs text-slate-500">
-                            Need different times? Send a new set below and it replaces the old one.
+                            {state.booking === 'calendar'
+                              ? 'Or book one of the open times below now: it replaces your proposal.'
+                              : 'Need different times? Send a new set below and it replaces the old one.'}
                           </p>
                         )}
                         {state.can_propose ? (
-                          <SlotsForm
-                            code={code}
-                            onDone={(adv) => setData({ ...data, advanced: { ...advanced, ...adv } })}
-                          />
+                          state.booking === 'calendar' ? (
+                            <SlotPicker
+                              code={code}
+                              onDone={(adv) => setData({ ...data, advanced: { ...advanced, ...adv } })}
+                            />
+                          ) : (
+                            <SlotsForm
+                              code={code}
+                              onDone={(adv) => setData({ ...data, advanced: { ...advanced, ...adv } })}
+                            />
+                          )
                         ) : feeDue ? (
                           // "Pay before the interview": the payment is the next step.
                           <FeeDue
@@ -909,6 +1097,12 @@ const CertificationPanel: React.FC<{
                           place with your camera on and have a photo ID ready. Questions are asked
                           without notice. Think aloud; the reasoning is what is examined.
                         </p>
+                        {state.calendar_invite && (
+                          <p className="mt-2 text-slate-400">
+                            The calendar invitation with the video link is in your email. Need a
+                            different time? Write to info@proreadyengineer.com.
+                          </p>
+                        )}
                       </Step>
                       {state.meeting_url && (
                         <a
