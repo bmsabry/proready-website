@@ -3,6 +3,7 @@ import { Award, BadgeCheck, ChevronRight } from 'lucide-react';
 import { api, reportError, type ViewState } from './lib';
 import { EmptyState, Kpi, Notice, RefreshButton, Section } from './ui';
 import { CandidateCard, money, type Candidate } from './CertificationTab';
+import ExamCalendarCard from './ExamCalendarCard';
 
 /* Certification — the menu item for the instructor-examined tier.
  *
@@ -115,6 +116,7 @@ export default function CertificationPage({
       actions={<RefreshButton onClick={() => void load()} loading={loading} />}
     >
       <div className="space-y-8">
+        <ExamCalendarCard onAuthError={onAuthError} />
         {error && <Notice kind="error">{error}</Notice>}
         {flash && <Notice kind="success">{flash}</Notice>}
         {!data && !error && <p className="text-sm text-slate-400">Loading…</p>}
