@@ -90,6 +90,10 @@ KIND_LABELS: dict[str, str] = {
     "advanced_waiver_declined": "Verified Competency: asked to pay",
     "advanced_fee_paid": "Verified Competency: fee paid",
     "advanced_extra_payment": "Verified Competency: payment not owed",
+    "advanced_exam_passed_admin": "Verified Competency: written exam passed (alert)",
+    "advanced_booked_admin": "Verified Competency: interview booked (alert)",
+    "advanced_moved": "Verified Competency: interview moved",
+    "exam_calendar_problem": "Calendar problem",
 }
 
 # (label, tone, what it means) — tone drives the colour: good/neutral/warn/bad.

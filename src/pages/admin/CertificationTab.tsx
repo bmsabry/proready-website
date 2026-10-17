@@ -63,6 +63,10 @@ export type Candidate = {
   waiver_decided_by: string;
   waiver_admin_note: string;
   fee_log: FeeEvent[];
+  // On his Google Calendar (2026-10): the event, and who booked it —
+  // 'candidate' (picked an open time) or 'admin' (confirmed here).
+  calendar_event_id: string;
+  booked_via: string;
   created_at: string;
 };
 
@@ -550,6 +554,7 @@ export function CandidateCard({
   const [retakeAfter, setRetakeAfter] = useState('');
   const [cancelNote, setCancelNote] = useState('');
   const [message, setMessage] = useState('');
+  const [moveTo, setMoveTo] = useState('');
   const key = `cand-${c.id}`;
   // A deferred fee keeps the interview locked until it is paid or waived.
   const canSchedule =
@@ -835,12 +840,49 @@ export function CandidateCard({
                           meeting_url: meeting,
                         }),
                       }),
-                    'Interview confirmed — the candidate has been emailed the details and a calendar file.'
+                    'Interview booked. The candidate has been emailed the details.'
                   )
                 }
               >
                 Confirm {custom ? 'custom time' : 'selected window'} &amp; email candidate
               </button>
+            </div>
+          )}
+
+          {c.status === 'scheduled' && (
+            <div className="rounded-lg border border-slate-800 p-3 space-y-2">
+              <div className="text-xs text-slate-300 flex items-center gap-1">
+                <CalendarClock className="w-3.5 h-3.5 text-cyan-400" />
+                {c.calendar_event_id ? 'On your calendar' : 'Not on your calendar'}
+                {c.booked_via === 'candidate' ? ' · booked by the candidate' : c.booked_via === 'admin' ? ' · booked by you' : ''}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="datetime-local"
+                  value={moveTo}
+                  onChange={(e) => setMoveTo(e.target.value)}
+                  className="rounded-lg bg-slate-950/70 border border-slate-700 px-2 py-1.5 text-white text-xs"
+                  title="New time on your local clock"
+                />
+                <button
+                  type="button"
+                  disabled={busy === key || !moveTo}
+                  className="btn-secondary text-xs py-1.5 px-3"
+                  onClick={() =>
+                    run(
+                      key,
+                      () =>
+                        api(`/api/admin/academy/certification/advanced/${c.id}/schedule`, {
+                          method: 'POST',
+                          body: JSON.stringify({ at: new Date(moveTo).toISOString(), meeting_url: c.meeting_url }),
+                        }),
+                      'Moved. The candidate has been emailed the new time.'
+                    ).then(() => setMoveTo(''))
+                  }
+                >
+                  Move to this time
+                </button>
+              </div>
             </div>
           )}
 
@@ -934,11 +976,14 @@ export function CandidateCard({
                     run(
                       key,
                       () => api(`/api/admin/academy/certification/advanced/${c.id}/reopen`, { method: 'POST' }),
-                      'Booking cleared — the candidate can propose new windows.'
+                      c.calendar_event_id
+                        ? 'Booking released and removed from your calendar. The candidate can book a new time.'
+                        : 'Booking cleared. The candidate can propose new windows.'
                     )
                   }
+                  title={c.calendar_event_id ? 'Removes the event from your calendar; Google tells the candidate' : undefined}
                 >
-                  Booking fell through — ask for new windows
+                  Booking fell through: release this time
                 </button>
               </div>
             </div>

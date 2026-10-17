@@ -13,6 +13,9 @@
   GET  /api/academy/advanced/{code}/exam            — written exam items
   POST /api/academy/advanced/{code}/exam            — submit written exam
   POST /api/academy/advanced/{code}/slots           — propose interview windows
+  GET  /api/academy/advanced/{code}/booking         — open slots on the
+                                                      instructor's calendar
+  POST /api/academy/advanced/{code}/book            — book one of them
 
 The certificate PDF/PNG are public on purpose: the certificate carries only
 what the verify page already shows, and LinkedIn's crawler needs the image.
@@ -30,6 +33,7 @@ from sqlalchemy.orm import Session
 from .. import academy as svc
 from .. import advanced_cert as adv
 from .. import certificates as certs
+from .. import exam_calendar as xcal
 from ..config import get_settings
 from ..db import get_db
 from ..learner_auth import require_learner
@@ -454,4 +458,79 @@ def propose_slots(
         adv.propose_slots(db, learner, product, row, body.slots, body.timezone, body.note)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return certification_payload(db, learner, product)["advanced"]
+
+
+# -----------------------------------------------------------------------------
+# Examined tier — booking a slot on the instructor's calendar
+# -----------------------------------------------------------------------------
+
+@router.get("/advanced/{code}/booking")
+def booking_slots(
+    code: str,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> dict:
+    """The open interview slots, straight from the instructor's calendar.
+
+    mode 'calendar': `slots` are UTC start times to pick from. mode
+    'propose': the calendar is not connected or cannot be read right now —
+    the candidate proposes windows instead (POST .../slots) and nothing is
+    lost."""
+    _product_or_404(db, code)
+    row = _advanced_row(db, learner, code)
+    ok, why = adv.can_propose(row)
+    if not ok:
+        raise HTTPException(status_code=409, detail=why)
+    settings = get_settings()
+    if adv.booking_mode(db) != "calendar":
+        return {"mode": "propose", "minutes": settings.ADVANCED_INTERVIEW_MINUTES, "slots": []}
+    try:
+        slots = adv.bookable_slots(db, row)
+    except xcal.CalendarError as exc:
+        adv.calendar_trouble(db, str(exc))
+        return {
+            "mode": "propose",
+            "minutes": settings.ADVANCED_INTERVIEW_MINUTES,
+            "slots": [],
+            "notice": "Live booking is unavailable right now, so propose your windows instead.",
+        }
+    cal = xcal.settings_row(db)
+    return {
+        "mode": "calendar",
+        "minutes": settings.ADVANCED_INTERVIEW_MINUTES,
+        "examiner_timezone": cal.timezone,
+        "slots": [s.strftime("%Y-%m-%dT%H:%M:%SZ") for s in slots],
+    }
+
+
+class BookIn(BaseModel):
+    start: datetime
+    timezone: str = Field(default="", max_length=64)
+
+
+@router.post("/advanced/{code}/book")
+def book_slot(
+    code: str,
+    body: BookIn,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> dict:
+    """Book one of the open slots. 409 when it has just gone (pick another);
+    503 when the calendar cannot be reached (propose windows instead)."""
+    product = _product_or_404(db, code)
+    row = _advanced_row(db, learner, code)
+    try:
+        adv.book(db, learner, product, row, body.start, body.timezone)
+    except xcal.SlotTaken as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except xcal.CalendarError as exc:
+        db.rollback()
+        adv.calendar_trouble(db, str(exc))
+        raise HTTPException(
+            status_code=503,
+            detail="Live booking is unavailable right now. Please propose your windows instead.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return certification_payload(db, learner, product)["advanced"]

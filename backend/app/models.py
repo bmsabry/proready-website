@@ -1205,9 +1205,62 @@ class AdvancedCertification(Base):
     # amount_cents}. The record of who waived what, when and why.
     fee_log: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
 
+    # The oral examination on the instructor's Google Calendar (2026-10):
+    # the event id when the booking created one, and who booked it —
+    # 'candidate' (picked an open slot) or 'admin' (confirmed by hand).
+    calendar_event_id: Mapped[str] = mapped_column(String(256), default="")
+    booked_via: Mapped[str] = mapped_column(String(16), default="")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ExamCalendar(Base):
+    """The instructor's calendar for oral examinations — one row (id 1).
+
+    Google Calendar, connected once from the admin panel with OAuth. Busy
+    time on every calendar in `check_calendars` blocks a slot ('primary' is
+    the connected account's own; others are calendars shared with it, at
+    least free/busy). Candidates are offered only slots inside `weekly_hours`
+    that are free, `buffer_minutes` clear of anything else, at least
+    `min_notice_hours` ahead, within `horizon_days`, and on days with fewer
+    than `max_per_day` examinations. A booking becomes an event on
+    `event_calendar` with a Google Meet link and the candidate as guest.
+
+    Secrets are stored encrypted (app/crypto.py); only busy times are ever
+    read from the calendars, never what the events are.
+    """
+
+    __tablename__ = "academy_exam_calendar"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider: Mapped[str] = mapped_column(String(16), default="google")
+    client_id: Mapped[str] = mapped_column(String(300), default="")
+    client_secret_encrypted: Mapped[str] = mapped_column(Text, default="")
+    refresh_token_encrypted: Mapped[str] = mapped_column(Text, default="")
+    account_email: Mapped[str] = mapped_column(String(320), default="")
+    scopes: Mapped[str] = mapped_column(String(500), default="")
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    check_calendars: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    event_calendar: Mapped[str] = mapped_column(String(320), default="primary")
+    timezone: Mapped[str] = mapped_column(String(64), default="America/New_York")
+    # {"mon": [["09:00", "17:00"]], ..., "sun": []} on the instructor's clock.
+    weekly_hours: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    buffer_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    min_notice_hours: Mapped[int] = mapped_column(Integer, default=48)
+    horizon_days: Mapped[int] = mapped_column(Integer, default=21)
+    max_per_day: Mapped[int] = mapped_column(Integer, default=2)
+    step_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    # Candidates pick their own slot when on and connected; otherwise they
+    # propose windows and the instructor confirms one (the older flow).
+    self_booking: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_ok_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    last_error: Mapped[str] = mapped_column(String(500), default="")
+    last_alert_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

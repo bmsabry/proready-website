@@ -27,6 +27,7 @@ from .routes import checkout as checkout_routes
 from .routes import comms as comms_routes
 from .routes import compat as compat_routes
 from .routes import courses as courses_routes
+from .routes import exam_calendar_admin as exam_calendar_admin_routes
 from .routes import downloads as downloads_routes
 from .routes import interest as interest_routes
 from .routes import payments as payments_routes
@@ -284,6 +285,10 @@ def _run_column_migrations() -> None:
         ("waiver_decided_by", "VARCHAR(320) NOT NULL DEFAULT ''"),
         ("waiver_admin_note", "TEXT NOT NULL DEFAULT ''"),
         ("fee_log", f"JSON NOT NULL DEFAULT {json_empty_list}"),
+        # Oral examination on the instructor's calendar (2026-10). The
+        # calendar settings themselves are a new table (create_all).
+        ("calendar_event_id", "VARCHAR(256) NOT NULL DEFAULT ''"),
+        ("booked_via", "VARCHAR(16) NOT NULL DEFAULT ''"),
     ):
         _ensure_column("academy_advanced_certifications", column, ddl)
     _ensure_column("academy_orders", "kind", "VARCHAR(16) NOT NULL DEFAULT 'course'")
@@ -462,6 +467,7 @@ app.include_router(stats_routes.router)
 app.include_router(academy_routes.router)
 app.include_router(certification_routes.router)
 app.include_router(certification_admin_routes.router)
+app.include_router(exam_calendar_admin_routes.router)
 app.include_router(checkout_routes.router)
 app.include_router(payments_routes.router)
 app.include_router(academy_admin_routes.router)
