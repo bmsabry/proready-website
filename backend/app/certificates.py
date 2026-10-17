@@ -445,6 +445,8 @@ def examined_tier_offer(db: Session, learner: Learner, product: Product) -> dict
         "interview_minutes": settings.ADVANCED_INTERVIEW_MINUTES,
         "booking_url": booking_url(product.code),
         "request_mailto": f"mailto:{settings.EMAIL_REPLY_TO}?subject={subject}",
+        # Candidates pick an open time on the instructor's calendar.
+        "self_booking": adv.booking_mode(db) == "calendar",
     }
 
 

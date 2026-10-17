@@ -38,8 +38,11 @@ from sqlalchemy.orm import Session
 
 from . import academy as svc
 from . import certificates as certs
+from . import exam_calendar as xcal
 from .config import get_settings
 from .emailer import (
+    advanced_booked_admin_html,
+    advanced_exam_passed_admin_html,
     advanced_exam_passed_html,
     advanced_extra_payment_admin_html,
     advanced_fee_deferred_html,
@@ -52,6 +55,7 @@ from .emailer import (
     advanced_slots_admin_html,
     advanced_waiver_declined_html,
     advanced_waiver_request_admin_html,
+    exam_calendar_problem_html,
     send_email,
 )
 from .models import AdvancedCertification, Course, Learner, Order, Product, QuizAttempt, QuizItem
@@ -286,6 +290,7 @@ def create(
             html=advanced_purchased_html(
                 learner.full_name or "", product.title,
                 f"{settings.SITE_URL}/learn/{product.code}", price,
+                self_booking=booking_mode(db) == "calendar",
             ),
             bcc=settings.ADMIN_NOTIFY_EMAIL or None,
             db=db, scope_kind="product", scope_code=product.code,
@@ -395,7 +400,7 @@ def decide_waiver(
             subject=f"Your examination fee is waived — {product.title}",
             html=advanced_fee_waived_html(
                 learner.full_name or "", product.title, price_display, note, course_url,
-                stage="exam",
+                stage="exam", self_booking=booking_mode(db) == "calendar",
             ),
             db=db, scope_kind="product", scope_code=product.code,
             template="advanced_fee_waived",
@@ -458,6 +463,7 @@ def waive_fee(
             learner.full_name or "", product.title, money(owed, row.currency), note,
             f"{settings.SITE_URL}/learn/{product.code}",
             stage="book" if can_book else "continue",
+            self_booking=booking_mode(db) == "calendar",
         ),
         db=db, scope_kind="product", scope_code=product.code,
         template="advanced_fee_waived",
@@ -514,6 +520,7 @@ def record_fee_payment(
             html=advanced_fee_paid_html(
                 learner.full_name or "", product.title, money(amount, row.currency),
                 f"{settings.SITE_URL}/learn/{product.code}", can_book=can_book,
+                self_booking=booking_mode(db) == "calendar",
             ),
             bcc=settings.ADMIN_NOTIFY_EMAIL or None,
             db=db, scope_kind="product", scope_code=product.code,
@@ -736,9 +743,39 @@ def grade_exam(
                 learner.full_name or "", product.title, score,
                 f"{settings.SITE_URL}/learn/{product.code}",
                 fee_due_display=money(row.amount_cents, row.currency) if fee_due(row) else "",
+                self_booking=booking_mode(db) == "calendar",
             ),
             db=db, scope_kind="product", scope_code=product.code,
             template="advanced_exam_passed",
+        )
+        # And the instructor, so he can prepare the oral examination around
+        # the candidate's weak points before they book.
+        if fee_due(row):
+            next_step = (
+                f"their {money(row.amount_cents, row.currency)} fee is still due; booking the "
+                "interview stays locked until they pay it or you waive it."
+            )
+        elif booking_mode(db) == "calendar":
+            next_step = (
+                "they choose an interview time from the open slots on your calendar. "
+                "You get an email the moment they book."
+            )
+        else:
+            next_step = "they propose interview windows. You get an email to confirm one."
+        _notify_admin(
+            db, product,
+            subject=f"[Written exam passed] {learner.full_name or learner.email} — {product.title} — {score:g}%",
+            html=advanced_exam_passed_admin_html(
+                learner_name=learner.full_name or "",
+                learner_email=learner.email,
+                course_title=product.title,
+                score=score,
+                attempt_no=row.exam_attempts,
+                breakdown=competency_breakdown(db, product, attempt),
+                next_step=next_step,
+                admin_url=admin_cert_url(db, product.code),
+            ),
+            template="advanced_exam_passed_admin",
         )
     return attempt
 
@@ -795,6 +832,135 @@ def can_propose(row: AdvancedCertification | None) -> tuple[bool, str]:
             "book your oral examination."
         )
     return ok, why
+
+
+def booking_mode(db: Session) -> str:
+    """'calendar': the candidate picks an open slot from the instructor's
+    calendar. 'propose': they propose windows and he confirms one."""
+    return "calendar" if xcal.self_booking_on(db) else "propose"
+
+
+def earliest_booking(db: Session, row: AdvancedCertification) -> datetime | None:
+    """A re-examination may not be booked before its study period ends."""
+    if row.status == "retake_pending" and row.retake_after:
+        return xcal.start_of_day(row.retake_after, xcal.settings_row(db))
+    return None
+
+
+def bookable_slots(db: Session, row: AdvancedCertification) -> list[datetime]:
+    """Open slots for this candidate (raises xcal.CalendarError)."""
+    return xcal.open_slots(db, earliest=earliest_booking(db, row))
+
+
+def calendar_trouble(db: Session, message: str) -> None:
+    """Record that the calendar failed, and tell the instructor (rarely)."""
+    log.warning("Exam calendar failed: %s", message)
+    if xcal.note_failure(db, message):
+        settings = get_settings()
+        to = settings.ADMIN_NOTIFY_EMAIL
+        if to:
+            send_email(
+                to=to,
+                subject="[Calendar] Booking from your calendar has stopped",
+                html=exam_calendar_problem_html(
+                    message, f"{settings.SITE_URL.rstrip('/')}/admin#certification"
+                ),
+                db=db, scope_kind="system", scope_code="calendar",
+                audience="admin", template="exam_calendar_problem",
+            )
+
+
+def _event_text(learner: Learner, product: Product, row: AdvancedCertification) -> tuple[str, str]:
+    """Title and description of the calendar event. The candidate is a
+    guest and sees both, so nothing private goes in."""
+    what = "re-examination" if row.interview_no > 1 else "oral examination"
+    name = learner.full_name or learner.email
+    summary = f"ProReadyEngineer {what}: {name} — {product.title}"
+    description = (
+        f"Live one-on-one {what} with the instructor for the Certificate of Verified "
+        f"Competency in {product.title}.\n\nPlease join from a quiet place with your camera "
+        "on and have a photo ID ready."
+    )
+    return summary, description
+
+
+def book(
+    db: Session, learner: Learner, product: Product, row: AdvancedCertification,
+    start: datetime, tz_name: str = "",
+) -> AdvancedCertification:
+    """The candidate books one of the open slots on the instructor's calendar.
+
+    Bookings are serialised and the slot is checked against the live
+    calendars again at this moment, so a time that has just gone is refused
+    (xcal.SlotTaken) rather than double-booked. The event goes on his
+    calendar with a Meet link and the candidate as guest; Google sends them
+    the invitation, and both of them get an email."""
+    ok, why = can_propose(row)
+    if not ok:
+        raise ValueError(why)
+    if not xcal.self_booking_on(db):
+        raise ValueError("Booking from the calendar is not available. Propose your windows instead.")
+    start = svc._aware(start).astimezone(timezone.utc).replace(second=0, microsecond=0)
+    xcal.lock(db)
+    slots = xcal.open_slots(db, earliest=earliest_booking(db, row), record=False)
+    if start not in slots:
+        db.rollback()
+        raise xcal.SlotTaken("That time is no longer free. Please pick another one.")
+    settings = get_settings()
+    minutes = settings.ADVANCED_INTERVIEW_MINUTES
+    summary, description = _event_text(learner, product, row)
+    event = xcal.create_event(
+        db, start=start, minutes=minutes, summary=summary, description=description,
+        guest_email=learner.email, guest_name=learner.full_name or "", row_id=row.id,
+    )
+    row.scheduled_at = start
+    row.meeting_url = event["meeting_url"]
+    row.calendar_event_id = event["id"]
+    row.booked_via = "candidate"
+    if tz_name and _zone(tz_name):
+        row.learner_timezone = tz_name
+    row.proposed_slots = []
+    row.status = "scheduled"
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            xcal.delete_event(db, event["id"])
+        except xcal.CalendarError:
+            log.error("Booking for row %s failed after event %s was created", row.id, event["id"])
+        raise
+    cal = xcal.settings_row(db)
+    send_email(
+        to=learner.email,
+        subject=f"Your oral examination is booked — {product.title}",
+        html=advanced_scheduled_html(
+            learner.full_name or "", product.title,
+            when_lines(row.scheduled_at, row.learner_timezone),
+            row.meeting_url, minutes, row.interview_no,
+            f"{settings.SITE_URL}/learn/{product.code}",
+            invite_from=cal.account_email,
+        ),
+        db=db, scope_kind="product", scope_code=product.code,
+        template="advanced_scheduled",
+    )
+    _notify_admin(
+        db, product,
+        subject=f"[Oral exam booked] {learner.full_name or learner.email} — {product.title}",
+        html=advanced_booked_admin_html(
+            learner_name=learner.full_name or "",
+            learner_email=learner.email,
+            course_title=product.title,
+            when_lines=when_lines(row.scheduled_at, row.learner_timezone),
+            meeting_url=row.meeting_url,
+            interview_no=row.interview_no,
+            calendar_account=cal.account_email,
+            breakdown=competency_breakdown(db, product, best_attempt(db, learner.id, product.code)),
+            admin_url=admin_cert_url(db, product.code),
+        ),
+        template="advanced_booked_admin",
+    )
+    return row
 
 
 def propose_slots(
@@ -860,28 +1026,76 @@ def schedule(
             "The examination fee is still due. Waive it, or wait for the payment, "
             "before booking the interview."
         )
-    row.scheduled_at = svc._aware(at)
-    row.meeting_url = (meeting_url or "").strip()[:500]
+    settings = get_settings()
+    minutes = settings.ADVANCED_INTERVIEW_MINUTES
+    at = svc._aware(at)
+    moved = row.status == "scheduled"
+    meeting = (meeting_url or "").strip()[:500]
+    # With the calendar connected, a booking made by hand goes on it too:
+    # a new event (Meet link unless one is given), or the existing one moved.
+    on_calendar = False
+    if xcal.connected(db):
+        try:
+            if row.calendar_event_id:
+                xcal.move_event(db, row.calendar_event_id, at, minutes)
+                meeting = meeting or row.meeting_url
+            else:
+                summary, description = _event_text(learner, product, row)
+                event = xcal.create_event(
+                    db, start=at, minutes=minutes, summary=summary, description=description,
+                    guest_email=learner.email, guest_name=learner.full_name or "",
+                    meeting_url=meeting, row_id=row.id,
+                )
+                row.calendar_event_id = event["id"]
+                meeting = meeting or event["meeting_url"]
+            on_calendar = True
+        except xcal.CalendarError as exc:
+            db.rollback()
+            raise ValueError(f"Your calendar could not be updated, so nothing was booked: {exc}") from exc
+    row.scheduled_at = at
+    row.meeting_url = meeting
+    row.booked_via = row.booked_via if (moved and row.booked_via) else "admin"
     row.status = "scheduled"
     db.commit()
 
-    settings = get_settings()
-    minutes = settings.ADVANCED_INTERVIEW_MINUTES
+    subject = (
+        f"Your oral examination has a new time — {product.title}" if moved
+        else f"Your oral examination is booked — {product.title}"
+    )
+    template = "advanced_moved" if moved else "advanced_scheduled"
+    if on_calendar:
+        # Google has sent the invitation (or the update) from his calendar.
+        send_email(
+            to=learner.email,
+            subject=subject,
+            html=advanced_scheduled_html(
+                learner.full_name or "", product.title,
+                when_lines(row.scheduled_at, row.learner_timezone),
+                row.meeting_url, minutes, row.interview_no,
+                f"{settings.SITE_URL}/learn/{product.code}",
+                invite_from=xcal.settings_row(db).account_email, moved=moved,
+            ),
+            db=db, scope_kind="product", scope_code=product.code,
+            template=template,
+        )
+        return row
+
     import base64  # noqa: PLC0415
 
     ics = base64.b64encode(_ics(row, product, learner, minutes).encode()).decode()
     send_email(
         to=learner.email,
-        subject=f"Your oral examination is booked — {product.title}",
+        subject=subject,
         html=advanced_scheduled_html(
             learner.full_name or "", product.title,
             when_lines(row.scheduled_at, row.learner_timezone),
             row.meeting_url, minutes, row.interview_no,
             f"{settings.SITE_URL}/learn/{product.code}",
+            moved=moved,
         ),
         bcc=settings.ADMIN_NOTIFY_EMAIL or None,
         db=db, scope_kind="product", scope_code=product.code,
-        template="advanced_scheduled",
+        template=template,
         attachments=[{"filename": "oral-examination.ics", "content": ics}],
     )
     return row
@@ -891,6 +1105,14 @@ def reopen_scheduling(db: Session, row: AdvancedCertification) -> AdvancedCertif
     """Admin: the booked time fell through — ask the learner for new windows."""
     if row.status != "scheduled":
         raise ValueError("Nothing is scheduled.")
+    if row.calendar_event_id:
+        # Google tells the candidate the event is cancelled.
+        try:
+            xcal.delete_event(db, row.calendar_event_id)
+        except xcal.CalendarError as exc:
+            raise ValueError(f"The event could not be removed from your calendar: {exc}") from exc
+        row.calendar_event_id = ""
+    row.booked_via = ""
     row.status = "retake_pending" if row.interview_no > 1 else "exam_passed"
     if row.interview_no > 1:
         row.retake_after = date.today()
@@ -935,6 +1157,10 @@ def record_outcome(
         row.proposed_slots = []
         row.scheduled_at = None
         row.meeting_url = ""
+        # The first examination's event stays on the calendar as a record;
+        # the re-examination gets an event of its own when it is booked.
+        row.calendar_event_id = ""
+        row.booked_via = ""
         db.commit()
         send_email(
             to=learner.email,
@@ -943,6 +1169,7 @@ def record_outcome(
                 learner.full_name or "", product.title,
                 row.retake_after.strftime("%B %d, %Y"),
                 f"{settings.SITE_URL}/learn/{product.code}",
+                self_booking=booking_mode(db) == "calendar",
             ),
             bcc=settings.ADMIN_NOTIFY_EMAIL or None,
             db=db, scope_kind="product", scope_code=product.code,
@@ -982,6 +1209,12 @@ def cancel(db: Session, row: AdvancedCertification, note: str) -> AdvancedCertif
     if row.status == WAIVER_PENDING:
         # A request is answered, not cancelled: the candidate must hear back.
         raise ValueError("Answer the fee-waiver request instead: waive, pay before the interview, or ask them to pay.")
+    if row.status == "scheduled" and row.calendar_event_id:
+        try:
+            xcal.delete_event(db, row.calendar_event_id)
+            row.calendar_event_id = ""
+        except xcal.CalendarError as exc:
+            log.warning("Cancelled row %s but its calendar event stays: %s", row.id, exc)
     row.status = "cancelled"
     row.outcome_note = (note or "").strip()
     row.outcome_at = datetime.now(timezone.utc)
@@ -1010,6 +1243,8 @@ def learner_out(db: Session, learner: Learner, product: Product, row: AdvancedCe
         "can_purchase": ok,
         "purchase_blocked_reason": reason,
         "competencies": certs.course_competencies(db, product),
+        # How the interview is booked: 'calendar' or 'propose'.
+        "booking_mode": booking_mode(db),
         # The "Request a fee waiver" link under the register button.
         "waiver": {
             "can_request": can_ask,
@@ -1036,6 +1271,10 @@ def learner_out(db: Session, learner: Learner, product: Product, row: AdvancedCe
         "exam_open": exam_open(row),
         "can_propose": can_prop,
         "propose_blocked_reason": why,
+        # 'calendar': pick an open slot on the instructor's calendar;
+        # 'propose': propose windows for him to confirm.
+        "booking": booking_mode(db) if can_prop else "",
+        "calendar_invite": bool(row.calendar_event_id),
         "proposed_slots": list(row.proposed_slots or []),
         "learner_timezone": row.learner_timezone,
         "scheduled_at": row.scheduled_at,
@@ -1104,6 +1343,8 @@ def admin_out(db: Session, row: AdvancedCertification) -> dict:
         "waiver_decided_by": row.waiver_decided_by,
         "waiver_admin_note": row.waiver_admin_note,
         "fee_log": list(row.fee_log or []),
+        "calendar_event_id": row.calendar_event_id or "",
+        "booked_via": row.booked_via or "",
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }

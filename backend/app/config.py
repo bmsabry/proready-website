@@ -122,6 +122,15 @@ class Settings(BaseSettings):
     # competencies, so a retake is a different paper of the same shape. A bank
     # at or below this size is served whole.
     ADVANCED_EXAM_SERVE_COUNT: int = 100
+    # Oral examination booked from the instructor's own calendar (2026-10).
+    # This API's public address: Google sends the OAuth answer back to
+    # {API_PUBLIC_URL}/api/admin/academy/calendar/google/callback, which must
+    # be listed character for character on the Google OAuth client.
+    API_PUBLIC_URL: str = "https://api.proreadyengineer.com"
+    # The OAuth client may be set here or pasted in the admin panel (stored
+    # encrypted); the admin panel's values win.
+    GOOGLE_OAUTH_CLIENT_ID: str = ""
+    GOOGLE_OAUTH_CLIENT_SECRET: str = ""
     # LinkedIn "Add to profile" pre-fill. The numeric Company Page id makes
     # the issuer show with the ProReadyEngineer logo; empty falls back to the
     # organisation name as text.

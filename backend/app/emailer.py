@@ -1020,8 +1020,7 @@ def examined_tier_invitation_html(
     body += _p(
         "Getting started takes a minute. The button below opens the examination section "
         "of your course page; register there and the written examination opens "
-        "immediately. When you pass it, you propose three windows that suit you, and I "
-        "confirm one and send the meeting link."
+        "immediately. " + _booking_sentence(offer)
     )
     body += _cta_button("Book my examination", offer["booking_url"])
     body += _p(
@@ -1165,8 +1164,7 @@ def certificate_issued_html(
             body += _p(
                 "Getting started takes a minute. The button below opens the examination "
                 "section of your course page; register there and the written examination "
-                "opens immediately. When you pass it, you propose three windows that suit "
-                "you, and I confirm one and send the meeting link."
+                "opens immediately. " + _booking_sentence(offer)
             )
             body += _cta_button("Book my examination", offer["booking_url"])
         else:
@@ -1304,13 +1302,36 @@ def request_declined_html(full_name: str, course_title: str, what: str, note: st
     return _shell("Learner request", f"About your request for {escape_html(what)}", body)
 
 
-_ADVANCED_NEXT_STEPS = (
-    "1. Pass the advanced written examination from your course page.<br>"
-    "2. Propose three 60-minute windows for your live oral examination.<br>"
-    "3. Your examiner confirms one and sends the meeting link.<br>"
-    "4. After the examination, a pass issues your signed "
-    "Certificate of Verified Competency."
-)
+def _booking_sentence(offer: dict) -> str:
+    """How the oral examination gets booked, in the instructor's voice."""
+    if offer.get("self_booking"):
+        return (
+            "When you pass it, you pick one of my open times for the oral examination, and "
+            "the calendar invitation with the video link arrives at once."
+        )
+    return "When you pass it, you propose three windows that suit you, and I confirm one and send the meeting link."
+
+
+def _advanced_next_steps(self_booking: bool = False) -> str:
+    if self_booking:
+        middle = (
+            "2. Book a 60-minute time for your live oral examination from the instructor's "
+            "open calendar.<br>"
+            "3. The calendar invitation with the video link arrives at once.<br>"
+        )
+    else:
+        middle = (
+            "2. Propose three 60-minute windows for your live oral examination.<br>"
+            "3. Your examiner confirms one and sends the meeting link.<br>"
+        )
+    return (
+        "1. Pass the advanced written examination from your course page.<br>"
+        + middle
+        + "4. After the examination, a pass issues your signed Certificate of Verified Competency."
+    )
+
+
+_ADVANCED_NEXT_STEPS = _advanced_next_steps(False)
 
 
 def _advanced_retake_footnote(paid: bool = True) -> str:
@@ -1325,7 +1346,8 @@ def _advanced_retake_footnote(paid: bool = True) -> str:
 
 
 def advanced_purchased_html(
-    full_name: str, course_title: str, exam_url: str, price_display: str
+    full_name: str, course_title: str, exam_url: str, price_display: str,
+    *, self_booking: bool = False,
 ) -> str:
     """Registration confirmed. With no price this is a complimentary place
     the instructor opened — it must not thank anyone for a payment."""
@@ -1343,7 +1365,7 @@ def advanced_purchased_html(
             "at no charge."
         )
     body += _p("<strong>What happens next</strong>", margin="0 0 8px")
-    body += _p(_ADVANCED_NEXT_STEPS, margin="0 0 22px")
+    body += _p(_advanced_next_steps(self_booking), margin="0 0 22px")
     if price_display:
         body += _kv_table([("Amount", price_display)])
     body += _cta_button("Start the written examination", exam_url)
@@ -1352,7 +1374,8 @@ def advanced_purchased_html(
 
 
 def advanced_exam_passed_html(
-    full_name: str, course_title: str, score: float, slots_url: str, fee_due_display: str = ""
+    full_name: str, course_title: str, score: float, slots_url: str, fee_due_display: str = "",
+    *, self_booking: bool = False,
 ) -> str:
     greeting = f"Hi {full_name}," if full_name else "Hi,"
     body = _p(greeting)
@@ -1364,19 +1387,29 @@ def advanced_exam_passed_html(
         # The instructor let them start before paying: the fee is due now.
         body += _p(
             f"Your <strong>{fee_due_display}</strong> examination fee is due before you "
-            "book: pay it from your course page, then propose three 60-minute windows "
-            "that suit you. Your examiner will confirm one and you will receive the "
-            "meeting link by email.",
+            "book: pay it from your course page, then "
+            + ("pick one of the instructor's open 60-minute times; the calendar invitation "
+               "with the video link arrives at once." if self_booking else
+               "propose three 60-minute windows that suit you. Your examiner will confirm "
+               "one and you will receive the meeting link by email."),
             margin="0 0 22px",
         )
         body += _cta_button("Pay and book your interview", slots_url)
     else:
-        body += _p(
-            "From your course page, propose three 60-minute windows that suit you. "
-            "Your examiner will confirm one and you will receive the meeting link by email.",
-            margin="0 0 22px",
-        )
-        body += _cta_button("Propose your interview times", slots_url)
+        if self_booking:
+            body += _p(
+                "From your course page, pick one of the instructor's open 60-minute times. "
+                "The calendar invitation with the video link arrives at once.",
+                margin="0 0 22px",
+            )
+            body += _cta_button("Book your interview time", slots_url)
+        else:
+            body += _p(
+                "From your course page, propose three 60-minute windows that suit you. "
+                "Your examiner will confirm one and you will receive the meeting link by email.",
+                margin="0 0 22px",
+            )
+            body += _cta_button("Propose your interview times", slots_url)
     return _shell("Written examination passed", "Now book your oral examination", body)
 
 
@@ -1399,17 +1432,33 @@ def advanced_slots_admin_html(
 def advanced_scheduled_html(
     full_name: str, course_title: str, when_lines: "list[str]", meeting_url: str,
     minutes: int, interview_no: int, dashboard_url: str,
+    *, invite_from: str = "", moved: bool = False,
 ) -> str:
+    """The booking, to the candidate. `invite_from`: the examination is on
+    the instructor's Google Calendar and Google has sent the invitation from
+    that address (no .ics attached then). `moved`: a new time for an
+    examination that was already booked."""
     greeting = f"Hi {full_name}," if full_name else "Hi,"
     body = _p(greeting)
     what = "re-examination" if interview_no > 1 else "oral examination"
-    body += _p(
-        f"Your live {what} for <strong>{course_title}</strong> is confirmed."
-    )
+    if moved:
+        body += _p(
+            f"Your live {what} for <strong>{course_title}</strong> has moved to a new time."
+        )
+    else:
+        body += _p(
+            f"Your live {what} for <strong>{course_title}</strong> is confirmed."
+        )
     body += _kv_table(
         [("When", "<br>".join(when_lines)), ("Duration", f"{minutes} minutes"),
-         ("Meeting link", _link(meeting_url) if meeting_url else "Sent separately")]
+         ("Meeting link", _link(meeting_url) if meeting_url
+          else ("In the calendar invitation" if invite_from else "Sent separately"))]
     )
+    if invite_from:
+        body += _p(
+            f"A calendar invitation from {escape_html(invite_from)} is on its way: accept it "
+            "and the examination is in your calendar with the link."
+        )
     body += _p(
         "Please join from a quiet place with your camera on. You will be asked to "
         "show a photo ID at the start. Questions are asked without notice and you "
@@ -1419,11 +1468,13 @@ def advanced_scheduled_html(
     if meeting_url:
         body += _cta_button("Join the examination", meeting_url)
     body += _p(f"Your course page: {_link(dashboard_url)}", size=13, color=MUTED, margin="0")
-    return _shell("Oral examination confirmed", "Your examination is booked", body)
+    heading = "Your examination has a new time" if moved else "Your examination is booked"
+    return _shell("Oral examination confirmed", heading, body)
 
 
 def advanced_outcome_retake_html(
-    full_name: str, course_title: str, retake_after: str, dashboard_url: str
+    full_name: str, course_title: str, retake_after: str, dashboard_url: str,
+    *, self_booking: bool = False,
 ) -> str:
     greeting = f"Hi {full_name}," if full_name else "Hi,"
     body = _p(greeting)
@@ -1434,7 +1485,9 @@ def advanced_outcome_retake_html(
     )
     body += _p(
         f"One complimentary re-examination is included. Take some time with the "
-        f"material and, on or after <strong>{retake_after}</strong>, propose new "
+        f"material and, on or after <strong>{retake_after}</strong>, "
+        + ("book a new time" if self_booking else "propose new")
+        + " "
         "windows from your course page.",
         margin="0 0 22px",
     )
@@ -1460,8 +1513,110 @@ def advanced_outcome_failed_html(full_name: str, course_title: str) -> str:
 
 
 # -----------------------------------------------------------------------------
+# Examined tier — alerts to the instructor about the oral examination
+# -----------------------------------------------------------------------------
+
+def _who(learner_name: str, learner_email: str) -> str:
+    return (
+        f"<strong>{escape_html(learner_name)}</strong> ({escape_html(learner_email)})"
+        if learner_name else f"<strong>{escape_html(learner_email)}</strong>"
+    )
+
+
+def _competency_rows(breakdown: "list[dict]") -> str:
+    """Per-competency result, weakest first, as label/value rows."""
+    if not breakdown:
+        return ""
+    rows = [
+        (escape_html(str(b.get("label", ""))), f"{b.get('correct', 0)}/{b.get('total', 0)} · {b.get('pct', 0):g}%")
+        for b in breakdown
+    ]
+    return _p("<strong>Competency by competency, weakest first</strong>", margin="0 0 8px") + _kv_table(rows, size=14)
+
+
+def advanced_exam_passed_admin_html(
+    *,
+    learner_name: str,
+    learner_email: str,
+    course_title: str,
+    score: float,
+    attempt_no: int,
+    breakdown: "list[dict]",
+    next_step: str,
+    admin_url: str,
+) -> str:
+    """To the instructor the moment a candidate passes the written exam, so
+    he can prepare the oral examination around their weak points."""
+    body = _p(
+        f"{_who(learner_name, learner_email)} passed the written examination for "
+        f"<strong>{escape_html(course_title)}</strong> with <strong>{score:g}%</strong>"
+        f" (attempt {attempt_no})."
+    )
+    body += _competency_rows(breakdown)
+    body += _p(f"<strong>Next:</strong> {escape_html(next_step)}")
+    body += _cta_button("Open the candidate", admin_url)
+    return _shell("Written examination passed", "A candidate is ready for the oral examination", body)
+
+
+def advanced_booked_admin_html(
+    *,
+    learner_name: str,
+    learner_email: str,
+    course_title: str,
+    when_lines: "list[str]",
+    meeting_url: str,
+    interview_no: int,
+    calendar_account: str,
+    breakdown: "list[dict]",
+    admin_url: str,
+) -> str:
+    """To the instructor when a candidate books a slot from his calendar."""
+    what = "re-examination" if interview_no > 1 else "oral examination"
+    body = _p(
+        f"{_who(learner_name, learner_email)} booked their {what} for "
+        f"<strong>{escape_html(course_title)}</strong>."
+    )
+    body += _kv_table([
+        ("When", "<br>".join(escape_html(x) for x in when_lines)),
+        ("Meeting link", _link(meeting_url) if meeting_url else "In the calendar event"),
+        ("Calendar", f"On your calendar ({escape_html(calendar_account)}); they have the invitation"
+         if calendar_account else "On your calendar; they have the invitation"),
+    ])
+    body += _competency_rows(breakdown)
+    body += _cta_button("Open the candidate", admin_url)
+    return _shell("Oral examination booked", "A candidate booked a time", body)
+
+
+def exam_calendar_problem_html(error: str, admin_url: str) -> str:
+    """To the instructor: booking from his calendar stopped working."""
+    body = _p(
+        "Candidates cannot book oral examinations from your calendar right now. Until this "
+        "is fixed they are asked to propose times instead, and you confirm one as before."
+    )
+    body += _kv_table([("What Google said", escape_html(error or "unknown error"))], size=14)
+    body += _p(
+        "Open Certification in the admin panel to test the connection or connect the "
+        "calendar again. You get this email at most twice a day."
+    )
+    body += _cta_button("Open Certification", admin_url)
+    return _shell("Calendar", "Booking from your calendar has stopped", body)
+
+
+# -----------------------------------------------------------------------------
 # Examined tier — fee waivers
 # -----------------------------------------------------------------------------
+
+def _book_now_sentence(self_booking: bool) -> str:
+    if self_booking:
+        return (
+            "You can now book your interview time from your course page: pick one of the "
+            "instructor's open times and the calendar invitation arrives at once."
+        )
+    return (
+        "You can now propose your interview windows from your course page. Your "
+        "examiner confirms one and sends the meeting link."
+    )
+
 
 def _hi(full_name: str) -> str:
     first = first_name(full_name)
@@ -1528,6 +1683,7 @@ def advanced_fee_waived_html(
     course_url: str,
     *,
     stage: str,
+    self_booking: bool = False,
 ) -> str:
     """The instructor waived the fee.
 
@@ -1551,15 +1707,13 @@ def advanced_fee_waived_html(
     body += _from_instructor(note)
     if stage == "exam":
         body += _p("<strong>What happens next</strong>", margin="0 0 8px")
-        body += _p(_ADVANCED_NEXT_STEPS, margin="0 0 22px")
+        body += _p(_advanced_next_steps(self_booking), margin="0 0 22px")
         body += _cta_button("Start the written examination", course_url)
     elif stage == "book":
-        body += _p(
-            "You can now propose your interview windows from your course page. Your "
-            "examiner confirms one and sends the meeting link.",
-            margin="0 0 22px",
+        body += _p(_book_now_sentence(self_booking), margin="0 0 22px")
+        body += _cta_button(
+            "Book your interview time" if self_booking else "Propose your interview times", course_url
         )
-        body += _cta_button("Propose your interview times", course_url)
     else:
         body += _p(
             "Once you pass the written examination you can book your oral examination "
@@ -1587,7 +1741,7 @@ def advanced_fee_deferred_html(
     )
     body += _p(
         "When you pass the written examination, your course page asks you to pay the "
-        "fee and then lets you propose your interview times. You can also pay it any "
+        "fee and then lets you book your interview. You can also pay it any "
         "time before that.",
         margin="0 0 22px",
     )
@@ -1618,7 +1772,8 @@ def advanced_waiver_declined_html(
 
 
 def advanced_fee_paid_html(
-    full_name: str, course_title: str, price_display: str, course_url: str, *, can_book: bool
+    full_name: str, course_title: str, price_display: str, course_url: str, *, can_book: bool,
+    self_booking: bool = False,
 ) -> str:
     """A fee the instructor had deferred has been paid."""
     body = _hi(full_name)
@@ -1627,12 +1782,10 @@ def advanced_fee_paid_html(
         f"certification in <strong>{escape_html(course_title)}</strong> went through."
     )
     if can_book:
-        body += _p(
-            "You can now propose your interview windows from your course page. Your "
-            "examiner confirms one and sends the meeting link.",
-            margin="0 0 22px",
+        body += _p(_book_now_sentence(self_booking), margin="0 0 22px")
+        body += _cta_button(
+            "Book your interview time" if self_booking else "Propose your interview times", course_url
         )
-        body += _cta_button("Propose your interview times", course_url)
     else:
         body += _p(
             "Once you pass the written examination you can book your oral examination "
