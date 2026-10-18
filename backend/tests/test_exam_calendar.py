@@ -644,3 +644,86 @@ def test_passing_the_written_exam_alerts_him_with_the_breakdown(world, google, o
     mine = _to(outbox, CARA)[-1]
     assert mine["subject"].startswith("Written examination passed")
     assert "Book your interview time" in mine["html"] and "propose three" not in mine["html"]
+
+
+# -----------------------------------------------------------------------------
+# 5. His test booking: the whole booking path, marked TEST, no candidate
+# -----------------------------------------------------------------------------
+
+GUEST = "calendar.test.guest@example.com"
+
+
+def test_a_test_booking_runs_the_booking_path_and_removes_cleanly(world, google, outbox):
+    """Asked for 2026-10-18 instead of a test candidate on the live site: the
+    same event, Meet link, Google invitation and emails as a real booking,
+    marked TEST, on the latest open time, and gone again on Remove."""
+    _connect(google)
+    db = SessionLocal()
+    rows_before = db.query(AdvancedCertification).count()
+    expected = xcal.open_slots(db, record=False)[-1]
+    db.close()
+    with _admin() as admin:
+        assert admin.get(CAL_API, headers=ADMIN).json()["test_booking"] is None
+        r = admin.post(f"{CAL_API}/test-booking", json={"guest_email": GUEST}, headers=ADMIN)
+        assert r.status_code == 200, r.text
+        tb = r.json()["test_booking"]
+    assert tb["guest_email"] == GUEST
+    assert datetime.fromisoformat(tb["start"].replace("Z", "+00:00")) == expected
+    assert tb["label"] == expected.astimezone(NY).strftime("%A, %B %d at %H:%M")
+    assert tb["meeting_url"].startswith("https://meet.google.com/")
+    assert tb["event_link"].startswith("https://calendar.google.com/")
+
+    # On his calendar exactly as a candidate's booking is, but named TEST.
+    (eid, ev), = google.events.items()
+    assert ev["_start"] == expected and ev["_end"] == expected + timedelta(minutes=60)
+    assert ev["summary"].startswith("TEST — ProReadyEngineer oral examination: Test Candidate")
+    assert ev["attendees"] == [{"email": GUEST, "displayName": "Test Candidate"}]
+    assert ev["conferenceData"]["createRequest"]["conferenceSolutionKey"]["type"] == "hangoutsMeet"
+    assert ev["_params"]["sendUpdates"] == "all"
+
+    # The candidate's email and his alert, both marked [TEST].
+    guest_mail = _to(outbox, GUEST)
+    assert len(guest_mail) == 1
+    assert guest_mail[0]["subject"].startswith("[TEST] Your oral examination is booked")
+    assert "meet.google.com" in guest_mail[0]["html"] and COMPANY in guest_mail[0]["html"]
+    alerts = [m for m in _to(outbox, get_settings().ADMIN_NOTIFY_EMAIL)
+              if m["subject"].startswith("[TEST] [Oral exam booked] Test Candidate")]
+    assert len(alerts) == 1 and "meet.google.com" in alerts[0]["html"]
+    # Neither looks like a real booking in the email log's course view.
+    assert not any(m["subject"].startswith("[Oral exam booked]") for m in outbox)
+
+    # No candidate or examination behind it, and that time is now taken.
+    db = SessionLocal()
+    assert db.query(AdvancedCertification).count() == rows_before
+    assert expected not in xcal.open_slots(db, record=False)
+    db.close()
+
+    with _admin() as admin:
+        # One at a time.
+        r = admin.post(f"{CAL_API}/test-booking", json={"guest_email": GUEST}, headers=ADMIN)
+        assert r.status_code == 409 and "Remove it first" in r.json()["detail"]
+        r = admin.post(f"{CAL_API}/test-booking/remove", headers=ADMIN)
+        assert r.status_code == 200, r.text
+        assert r.json()["test_booking"] is None
+        assert admin.post(f"{CAL_API}/test-booking/remove", headers=ADMIN).status_code == 409
+    assert google.events == {}
+    deletes = [c for c in google.calls if c[0] == "DELETE"]
+    assert deletes and deletes[-1][1].endswith(f"/events/{eid}")
+    assert deletes[-1][2]["params"] == {"sendUpdates": "all"}  # Google tells the guest
+
+
+def test_a_test_booking_needs_a_connection_and_goes_with_a_disconnect(world, google, outbox):
+    _connect(google)
+    with _admin() as admin:
+        assert admin.post(f"{CAL_API}/test-booking", json={"guest_email": "not-an-email"},
+                          headers=ADMIN).status_code == 422
+        assert admin.post(f"{CAL_API}/test-booking", json={"guest_email": GUEST},
+                          headers=ADMIN).status_code == 200
+        assert len(google.events) == 1
+        r = admin.post(f"{CAL_API}/disconnect", headers=ADMIN)
+        assert r.status_code == 200
+        assert r.json()["connected"] is False and r.json()["test_booking"] is None
+    assert google.events == {}  # removed before the permission was given up
+    with _admin() as admin:
+        r = admin.post(f"{CAL_API}/test-booking", json={"guest_email": GUEST}, headers=ADMIN)
+        assert r.status_code == 409 and "Connect your Google Calendar" in r.json()["detail"]
