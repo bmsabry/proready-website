@@ -7,6 +7,8 @@
   POST /api/admin/academy/calendar/disconnect
   POST /api/admin/academy/calendar/test             can each calendar be read?
   GET  /api/admin/academy/calendar/preview          the next open slots
+  POST /api/admin/academy/calendar/test-booking     a booking marked TEST, end to end
+  POST /api/admin/academy/calendar/test-booking/remove
 
 Secrets go in and never come back out: the OAuth client secret and the
 refresh token are stored encrypted, and the GET shows only whether they are
@@ -19,9 +21,10 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
+from .. import advanced_cert as adv
 from .. import exam_calendar as xcal
 from ..config import get_settings
 from ..db import get_db
@@ -128,3 +131,43 @@ def preview(db: Session = Depends(get_db), _: str = Depends(require_admin)) -> d
             for s, label in zip(slots[:40], xcal.day_lines(slots[:40], tz))
         ],
     }
+
+
+# -----------------------------------------------------------------------------
+# Test booking — the whole booking path, marked TEST, without a candidate
+# -----------------------------------------------------------------------------
+
+class TestBookingIn(BaseModel):
+    guest_email: EmailStr
+    product_code: str = Field(default="", max_length=64)
+
+
+@router.post("/test-booking")
+def make_test_booking(
+    body: TestBookingIn, db: Session = Depends(get_db), _: str = Depends(require_admin)
+) -> dict:
+    """Book the latest open time as a candidate would: event with Meet link
+    on his calendar, Google's invitation to `guest_email`, the candidate's
+    email and his alert, all marked TEST."""
+    try:
+        cal = adv.make_test_booking(db, str(body.guest_email), body.product_code)
+    except xcal.CalendarError as exc:
+        db.rollback()
+        xcal.note_failure(db, str(exc), alert=False)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return xcal.settings_out(cal)
+
+
+@router.post("/test-booking/remove")
+def remove_test_booking(db: Session = Depends(get_db), _: str = Depends(require_admin)) -> dict:
+    """Delete the test event; Google sends the guest the cancellation."""
+    try:
+        cal = adv.remove_test_booking(db)
+    except xcal.CalendarError as exc:
+        db.rollback()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return xcal.settings_out(cal)
