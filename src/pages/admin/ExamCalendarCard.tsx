@@ -32,6 +32,16 @@ type Settings = {
   self_booking: boolean;
   last_ok_at: string | null;
   last_error: string;
+  // A booking marked TEST that he made from this card (2026-10-18).
+  test_booking: TestBooking | null;
+};
+
+type TestBooking = {
+  start: string | null;
+  label: string;
+  guest_email: string;
+  meeting_url: string;
+  event_link: string;
 };
 
 type TestResult = { id: string; ok: boolean; error: string; busy_blocks: number };
@@ -78,6 +88,7 @@ export default function ExamCalendarCard({ onAuthError }: { onAuthError: () => v
   const [nums, setNums] = useState({ buffer: '30', notice: '48', horizon: '21', perDay: '2', step: '30' });
   const [tz, setTz] = useState('America/New_York');
   const [selfBooking, setSelfBooking] = useState(true);
+  const [testGuest, setTestGuest] = useState('');
 
   const adopt = (x: Settings) => {
     setS(x);
@@ -459,6 +470,96 @@ export default function ExamCalendarCard({ onAuthError }: { onAuthError: () => v
           )}
           {preview.count > preview.slots.length && (
             <p className="text-xs text-slate-500 mt-1">…and {preview.count - preview.slots.length} more.</p>
+          )}
+        </div>
+      )}
+
+      {/* ---- Test booking: the whole booking path, marked TEST ---- */}
+      {s.connected && (
+        <div className="rounded-lg border border-slate-800 p-4 space-y-3">
+          <div className="text-xs uppercase tracking-wider text-slate-400">Test booking</div>
+          {s.test_booking ? (
+            <>
+              <p className="text-sm text-slate-200">
+                On your calendar: <strong className="text-white">{s.test_booking.label}</strong> ({s.timezone}).
+                Google invited {s.test_booking.guest_email}. The candidate's confirmation email and your
+                "[Oral exam booked]" alert went out marked [TEST].
+              </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                {s.test_booking.event_link && (
+                  <a href={s.test_booking.event_link} target="_blank" rel="noreferrer" className="text-cyan-300 hover:text-cyan-200 underline">
+                    Open the event in Google Calendar
+                  </a>
+                )}
+                {s.test_booking.meeting_url && (
+                  <a href={s.test_booking.meeting_url} target="_blank" rel="noreferrer" className="text-cyan-300 hover:text-cyan-200 underline">
+                    Google Meet link
+                  </a>
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn-secondary text-sm py-2 px-4"
+                disabled={busy === 'test-booking'}
+                onClick={() => {
+                  const guest = s.test_booking?.guest_email ?? '';
+                  void run(
+                    'test-booking',
+                    async () => adopt(await api<Settings>('/api/admin/academy/calendar/test-booking/remove', { method: 'POST' })),
+                    `Test booking removed. Google has told ${guest} it is cancelled.`,
+                  );
+                }}
+              >
+                <X className="w-4 h-4" /> Remove the test booking
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-300 max-w-3xl">
+                Books the latest open time on your calendar exactly as a candidate's booking does: the
+                event with a Google Meet link, Google's invitation to the address below, the candidate's
+                confirmation email and your "[Oral exam booked]" alert, all marked TEST. No candidate is
+                involved. Remove it here when you have looked; Google then sends the cancellation.
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="block flex-1 min-w-[16rem] max-w-md">
+                  <span className="text-[11px] uppercase tracking-wider text-slate-300">Send the invitation to</span>
+                  <input
+                    type="email"
+                    value={testGuest}
+                    onChange={(e) => setTestGuest(e.target.value)}
+                    placeholder="an address you can open, e.g. your Gmail"
+                    className={inputCls}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn-primary text-sm py-2 px-4 mb-0.5"
+                  disabled={busy === 'test-booking' || !testGuest.includes('@')}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        `Put a TEST oral exam on your calendar at the latest open time and invite ${testGuest.trim()}? ` +
+                          'Two emails marked [TEST] go out (to that address and to you), plus Google\'s invitation.',
+                      )
+                    )
+                      return;
+                    void run('test-booking', async () => {
+                      const x = await api<Settings>('/api/admin/academy/calendar/test-booking', {
+                        method: 'POST',
+                        body: JSON.stringify({ guest_email: testGuest.trim() }),
+                      });
+                      adopt(x);
+                      setPreview(null);
+                      setFlash(`Test booking made for ${x.test_booking?.label ?? 'the latest open time'}. Check your calendar and inbox.`);
+                      window.setTimeout(() => setFlash(null), 8000);
+                    });
+                  }}
+                >
+                  <CalendarCheck className="w-4 h-4" /> Send a test booking
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}

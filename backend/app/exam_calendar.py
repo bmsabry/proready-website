@@ -155,7 +155,30 @@ def settings_out(cal: ExamCalendar) -> dict:
         "self_booking": bool(cal.self_booking),
         "last_ok_at": cal.last_ok_at,
         "last_error": cal.last_error,
+        "test_booking": test_booking_out(cal),
     }
+
+
+def test_booking_out(cal: ExamCalendar) -> dict | None:
+    """The admin's test booking, if one is on his calendar."""
+    if not cal.test_event_id:
+        return None
+    start = _aware(cal.test_event_start) if cal.test_event_start else None
+    return {
+        "start": start.strftime("%Y-%m-%dT%H:%M:%SZ") if start else None,
+        "label": day_lines([start], zone(cal))[0] if start else "",
+        "guest_email": cal.test_guest_email,
+        "meeting_url": cal.test_meeting_url,
+        "event_link": cal.test_event_link,
+    }
+
+
+def clear_test_booking(cal: ExamCalendar) -> None:
+    cal.test_event_id = ""
+    cal.test_event_start = None
+    cal.test_guest_email = ""
+    cal.test_meeting_url = ""
+    cal.test_event_link = ""
 
 
 def _bounded(value, low: int, high: int, what: str) -> int:
@@ -355,6 +378,14 @@ def complete_authorization(db: Session, code: str, state: str, admin_email: str)
 
 def disconnect(db: Session) -> ExamCalendar:
     cal = settings_row(db)
+    if cal.test_event_id and cal.refresh_token_encrypted:
+        # Remove the test booking while we still may; once disconnected it
+        # could only be deleted by hand in Google Calendar.
+        try:
+            delete_event(db, cal.test_event_id)
+        except CalendarError as exc:
+            log.warning("Could not remove the test booking on disconnect: %s", exc)
+    clear_test_booking(cal)
     if cal.refresh_token_encrypted:
         try:
             _google("POST", REVOKE_URL, data={"token": decrypt(cal.refresh_token_encrypted)})
