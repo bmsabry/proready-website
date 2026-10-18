@@ -291,6 +291,15 @@ def _run_column_migrations() -> None:
         ("booked_via", "VARCHAR(16) NOT NULL DEFAULT ''"),
     ):
         _ensure_column("academy_advanced_certifications", column, ddl)
+    # The admin's test booking on the oral-exam calendar (2026-10-18).
+    for column, ddl in (
+        ("test_event_id", "VARCHAR(256) NOT NULL DEFAULT ''"),
+        ("test_event_start", "TIMESTAMP WITH TIME ZONE"),
+        ("test_guest_email", "VARCHAR(320) NOT NULL DEFAULT ''"),
+        ("test_meeting_url", "VARCHAR(500) NOT NULL DEFAULT ''"),
+        ("test_event_link", "VARCHAR(1000) NOT NULL DEFAULT ''"),
+    ):
+        _ensure_column("academy_exam_calendar", column, ddl)
     _ensure_column("academy_orders", "kind", "VARCHAR(16) NOT NULL DEFAULT 'course'")
     _ensure_column("academy_quiz_items", "product_code", "VARCHAR(64) NOT NULL DEFAULT ''")
     _ensure_column("academy_quiz_attempts", "product_code", "VARCHAR(64) NOT NULL DEFAULT ''")

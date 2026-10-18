@@ -1261,6 +1261,14 @@ class ExamCalendar(Base):
     last_ok_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     last_error: Mapped[str] = mapped_column(String(500), default="")
     last_alert_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # A test booking made from the admin card (2026-10-18): the same event,
+    # Google invitation and emails as a candidate's booking, marked TEST,
+    # until he removes it. One at a time; no candidate or exam row behind it.
+    test_event_id: Mapped[str] = mapped_column(String(256), default="")
+    test_event_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    test_guest_email: Mapped[str] = mapped_column(String(320), default="")
+    test_meeting_url: Mapped[str] = mapped_column(String(500), default="")
+    test_event_link: Mapped[str] = mapped_column(String(1000), default="")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

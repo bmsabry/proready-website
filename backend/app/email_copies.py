@@ -94,6 +94,8 @@ KIND_LABELS: dict[str, str] = {
     "advanced_booked_admin": "Verified Competency: interview booked (alert)",
     "advanced_moved": "Verified Competency: interview moved",
     "exam_calendar_problem": "Calendar problem",
+    "exam_test_booking": "Calendar: test booking (candidate's copy)",
+    "exam_test_booking_admin": "Calendar: test booking (your alert)",
 }
 
 # (label, tone, what it means) — tone drives the colour: good/neutral/warn/bad.

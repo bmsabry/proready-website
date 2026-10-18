@@ -58,7 +58,9 @@ from .emailer import (
     exam_calendar_problem_html,
     send_email,
 )
-from .models import AdvancedCertification, Course, Learner, Order, Product, QuizAttempt, QuizItem
+from .models import (
+    AdvancedCertification, Course, ExamCalendar, Learner, Order, Product, QuizAttempt, QuizItem,
+)
 
 log = logging.getLogger(__name__)
 
@@ -961,6 +963,120 @@ def book(
         template="advanced_booked_admin",
     )
     return row
+
+
+# -----------------------------------------------------------------------------
+# The admin's test booking
+# -----------------------------------------------------------------------------
+
+TEST_NAME = "Test Candidate"
+
+
+def _test_product(db: Session, product_code: str = "") -> Product:
+    """The course the test booking is about: the one asked for, else the
+    first that offers the examined tier."""
+    if product_code:
+        product = db.get(Product, product_code)
+        if product is None:
+            raise ValueError("No course with that code.")
+        return product
+    product = db.execute(
+        select(Product).where(Product.advanced_cert_enabled.is_(True)).order_by(Product.code)
+    ).scalars().first()
+    if product is None:
+        raise ValueError("No course offers the instructor-examined tier yet.")
+    return product
+
+
+def make_test_booking(db: Session, guest_email: str, product_code: str = "") -> ExamCalendar:
+    """Book the latest open time on his calendar exactly as a candidate's
+    booking does — the event with a Google Meet link, Google's invitation
+    to `guest_email`, the candidate's confirmation email and his
+    "[Oral exam booked]" alert — all marked TEST. Nothing else changes: no
+    candidate, no examination row. Removed with `remove_test_booking`.
+
+    The latest open time keeps the near ones free for real candidates."""
+    guest_email = (guest_email or "").strip()
+    cal = xcal.settings_row(db)
+    if not xcal.connected(db):
+        raise ValueError("Connect your Google Calendar first.")
+    if cal.test_event_id:
+        raise ValueError("A test booking is already on your calendar. Remove it first.")
+    product = _test_product(db, product_code)
+    settings = get_settings()
+    minutes = settings.ADVANCED_INTERVIEW_MINUTES
+    try:
+        xcal.lock(db)
+        slots = xcal.open_slots(db, record=False)
+        if not slots:
+            raise ValueError(
+                "There is no open time to book: check your exam hours and calendars."
+            )
+        start = slots[-1]
+        event = xcal.create_event(
+            db, start=start, minutes=minutes,
+            summary=f"TEST — ProReadyEngineer oral examination: {TEST_NAME} — {product.title}",
+            description=(
+                "A test booking made from Admin → Certification → Oral-exam calendar. "
+                "Nobody is coming. Remove it there, and Google tells the guest it is cancelled."
+            ),
+            guest_email=guest_email, guest_name=TEST_NAME,
+        )
+    except Exception:
+        db.rollback()
+        raise
+    cal = xcal.settings_row(db)
+    cal.test_event_id = event["id"]
+    cal.test_event_start = start
+    cal.test_guest_email = guest_email
+    cal.test_meeting_url = event["meeting_url"]
+    cal.test_event_link = (event.get("html_link") or "")[:1000]
+    db.commit()
+
+    when = when_lines(start, "")
+    send_email(
+        to=guest_email,
+        subject=f"[TEST] Your oral examination is booked — {product.title}",
+        html=advanced_scheduled_html(
+            TEST_NAME, product.title, when, event["meeting_url"], minutes, 1,
+            f"{settings.SITE_URL}/learn/{product.code}",
+            invite_from=cal.account_email,
+        ),
+        db=db, scope_kind="system", scope_code="calendar",
+        audience="admin", template="exam_test_booking",
+    )
+    to = settings.ADMIN_NOTIFY_EMAIL
+    if to:
+        send_email(
+            to=to,
+            subject=f"[TEST] [Oral exam booked] {TEST_NAME} — {product.title}",
+            html=advanced_booked_admin_html(
+                learner_name=TEST_NAME,
+                learner_email=guest_email,
+                course_title=product.title,
+                when_lines=when,
+                meeting_url=event["meeting_url"],
+                interview_no=1,
+                calendar_account=cal.account_email,
+                breakdown=[],
+                admin_url=f"{settings.SITE_URL.rstrip('/')}/admin#certification",
+            ),
+            db=db, scope_kind="system", scope_code="calendar",
+            audience="admin", template="exam_test_booking_admin",
+        )
+    log.info("Test booking %s made for %s", event["id"], start.isoformat())
+    return cal
+
+
+def remove_test_booking(db: Session) -> ExamCalendar:
+    """Delete the test event; Google sends the guest the cancellation."""
+    cal = xcal.settings_row(db)
+    if not cal.test_event_id:
+        raise ValueError("There is no test booking to remove.")
+    xcal.delete_event(db, cal.test_event_id)
+    xcal.clear_test_booking(cal)
+    db.commit()
+    return cal
 
 
 def propose_slots(
