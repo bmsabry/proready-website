@@ -72,6 +72,8 @@ def _about(r: EmailLog, courses: dict[str, str], products: dict[str, str]) -> di
         return {"label": "Account integrity", "href": "#students"}
     if r.scope_kind == "interest":
         return {"label": "Course interest list", "href": ""}
+    if r.template == "delivery_problem" and code.startswith("email:"):
+        return {"label": f"Email #{code.split(':', 1)[1]} not delivered", "href": ""}
     return {"label": code, "href": ""}
 
 
