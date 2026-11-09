@@ -215,6 +215,8 @@ const MicroGasTurbineDesignLive = () => {
     'idle',
   );
   const [formError, setFormError] = useState<string | null>(null);
+  // The address the confirmation went to, shown back on the success screen.
+  const [submittedEmail, setSubmittedEmail] = useState('');
   // Online payment for the held seat. registrationId only exists after a real
   // (non-simulated) /api/register success; priceCents comes from the course
   // record. Unlike the invoice-only default elsewhere, this cohort has a
@@ -377,6 +379,7 @@ const MicroGasTurbineDesignLive = () => {
       }
       if (typeof data.taken === 'number') setSeatsTaken(data.taken);
       if (typeof data.registration_id === 'number') setRegistrationId(data.registration_id);
+      setSubmittedEmail(String(formData.get('email') || '').trim());
       setFormState(data.status === 'duplicate' ? 'duplicate' : 'success');
     } catch {
       setFormError('Network error. Please try again or email info@proreadyengineer.com.');
@@ -942,15 +945,21 @@ const MicroGasTurbineDesignLive = () => {
                 <>
                   <h3 className="text-2xl font-bold mb-4">Registration received</h3>
                   <p className="text-slate-300 mb-8 max-w-md mx-auto">
-                    Thanks. We'll send a confirmation email with payment details and pre-read
-                    material within 24 hours. If you don't see it, check spam or email{' '}
+                    Thanks. We have just emailed your confirmation
+                    {submittedEmail ? (
+                      <>
+                        {' '}to <span className="text-white font-semibold break-all">{submittedEmail}</span>
+                      </>
+                    ) : null}
+                    . If it is not in your inbox within 10 minutes, check your spam or junk
+                    folder, then email{' '}
                     <a
                       className="text-cyan-400 underline"
                       href="mailto:info@proreadyengineer.com"
                     >
                       info@proreadyengineer.com
-                    </a>
-                    .
+                    </a>{' '}
+                    so we can reach you another way.
                   </p>
                   {showPayPanel && payCfg && (
                     <div className="max-w-md mx-auto text-left rounded-2xl border border-cyan-500/30 bg-slate-900/60 p-6">
@@ -1106,6 +1115,18 @@ const MicroGasTurbineDesignLive = () => {
                   required
                   placeholder="Cincinnati, USA"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Field
+                  label="WhatsApp / Phone (optional)"
+                  name="phone"
+                  type="tel"
+                  placeholder="+1 513 555 0100"
+                />
+                <p className="text-xs text-slate-400 ml-1">
+                  Only used to reach you if our emails cannot get through to your inbox.
+                </p>
               </div>
 
               {/* Honeypot — hidden from real users, filled by bots. Submissions with a
