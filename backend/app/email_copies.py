@@ -97,6 +97,11 @@ KIND_LABELS: dict[str, str] = {
     "exam_test_booking": "Calendar: test booking (candidate's copy)",
     "exam_test_booking_admin": "Calendar: test booking (your alert)",
     "delivery_problem": "Email problem (alert)",
+    "login_link": "Sign-in link",
+    "login_link_admin": "Sign-in link (sent from admin)",
+    "purchase_welcome": "Purchase: you're in",
+    "delivery_canary": "Daily email check (canary)",
+    "email_setup_problem": "Email setup problem (alert)",
 }
 
 # (label, tone, what it means) — tone drives the colour: good/neutral/warn/bad.
@@ -164,6 +169,9 @@ def delivery_info(row: EmailLog) -> dict[str, Any]:
             "Sent", "neutral",
             "Accepted for sending. No delivery report from Resend yet.",
         )
+    detail = (getattr(row, "delivery_detail", "") or "").strip()
+    if detail:
+        explanation = f"{explanation} The receiving server said: {detail}"
     return {
         "state": row.delivery or "accepted",
         "label": label,

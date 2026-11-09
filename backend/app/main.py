@@ -327,6 +327,8 @@ def _run_column_migrations() -> None:
     # registrations.attended_at — a moderator's record that the registrant
     # attended the full live course (issues the Certificate of Attendance).
     _ensure_column("registrations", "attended_at", "TIMESTAMP WITH TIME ZONE")
+    # registrations.phone — optional WhatsApp/phone, for when email fails.
+    _ensure_column("registrations", "phone", "VARCHAR(40) NOT NULL DEFAULT ''")
     # academy_asset_blobs.content_type — the Office MIME types (an .xlsx
     # workbook, a .docx handout) are 65-71 characters; VARCHAR(64) refused
     # them.
@@ -345,6 +347,7 @@ def _run_column_migrations() -> None:
         ("error", "VARCHAR(500) NOT NULL DEFAULT ''"),
         ("delivery", "VARCHAR(32) NOT NULL DEFAULT ''"),
         ("delivery_checked_at", "TIMESTAMP WITH TIME ZONE"),
+        ("delivery_detail", "VARCHAR(1000) NOT NULL DEFAULT ''"),
     ):
         _ensure_column("email_log", column, ddl)
 
@@ -468,6 +471,7 @@ app.include_router(courses_routes.public_router)
 app.include_router(courses_routes.admin_router)
 app.include_router(reminders_routes.router)
 app.include_router(delivery_routes.router)
+app.include_router(delivery_routes.webhook_router)
 app.include_router(interest_routes.public_router)
 app.include_router(interest_routes.admin_router)
 app.include_router(ai_routes.router)

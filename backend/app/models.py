@@ -111,6 +111,9 @@ class Registration(Base):
     company: Mapped[str] = mapped_column(String(200))
     years_experience: Mapped[str] = mapped_column(String(16))
     location: Mapped[str] = mapped_column(String(200))
+    # Optional WhatsApp/phone — the way to reach a registrant whose
+    # confirmation email bounced. Empty when not given.
+    phone: Mapped[str] = mapped_column(String(40), default="")
 
     # 'pending' | 'paid' | 'cancelled'
     status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
@@ -1496,6 +1499,10 @@ class EmailLog(Base):
     delivery_checked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # The receiving server's own words when it refused the email (from the
+    # Resend webhook) — e.g. "550 5.7.1 Message rejected: …". Empty when
+    # delivered or not reported.
+    delivery_detail: Mapped[str] = mapped_column(String(1000), default="")
 
 
 class AssetDelivery(Base):

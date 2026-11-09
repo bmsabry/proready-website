@@ -701,8 +701,8 @@ def broadcast_html(course_title: str, body_html: str) -> str:
 
 def admin_notification_html(reg: dict, taken_after: int, capacity: int) -> str:
     body = _p(
-        f"Pending count unchanged ({taken_after}/{capacity} paid). Mark the row "
-        "paid from the Registrations tab once the invoice clears.",
+        f"Seats held now: {taken_after} of {capacity} (paid and pending together). "
+        "Mark the row paid from the Registrations tab once payment clears.",
         size=13,
         color=MUTED,
     )
@@ -1613,17 +1613,26 @@ def delivery_problem_html(
     person: "list[tuple[str, str]]",
     resend_url: str,
     comms_url: str,
+    canary_domain: str = "",
 ) -> str:
     """To the instructor: an email to a customer did not reach them.
 
     `person` is what the site knows about the recipient (registration,
-    learner account) as label/value pairs, in plain words.
+    learner account) as label/value pairs, in plain words. `canary_domain`
+    is set when the refused email was the daily test to his own mailbox.
     """
     who = next((v for k, v in person if k == "Name" and v), "") or recipient
-    body = _p(
-        f"<strong>{escape_html(who)}</strong> did not receive "
-        f"&ldquo;{escape_html(subject)}&rdquo;. They may be waiting for it."
-    )
+    if canary_domain:
+        body = _p(
+            f"The daily test email to your own mailbox at <strong>{escape_html(canary_domain)}</strong> "
+            "was refused. Trainees who use that provider are probably not receiving the "
+            "website's emails either (registration confirmations, sign-in links, reminders)."
+        )
+    else:
+        body = _p(
+            f"<strong>{escape_html(who)}</strong> did not receive "
+            f"&ldquo;{escape_html(subject)}&rdquo;. They may be waiting for it."
+        )
     rows = [
         ("Sent to", escape_html(recipient)),
         ("Email", escape_html(what)),
@@ -1634,10 +1643,17 @@ def delivery_problem_html(
     if who != recipient:
         rows.insert(0, ("Name", escape_html(who)))
     body += _kv_table(rows, size=14)
-    body += _p(
-        "<strong>What to do:</strong> check the address for a typo, then reach them another "
-        "way (phone, WhatsApp, LinkedIn) and ask for an address that works."
-    )
+    if canary_domain:
+        body += _p(
+            "<strong>What to do:</strong> open it in Resend and read the provider's reply "
+            "(click <em>See details</em>). It usually names what they want: an "
+            "authentication record, a blocked sending address, or a content rule."
+        )
+    else:
+        body += _p(
+            "<strong>What to do:</strong> check the address for a typo, then reach them another "
+            "way (phone, WhatsApp, LinkedIn) and ask for an address that works."
+        )
     if resend_url:
         body += _p(
             "If several people at the same provider (Hotmail/Outlook, Yahoo&hellip;) are "
@@ -1650,7 +1666,48 @@ def delivery_problem_html(
         f"It is also marked in {_link(comms_url, 'Admin &rarr; Comms')} (Problems only).",
         size=14,
     )
-    return _shell("Email problem", "An email to a customer was not delivered", body)
+    heading = (
+        "A provider refused our daily test email" if canary_domain
+        else "An email to a customer was not delivered"
+    )
+    return _shell("Email problem", heading, body)
+
+
+def delivery_canary_html(day: str) -> str:
+    """The daily test email to the instructor's own mailboxes."""
+    body = _p(
+        "This is the website's automatic daily email check. If it reached you, this "
+        "provider is accepting ProReadyEngineer's emails today. No action is needed; "
+        "you can filter these into a folder."
+    )
+    body += _p(
+        "If a provider ever refuses it, you get an &ldquo;Email problem&rdquo; alert "
+        "within minutes.", size=14,
+    )
+    return _shell("Daily email check", f"Email check for {escape_html(day)}", body)
+
+
+def email_setup_problem_html(failures: "list[tuple[str, str, str]]") -> str:
+    """To the instructor: a DNS record that email depends on is missing or changed.
+
+    `failures` holds (record, what it is for, what DNS answers now).
+    """
+    body = _p(
+        "One or more DNS records that ProReadyEngineer's email depends on no longer "
+        "look right. Until fixed, some providers may refuse the website's emails or "
+        "the support desk may stop receiving."
+    )
+    for record, why, now in failures:
+        body += _kv_table([
+            ("Record", escape_html(record)),
+            ("What it is for", escape_html(why)),
+            ("DNS answers now", escape_html(now)),
+        ], size=14)
+    body += _p(
+        "Check the record in Cloudflare (DNS &rarr; Records for proreadyengineer.com). "
+        "This alert repeats at most once a day while the problem lasts."
+    )
+    return _shell("Email setup", "A DNS record for email is missing or changed", body)
 
 
 # -----------------------------------------------------------------------------

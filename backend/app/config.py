@@ -49,6 +49,18 @@ class Settings(BaseSettings):
     SESSION_REMINDER_LEAD_MINUTES: int = 60
     CRON_SECRET: str = ""
 
+    # --- Email delivery watch (app/delivery_watch.py) ----------------------
+    # Signing secret of the Resend webhook that reports bounces/complaints
+    # (whsec_...). Empty = the webhook endpoint refuses everything and the
+    # 10-minute sweep is the only detector.
+    RESEND_WEBHOOK_SECRET: str = ""
+    # The instructor's own mailboxes at other providers (comma-separated),
+    # emailed once a day so a provider that starts refusing our mail is seen
+    # on a test mailbox before a trainee. Kept out of the public repo.
+    CANARY_EMAILS: str = ""
+    # Hour (UTC) after which the day's canary goes out.
+    CANARY_HOUR_UTC: int = 13
+
     # --- Admin auth -------------------------------------------------------
     # Single shared bearer token (server-to-server / curl escape hatch).
     # Rotate by changing the env var on Render.
