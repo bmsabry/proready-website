@@ -1602,6 +1602,57 @@ def exam_calendar_problem_html(error: str, admin_url: str) -> str:
     return _shell("Calendar", "Booking from your calendar has stopped", body)
 
 
+def delivery_problem_html(
+    *,
+    recipient: str,
+    what: str,
+    subject: str,
+    sent: str,
+    outcome: str,
+    explanation: str,
+    person: "list[tuple[str, str]]",
+    resend_url: str,
+    comms_url: str,
+) -> str:
+    """To the instructor: an email to a customer did not reach them.
+
+    `person` is what the site knows about the recipient (registration,
+    learner account) as label/value pairs, in plain words.
+    """
+    who = next((v for k, v in person if k == "Name" and v), "") or recipient
+    body = _p(
+        f"<strong>{escape_html(who)}</strong> did not receive "
+        f"&ldquo;{escape_html(subject)}&rdquo;. They may be waiting for it."
+    )
+    rows = [
+        ("Sent to", escape_html(recipient)),
+        ("Email", escape_html(what)),
+        ("Sent", escape_html(sent)),
+        ("What happened", f"<strong>{escape_html(outcome)}</strong> &mdash; {escape_html(explanation)}"),
+    ]
+    rows += [(escape_html(k), escape_html(v)) for k, v in person if v and k != "Name"]
+    if who != recipient:
+        rows.insert(0, ("Name", escape_html(who)))
+    body += _kv_table(rows, size=14)
+    body += _p(
+        "<strong>What to do:</strong> check the address for a typo, then reach them another "
+        "way (phone, WhatsApp, LinkedIn) and ask for an address that works."
+    )
+    if resend_url:
+        body += _p(
+            "If several people at the same provider (Hotmail/Outlook, Yahoo&hellip;) are "
+            "refused, the problem is on our side, not theirs. Resend shows the provider's "
+            "exact reply: open the email there and click <em>See details</em>.",
+            size=14,
+        )
+        body += _cta_button("Open it in Resend", resend_url)
+    body += _p(
+        f"It is also marked in {_link(comms_url, 'Admin &rarr; Comms')} (Problems only).",
+        size=14,
+    )
+    return _shell("Email problem", "An email to a customer was not delivered", body)
+
+
 # -----------------------------------------------------------------------------
 # Examined tier — fee waivers
 # -----------------------------------------------------------------------------
