@@ -96,6 +96,7 @@ KIND_LABELS: dict[str, str] = {
     "exam_calendar_problem": "Calendar problem",
     "exam_test_booking": "Calendar: test booking (candidate's copy)",
     "exam_test_booking_admin": "Calendar: test booking (your alert)",
+    "delivery_problem": "Email problem (alert)",
 }
 
 # (label, tone, what it means) — tone drives the colour: good/neutral/warn/bad.
