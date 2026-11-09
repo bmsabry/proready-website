@@ -115,6 +115,16 @@ TEMPLATES = {
         breakdown=[], admin_url=LINK,
     ),
     "exam_calendar_problem": lambda: E.exam_calendar_problem_html("notFound", LINK),
+    "delivery_problem": lambda: E.delivery_problem_html(
+        recipient="ada@example.com", what="Registration received", subject="Registration received — X",
+        sent="Nov 09, 2026 05:08 UTC", outcome="Bounced", explanation="Rejected.",
+        person=[("Name", "Ada"), ("Location", "Egypt")], resend_url=LINK, comms_url=LINK,
+    ),
+    "delivery_problem_not_sent": lambda: E.delivery_problem_html(
+        recipient="ada@example.com", what="Registration received", subject="Registration received — X",
+        sent="", outcome="Not sent", explanation="Resend refused it.", person=[("Name", "")],
+        resend_url="", comms_url=LINK,
+    ),
     "advanced_purchased_self_booking": lambda: E.advanced_purchased_html(
         "Ada", "Course X", LINK, "$300", self_booking=True
     ),
