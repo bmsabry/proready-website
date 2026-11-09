@@ -69,6 +69,8 @@ export type Registration = {
   company: string;
   years_experience: string;
   location: string;
+  /** Optional WhatsApp/phone from the registration form ('' when not given). */
+  phone?: string;
   status: 'pending' | 'paid' | 'cancelled' | string;
   /** 'paypal' | 'stripe' | '' (empty = manual invoice / not paid online) */
   payment_provider: string;

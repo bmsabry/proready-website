@@ -653,6 +653,8 @@ def login_link(
             html=login_link_html(
                 learner.full_name or "", link, settings.LOGIN_LINK_TTL_SECONDS // 60
             ),
+            db=db, scope_kind="system", scope_code="signin",
+            audience="learner", template="login_link_admin",
         )
     log.info("Admin %s minted a sign-in link for %s", admin, learner.email)
     return {

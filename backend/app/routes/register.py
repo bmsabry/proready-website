@@ -122,6 +122,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
         company=payload.company.strip(),
         years_experience=payload.years_experience.strip(),
         location=payload.location.strip(),
+        phone=payload.phone.strip(),
         status="pending",
     )
     db.add(reg)
@@ -167,6 +168,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
                     "Company": reg.company,
                     "Experience": reg.years_experience,
                     "Location": reg.location,
+                    "WhatsApp / phone": reg.phone or "not given",
                     "Course": course.code,
                     "Status": reg.status,
                     "Registration ID": str(reg.id),

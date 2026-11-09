@@ -16,6 +16,8 @@ class RegisterIn(BaseModel):
     company: str = Field(min_length=1, max_length=200)
     years_experience: str = Field(min_length=1, max_length=16)
     location: str = Field(min_length=1, max_length=200)
+    # Optional WhatsApp/phone: how to reach them if the confirmation bounces.
+    phone: str = Field(default="", max_length=40)
     consent: bool | str = True  # HTML checkbox sends "on" as string
 
     # Optional course code. If omitted, falls back to settings.COURSE_CODE
@@ -52,6 +54,7 @@ class AdminRegistrationOut(BaseModel):
     company: str
     years_experience: str
     location: str
+    phone: str = ""
     status: str
     # 'paypal' | 'stripe' | '' (empty = manual invoice / not paid online)
     payment_provider: str = ""

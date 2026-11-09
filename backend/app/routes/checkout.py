@@ -351,6 +351,8 @@ def grant_and_welcome(
             bank_pending=bank_pending,
         ),
         bcc=settings.ADMIN_NOTIFY_EMAIL or None,
+        db=db, scope_kind="product", scope_code=order.product_code,
+        audience="buyer", template="purchase_welcome",
     )
 
 
