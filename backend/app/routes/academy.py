@@ -294,6 +294,8 @@ def request_link(body: RequestLinkIn, request: Request, db: Session = Depends(ge
         html=login_link_html(
             learner.full_name or "", link, settings.LOGIN_LINK_TTL_SECONDS // 60
         ),
+        db=db, scope_kind="system", scope_code="signin",
+        audience="learner", template="login_link",
     )
     activity.record(
         db, learner.id, "link_requested", request=request, visit="none",
