@@ -33,6 +33,7 @@ from .routes import interest as interest_routes
 from .routes import payments as payments_routes
 from .routes import register as register_routes
 from .routes import reminders as reminders_routes
+from .routes import delivery as delivery_routes
 from .routes import seats as seats_routes
 from .routes import sim as sim_routes
 from .routes import software as software_routes
@@ -466,6 +467,7 @@ app.include_router(admin_routes.router)
 app.include_router(courses_routes.public_router)
 app.include_router(courses_routes.admin_router)
 app.include_router(reminders_routes.router)
+app.include_router(delivery_routes.router)
 app.include_router(interest_routes.public_router)
 app.include_router(interest_routes.admin_router)
 app.include_router(ai_routes.router)
