@@ -28,6 +28,7 @@ import {
   Lock,
   Mail,
   MapPin,
+  Phone,
   PlayCircle,
   Plus,
   Save,
@@ -344,7 +345,7 @@ function RegistrationsTab({
         return false;
       }
       if (!q) return true;
-      return [r.full_name, r.email, r.company, r.job_title, r.location]
+      return [r.full_name, r.email, r.company, r.job_title, r.location, r.phone ?? '']
         .join(' ')
         .toLowerCase()
         .includes(q);
@@ -495,6 +496,7 @@ function RegistrationsTab({
         'Company',
         'Years experience',
         'Location',
+        'WhatsApp / phone',
         'Status',
         'Payment',
         'Registered',
@@ -510,6 +512,7 @@ function RegistrationsTab({
         r.company,
         r.years_experience,
         r.location,
+        r.phone ?? '',
         r.status,
         r.payment_provider || 'invoice',
         r.created_at,
@@ -647,6 +650,18 @@ function RegistrationsTab({
                         <Mail className="w-3 h-3" />
                         {r.email}
                       </a>
+                      {r.phone && (
+                        <a
+                          href={`https://wa.me/${r.phone.replace(/[^0-9]/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-emerald-300 hover:underline flex items-center gap-1 mt-0.5"
+                          title="Open a WhatsApp chat"
+                        >
+                          <Phone className="w-3 h-3" />
+                          {r.phone}
+                        </a>
+                      )}
                     </td>
                     <td className="px-4 py-3 align-top">
                       <div className="text-slate-200">{r.company}</div>
