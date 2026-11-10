@@ -548,7 +548,9 @@ const MicroGasTurbineDesignLive = () => {
                 <Send className="w-4 h-4" aria-hidden="true" />
               </a>
               <span className="text-sm text-slate-300">
-                No payment required to register. Your seat is held as pending.
+                {isFull
+                  ? 'Leave your email and we will write to you when the next dates are set.'
+                  : 'No payment required to register. Your seat is held as pending.'}
               </span>
             </div>
 
