@@ -6,6 +6,8 @@
  * it to report whether you already own the course).
  */
 
+import { apiErrorMessage } from './apiError';
+
 /* Build marker: gate-messaging release (sequential mastery gate). */
 export const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
@@ -57,10 +59,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     // `gate` object; older shapes put the object in `detail` itself.
     const detail = data?.detail;
     const gate: GateBlock | undefined =
-      data?.gate ?? (detail && typeof detail === 'object' ? detail : undefined);
+      data?.gate ??
+      (detail && typeof detail === 'object' && !Array.isArray(detail) ? detail : undefined);
     const message =
       (typeof detail === 'string' ? detail : gate?.message) ||
-      `Request failed (${res.status})`;
+      // A rejected field arrives as a list; say which field and why.
+      apiErrorMessage(data, `Request failed (${res.status})`);
     throw new ApiError(res.status, message, gate);
   }
   return data as T;

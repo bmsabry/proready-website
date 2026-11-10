@@ -43,6 +43,20 @@ const fmtDate = (iso: string | null | undefined) =>
       })
     : '';
 
+/* Dates printed on a certificate (issued, examined) and the re-examination
+ * date are calendar dates set by the server in UTC. Shown in UTC so they read
+ * the same as the PDF; in the viewer's zone they came out a day early
+ * anywhere west of Greenwich. */
+const fmtCertDate = (iso: string | null | undefined) =>
+  iso
+    ? new Date(iso).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'UTC',
+      })
+    : '';
+
 const money = (cents: number, currency: string) =>
   new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -97,8 +111,8 @@ const CertificateCard = ({ cert }: { cert: IssuedCertificate }) => (
     </a>
     <div>
       <div className="text-xs font-mono uppercase tracking-widest text-cyan-400">
-        Issued {fmtDate(cert.issued_at)}
-        {cert.exam_date ? ` · examined ${fmtDate(cert.exam_date)}` : ''}
+        Issued {fmtCertDate(cert.issued_at)}
+        {cert.exam_date ? ` · examined ${fmtCertDate(cert.exam_date)}` : ''}
       </div>
       <h3 className="text-lg font-semibold text-white mt-1">{cert.title}</h3>
       <p className="text-sm text-slate-300 mt-1">
@@ -649,6 +663,7 @@ const CertificationPanel: React.FC<{
   const load = useCallback(async () => {
     try {
       setData(await academy.certification(code));
+      setError(''); // a later success clears an earlier failure
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load certification status.');
     }
@@ -689,10 +704,13 @@ const CertificationPanel: React.FC<{
     return () => window.clearTimeout(t);
   }, [startAdvanced, data]);
 
-  if (error) {
+  // With nothing loaded yet the message is all there is to show. Once the
+  // certificates are on screen, an error is shown above them, never instead
+  // of them: a failed checkout must not hide an issued certificate.
+  if (error && !data) {
     return (
       <div className="card p-6 mb-8">
-        <p className="text-sm text-slate-300">{error}</p>
+        <p role="alert" className="text-sm text-slate-300">{error}</p>
       </div>
     );
   }
@@ -732,6 +750,11 @@ const CertificationPanel: React.FC<{
 
   return (
     <>
+      {error && (
+        <p role="alert" className="text-sm text-amber-200 mb-4">
+          {error}
+        </p>
+      )}
       {/* ---- Certificate of Attendance (issued by a moderator for live-cohort
              attendees; shown only when held — there is no learner action) ---- */}
       {data.attendance?.certificate && (
@@ -1031,7 +1054,7 @@ const CertificationPanel: React.FC<{
                           active
                         >
                           {state.status === 'retake_pending' && state.retake_after && (
-                            <>Your complimentary re-examination can be booked on or after {fmtDate(state.retake_after)}. </>
+                            <>Your complimentary re-examination can be booked on or after {fmtCertDate(state.retake_after)}. </>
                           )}
                           {state.status === 'slots_proposed' && (
                             <>

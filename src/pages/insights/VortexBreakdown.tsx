@@ -3,6 +3,8 @@ import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
+import Img from '../../components/Img';
 const VortexBreakdown = () => {
   usePageMeta('Vortex Breakdown Dynamics and Stability', 'A technical deep dive into vortex breakdown in swirling flows: stagnation points, recirculation zones, and the velocity ratios that trigger them.');
 
@@ -34,7 +36,7 @@ const VortexBreakdown = () => {
           <div className="flex items-center justify-between gap-4 mb-12 pb-12 border-b border-slate-800">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
-                <img loading="lazy" decoding="async" src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" className="w-full h-full object-cover" />
+                <Img src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" sizes="48px" className="w-full h-full object-cover" />
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-200">Dr. Bassam Abdelnabi</p>
@@ -52,19 +54,13 @@ const VortexBreakdown = () => {
             </div>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async" 
-              src="/Vortex_Break_Down_Image.png" 
-              alt="Vortex Breakdown Visualization" 
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/Vortex_Break_Down_Image.png" alt="Vortex Breakdown Visualization" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed space-y-10">
             <section>
               <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">1. Introduction: The Mechanics of the "Vortex Breakdown"</h2>
               <p>
-                In the rigorous analysis of high-speed fluid mechanics, "vortex breakdown" is defined as a abrupt and drastic change in the structure of a swirling flow. As fundamentally articulated by Leibovich, this phenomenon is initiated by specific variations in the tangential-to-axial velocity ratios. Physically, it manifests as a sudden retardation of the axial flow, culminating in the formation of stagnation points and complex recirculation zones.
+                In the rigorous analysis of high-speed fluid mechanics, "vortex breakdown" is defined as an abrupt and drastic change in the structure of a swirling flow. As fundamentally articulated by Leibovich, this phenomenon is initiated by specific variations in the tangential-to-axial velocity ratios. Physically, it manifests as a sudden retardation of the axial flow, culminating in the formation of stagnation points and complex recirculation zones.
               </p>
               <p>
                 The engineering relevance of vortex breakdown is bifurcated. In aeronautical applications, it represents a catastrophic stability hazard; for instance, the breakdown of leading-edge vortices on delta wings, governed by the angle of attack, can cause a sudden shift in the aerodynamic center and loss of lift. Conversely, in the propulsion sector, breakdown is an essential mechanism for flame stabilization. The resulting internal recirculation zone (IRZ) acts as a high-temperature aerodynamic bluff body, ensuring continuous ignition and stable heat release in high-intensity combustion systems. This synthesis evaluates the mechanical thresholds, numerical evolution, and enstrophy intensification associated with this transition, drawing upon 45 years of experimental and computational research.

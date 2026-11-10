@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import Img from './Img';
 
 /* ---------- Reveal: scroll-in animation wrapper ----------
    SEO/no-JS safe: content renders visible by default. On mount, elements
@@ -117,7 +118,7 @@ export const StatCounter = ({
   return (
     <div ref={ref} className="text-center">
       <div className="font-display text-4xl md:text-5xl font-bold text-gradient tabular-nums">
-        {prefix}{n.toLocaleString()}{suffix}
+        {prefix}{n.toLocaleString('en-US')}{suffix}
       </div>
       <div className="mt-2 text-xs font-mono uppercase tracking-widest text-slate-300">{label}</div>
     </div>
@@ -184,4 +185,32 @@ export const PageHero = ({
       </div>
     </div>
   </section>
+);
+
+/* ---------- ArticleFigure: lead figure of a case study or insight ----------
+   Shown whole, never cropped: these are engineering figures and infographics,
+   and a figure with its axis label or legend trimmed off is a wrong figure.
+   Selecting it opens the full-quality original, which is what makes the small
+   print readable on a phone. */
+export const ArticleFigure = ({ src, alt }: { src: string; alt: string }) => (
+  <figure className="mb-12">
+    <a
+      href={src}
+      target="_blank"
+      rel="noopener"
+      className="block rounded-3xl overflow-hidden border border-slate-800/80 bg-slate-900 cursor-zoom-in"
+    >
+      <Img
+        src={src}
+        alt={alt}
+        priority
+        sizes="(min-width: 960px) 896px, 100vw"
+        className="w-full h-auto block"
+      />
+      <span className="sr-only"> (opens the full-size image in a new tab)</span>
+    </a>
+    <figcaption className="mt-3 text-center text-xs text-slate-400">
+      Select the image to view it full size.
+    </figcaption>
+  </figure>
 );

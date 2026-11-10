@@ -75,7 +75,12 @@ export default function AdminDashboard() {
   const [certNeeds, setCertNeeds] = useState(0);
 
   const onAuthError = useCallback(() => {
-    navigate('/admin/login', { replace: true });
+    // Carry the screen that was open (the #hash) through the sign-in page, so
+    // a link from an alert email still lands on its ticket or candidate.
+    // Several requests fail together when the session has ended; only the
+    // first one still sees the hash, so later ones must not overwrite it.
+    if (window.location.pathname.startsWith('/admin/login')) return;
+    navigate('/admin/login', { replace: true, state: { next: window.location.hash } });
   }, [navigate]);
 
   // Hash is the single source of truth for navigation — back/forward works,
@@ -309,7 +314,7 @@ export default function AdminDashboard() {
           <div className="mt-auto pt-2 border-t border-slate-800">
             {adminEmail && (
               <div
-                className="hidden lg:block text-[11px] text-slate-400 truncate px-2.5 pb-1.5"
+                className="hidden lg:block text-[11px] text-slate-400 break-all px-2.5 pb-1.5"
                 title={`Signed in as ${adminEmail}`}
               >
                 {adminEmail}

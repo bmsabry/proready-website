@@ -3,6 +3,7 @@ import { ArrowLeft, Calendar, User, Tag, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
 const EnhancingTestExecutionCostEfficiency = () => {
   usePageMeta('Enhancing Test Execution Cost & Efficiency', 'Automating manual test operations delivered 40% more daily data points, 50% lower staffing per test, and $2M in savings over 10 years.');
 
@@ -29,13 +30,7 @@ const EnhancingTestExecutionCostEfficiency = () => {
             </a>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async" 
-              src="/case2-study-enhancing-test-execution-cost-efficiency.jpg" 
-              alt="Enhancing Test Execution Cost & Efficiency" 
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/case2-study-enhancing-test-execution-cost-efficiency.jpg" alt="Enhancing Test Execution Cost & Efficiency" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
             <section>

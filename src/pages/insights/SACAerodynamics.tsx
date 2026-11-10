@@ -3,6 +3,8 @@ import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
+import Img from '../../components/Img';
 const bassamImg = '/Bassam.jpg';
 const aerodynamicsImg = '/SAC_Aerodynamics.jpg';
 
@@ -37,7 +39,7 @@ const SACAerodynamics = () => {
           <div className="flex items-center justify-between gap-4 mb-12 pb-12 border-b border-slate-800">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
-                <img loading="lazy" decoding="async" src={bassamImg} alt="Dr. Bassam Abdelnabi" className="w-full h-full object-cover" />
+                <Img src={bassamImg} alt="Dr. Bassam Abdelnabi" sizes="48px" className="w-full h-full object-cover" />
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-200">Dr. Bassam Abdelnabi</p>
@@ -55,13 +57,7 @@ const SACAerodynamics = () => {
             </div>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async" 
-              src={aerodynamicsImg} 
-              alt="Aerodynamics of a Single Annular Combustor" 
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src={aerodynamicsImg} alt="Aerodynamics of a Single Annular Combustor" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed space-y-10">
             <section>

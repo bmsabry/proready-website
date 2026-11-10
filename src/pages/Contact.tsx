@@ -245,7 +245,7 @@ const Contact = () => {
                       <p className="text-sm text-slate-400 mb-8">
                         Your reference:{' '}
                         <span className="font-mono text-cyan-400">#{ticketRef}</span>
-                        <span className="block text-xs text-slate-500 mt-1">
+                        <span className="block text-xs text-slate-400 mt-1">
                           Replying to that email keeps everything in one conversation.
                         </span>
                       </p>

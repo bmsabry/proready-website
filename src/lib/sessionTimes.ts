@@ -3,10 +3,12 @@
  *
  * Bassam sets the start on his own clock (New York) in the admin. Every other
  * place is derived from that for each session DATE, using that date's
- * daylight-saving rules for both ends: New York and Vancouver change clocks
- * together in March and November, Europe changes on different weekends, and
- * Saudi Arabia and Algeria never change. A single fixed offset — or a single
- * UTC time — is wrong for part of the year, so nothing here stores one.
+ * daylight-saving rules for both ends: New York changes clocks in March and
+ * November, Europe changes on different weekends, and Saudi Arabia and Algeria
+ * never change. British Columbia stopped changing in 2026 and stays on UTC-7,
+ * so from November to March Vancouver is an hour AHEAD of Seattle and Los
+ * Angeles. A single fixed offset — or a single UTC time — is wrong for part of
+ * the year, so nothing here stores one.
  *
  * The backend does the same arithmetic in Python (app/local_times.py,
  * session_start_utc) for the reminder emails; both read the same IANA rules.
@@ -28,7 +30,10 @@ export type Place = { place: string; region: string; zone: string };
 
 /** The places the public course pages show, in display order. */
 export const COURSE_PLACES: Place[] = [
-  { place: 'Vancouver', region: 'Pacific Time', zone: 'America/Vancouver' },
+  // "British Columbia", not "Pacific Time": since 2026 the province no longer
+  // shares a clock with the US west coast in winter, and a reader in Seattle
+  // or California must not take this card for their own time.
+  { place: 'Vancouver', region: 'British Columbia', zone: 'America/Vancouver' },
   { place: 'New York', region: 'Eastern Time', zone: 'America/New_York' },
   { place: 'Algeria', region: '', zone: 'Africa/Algiers' },
   { place: 'Saudi Arabia', region: '', zone: 'Asia/Riyadh' },
@@ -215,4 +220,28 @@ export const hourBlocks = (
     const a = start + i * (hourMinutes + breakMinutes) * MINUTE;
     return `${clockTime(a, zone, '24h')} – ${clockTime(a + hourMinutes * MINUTE, zone, '24h')}`;
   });
+};
+
+/* ---------- Where a cohort stands today ---------- */
+
+export type CohortPhase = 'upcoming' | 'running' | 'ended';
+
+/**
+ * 'upcoming' until the first session starts, 'running' from then until the end
+ * of the last session day (on the instructor's calendar), 'ended' after that.
+ * A course with no dates yet is 'upcoming'.
+ *
+ * The public pages use this so a cohort that has started or finished is never
+ * advertised as "Next cohort ... Registration open".
+ */
+export const cohortPhase = (clock: SessionClock, dayIsos: string[], nowMs: number): CohortPhase => {
+  const days = dayIsos.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  if (days.length === 0) return 'upcoming';
+  const zone = clock.zone || INSTRUCTOR_ZONE;
+  const today = localDateIso(nowMs, zone);
+  if (today > days[days.length - 1]) return 'ended';
+  const [firstStart] = sessionStartsUtcMs(clock, [days[0]]);
+  // With no session time set, the cohort counts as started from its first date.
+  const started = firstStart !== undefined ? nowMs >= firstStart : today >= days[0];
+  return started ? 'running' : 'upcoming';
 };

@@ -72,7 +72,7 @@ export type Candidate = {
 
 type CertRow = {
   code: string;
-  tier: 'completion' | 'verified';
+  tier: 'completion' | 'verified' | 'attendance';
   status: 'issued' | 'revoked';
   revoke_reason: string;
   email: string;
@@ -241,7 +241,13 @@ export default function CertificationTab({
       />
     );
   }
-  if (!data) return <p className="text-sm text-slate-400">Loading…</p>;
+  if (!data) {
+    return error ? (
+      <Notice kind="error">{error}</Notice>
+    ) : (
+      <p className="text-sm text-slate-400">Loading…</p>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -902,6 +908,9 @@ export function CandidateCard({
                   disabled={busy === key}
                   className="btn-primary text-xs py-1.5 px-3"
                   onClick={() =>
+                    window.confirm(
+                      'Record a PASS for this candidate? The signed Certificate of Verified Competency is issued and emailed to them now.',
+                    ) &&
                     run(
                       key,
                       () =>
@@ -929,6 +938,9 @@ export function CandidateCard({
                       disabled={busy === key}
                       className="btn-secondary text-xs py-1.5 px-3"
                       onClick={() =>
+                        window.confirm(
+                          'Record NOT YET for this candidate? They are emailed now and offered the complimentary re-examination.',
+                        ) &&
                         run(
                           key,
                           () =>
@@ -954,6 +966,9 @@ export function CandidateCard({
                     disabled={busy === key}
                     className="btn-secondary text-xs py-1.5 px-3 border-red-900 text-red-300"
                     onClick={() =>
+                      window.confirm(
+                        'Record DID NOT PASS for this candidate? They are emailed the outcome now.',
+                      ) &&
                       run(
                         key,
                         () =>
@@ -1058,7 +1073,9 @@ function CertificateRow({
     <tr className="border-t border-slate-800 align-top">
       <td className="px-3 py-2">
         <div className="font-mono text-slate-200">{r.code}</div>
-        <div className="text-xs text-slate-400">{r.tier === 'verified' ? 'Verified Competency' : 'Completion'}</div>
+        <div className="text-xs text-slate-400">
+          {r.tier === 'verified' ? 'Verified Competency' : r.tier === 'attendance' ? 'Attendance' : 'Completion'}
+        </div>
         <div className="flex gap-2 mt-1 text-xs">
           <a href={r.verify_url} target="_blank" rel="noopener" className="text-cyan-400">verify</a>
           <a href={`${API_BASE}${r.pdf_url}`} target="_blank" rel="noopener" className="text-cyan-400">pdf</a>

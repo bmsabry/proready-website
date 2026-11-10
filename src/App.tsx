@@ -1,8 +1,10 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
+import PageErrorBoundary from './components/PageErrorBoundary';
+import { CTABand } from './components/ui';
 import Home from './pages/Home';
 
 const Services = lazy(() => import('./pages/Services'));
@@ -77,7 +79,34 @@ const MgtCohortRedirect = () => {
   return <Navigate to={`/training/micro-gas-turbine-design-live${search}`} replace />;
 };
 
+/** Every case study and research insight ends with a next step. The article
+    pages themselves stop at their last paragraph; without this a reader who
+    has just finished one reaches the footer with nowhere to go. */
+const ArticleLayout = ({ kind }: { kind: 'case-study' | 'insight' }) => (
+  <>
+    <Outlet />
+    {kind === 'case-study' ? (
+      <CTABand
+        title="Have a complex engineering challenge?"
+        subtitle="Let's discuss how our expertise can help you achieve your goals and drive innovation in your industry."
+        primaryLabel="Start a Conversation"
+        secondaryLabel="More Case Studies"
+        secondaryTo="/case-studies"
+      />
+    ) : (
+      <CTABand
+        title="Want this expertise on your problem?"
+        subtitle="The same rigor behind these analyses goes into every client engagement, from combustion test campaigns to hydrogen readiness studies."
+        primaryLabel="Consult with Experts"
+        secondaryLabel="More Research Insights"
+        secondaryTo="/insights"
+      />
+    )}
+  </>
+);
+
 function App() {
+  const { pathname } = useLocation();
   return (
     <>
       <ScrollToTop />
@@ -85,6 +114,7 @@ function App() {
         <a href="#main-content" className="skip-link">Skip to main content</a>
         <Navbar />
         <main id="main-content" tabIndex={-1} className="flex-grow">
+          <PageErrorBoundary resetKey={pathname}>
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Home />} />
@@ -110,6 +140,7 @@ function App() {
               <Route path="/insights" element={<Insights />} />
               <Route path="/case-studies" element={<CaseStudies />} />
               <Route path="/testimonials" element={<Testimonials />} />
+              <Route element={<ArticleLayout kind="case-study" />}>
               <Route path="/case-studies/optimizing-test-cell-assembly" element={<OptimizingTestCellAssembly />} />
               <Route path="/case-studies/enhancing-test-execution-cost-efficiency" element={<EnhancingTestExecutionCostEfficiency />} />
               <Route path="/case-studies/multichannel-emissions-sampling" element={<MultichannelEmissionsSampling />} />
@@ -122,6 +153,8 @@ function App() {
               <Route path="/case-studies/reinstatement-of-polypropylene-plant-high-pressure-blow-down-vessel" element={<ReinstatementOfPolypropylenePlant />} />
               <Route path="/case-studies/recovery-reactor-feed-cooler-heat-exchanger" element={<RecoveryReactorFeedCoolerHeatExchanger />} />
               <Route path="/case-studies/case-study-fuel-supply-capability-expansion-specification-procurement-and-commissioning" element={<CaseStudyFuelSupplyCapabilityExpansion />} />
+              </Route>
+              <Route element={<ArticleLayout kind="insight" />}>
               <Route path="/insights/secondary-air-impact" element={<SecondaryAirImpact />} />
               <Route path="/insights/transitioning-dle-combustion-systems-to-100-hydrogen" element={<TransitioningDLECombustionSystemsTo100Hydrogen />} />
               <Route path="/insights/operational-modes-impact" element={<ImpactOfOperationalModes />} />
@@ -130,12 +163,14 @@ function App() {
               <Route path="/insights/automated-combustor-design" element={<AutomatedCombustorDesign />} />
               <Route path="/insights/sac-dynamics" element={<SACDynamics />} />
               <Route path="/insights/sac-aerodynamics" element={<SACAerodynamics />} />
+              </Route>
               <Route path="/contact" element={<Contact />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          </PageErrorBoundary>
         </main>
         <Footer />
       </div>

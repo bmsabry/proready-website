@@ -3,6 +3,7 @@ import { ArrowLeft, Calendar, User, Tag, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
 const DualModeLiquidFuelPumpingSystem = () => {
   usePageMeta('Dual-Mode Liquid-Fuel Pumping System Case Study', 'Design, procurement, and commissioning of a three-stage high-pressure pumping skid for dry-fuel and fuel-water emulsion operation with redundancy and purge safety.');
 
@@ -29,13 +30,7 @@ const DualModeLiquidFuelPumpingSystem = () => {
             </a>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async" 
-              src="/case-study-specifying-procuring-and-installing-a-dualmode-liquidfuel-pumping-system.jpg" 
-              alt="Dual-Mode Liquid-Fuel Pumping System" 
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/case-study-specifying-procuring-and-installing-a-dualmode-liquidfuel-pumping-system.jpg" alt="Dual-Mode Liquid-Fuel Pumping System" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
             <section>

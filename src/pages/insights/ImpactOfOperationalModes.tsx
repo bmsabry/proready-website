@@ -3,6 +3,8 @@ import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
+import Img from '../../components/Img';
 const ImpactOfOperationalModes = () => {
   usePageMeta('Operational Modes & Combustor Performance', 'How fuel phase and injection method drive combustor liner temperatures, thermal gradients, and durability in gas turbine operation.');
 
@@ -34,7 +36,7 @@ const ImpactOfOperationalModes = () => {
           <div className="flex items-center justify-between gap-4 mb-12 pb-12 border-b border-slate-800">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
-                <img loading="lazy" decoding="async" src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" className="w-full h-full object-cover" />
+                <Img src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" sizes="48px" className="w-full h-full object-cover" />
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-200">Dr. Bassam Abdelnabi</p>
@@ -52,13 +54,7 @@ const ImpactOfOperationalModes = () => {
             </div>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async"
-              src="/Impact_of_Operational_Modes_on_Gas_Turbine_Combustor_Performance.jpg"
-              alt="Operational Modes Impact Visualization"
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/Impact_of_Operational_Modes_on_Gas_Turbine_Combustor_Performance.jpg" alt="Operational Modes Impact Visualization" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed space-y-10">
             <section>

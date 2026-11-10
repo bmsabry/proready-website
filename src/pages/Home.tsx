@@ -12,6 +12,7 @@ import {
 import { Link } from 'react-router-dom';
 import { Reveal, SectionHeading, StatCounter, CTABand } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
+import Img from '../components/Img';
 
 /* ---------------- Data ---------------- */
 
@@ -148,11 +149,9 @@ const TeamCard = ({ member, index }: { member: TeamMember; index: number }) => {
     <Reveal delay={(index % 2) * 0.08} className="h-full">
       <article className="card card-hover h-full flex flex-col p-6 md:p-8">
         <div className="flex items-center gap-5">
-          <img
-            src={member.image}
+          <Img
+            src={member.image} sizes="112px"
             alt={`Portrait of ${member.name}`}
-            loading="lazy"
-            decoding="async"
             className="w-28 h-28 rounded-2xl object-cover border border-slate-800 shrink-0"
           />
           <div>
@@ -200,10 +199,9 @@ const Home = () => {
         <div className="hero-backdrop" />
         <div className="absolute inset-0 -z-20 bg-hero-radial" />
         <div className="absolute inset-0 -z-30" aria-hidden="true">
-          <img
-            src="/Banner.png"
+          <Img
+            src="/Banner.png" sizes="100vw" priority
             alt=""
-            decoding="async"
             className="w-full h-full object-cover opacity-[0.15]"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/70 to-slate-950" />

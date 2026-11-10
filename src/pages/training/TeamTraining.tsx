@@ -27,6 +27,7 @@ import {
   Thermometer,
 } from 'lucide-react';
 import { Reveal } from '../../components/ui';
+import Img from '../../components/Img';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
 
@@ -133,14 +134,10 @@ export const DeliveryOptions = () => (
       <Reveal delay={0.1}>
         <div className="card mt-8 p-6 md:p-8 grid grid-cols-1 lg:grid-cols-5 gap-6 items-center">
           <div className="lg:col-span-3 flex items-center gap-5">
-            <img
-              src="/Bassam.jpg"
+            <Img
+              src="/Bassam.jpg" sizes="80px"
               alt="Dr. Bassam Abdelnabi"
               className="w-20 h-20 rounded-2xl object-cover border border-slate-700 shrink-0"
-              width={80}
-              height={80}
-              loading="lazy"
-              decoding="async"
             />
             <div>
               <p className="text-xs font-mono uppercase tracking-widest text-slate-400 mb-1">

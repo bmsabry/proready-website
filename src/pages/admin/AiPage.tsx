@@ -391,11 +391,11 @@ function AIActivitySection({ onAuthError }: { onAuthError: () => void }) {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-slate-200">
-                    <div className="truncate max-w-[420px]" title={r.summary}>
+                    <div className="break-words max-w-[420px]" title={r.summary}>
                       {r.summary}
                     </div>
                     {r.error && (
-                      <div className="text-red-300 text-[11px] truncate max-w-[420px]" title={r.error}>
+                      <div className="text-red-300 text-[11px] break-words max-w-[420px]" title={r.error}>
                         ↳ {r.error}
                       </div>
                     )}

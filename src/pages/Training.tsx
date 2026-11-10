@@ -21,12 +21,15 @@ import {
   TEAM_FORM_ID,
   TeamTrainingForm,
 } from './training/TeamTraining';
+import { CohortPhase, clockFromApi, cohortPhase } from '../lib/sessionTimes';
+import NotifyMeForm from '../components/NotifyMeForm';
 import { usePageMeta } from '../lib/meta';
 import {
   courseSnapshot,
   formatIsoDate as formatStartDate,
   snapshotStartLabel,
 } from '../data/courseSnapshot';
+import Img from '../components/Img';
 
 // Courses backed by the registration API expose a `code` so the card can show
 // live seats / start date instead of hardcoded values.
@@ -88,6 +91,15 @@ const courses = [
   },
 ];
 
+/* The date chip of a live-cohort card: a cohort that has started or finished
+   is never advertised as the "next" one. */
+const cohortWhenLabel = (phase: CohortPhase | undefined, date: string, nextPrefix: string): string =>
+  phase === 'ended'
+    ? 'Next cohort: dates to be announced'
+    : phase === 'running'
+      ? `In progress since ${date}`
+      : `${nextPrefix}${date}`;
+
 type LiveCourseInfo = {
   seatsRemaining: number;
   totalSeats: number;
@@ -97,6 +109,7 @@ type LiveCourseInfo = {
   priceCents: number; // 0 = invoice-only, no public price shown
   currency: string;
   recordedProductCode: string | null; // set when an on-demand edition exists
+  phase: CohortPhase; // upcoming, already running, or finished
 };
 
 const WHY_TRAIN = [
@@ -318,69 +331,14 @@ const TRACKS: Track[] = [
 ];
 
 /* ---------- Waitlist capture for an upcoming course ---------- */
-const WaitlistForm = ({ slug }: { slug: string }) => {
-  const [email, setEmail] = useState('');
-  const [website, setWebsite] = useState(''); // honeypot
-  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setState('error');
-      return;
-    }
-    setState('busy');
-    try {
-      const res = await fetch(`${API_BASE}/api/interest`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ course_slug: slug, email: email.trim(), website }),
-      });
-      setState(res.ok ? 'done' : 'error');
-    } catch {
-      setState('error');
-    }
-  };
-
-  if (state === 'done') {
-    return (
-      <p className="text-sm text-cyan-300 mt-auto pt-2">
-        You're on the list. We'll email you when this course opens.
-      </p>
-    );
-  }
-  return (
-    <form onSubmit={submit} className="mt-auto pt-2 flex gap-2">
-      <label className="sr-only" htmlFor={`wl-${slug}`}>
-        Email for the {slug} waitlist
-      </label>
-      <input
-        id={`wl-${slug}`}
-        type="email"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@company.com"
-        className="flex-1 min-w-0 bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
-      />
-      <input
-        type="text"
-        value={website}
-        onChange={(e) => setWebsite(e.target.value)}
-        className="hidden"
-        tabIndex={-1}
-        autoComplete="off"
-        aria-hidden="true"
-      />
-      <button type="submit" disabled={state === 'busy'} className="btn-secondary px-4 py-2 text-sm whitespace-nowrap disabled:opacity-60">
-        {state === 'busy' ? 'Adding…' : 'Notify me'}
-      </button>
-      {state === 'error' && (
-        <span className="sr-only" role="alert">Could not join the waitlist, please retry.</span>
-      )}
-    </form>
-  );
-};
+const WaitlistForm = ({ slug }: { slug: string }) => (
+  <NotifyMeForm
+    slug={slug}
+    label={`Email for the ${slug} waitlist`}
+    doneText="You're on the list. We'll email you when this course opens."
+    className="mt-auto pt-2"
+  />
+);
 
 const UpcomingCard = ({ course, index }: { course: UpcomingCourse; index: number }) => (
   <Reveal delay={(index % 2) * 0.07} className="h-full">
@@ -491,6 +449,10 @@ const Training = () => {
               price_cents?: number;
               currency?: string;
               recorded_product_code?: string | null;
+              session_time_local?: string;
+              session_timezone?: string;
+              session_time_utc?: string;
+              session_duration_minutes?: number;
             };
             // Prefer day_dates[0] over start_date so the listing matches
             // the detail page when admin updates the daily schedule.
@@ -507,6 +469,13 @@ const Training = () => {
               priceCents: typeof data.price_cents === 'number' ? data.price_cents : 0,
               currency: data.currency || 'usd',
               recordedProductCode: data.recorded_product_code || null,
+              phase: cohortPhase(
+                clockFromApi(data),
+                Array.isArray(data.day_dates) && data.day_dates.length > 0
+                  ? data.day_dates
+                  : [data.start_date],
+                Date.now(),
+              ),
             };
             return [code, info] as const;
           } catch {
@@ -528,13 +497,16 @@ const Training = () => {
 
   const flagshipLive = flagship.code ? liveByCode[flagship.code] : undefined;
   const flagshipSeatsLabel = flagshipLive
-    ? flagshipLive.status === 'closed'
+    ? flagshipLive.phase !== 'upcoming'
+      ? 'Waitlist open for the next cohort'
+      : flagshipLive.status === 'closed'
       ? 'Registration closed'
       : flagshipLive.seatsRemaining === 0
         ? `Cohort full (${flagshipLive.totalSeats} seats)`
         : 'Registration open'
     : flagship.attendees;
   const flagshipDateLabel = flagshipLive ? flagshipLive.startDate : flagship.nextDate;
+  const flagshipWhenLabel = cohortWhenLabel(flagshipLive?.phase, flagshipDateLabel, 'Next: ');
   // Price shows only when the API reports one; the SSR fallback stays priceless.
   const flagshipPriceLabel =
     flagshipLive && flagshipLive.priceCents > 0
@@ -551,13 +523,16 @@ const Training = () => {
   const mgtCourse = courses.find((c) => c.code === MGT_LIVE_CODE)!;
   const mgtLive = liveByCode[MGT_LIVE_CODE];
   const mgtSeatsLabel = mgtLive
-    ? mgtLive.status === 'closed'
+    ? mgtLive.phase !== 'upcoming'
+      ? 'Waitlist open for the next cohort'
+      : mgtLive.status === 'closed'
       ? 'Registration closed'
       : mgtLive.seatsRemaining === 0
         ? `Cohort full (${mgtLive.totalSeats} seats)`
         : 'Registration open'
     : mgtCourse.attendees;
   const mgtDateLabel = mgtLive ? mgtLive.startDate : mgtCourse.nextDate;
+  const mgtWhenLabel = cohortWhenLabel(mgtLive?.phase, mgtDateLabel, 'Next cohort: ');
   const mgtPriceLabel =
     mgtLive && mgtLive.priceCents > 0
       ? new Intl.NumberFormat('en-US', {
@@ -661,7 +636,7 @@ const Training = () => {
 
                 <div className="flex flex-wrap gap-3 mb-8">
                   <MonoBadge icon={<Calendar className="w-3.5 h-3.5" aria-hidden="true" />}>
-                    Next: {flagshipDateLabel}
+                    {flagshipWhenLabel}
                   </MonoBadge>
                   <MonoBadge icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />}>
                     {flagshipSeatsLabel}
@@ -681,7 +656,9 @@ const Training = () => {
 
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Link to={`/training/${flagship.slug}`} className="btn-primary">
-                    View Course & Register{' '}
+                    {flagshipLive && flagshipLive.phase !== 'upcoming'
+                      ? 'View Course & Join the Waitlist'
+                      : 'View Course & Register'}{' '}
                     <ArrowRight className="w-4 h-4" aria-hidden="true" />
                   </Link>
                   <Link to="/contact" className="btn-secondary">
@@ -708,13 +685,10 @@ const Training = () => {
                   to={`/training/${flagship.slug}`}
                   className="block rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/50 hover:border-cyan-500/40 transition-colors"
                 >
-                  <img
-                    src="/Mapping_Course_Advertisement_v2.jpg"
+                  <Img
+                    src="/Mapping_Course_Advertisement_v2.jpg" sizes="(min-width: 1024px) 480px, 100vw"
                     alt="Gas Turbine Emissions Mapping, flagship live online course, four live days covering combustion fundamentals, dynamics and DLE operation, emissions and mapping on a simulator, then ambient, flex fuel and troubleshooting."
                     className="w-full h-auto block"
-                    width={1671}
-                    height={941}
-                    loading="lazy"
                   />
                 </Link>
               </div>
@@ -751,8 +725,8 @@ const Training = () => {
                   <p className="text-slate-300 leading-relaxed mb-8">
                     Design a single-shaft turbojet end to end: architecture, centrifugal
                     compressor, evaporative combustor, axial turbine, compressor maps, CFD and
-                    combustor analysis. One curriculum, one set of materials, one certificate,
-                    offered two ways. Pick the delivery that fits you.
+                    combustor analysis. One curriculum and one set of materials, offered two
+                    ways. Pick the delivery that fits you.
                   </p>
 
                   {/* Format chooser — the two ways to take the same course */}
@@ -774,7 +748,7 @@ const Training = () => {
                       <ul className="space-y-1.5 text-xs font-mono text-slate-300 mb-4">
                         <li className="flex items-center gap-2">
                           <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
-                          Next cohort: {mgtDateLabel}
+                          {mgtWhenLabel}
                         </li>
                         <li className="flex items-center gap-2">
                           <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
@@ -793,7 +767,9 @@ const Training = () => {
                         to="/training/micro-gas-turbine-design-live"
                         className="btn-primary w-full mt-auto"
                       >
-                        Join the Live Cohort{' '}
+                        {mgtLive && mgtLive.phase !== 'upcoming'
+                          ? 'Join the Waitlist for the Next Cohort'
+                          : 'Join the Live Cohort'}{' '}
                         <ArrowRight className="w-4 h-4" aria-hidden="true" />
                       </Link>
                     </div>
@@ -841,8 +817,8 @@ const Training = () => {
                   </div>
 
                   <p className="text-sm text-slate-400 leading-relaxed">
-                    Same topics, same depth, same certificate in both formats. Only the
-                    delivery differs. For teams,{' '}
+                    Same topics, same depth and the same Certificate of Completion in both
+                    formats; the live cohort also earns a Certificate of Attendance. For teams,{' '}
                     <a href={`#${TEAM_FORM_ID}`} className="text-cyan-400 hover:text-cyan-300 underline">
                       ask us
                     </a>{' '}
@@ -855,14 +831,10 @@ const Training = () => {
                     to="/training/micro-gas-turbine-design-live"
                     className="block mb-6 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/50 hover:border-cyan-500/40 transition-colors"
                   >
-                    <img
-                      src="/Micro_Gas_Turbine_Design_Infographic_v2.jpg"
+                    <Img
+                      src="/Micro_Gas_Turbine_Design_Infographic_v2.jpg" sizes="(min-width: 1024px) 480px, 100vw"
                       alt="Micro Gas Turbine Design: design a single-shaft turbojet end to end, engine architecture, centrifugal compressor, evaporative combustor, axial turbine, compressor maps, CFD and combustor analysis. Offered as a live online cohort or self-paced on-demand, with the same curriculum and materials in both."
                       className="w-full h-auto block"
-                      width={941}
-                      height={1672}
-                      loading="lazy"
-                      decoding="async"
                     />
                   </Link>
                   <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-3">

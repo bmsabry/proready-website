@@ -3,6 +3,8 @@ import { ArrowRight, Calendar, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Reveal, PageHero, CTABand } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
+import NotifyMeForm from '../components/NotifyMeForm';
+import Img from '../components/Img';
 
 const posts = [
   {
@@ -38,7 +40,7 @@ const posts = [
   {
     id: 1,
     title: "Decoding the Vortex: A Technical Deep-Dive into Breakdown Dynamics and Stability",
-    excerpt: "In the rigorous analysis of high-speed fluid mechanics, 'vortex breakdown' is defined as a abrupt and drastic change in the structure of a swirling flow. Discover the mechanical thresholds, numerical evolution, and enstrophy intensification associated with this transition.",
+    excerpt: "In the rigorous analysis of high-speed fluid mechanics, 'vortex breakdown' is defined as an abrupt and drastic change in the structure of a swirling flow. Discover the mechanical thresholds, numerical evolution, and enstrophy intensification associated with this transition.",
     category: "Technical Analysis",
     author: "Dr. Bassam Abdelnabi",
     date: "Jan 25, 2026",
@@ -108,10 +110,9 @@ const Insights = () => {
               <Reveal key={post.id} delay={Math.min(i * 0.06, 0.3)} className="h-full">
                 <article className="group card card-hover h-full flex flex-col overflow-hidden">
                   <Link to={post.link} className="block aspect-video overflow-hidden" tabIndex={-1} aria-hidden="true">
-                    <img
-                      src={post.image}
+                    <Img
+                      src={post.image} sizes="(min-width: 1024px) 400px, (min-width: 768px) 50vw, 100vw"
                       alt={post.title}
-                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   </Link>
@@ -160,18 +161,15 @@ const Insights = () => {
                   Get our latest technical papers and case studies delivered directly to your inbox.
                 </p>
               </div>
-              <div className="flex w-full md:w-auto gap-3">
-                <label htmlFor="newsletter-email" className="sr-only">Email address for newsletter</label>
-                <input
-                  id="newsletter-email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="engineering@company.com"
-                  className="flex-grow md:w-64 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
-                />
-                <button className="btn-primary whitespace-nowrap">Subscribe</button>
-              </div>
+              {/* Addresses join the "insights-newsletter" list in Admin → Courses → Waitlists. */}
+              <NotifyMeForm
+                slug="insights-newsletter"
+                label="Email address for new papers and case studies"
+                button="Subscribe"
+                doneText="You're subscribed. New papers and case studies will come to your inbox."
+                size="roomy"
+                className="w-full md:w-[26rem]"
+              />
             </div>
           </Reveal>
         </div>

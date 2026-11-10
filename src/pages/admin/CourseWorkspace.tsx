@@ -68,6 +68,7 @@ import {
   type NotifyResult,
   type ProductContent,
   type Registration,
+  broadcastFailureText,
 } from './lib';
 import {
   BarChart,
@@ -123,6 +124,11 @@ export default function CourseWorkspace({ code, tab, onTab, onBack, onAuthError 
   const [products, setProducts] = useState<AcademyProduct[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Who the Comms composer starts on; 'alumni' when opened from Past cohorts.
+  const [commsAudience, setCommsAudience] = useState<NotifyAudience>('all');
+  useEffect(() => {
+    if (tab !== 'comms') setCommsAudience('all');
+  }, [tab]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -161,7 +167,7 @@ export default function CourseWorkspace({ code, tab, onTab, onBack, onAuthError 
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="min-w-0">
           <div className="text-xs font-mono text-slate-400">{code}</div>
-          <h1 className="text-2xl font-bold text-white truncate">{course?.title ?? '…'}</h1>
+          <h1 className="text-2xl font-bold text-white break-words">{course?.title ?? '…'}</h1>
         </div>
         {course && <StatusBadge status={course.status} />}
         {course && (
@@ -230,7 +236,13 @@ export default function CourseWorkspace({ code, tab, onTab, onBack, onAuthError 
         />
       )}
       {course && tab === 'comms' && (
-        <CommsTab code={code} course={course} stats={stats} onAuthError={onAuthError} />
+        <CommsTab
+          code={code}
+          course={course}
+          stats={stats}
+          onAuthError={onAuthError}
+          initialAudience={commsAudience}
+        />
       )}
       {course && tab === 'stats' && <StatsTab course={course} stats={stats} />}
       {course && tab === 'materials' && (
@@ -252,7 +264,10 @@ export default function CourseWorkspace({ code, tab, onTab, onBack, onAuthError 
           code={code}
           onAuthError={onAuthError}
           onSeatsChanged={() => void load()}
-          gotoComms={() => onTab('comms')}
+          gotoComms={() => {
+            setCommsAudience('alumni');
+            onTab('comms');
+          }}
         />
       )}
       {course && tab === 'settings' && (
@@ -750,7 +765,12 @@ function RegistrationsTab({
                       <div className="flex flex-col items-end gap-1.5">
                         {r.status !== 'cancelled' && (
                           <ConfirmButton
-                            message={`Cancel ${r.full_name}'s registration? The seat will be released.`}
+                            message={
+                              `Cancel ${r.full_name}'s registration? The seat will be released.` +
+                              (r.status === 'paid'
+                                ? ' The course-materials access that came with the seat is withdrawn too.'
+                                : '')
+                            }
                             onConfirm={() => void action('cancel', r.id)}
                             disabled={busyId === r.id}
                             className="inline-flex items-center justify-center gap-1 whitespace-nowrap w-28 text-xs px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 disabled:opacity-50"
@@ -905,6 +925,14 @@ function AccessTab({
     setError(null);
     try {
       if (row.enrolled_all) {
+        if (
+          !window.confirm(
+            `Revoke ${row.email}'s full access to this course's materials? They lose it at once. ` +
+              'Per-day grants, if any, still apply.',
+          )
+        ) {
+          return;
+        }
         await api('/api/admin/academy/revoke', {
           method: 'POST',
           body: JSON.stringify({ email: row.email, product_code: productCode }),
@@ -934,6 +962,7 @@ function AccessTab({
     moduleId: number,
     has: boolean,
   ) {
+    if (has && !window.confirm(`Remove ${row.email}'s access to this part of the course?`)) return;
     setBusy(`${row.email}-${moduleId}`);
     setError(null);
     try {
@@ -1574,16 +1603,19 @@ function CommsTab({
   course,
   stats,
   onAuthError,
+  initialAudience = 'all',
 }: {
   code: string;
   course: Course;
   stats: CourseStats | null;
   onAuthError: () => void;
+  /** Who the composer starts on. "Email past attendees" opens it on alumni. */
+  initialAudience?: NotifyAudience;
 }) {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [rawHtml, setRawHtml] = useState(false);
-  const [audience, setAudience] = useState<NotifyAudience>('all');
+  const [audience, setAudience] = useState<NotifyAudience>(initialAudience);
   // Past attendees are outside every automatic audience; count them here so
   // the chip says how many a deliberate message would reach.
   const [alumniCount, setAlumniCount] = useState<number | null>(null);
@@ -1682,12 +1714,14 @@ function CommsTab({
           body: JSON.stringify({ subject: subject.trim(), body_html: bodyHtml, audience }),
         },
       );
-      setFlash(
-        `Broadcast sent to ${data.recipients} recipient${data.recipients === 1 ? '' : 's'}` +
-          (data.failures > 0 ? ` (${data.failures} failed)` : '') +
-          '.',
-      );
-      window.setTimeout(() => setFlash(null), 6000);
+      if (data.failures > 0) {
+        // Stays on screen until dismissed by the next action: these people did
+        // not get the message.
+        setError(broadcastFailureText(data, 'recipient'));
+      } else {
+        setFlash(`Broadcast sent to ${data.recipients} recipient${data.recipients === 1 ? '' : 's'}.`);
+        window.setTimeout(() => setFlash(null), 6000);
+      }
       setSubject('');
       setBody('');
       void loadLog();
@@ -2089,7 +2123,7 @@ function MaterialsTab({
                   className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-slate-800/30"
                 >
                   <span className="text-xs font-mono text-slate-500 w-6 shrink-0">{m.position}</span>
-                  <span className="text-white font-medium flex-1 min-w-0 truncate">{m.title}</span>
+                  <span className="text-white font-medium flex-1 min-w-0 break-words">{m.title}</span>
                   <span className="text-xs text-slate-400 hidden sm:inline whitespace-nowrap">
                     {m.lessons.length} lessons · {m.hours} hrs
                     {m.quiz_item_count > 0 && <> · {m.quiz_item_count} quiz items</>}
@@ -2134,7 +2168,7 @@ function MaterialsTab({
                                   : 'video pending'
                             }
                           />
-                          <span className="text-slate-200 flex-1 min-w-0 truncate">{l.title}</span>
+                          <span className="text-slate-200 flex-1 min-w-0 break-words">{l.title}</span>
                           {l.is_preview && (
                             <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
                               <Eye className="w-3 h-3" /> preview
@@ -2275,8 +2309,8 @@ function LessonEditor({
               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500"
             />
             <span className="text-[11px] text-slate-500 mt-1 block">
-              The existing body isn't returned by the API, so it isn't shown here. Typing anything
-              replaces it; leaving this blank keeps it as-is.
+              This is the text shown under the lesson. What you save here replaces it, and
+              clearing the box removes it.
             </span>
           </label>
 
@@ -2292,7 +2326,7 @@ function LessonEditor({
               )}
             </div>
             {lesson.duration_s > 0 && <div>Duration: {fmtDuration(lesson.duration_s)}</div>}
-            {lesson.source_file && <div className="truncate">Source: {lesson.source_file}</div>}
+            {lesson.source_file && <div className="break-all">Source: {lesson.source_file}</div>}
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-2">
@@ -2984,15 +3018,20 @@ function DayDatesEditor({
     onChange(next);
   };
   const addDay = () => {
-    // Default new day to one day after the last entry, or to start_date.
-    const last = value[value.length - 1] ?? startDate;
+    // The first day is the start date itself; each later one defaults to the
+    // day after the last entry. Built from calendar parts, not toISOString():
+    // that converts to UTC, which east of Greenwich gave the same date again.
+    if (value.length === 0) {
+      onChange([startDate]);
+      return;
+    }
+    const last = value[value.length - 1];
     let next = last;
-    try {
-      const d = new Date(`${last}T00:00:00`);
-      d.setDate(d.getDate() + 1);
-      next = d.toISOString().slice(0, 10);
-    } catch {
-      /* keep last */
+    const [y, m, d] = last.split('-').map((n) => parseInt(n, 10));
+    if (y && m && d) {
+      const day = new Date(y, m - 1, d + 1);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      next = `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
     }
     onChange([...value, next]);
   };

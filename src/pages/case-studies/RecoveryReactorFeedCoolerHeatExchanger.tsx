@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
 const RecoveryReactorFeedCoolerHeatExchanger = () => {
   usePageMeta('Recovery Reactor Feed Cooler Heat Exchanger', 'An ASME-compliant heat exchanger meeting TEMA BFU and API 660 requirements, fabricated in SS TP316L for corrosion resistance in a demanding process environment.');
 
@@ -29,13 +30,7 @@ const RecoveryReactorFeedCoolerHeatExchanger = () => {
             </a>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async"
-              src="/Recovery_Reactor_Feed_Cooler_Heat_Exchanger.jpg"
-              alt="Recovery Reactor Feed Cooler Heat Exchanger"
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/Recovery_Reactor_Feed_Cooler_Heat_Exchanger.jpg" alt="Recovery Reactor Feed Cooler Heat Exchanger" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
             <p className="text-xl font-bold text-white mb-6">Precision Thermal Design for a Critical Process Stream in a Chemically Aggressive Environment</p>

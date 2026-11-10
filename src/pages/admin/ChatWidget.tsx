@@ -75,6 +75,8 @@ function describeCurrentView(): string {
       return 'Admin → Comms (outbound email log and broadcasts).';
     case 'ai':
       return 'Admin → AI Assistant settings.';
+    case 'certification':
+      return 'Admin → Certification (examined-tier candidates, fee waivers, interviews and outcomes, across all courses).';
     default:
       return 'Admin → Overview.';
   }
@@ -269,10 +271,10 @@ export default function ChatWidget({ onAuthError }: { onAuthError: () => void })
                     {m.actionsExecuted.map((a, j) => (
                       <span
                         key={j}
-                        className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono truncate max-w-full"
+                        className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono break-all max-w-full"
                         title={a}
                       >
-                        {a.length > 80 ? a.slice(0, 80) + '…' : a}
+                        {a}
                       </span>
                     ))}
                   </div>

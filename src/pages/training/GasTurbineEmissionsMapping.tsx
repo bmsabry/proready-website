@@ -20,6 +20,7 @@ import {
 import { Reveal } from '../../components/ui';
 import PayPalButtons, { fetchPaymentsConfig, PaymentsConfig } from '../../components/PayPalButtons';
 import { usePageMeta } from '../../lib/meta';
+import { apiErrorMessage } from '../../lib/apiError';
 import {
   courseSnapshot,
   formatIsoDate as formatStartDate,
@@ -28,9 +29,12 @@ import {
   snapshotStartLabel,
 } from '../../data/courseSnapshot';
 import { clockFromApi, EMPTY_CLOCK, SessionClock } from '../../lib/sessionTimes';
+import { useCohortPhase } from '../../lib/useCohortPhase';
+import NotifyMeForm from '../../components/NotifyMeForm';
 import SessionTimes from './SessionTimes';
 import IndependenceNotice from './IndependenceNotice';
 import CertificationSection from './CertificationSection';
+import Img from '../../components/Img';
 
 // -----------------------------------------------------------------------------
 // Course constants
@@ -70,21 +74,6 @@ const formatAmount = (cents: number, currency: string): string =>
 
 // formatStartDate (ISO -> "August 29, 2026", no timezone drift) is imported
 // above from data/courseSnapshot so the build script and the page agree.
-
-// JSON-LD Course schema for search engines.
-const COURSE_JSONLD = JSON.stringify({
-  '@context': 'https://schema.org',
-  '@type': 'Course',
-  name: 'Gas Turbine Emissions Mapping',
-  description:
-    
-    'Four-day live expert course (two weekends) on DLE gas turbine emissions mapping, built on 239 slides across 10 chapters: combustion and gas turbine fundamentals, combustion dynamics and DLE combustion system operation, NOx/CO and EPA Method 7E CEMS, step-by-step mapping campaigns for aeroderivative and heavy-duty machines practised on a simulated combustion system, then ambient effects, flex fuel and field troubleshooting. Taught by a practitioner with 19+ years of field mapping experience.',
-  provider: {
-    '@type': 'Organization',
-    name: 'ProReadyEngineer LLC',
-    url: 'https://proreadyengineer.com',
-  },
-});
 
 // Curriculum content. Index 0 -> Day 1, index 1 -> Day 2, etc.
 // Dates are *not* stored here — they come from the live API (day_dates)
@@ -281,7 +270,9 @@ const GasTurbineEmissionsMapping = () => {
   const [seatsTaken, setSeatsTaken] = useState<number | null>(null);
   const [capacity, setCapacity] = useState<number>(DEFAULT_CAPACITY);
   const [cohortDate, setCohortDate] = useState<string>(DEFAULT_COHORT_DATE);
-  const [courseStatus, setCourseStatus] = useState<'open' | 'closed'>('open');
+  const [courseStatus, setCourseStatus] = useState<'open' | 'closed'>(
+    courseSnapshot(COURSE_CODE)?.status ?? 'open',
+  );
   // Per-day dates (formatted "May 16, 2026"). Defaults to the hardcoded
   // schedule above; replaced by the API list when day_dates is non-empty.
   const [dayDates, setDayDates] = useState<string[]>(DEFAULT_DAY_DATES);
@@ -393,7 +384,25 @@ const GasTurbineEmissionsMapping = () => {
   }, [formState, registrationId, priceCents]);
 
   const atCapacity = seatsTaken !== null && seatsTaken >= capacity;
-  const isFull = atCapacity || courseStatus === 'closed';
+  // A cohort that has started or finished takes no new registrations. The page
+  // then collects addresses for the next cohort instead of selling a seat in
+  // sessions that have already been taught.
+  const phase = useCohortPhase(clock, dayIsos);
+  const cohortOver = phase !== 'upcoming';
+  const isFull = atCapacity || courseStatus === 'closed' || cohortOver;
+  const cohortChip =
+    phase === 'ended'
+      ? 'Next cohort: dates to be announced'
+      : phase === 'running'
+        ? `In progress since ${cohortDate}`
+        : `Next cohort: ${cohortDate}`;
+  const registrationChip = cohortOver
+    ? 'Waitlist open for the next cohort'
+    : courseStatus === 'closed'
+      ? 'Registration closed'
+      : atCapacity
+        ? 'Cohort full'
+        : 'Registration open';
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -423,7 +432,7 @@ const GasTurbineEmissionsMapping = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setFormError(data.detail || data.error || `Registration failed (${res.status}).`);
+        setFormError(apiErrorMessage(data, `Registration failed (${res.status}).`));
         setFormState('error');
         return;
       }
@@ -511,7 +520,6 @@ const GasTurbineEmissionsMapping = () => {
   return (
     <div className="pb-20">
       {/* JSON-LD Course schema */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: COURSE_JSONLD }} />
 
       {/* HERO */}
       <section className="relative pt-36 pb-12 lg:pt-44 overflow-hidden">
@@ -533,14 +541,10 @@ const GasTurbineEmissionsMapping = () => {
                 {dayDates.length || CURRICULUM.length} days · live online
               </FactChip>
               <FactChip icon={<Calendar className="w-3.5 h-3.5" aria-hidden="true" />}>
-                Next cohort: {cohortDate}
+                {cohortChip}
               </FactChip>
               <FactChip icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />}>
-                {courseStatus === 'closed'
-                  ? 'Registration closed'
-                  : atCapacity
-                    ? 'Cohort full'
-                    : 'Registration open'}
+                {registrationChip}
               </FactChip>
               <FactChip icon={<Sparkles className="w-3.5 h-3.5" aria-hidden="true" />}>
                 {formatAmount(priceCents, currency)} per seat · {LAUNCH_DISCOUNT_LABEL} off
@@ -561,7 +565,7 @@ const GasTurbineEmissionsMapping = () => {
                 }}
                 className="btn-primary text-base px-8 py-4"
               >
-                Register
+                {isFull ? 'Join the waitlist' : 'Register'}
                 <Send className="w-4 h-4" aria-hidden="true" />
               </a>
               <span className="text-sm text-slate-300">
@@ -571,14 +575,10 @@ const GasTurbineEmissionsMapping = () => {
 
             {/* Course infographic — placed directly under the title, matching site pattern */}
             <div className="card overflow-hidden mb-10 shadow-2xl shadow-cyan-900/10">
-              <img
-                src="/Mapping_Course_Advertisement_v2.jpg"
+              <Img
+                src="/Mapping_Course_Advertisement_v2.jpg" sizes="(min-width: 1280px) 1216px, 100vw" priority
                 alt="Gas Turbine Emissions Mapping, flagship live online course: from zero to field-ready in 4 live days. Day 1 combustion and gas turbine fundamentals, Day 2 combustion dynamics and DLE operation, Day 3 emissions, CEMS and the live mapping simulator, Day 4 ambient, flex fuel and troubleshooting. 239 slides, mapping simulator, daily mastery checks, quiz and interview for certification. Led by Bassam Abdelnabi."
                 className="w-full h-auto block"
-                width={1671}
-                height={941}
-                loading="eager"
-                fetchPriority="high"
               />
             </div>
 
@@ -600,7 +600,7 @@ const GasTurbineEmissionsMapping = () => {
               <Stat
                 icon={<Calendar className="w-5 h-5" aria-hidden="true" />}
                 label="Next Cohort"
-                value={cohortDate}
+                value={phase === 'ended' ? 'To be announced' : phase === 'running' ? 'In progress' : cohortDate}
               />
               <Stat
                 icon={<Users className="w-5 h-5" aria-hidden="true" />}
@@ -623,10 +623,14 @@ const GasTurbineEmissionsMapping = () => {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-1">
-                Registration: {cohortDate} cohort
+                {cohortOver ? 'Registration: next cohort' : `Registration: ${cohortDate} cohort`}
               </div>
               <div className="text-2xl font-bold">
-                {courseStatus === 'closed' ? (
+                {phase === 'ended' ? (
+                  <span className="text-amber-400">This cohort has finished</span>
+                ) : phase === 'running' ? (
+                  <span className="text-amber-400">This cohort is in progress</span>
+                ) : courseStatus === 'closed' ? (
                   <span className="text-amber-400">Registration closed</span>
                 ) : atCapacity ? (
                   <span className="text-amber-400">Cohort full, waitlist only</span>
@@ -636,9 +640,9 @@ const GasTurbineEmissionsMapping = () => {
               </div>
             </div>
             {isFull ? (
-              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-semibold">
-                <Lock className="w-4 h-4" aria-hidden="true" /> Registration closed
-              </span>
+              <a href="#register" className="btn-secondary">
+                Join the waitlist
+              </a>
             ) : (
               <a
                 href="#register"
@@ -736,13 +740,10 @@ const GasTurbineEmissionsMapping = () => {
 
         {/* COURSE MAP INFOGRAPHIC */}
         <Reveal className="mb-16 card overflow-hidden">
-          <img
-            src="/Mapping_Course_Advertisement_v2.jpg"
+          <Img
+            src="/Mapping_Course_Advertisement_v2.jpg" sizes="(min-width: 1280px) 1216px, 100vw"
             alt="Course overview: the four live days, what each covers, and what is included: 239 slides, the mapping simulator, daily mastery checks, and the certification quiz and interview."
             className="w-full h-auto block"
-            width={1671}
-            height={941}
-            loading="lazy"
           />
         </Reveal>
 
@@ -970,10 +971,16 @@ const GasTurbineEmissionsMapping = () => {
           )}
           <span className="eyebrow mb-4">Register</span>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-2">
-            Reserve your seat for the {cohortDate} cohort
+            {cohortOver
+              ? 'Join the waitlist for the next cohort'
+              : `Reserve your seat for the ${cohortDate} cohort`}
           </h2>
           <p className="text-slate-300 mb-8 font-mono text-sm">
-            {courseStatus === 'closed'
+            {phase === 'ended'
+              ? `The ${cohortDate} cohort has finished. New dates will be published on this page.`
+              : phase === 'running'
+                ? `The ${cohortDate} cohort is under way, so registration for it has closed.`
+                : courseStatus === 'closed'
               ? 'Registration is closed for this cohort.'
               : atCapacity
                 ? `All ${capacity} seats are taken. Join the waitlist for the next cohort.`
@@ -1097,26 +1104,48 @@ const GasTurbineEmissionsMapping = () => {
                 <Lock className="w-10 h-10 text-amber-400" aria-hidden="true" />
               </div>
               <h3 className="text-2xl font-bold mb-4">
-                {courseStatus === 'closed' ? 'Registration closed' : 'Cohort full'}
+                {phase === 'ended'
+                  ? 'This cohort has finished'
+                  : phase === 'running'
+                    ? 'This cohort is under way'
+                    : courseStatus === 'closed'
+                      ? 'Registration closed'
+                      : 'Cohort full'}
               </h3>
-              <p className="text-slate-300 mb-8 max-w-md mx-auto">
-                {courseStatus === 'closed'
-                  ? `Registration for the ${cohortDate} cohort is closed.`
-                  : `All ${capacity} seats for the ${cohortDate} cohort are taken.`}{' '}
-                Email{' '}
+              <p className="text-slate-300 mb-6 max-w-md mx-auto">
+                {phase === 'ended'
+                  ? `The ${cohortDate} cohort has finished.`
+                  : phase === 'running'
+                    ? `The ${cohortDate} cohort has started, so it is no longer taking registrations.`
+                    : courseStatus === 'closed'
+                      ? `Registration for the ${cohortDate} cohort is closed.`
+                      : `All ${capacity} seats for the ${cohortDate} cohort are taken.`}{' '}
+                Leave your email and we will tell you first when registration for the next
+                cohort opens.
+              </p>
+              <NotifyMeForm
+                slug="gas-turbine-emissions-mapping"
+                label="Email address for the next-cohort waitlist"
+                button="Join the waitlist"
+                doneText="You're on the list. We'll email you as soon as the next cohort opens for registration."
+                size="roomy"
+                className="max-w-md mx-auto justify-center text-left"
+              />
+              <p className="text-xs text-slate-400 mt-6">
+                Prefer to write? Email{' '}
                 <a
                   className="text-cyan-400 underline"
                   href="mailto:info@proreadyengineer.com?subject=Waitlist: Gas Turbine Emissions Mapping"
                 >
                   info@proreadyengineer.com
-                </a>{' '}
-                to join the waitlist for the next cohort.
+                </a>
+                .
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               {formState === 'error' && formError && (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-start gap-3">
+                <div role="alert" className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-start gap-3">
                   <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
                   <span>{formError}</span>
                 </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Youtube, Mail, ArrowRight } from 'lucide-react';
+import Img from './Img';
 
 const FooterHeading = ({ children }: { children: React.ReactNode }) => (
   <h2 className="text-xs font-mono font-semibold uppercase tracking-[0.18em] text-slate-400 mb-6">
@@ -27,7 +28,7 @@ const Footer = () => {
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1 lg:pr-6">
             <Link to="/" className="inline-flex items-center gap-3 mb-5">
-              <img src="/Logo.jpg" alt="" width="36" height="36" className="h-9 w-auto rounded-md" loading="lazy" />
+              <Img src="/Logo.jpg" sizes="36px" alt="" className="h-9 w-auto rounded-md" />
               <span className="font-display text-lg font-bold">
                 ProReady<span className="text-cyan-400">Engineer</span>
               </span>

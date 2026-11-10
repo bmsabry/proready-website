@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ARTICLE_META } from './articleMeta';
+import { socialImage } from '../components/Img';
 
 const SITE = 'ProReadyEngineer LLC';
 const ORIGIN = 'https://proreadyengineer.com';
@@ -89,7 +90,7 @@ export function usePageMeta(title: string, description?: string, opts?: PageMeta
     title: title ? `${title} | ${SITE}` : DEFAULT_TITLE,
     description: description ?? '',
     canonical: ORIGIN + (pathname === '/' ? '/' : pathname.replace(/\/+$/, '')),
-    image: opts?.image ?? (article ? ORIGIN + article.image : DEFAULT_IMAGE),
+    image: opts?.image ?? (article ? ORIGIN + socialImage(article.image) : DEFAULT_IMAGE),
     type: opts?.type ?? (article ? 'article' : 'website'),
     noindex: opts?.noindex ?? false,
     jsonLd,

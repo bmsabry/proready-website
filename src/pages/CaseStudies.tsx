@@ -3,6 +3,7 @@ import { ArrowRight, Calendar, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Reveal, PageHero, CTABand } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
+import Img from '../components/Img';
 
 const FILTERS = ['All', 'Test Infrastructure', 'Emissions & Measurement', 'Fuel Systems', 'Oil & Gas / Process'] as const;
 type Filter = (typeof FILTERS)[number];
@@ -185,10 +186,9 @@ const CaseStudies = () => {
               <Reveal key={`${filter}-${study.id}`} delay={Math.min(i * 0.06, 0.3)} className="h-full">
                 <article className="group card card-hover h-full flex flex-col overflow-hidden">
                   <Link to={study.link} className="block aspect-video overflow-hidden" tabIndex={-1} aria-hidden="true">
-                    <img
-                      src={study.image}
+                    <Img
+                      src={study.image} sizes="(min-width: 1024px) 400px, (min-width: 768px) 50vw, 100vw"
                       alt={study.title}
-                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   </Link>
