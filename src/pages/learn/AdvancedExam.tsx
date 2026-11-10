@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, ShieldCheck, X } from 'lucide-react';
 import { usePageMeta } from '../../lib/meta';
+import { useAnswerDraft } from '../../lib/useAnswerDraft';
 import {
   academy,
   AdvancedExamResult,
@@ -35,12 +36,26 @@ const AdvancedExam: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await academy.advancedExam(productCode);
-        if (!cancelled) setExam(data);
+        const [data, me] = await Promise.all([
+          academy.advancedExam(productCode),
+          academy.me().catch(() => null),
+        ]);
+        if (cancelled) return;
+        // The Training Terms are accepted on the course page; the examination
+        // opened from a link must not skip them.
+        if (me?.signed_in && me.terms_version && !me.terms_accepted && !me.is_owner) {
+          navigate(`/learn/${productCode}`, { replace: true });
+          return;
+        }
+        setExam(data);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
-          navigate('/learn/signin', { replace: true });
+          // Sign in, then come straight back to the examination.
+          navigate(
+            `/learn/signin?next=${encodeURIComponent(`/learn/advanced-exam/${productCode}`)}`,
+            { replace: true },
+          );
           return;
         }
         setError(err instanceof ApiError ? err.message : 'Could not load the examination.');
@@ -57,6 +72,19 @@ const AdvancedExam: React.FC = () => {
   const answered = Object.keys(answers).filter(
     (k) => answers[k] !== undefined && answers[k] !== ''
   ).length;
+
+  // One hundred answers must not be lost to a reload or a discarded tab. The
+  // key names this exact paper, so answers to an earlier paper are never
+  // restored onto a new one.
+  useAnswerDraft(
+    exam && exam.items.length > 0
+      ? `pre:draft:exam:${productCode}:${exam.items[0].code}:${exam.items[exam.items.length - 1].code}:${exam.items.length}`
+      : null,
+    exam ? exam.items.map((item) => item.code) : [],
+    answers,
+    setAnswers,
+    result !== null,
+  );
 
   const submit = async () => {
     setSubmitting(true);

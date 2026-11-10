@@ -3,6 +3,8 @@ import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
+import Img from '../../components/Img';
 const SecondaryAirImpact = () => {
   usePageMeta('Secondary Air Impact on DLE Combustor Emissions', 'Quantifying how secondary air used for cooling, dilution, and leakage management affects NOx emissions in Dry Low Emissions combustion systems.');
 
@@ -34,7 +36,7 @@ const SecondaryAirImpact = () => {
           <div className="flex items-center justify-between gap-4 mb-12 pb-12 border-b border-slate-800">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
-                <img loading="lazy" decoding="async" src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" className="w-full h-full object-cover" />
+                <Img src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" sizes="48px" className="w-full h-full object-cover" />
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-200">Dr. Bassam Abdelnabi</p>
@@ -52,13 +54,7 @@ const SecondaryAirImpact = () => {
             </div>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async" 
-              src="/impact-secondary-air-emissions.jpg" 
-              alt="Secondary Air Impact Visualization" 
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/impact-secondary-air-emissions.jpg" alt="Secondary Air Impact Visualization" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed space-y-10">
             <section>

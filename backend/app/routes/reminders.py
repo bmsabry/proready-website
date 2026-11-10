@@ -31,7 +31,7 @@ def require_admin_or_cron(
 ) -> str:
     settings = get_settings()
     if settings.CRON_SECRET and x_cron_secret:
-        if secrets.compare_digest(x_cron_secret, settings.CRON_SECRET):
+        if secrets.compare_digest(x_cron_secret.encode(), settings.CRON_SECRET.encode()):
             return "cron"
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bad cron secret.")
     return require_admin(authorization=authorization, admin_session=admin_session)

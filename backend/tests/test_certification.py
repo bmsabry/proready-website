@@ -291,10 +291,23 @@ def test_comp_candidate_and_written_exam(client):
     assert r.status_code == 200
     assert r.json()["passed"] is False and r.json()["attempts_used"] == 1
     assert all("explanation" not in f for f in r.json()["feedback"])
-    # Attempt 2: another guess → attempts exhausted.
+    # Pressing Submit again on the paper just handed in (the reply was lost on
+    # the way back) is refused and costs nothing: the paper is no longer open.
+    again = client.post(f"/api/academy/advanced/{PRODUCT}/exam",
+                        json={"responses": {i["code"]: "A" for i in items}})
+    assert again.status_code == 409 and "No attempt has been used" in again.json()["detail"]
+    state = client.get(f"/api/academy/certification/{PRODUCT}").json()["advanced"]["state"]
+    assert state["exam_attempts"] == 1 and state["status"] == "purchased"
+
+    # Attempt 2 (the candidate opens the paper again): another guess → attempts exhausted.
+    assert client.get(f"/api/academy/advanced/{PRODUCT}/exam").status_code == 200
+    # Answers to a question that is not on the open paper are refused, unused.
+    stray = client.post(f"/api/academy/advanced/{PRODUCT}/exam",
+                        json={"responses": {"NOT-ON-THIS-PAPER": "A"}})
+    assert stray.status_code == 409
     r = client.post(f"/api/academy/advanced/{PRODUCT}/exam",
                     json={"responses": {i["code"]: "D" for i in items}})
-    assert r.json()["status"] == "exam_failed"
+    assert r.json()["status"] == "exam_failed" and r.json()["attempts_used"] == 2
     assert client.get(f"/api/academy/advanced/{PRODUCT}/exam").status_code == 409
 
     # Admin gives the exam back.
@@ -307,6 +320,7 @@ def test_comp_candidate_and_written_exam(client):
     for item in db.query(QuizItem).filter(QuizItem.product_code == PRODUCT, QuizItem.item_set == "advanced").all():
         key[item.code] = item.answer.get("key") if item.kind == "mcq" else item.answer.get("value")
     db.close()
+    assert client.get(f"/api/academy/advanced/{PRODUCT}/exam").status_code == 200  # opens the paper
     r = client.post(f"/api/academy/advanced/{PRODUCT}/exam", json={"responses": key})
     assert r.status_code == 200 and r.json()["passed"] is True and r.json()["score_pct"] == 100.0
     state = client.get(f"/api/academy/certification/{PRODUCT}").json()["advanced"]["state"]

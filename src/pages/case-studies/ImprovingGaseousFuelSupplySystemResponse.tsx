@@ -3,6 +3,7 @@ import { ArrowLeft, Calendar, User, Tag, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
 const ImprovingGaseousFuelSupplySystemResponse = () => {
   usePageMeta('Improving Gaseous Fuel Supply System Response', 'Replacing pneumatic valves with ten electronically actuated control valves improved flow-adjustment response by about 35% and added auto-calibration.');
 
@@ -29,13 +30,7 @@ const ImprovingGaseousFuelSupplySystemResponse = () => {
             </a>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async" 
-              src="/case-study-improving-gaseous-fuel-supply-system-response.jpg" 
-              alt="Improving Gaseous Fuel Supply System Response" 
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/case-study-improving-gaseous-fuel-supply-system-response.jpg" alt="Improving Gaseous Fuel Supply System Response" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
             <section>

@@ -220,8 +220,9 @@ def test_the_email_carries_the_instructions_verbatim_with_live_links_and_local_t
     assert 'href="https://tel.meet/abc-defg-hij?hs=5"' in html
     assert "dial +1 321-430-1922 and enter this PIN: 316 913 670#" in html
     assert "14:00 UTC on Saturday, March 2" in html
-    # Kitimat is Pacific: 14:00 UTC = 06:00 PST in March 2030 (before DST).
-    assert "06:00 PST in Kitimat, BC" in html
+    # Kitimat keeps UTC-7 all year since 2026: 14:00 UTC = 07:00, and the label
+    # is the province's own "PT", not the database's borrowed "MST".
+    assert "07:00 PT in Kitimat, BC" in html
     assert "your local time" in html
     # the plain-text part keeps the link destinations
     assert "https://meet.google.com/abc-defg-hij" in payload["text"]

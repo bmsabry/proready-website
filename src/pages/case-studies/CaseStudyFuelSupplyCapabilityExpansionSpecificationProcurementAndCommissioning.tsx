@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
 const CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissioning = () => {
   usePageMeta('Fuel Supply Capability Expansion Case Study', 'How a multi-fuel supply system (CNG, nitrogen, propane) was specified, procured, and commissioned to deliver flows the existing infrastructure could not support.');
 
@@ -29,13 +30,7 @@ const CaseStudyFuelSupplyCapabilityExpansionSpecificationProcurementAndCommissio
             </a>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async"
-              src="/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning.jpg"
-              alt="Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning"
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning.jpg" alt="Fuel Supply Capability Expansion – Specification, Procurement, and Commissioning" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
             <p className="text-xl text-white font-semibold mb-6">

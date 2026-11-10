@@ -168,7 +168,7 @@ export default function OverviewPage({ onAuthError, go }: Props) {
                 className="card card-hover p-4 text-left w-full hover:border-cyan-500/40 focus:outline-none focus:border-cyan-500/60"
               >
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-[11px] font-mono text-slate-400 truncate">{c.code}</span>
+                  <span className="text-[11px] font-mono text-slate-400 min-w-0 break-all">{c.code}</span>
                   <StatusBadge status={c.status} />
                 </div>
                 <div className="text-white font-semibold mb-3 break-words">{c.title}</div>
@@ -249,11 +249,11 @@ export default function OverviewPage({ onAuthError, go }: Props) {
                       </span>
                       <span className="text-slate-400">{formatDate(r.created_at)}</span>
                     </div>
-                    <div className="text-slate-200 truncate" title={r.summary}>
+                    <div className="text-slate-200 break-words" title={r.summary}>
                       {r.summary}
                     </div>
                     {r.error && (
-                      <div className="text-red-300 truncate" title={r.error}>
+                      <div className="text-red-300 break-words" title={r.error}>
                         ↳ {r.error}
                       </div>
                     )}

@@ -28,6 +28,7 @@ import {
   type InterestRow,
   type InterestSummary,
   type NotifyResult,
+  broadcastFailureText,
 } from './lib';
 import {
   ConfirmButton,
@@ -152,8 +153,8 @@ export default function CoursesPage({ onAuthError, openCourse }: Props) {
                 >
                   <div className="flex items-start justify-between gap-3 mb-1">
                     <div className="min-w-0">
-                      <div className="text-xs font-mono text-slate-400 truncate">{c.code}</div>
-                      <div className="text-white font-semibold text-lg truncate">{c.title}</div>
+                      <div className="text-xs font-mono text-slate-400 break-all">{c.code}</div>
+                      <div className="text-white font-semibold text-lg break-words">{c.title}</div>
                     </div>
                     <StatusBadge status={c.status} />
                   </div>
@@ -433,7 +434,7 @@ function InterestSection({ onAuthError }: { onAuthError: () => void }) {
                     ) : (
                       <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                     )}
-                    <span className="font-mono text-sm text-slate-200 truncate group-hover:text-white">
+                    <span className="font-mono text-sm text-slate-200 min-w-0 break-all text-left group-hover:text-white">
                       {w.course_slug}
                     </span>
                   </button>
@@ -483,10 +484,10 @@ function InterestSection({ onAuthError }: { onAuthError: () => void }) {
                             key={r.id}
                             className="px-5 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
                           >
-                            <span className="text-slate-100 min-w-0 flex-1 truncate">
+                            <span className="text-slate-100 min-w-0 flex-1 break-all">
                               {r.email}
                             </span>
-                            <span className="text-slate-300 truncate max-w-[220px]">
+                            <span className="text-slate-300 break-words max-w-[220px]">
                               {r.full_name || <span className="text-slate-500">—</span>}
                             </span>
                             <span className="text-xs text-slate-400 whitespace-nowrap">
@@ -572,11 +573,13 @@ function WaitlistNotifyForm({
           body: JSON.stringify({ subject: subject.trim(), body_html: bodyHtml }),
         },
       );
-      onDone(
-        `Waitlist broadcast sent to ${data.recipients} recipient${data.recipients === 1 ? '' : 's'}` +
-          (data.failures > 0 ? ` (${data.failures} failed)` : '') +
-          '.',
-      );
+      if (data.failures > 0) {
+        // Keep the composer open with the failure listed; a green banner here
+        // read as "everyone got it".
+        setError(broadcastFailureText(data, 'recipient'));
+        return;
+      }
+      onDone(`Waitlist broadcast sent to ${data.recipients} recipient${data.recipients === 1 ? '' : 's'}.`);
     } catch (e) {
       reportError(e, onAuthError, setError);
     } finally {

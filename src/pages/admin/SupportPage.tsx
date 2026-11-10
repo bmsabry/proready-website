@@ -291,12 +291,12 @@ function TicketRow({
           {bold && (
             <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" title="Your move" />
           )}
-          <span className={`truncate text-sm ${bold ? 'text-white font-medium' : 'text-slate-200'}`}>
+          <span className={`min-w-0 break-words text-sm ${bold ? 'text-white font-medium' : 'text-slate-200'}`}>
             {t.subject}
           </span>
           <span className="text-[10px] text-slate-600 font-mono shrink-0">#{t.ref}</span>
         </div>
-        <div className="text-xs text-slate-500 truncate">
+        <div className="text-xs text-slate-500 break-words">
           {t.submitter_name ? `${t.submitter_name} · ` : ''}
           {t.submitter_email}
           {t.summary ? ` — ${t.summary}` : ''}
@@ -845,7 +845,7 @@ function TicketThread({
   }
 
   async function saveNote() {
-    if (!note.trim()) return;
+    if (!note.trim() || busy) return; // a second Enter while saving must not post it again
     setBusy(true);
     try {
       await api(`/api/admin/support/tickets/${encodeURIComponent(ticketRef)}/note`, {
@@ -915,8 +915,8 @@ function TicketThread({
           <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 sm:p-5">
             <div className="flex flex-wrap items-start gap-3 mb-3">
               <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-semibold text-white truncate">{t.subject}</h2>
-                <p className="text-sm text-slate-400 truncate">
+                <h2 className="text-lg font-semibold text-white break-words">{t.subject}</h2>
+                <p className="text-sm text-slate-400 break-words">
                   {t.submitter_name ? `${t.submitter_name} · ` : ''}
                   <a
                     href={`mailto:${t.submitter_email}`}
@@ -1320,7 +1320,7 @@ function CustomerCard({ detail }: { detail: SupportTicketDetail }) {
                   >
                     {r.status === 'paid' ? <Check className="w-3 h-3 inline" /> : null} {r.status}
                   </span>
-                  <span className="text-slate-300 truncate">{r.course_title}</span>
+                  <span className="text-slate-300 min-w-0 break-words">{r.course_title}</span>
                 </div>
                 {r.company && <div className="text-slate-600">{r.company}</div>}
               </li>
@@ -1336,7 +1336,7 @@ function CustomerCard({ detail }: { detail: SupportTicketDetail }) {
           </div>
           <ul className="space-y-1">
             {enrolls.map((e) => (
-              <li key={e.product_code} className="text-xs text-slate-300 truncate">
+              <li key={e.product_code} className="text-xs text-slate-300 break-words">
                 <span
                   className={e.status === 'active' ? 'text-emerald-300' : 'text-slate-500'}
                 >
@@ -1358,7 +1358,7 @@ function CustomerCard({ detail }: { detail: SupportTicketDetail }) {
                 <span className={o.status === 'paid' ? 'text-emerald-300' : 'text-amber-300'}>
                   {o.status}
                 </span>
-                <span className="truncate">{o.product_code}</span>
+                <span className="min-w-0 break-all">{o.product_code}</span>
                 {typeof o.amount_cents === 'number' && (
                   <span className="ml-auto text-slate-500">{money(o.amount_cents)}</span>
                 )}
@@ -1378,7 +1378,7 @@ function CustomerCard({ detail }: { detail: SupportTicketDetail }) {
               <li key={p.ref} className="text-xs">
                 <a
                   href={`#support/${p.ref}`}
-                  className="text-slate-400 hover:text-cyan-300 truncate block"
+                  className="text-slate-400 hover:text-cyan-300 break-words block"
                 >
                   <span className="font-mono text-slate-600">#{p.ref}</span> {p.subject}
                 </a>

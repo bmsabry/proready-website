@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, RotateCcw, X } from 'lucide-react';
 import { usePageMeta } from '../../lib/meta';
+import { useAnswerDraft } from '../../lib/useAnswerDraft';
 import {
   academy,
   ApiError,
@@ -41,14 +42,32 @@ const Quiz: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
+    // The same page instance serves every assessment (the gate page links
+    // straight to another one), so nothing from the last one may linger.
+    setLoading(true);
+    setError('');
+    setGate(null);
+    setQuiz(null);
+    setResult(null);
+    setAnswers({});
     (async () => {
       try {
-        const data = await academy.quiz(id, set);
-        if (!cancelled) setQuiz(data);
+        const [data, me] = await Promise.all([academy.quiz(id, set), academy.me().catch(() => null)]);
+        if (cancelled) return;
+        // The Training Terms are accepted on the course page; an assessment
+        // opened from a link must not skip them.
+        if (me?.signed_in && me.terms_version && !me.terms_accepted && !me.is_owner) {
+          navigate('/learn', { replace: true });
+          return;
+        }
+        setQuiz(data);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
-          navigate('/learn/signin', { replace: true });
+          // Sign in, then come straight back to this assessment.
+          navigate(`/learn/signin?next=${encodeURIComponent(`/learn/quiz/${id}/${set}`)}`, {
+            replace: true,
+          });
           return;
         }
         if (err instanceof ApiError && err.info?.code === 'gate_locked') {
@@ -79,6 +98,16 @@ const Quiz: React.FC = () => {
     (k) => answers[k] !== undefined && answers[k] !== ''
   ).length;
   const total = quiz?.items.length ?? 0;
+
+  // Answers survive a reload or a Back press, and the browser asks before the
+  // page is closed with unsent answers.
+  useAnswerDraft(
+    quiz ? `pre:draft:quiz:${id}:${set}` : null,
+    quiz ? quiz.items.map((item) => item.code) : [],
+    answers,
+    setAnswers,
+    result !== null,
+  );
 
   const submit = async () => {
     if (!quiz) return;

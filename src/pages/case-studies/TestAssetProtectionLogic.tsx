@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
 const TestAssetProtectionLogic = () => {
   usePageMeta('Smart Protection Logic for Combustion Testing', 'Automated protection logic that sequences dozens of control elements during emergencies, safeguarding high-value combustion test articles from catastrophic damage.');
 
@@ -29,13 +30,7 @@ const TestAssetProtectionLogic = () => {
             </a>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async"
-              src="/Test_Asset_Protection_Logic.jpg"
-              alt="Test Asset Protection Logic"
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/Test_Asset_Protection_Logic.jpg" alt="Test Asset Protection Logic" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
             <section>

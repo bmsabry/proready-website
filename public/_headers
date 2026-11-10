@@ -1,0 +1,24 @@
+# Response headers for proreadyengineer.com (Cloudflare Pages).
+#
+# /assets/* is safe to cache for a year: Vite puts a hash of the content in
+# every file name there, so a changed file is a new name and a returning
+# visitor downloads nothing twice.
+#
+# /img/* (the light image copies) keeps its name when the artwork behind it is
+# replaced, so it is cached for a day only; after that the browser checks, and
+# is told "unchanged" without downloading again.
+#
+# Pages and everything else keep Cloudflare's default "always revalidate", so a
+# new release shows at once.
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/img/*
+  Cache-Control: public, max-age=86400
+
+# Ask browsers to use HTTPS only, and keep the site out of other sites' frames
+# (the learner portal and admin live on this origin).
+/*
+  Strict-Transport-Security: max-age=31536000
+  X-Frame-Options: SAMEORIGIN

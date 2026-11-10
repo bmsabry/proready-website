@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
 const NewHighperformanceDataAcquisitionSystem = () => {
   usePageMeta('New High-Performance Data Acquisition System', 'A modern data acquisition platform with auto-saving, Excel integration, and on-the-fly configuration, delivered as an MVP in 3 weeks and fully functional in 12.');
 
@@ -29,13 +30,7 @@ const NewHighperformanceDataAcquisitionSystem = () => {
             </a>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async"
-              src="/New_HighPerformance_Data_Acquisition_System.jpg"
-              alt="New High‑Performance Data Acquisition System"
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/New_HighPerformance_Data_Acquisition_System.jpg" alt="New High‑Performance Data Acquisition System" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
             <p className="text-xl text-white font-semibold mb-6">

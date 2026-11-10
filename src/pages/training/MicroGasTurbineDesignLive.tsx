@@ -25,6 +25,7 @@ import {
 import { Reveal } from '../../components/ui';
 import PayPalButtons, { fetchPaymentsConfig, PaymentsConfig } from '../../components/PayPalButtons';
 import { usePageMeta } from '../../lib/meta';
+import { apiErrorMessage } from '../../lib/apiError';
 import {
   courseSnapshot,
   formatIsoDate as formatStartDate,
@@ -33,11 +34,14 @@ import {
   snapshotStartLabel,
 } from '../../data/courseSnapshot';
 import { clockFromApi, EMPTY_CLOCK, SessionClock } from '../../lib/sessionTimes';
+import { useCohortPhase } from '../../lib/useCohortPhase';
+import NotifyMeForm from '../../components/NotifyMeForm';
 import SessionTimes from './SessionTimes';
 import { MODULES, COURSE_SUBTITLE } from './microGasTurbineCurriculum';
 import FormatSwitcher from './FormatSwitcher';
 import IndependenceNotice from './IndependenceNotice';
 import CertificationSection from './CertificationSection';
+import Img from '../../components/Img';
 
 // -----------------------------------------------------------------------------
 // Course constants
@@ -75,20 +79,6 @@ const formatAmount = (cents: number, currency: string): string =>
     currency: (currency || 'usd').toUpperCase(),
     minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
   }).format(cents / 100);
-
-// JSON-LD Course schema for search engines.
-const COURSE_JSONLD = JSON.stringify({
-  '@context': 'https://schema.org',
-  '@type': 'Course',
-  name: 'Micro Gas Turbine Design: Live Online Cohort',
-  description:
-    'Seven-day live online cohort on designing a single-shaft turbojet end to end: engine architecture and materials, centrifugal compressor aerodynamics, the evaporative tube combustor, the axial turbine, compressor maps and surge margin, turbomachinery CFD, and combustor design analysis. Four live hours per day over consecutive business days, with lifetime access to the complete recorded course included.',
-  provider: {
-    '@type': 'Organization',
-    name: 'ProReadyEngineer LLC',
-    url: 'https://proreadyengineer.com',
-  },
-});
 
 // Curriculum content. Index 0 -> Day 1, index 1 -> Day 2, etc.
 // Dates are *not* stored here — they come from the live API (day_dates)
@@ -204,7 +194,9 @@ const MicroGasTurbineDesignLive = () => {
   const [seatsTaken, setSeatsTaken] = useState<number | null>(null);
   const [capacity, setCapacity] = useState<number>(DEFAULT_CAPACITY);
   const [cohortDate, setCohortDate] = useState<string>(DEFAULT_COHORT_DATE);
-  const [courseStatus, setCourseStatus] = useState<'open' | 'closed'>('open');
+  const [courseStatus, setCourseStatus] = useState<'open' | 'closed'>(
+    courseSnapshot(COURSE_CODE)?.status ?? 'open',
+  );
   // Per-day dates (formatted "October 1, 2026"). Defaults to the snapshot
   // schedule above; replaced by the API list when day_dates is non-empty.
   const [dayDates, setDayDates] = useState<string[]>(DEFAULT_DAY_DATES);
@@ -342,7 +334,25 @@ const MicroGasTurbineDesignLive = () => {
   }, [formState, registrationId, priceCents]);
 
   const atCapacity = seatsTaken !== null && seatsTaken >= capacity;
-  const isFull = atCapacity || courseStatus === 'closed';
+  // A cohort that has started or finished takes no new registrations. The page
+  // then collects addresses for the next cohort instead of selling a seat in
+  // sessions that have already been taught.
+  const phase = useCohortPhase(clock, dayIsos);
+  const cohortOver = phase !== 'upcoming';
+  const isFull = atCapacity || courseStatus === 'closed' || cohortOver;
+  const cohortChip =
+    phase === 'ended'
+      ? 'Next cohort: dates to be announced'
+      : phase === 'running'
+        ? `In progress since ${cohortDate}`
+        : `Next cohort: ${cohortDate}`;
+  const registrationChip = cohortOver
+    ? 'Waitlist open for the next cohort'
+    : courseStatus === 'closed'
+      ? 'Registration closed'
+      : atCapacity
+        ? 'Cohort full'
+        : 'Registration open';
   const priceLabel = formatAmount(priceCents, currency);
   const recordedPriceLabel = formatAmount(recordedPriceCents, 'usd');
 
@@ -373,7 +383,7 @@ const MicroGasTurbineDesignLive = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setFormError(data.detail || data.error || `Registration failed (${res.status}).`);
+        setFormError(apiErrorMessage(data, `Registration failed (${res.status}).`));
         setFormState('error');
         return;
       }
@@ -461,7 +471,6 @@ const MicroGasTurbineDesignLive = () => {
   return (
     <div className="pb-20">
       {/* JSON-LD Course schema */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: COURSE_JSONLD }} />
 
       {/* HERO */}
       <section className="relative pt-36 pb-12 lg:pt-44 overflow-hidden">
@@ -484,14 +493,10 @@ const MicroGasTurbineDesignLive = () => {
                 {dayDates.length || CURRICULUM.length} days · 4 hours/day · live online
               </FactChip>
               <FactChip icon={<Calendar className="w-3.5 h-3.5" aria-hidden="true" />}>
-                Next cohort: {cohortDate}
+                {cohortChip}
               </FactChip>
               <FactChip icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />}>
-                {courseStatus === 'closed'
-                  ? 'Registration closed'
-                  : atCapacity
-                    ? 'Cohort full'
-                    : 'Registration open'}
+                {registrationChip}
               </FactChip>
               <FactChip icon={<PlayCircle className="w-3.5 h-3.5" aria-hidden="true" />}>
                 Recorded course included
@@ -509,7 +514,13 @@ const MicroGasTurbineDesignLive = () => {
                   key: 'live',
                   title: 'Live Online Cohort',
                   price: `${priceLabel} per seat`,
-                  meta: `Next cohort ${cohortDate} · ${dayDates.length || 7} days × 4 hours`,
+                  meta: `${
+                    phase === 'ended'
+                      ? 'Next cohort to be announced'
+                      : phase === 'running'
+                        ? `In progress since ${cohortDate}`
+                        : `Next cohort ${cohortDate}`
+                  } · ${dayDates.length || 7} days × 4 hours`,
                   to: '/training/micro-gas-turbine-design-live',
                 },
                 {
@@ -533,24 +544,22 @@ const MicroGasTurbineDesignLive = () => {
                 }}
                 className="btn-primary text-base px-8 py-4"
               >
-                Register
+                {isFull ? 'Join the waitlist' : 'Register'}
                 <Send className="w-4 h-4" aria-hidden="true" />
               </a>
               <span className="text-sm text-slate-300">
-                No payment required to register. Your seat is held as pending.
+                {isFull
+                  ? 'Leave your email and we will write to you when the next dates are set.'
+                  : 'No payment required to register. Your seat is held as pending.'}
               </span>
             </div>
 
             {/* Course infographic — placed directly under the title, matching site pattern */}
-            <div className="card overflow-hidden mb-10 shadow-2xl shadow-cyan-900/10">
-              <img
-                src="/Micro_Gas_Turbine_Design_Infographic_v2.jpg"
+            <div className="card overflow-hidden mb-10 shadow-2xl shadow-cyan-900/10 max-w-2xl mx-auto">
+              <Img
+                src="/Micro_Gas_Turbine_Design_Infographic_v2.jpg" sizes="(min-width: 720px) 672px, 100vw" priority
                 alt="Micro Gas Turbine Design live online cohort: design a single-shaft turbojet end to end. Engine architecture and gas path, centrifugal compressor, evaporative combustor, axial turbine, compressor maps and surge, turbomachinery CFD, and combustor analysis. Seven live days of four hours each, with the complete recorded course included."
                 className="w-full h-auto block"
-                width={941}
-                height={1672}
-                loading="eager"
-                fetchPriority="high"
               />
             </div>
 
@@ -574,7 +583,7 @@ const MicroGasTurbineDesignLive = () => {
               <Stat
                 icon={<Calendar className="w-5 h-5" aria-hidden="true" />}
                 label="Next Cohort"
-                value={cohortDate}
+                value={phase === 'ended' ? 'To be announced' : phase === 'running' ? 'In progress' : cohortDate}
               />
               <Stat
                 icon={<Users className="w-5 h-5" aria-hidden="true" />}
@@ -597,10 +606,14 @@ const MicroGasTurbineDesignLive = () => {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-1">
-                Registration: {cohortDate} cohort
+                {cohortOver ? 'Registration: next cohort' : `Registration: ${cohortDate} cohort`}
               </div>
               <div className="text-2xl font-bold">
-                {courseStatus === 'closed' ? (
+                {phase === 'ended' ? (
+                  <span className="text-amber-400">This cohort has finished</span>
+                ) : phase === 'running' ? (
+                  <span className="text-amber-400">This cohort is in progress</span>
+                ) : courseStatus === 'closed' ? (
                   <span className="text-amber-400">Registration closed</span>
                 ) : atCapacity ? (
                   <span className="text-amber-400">Cohort full, waitlist only</span>
@@ -610,9 +623,9 @@ const MicroGasTurbineDesignLive = () => {
               </div>
             </div>
             {isFull ? (
-              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-semibold">
-                <Lock className="w-4 h-4" aria-hidden="true" /> Registration closed
-              </span>
+              <a href="#register" className="btn-secondary">
+                Join the waitlist
+              </a>
             ) : (
               <a
                 href="#register"
@@ -909,10 +922,16 @@ const MicroGasTurbineDesignLive = () => {
           )}
           <span className="eyebrow mb-4">Register</span>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight mt-4 mb-2">
-            Reserve your seat for the {cohortDate} cohort
+            {cohortOver
+              ? 'Join the waitlist for the next cohort'
+              : `Reserve your seat for the ${cohortDate} cohort`}
           </h2>
           <p className="text-slate-300 mb-8 font-mono text-sm">
-            {courseStatus === 'closed'
+            {phase === 'ended'
+              ? `The ${cohortDate} cohort has finished. New dates will be published on this page.`
+              : phase === 'running'
+                ? `The ${cohortDate} cohort is under way, so registration for it has closed.`
+                : courseStatus === 'closed'
               ? 'Registration is closed for this cohort.'
               : atCapacity
                 ? `All ${capacity} seats are taken. Join the waitlist for the next cohort.`
@@ -1036,26 +1055,48 @@ const MicroGasTurbineDesignLive = () => {
                 <Lock className="w-10 h-10 text-amber-400" aria-hidden="true" />
               </div>
               <h3 className="text-2xl font-bold mb-4">
-                {courseStatus === 'closed' ? 'Registration closed' : 'Cohort full'}
+                {phase === 'ended'
+                  ? 'This cohort has finished'
+                  : phase === 'running'
+                    ? 'This cohort is under way'
+                    : courseStatus === 'closed'
+                      ? 'Registration closed'
+                      : 'Cohort full'}
               </h3>
-              <p className="text-slate-300 mb-8 max-w-md mx-auto">
-                {courseStatus === 'closed'
-                  ? `Registration for the ${cohortDate} cohort is closed.`
-                  : `All ${capacity} seats for the ${cohortDate} cohort are taken.`}{' '}
-                Email{' '}
+              <p className="text-slate-300 mb-6 max-w-md mx-auto">
+                {phase === 'ended'
+                  ? `The ${cohortDate} cohort has finished.`
+                  : phase === 'running'
+                    ? `The ${cohortDate} cohort has started, so it is no longer taking registrations.`
+                    : courseStatus === 'closed'
+                      ? `Registration for the ${cohortDate} cohort is closed.`
+                      : `All ${capacity} seats for the ${cohortDate} cohort are taken.`}{' '}
+                Leave your email and we will tell you first when registration for the next
+                cohort opens.
+              </p>
+              <NotifyMeForm
+                slug="micro-gas-turbine-design-live"
+                label="Email address for the next-cohort waitlist"
+                button="Join the waitlist"
+                doneText="You're on the list. We'll email you as soon as the next cohort opens for registration."
+                size="roomy"
+                className="max-w-md mx-auto justify-center text-left"
+              />
+              <p className="text-xs text-slate-400 mt-6">
+                Prefer to write? Email{' '}
                 <a
                   className="text-cyan-400 underline"
                   href="mailto:info@proreadyengineer.com?subject=Waitlist: Micro Gas Turbine Design Live Cohort"
                 >
                   info@proreadyengineer.com
-                </a>{' '}
-                to join the waitlist for the next cohort.
+                </a>
+                .
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               {formState === 'error' && formError && (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-start gap-3">
+                <div role="alert" className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-start gap-3">
                   <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
                   <span>{formError}</span>
                 </div>

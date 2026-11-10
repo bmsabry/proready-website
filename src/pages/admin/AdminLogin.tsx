@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { apiErrorMessage } from '../../lib/apiError';
 import { Lock, LogIn, AlertCircle } from 'lucide-react';
 
 // Same env var as the training page's form. Set in Cloudflare Pages env.
@@ -8,6 +9,10 @@ const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  // The dashboard hands over the screen that was open (e.g. "#support/AB12")
+  // so a link from an alert email still lands there after sign-in.
+  const nextHash = (useLocation().state as { next?: string } | null)?.next;
+  const dashboardUrl = '/admin' + (typeof nextHash === 'string' && nextHash.startsWith('#') ? nextHash : '');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,7 +32,7 @@ export default function AdminLogin() {
           credentials: 'include',
           cache: 'no-store',
         });
-        if (!cancelled && res.ok) navigate('/admin', { replace: true });
+        if (!cancelled && res.ok) navigate(dashboardUrl, { replace: true });
       } catch {
         /* ignore — stay on login form */
       } finally {
@@ -56,11 +61,11 @@ export default function AdminLogin() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({} as any));
-        setError(body.detail ?? `Login failed (HTTP ${res.status}).`);
+        setError(apiErrorMessage(body, `Login failed (HTTP ${res.status}).`));
         setLoading(false);
         return;
       }
-      navigate('/admin', { replace: true });
+      navigate(dashboardUrl, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Network error.');
       setLoading(false);

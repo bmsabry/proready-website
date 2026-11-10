@@ -236,6 +236,10 @@ const SlideViewer = ({
     return saved > 0 ? Math.min(saved, slides.length) - 1 : 0;
   });
   const [imgLoaded, setImgLoaded] = useState(false);
+  // The slide's image request failed (session lapsed, network dropped, image
+  // missing). `imgTry` forces a fresh request when the learner presses Retry.
+  const [imgFailed, setImgFailed] = useState(false);
+  const [imgTry, setImgTry] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Theater mode: a CSS full-viewport overlay used when the native
   // Fullscreen API is unavailable or denied (locked-down corporate
@@ -277,6 +281,10 @@ const SlideViewer = ({
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && /^(input|textarea|select)$/i.test(target.tagName)) return;
+      // Ctrl/Cmd+F is "find in page" and Alt+Left is "back": not ours to take.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // Space on a focused button or link presses that control, nothing more.
+      if (e.key === ' ' && target?.closest('button, a')) return;
       // While a slide movie is playing, space belongs to the player.
       if (
         (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') &&
@@ -316,6 +324,7 @@ const SlideViewer = ({
   // always stops its movie.
   useEffect(() => {
     setImgLoaded(false);
+    setImgFailed(false);
     setPlaying(false);
   }, [index]);
 
@@ -382,11 +391,12 @@ const SlideViewer = ({
           />
         ) : (
           <img
-            key={current.number}
+            key={`${current.number}-${imgTry}`}
             src={slideImageUrl(moduleId, current.number, 'lg')}
             crossOrigin="use-credentials"
             draggable={false}
             onLoad={() => setImgLoaded(true)}
+            onError={() => setImgFailed(true)}
             alt={current.title || `Slide ${current.number}`}
             className={
               presenting
@@ -395,12 +405,32 @@ const SlideViewer = ({
             }
           />
         )}
-        {!imgLoaded && !playing && (
+        {!imgLoaded && !playing && !imgFailed && (
           <div className="absolute inset-0 grid place-items-center bg-slate-950/70 z-20">
             <span className="inline-flex items-center gap-2 text-sm font-mono uppercase tracking-widest text-cyan-400">
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               Loading slide {current.number}…
             </span>
+          </div>
+        )}
+        {imgFailed && !playing && (
+          <div role="alert" className="absolute inset-0 grid place-items-center bg-slate-950/80 z-30 p-6 text-center">
+            <div>
+              <p className="text-sm text-slate-200 mb-4">
+                Slide {current.number} could not be loaded. Check your connection, then try again.
+                If it keeps happening, reload the page: you may have been signed out.
+              </p>
+              <button
+                type="button"
+                className="btn-secondary px-4 py-2 text-sm"
+                onClick={() => {
+                  setImgFailed(false);
+                  setImgTry((n) => n + 1);
+                }}
+              >
+                Try again
+              </button>
+            </div>
           </div>
         )}
         <Watermark text={lesson.watermark} />
@@ -571,17 +601,41 @@ const Lesson: React.FC = () => {
     setError('');
     (async () => {
       try {
-        const data = await academy.lesson(id);
+        // Asked together so the terms check below costs no extra wait.
+        const [data, me] = await Promise.all([academy.lesson(id), academy.me().catch(() => null)]);
         if (cancelled) return;
+        // The Training Terms are accepted on the course page. A lesson opened
+        // straight from a link or a bookmark must not skip that step, so a
+        // learner who has not accepted the current version is taken there
+        // first. Free previews stay open to everyone.
+        if (
+          !data.is_preview &&
+          me?.signed_in &&
+          me.terms_version &&
+          !me.terms_accepted &&
+          !me.is_owner
+        ) {
+          navigate(`/learn/${data.module.product_code}`, { replace: true });
+          return;
+        }
         setLesson(data);
         setCompleted(data.progress.completed);
         maxSlideRef.current =
           data.kind === 'slides' ? data.progress.position_s || 0 : 0;
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401) {
-          navigate('/learn/signin', { replace: true });
-          return;
+        // A lapsed session answers 403 here ("requires an enrollment"), not
+        // 401, because previews are open to the public. Ask who is signed in:
+        // nobody means sign in and come straight back to this lesson.
+        if (err instanceof ApiError && (err.status === 401 || (err.status === 403 && !err.info))) {
+          const me = err.status === 401 ? null : await academy.me().catch(() => null);
+          if (cancelled) return;
+          if (!me?.signed_in) {
+            navigate(`/learn/signin?next=${encodeURIComponent(`/learn/lesson/${id}`)}`, {
+              replace: true,
+            });
+            return;
+          }
         }
         if (err instanceof ApiError && err.info?.code === 'gate_locked') {
           setGate(err.info);
@@ -627,6 +681,30 @@ const Lesson: React.FC = () => {
     },
     [beat]
   );
+
+  // A lesson with nothing to time (a lab, a handout, a calculator, a link out
+  // to a quiz app) is complete once it has been opened: that is the server's
+  // rule. Report the opening at once. Waiting for the first 15-second tick
+  // lost it, because the usual visit is to launch the tool in a new tab
+  // within seconds, which hides this one and stops the ticks.
+  useEffect(() => {
+    if (!lesson || lesson.is_preview || lesson.progress.completed) return;
+    const nothingToTime =
+      lesson.duration_s <= 0 &&
+      lesson.kind !== 'video' &&
+      !(lesson.kind === 'slides' && lesson.slides.length > 0);
+    if (!nothingToTime) return;
+    let cancelled = false;
+    academy
+      .heartbeat(lesson.id, lesson.progress.position_s, 1)
+      .then((res) => {
+        if (!cancelled && res.completed) setCompleted(true);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [lesson]);
 
   useEffect(() => {
     if (!lesson) return;

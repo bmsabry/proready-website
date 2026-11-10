@@ -438,7 +438,7 @@ export function HBarList({
       {rows.map((r) => (
         <li key={r.label} className="text-sm">
           <div className="flex items-center justify-between mb-1 gap-4">
-            <span className="text-slate-300 truncate">{r.label}</span>
+            <span className="text-slate-300 min-w-0 break-words">{r.label}</span>
             <span className="text-slate-400 shrink-0">{r.count.toLocaleString()}</span>
           </div>
           <div className="h-1.5 rounded bg-slate-800">

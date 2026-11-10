@@ -583,7 +583,7 @@ def applicant_confirmation_html(
         "we'll move you to the waitlist and refund any overlap."
     )
     heading = (
-        f"Thanks, {full_name}. Your seat is pending"
+        f"Thanks, {escape_html(full_name)}. Your seat is pending"
         if full_name
         else "Your seat is pending"
     )
@@ -665,13 +665,13 @@ def session_reminder_html(
     location resolved to a time zone, by their own local time — the
     arithmetic is done by local_times.py, never here.
     """
-    greeting = f"Hi {full_name.split(' ')[0]}," if full_name.strip() else "Hi,"
+    greeting = f"Hi {escape_html(full_name.split(' ')[0])}," if full_name.strip() else "Hi,"
     when = f"in about {lead_minutes} minutes" if lead_minutes != 60 else "in about an hour"
     body = _p(greeting)
     body += _p(
         f"<strong>{course_title}</strong> — Day {day} of {total_days} — starts {when}."
     )
-    body += _kv_table([("Starts", "<br>".join(when_lines))])
+    body += _kv_table([("Starts", "<br>".join(escape_html(line) for line in when_lines))])
     body += _p("Here is how to join:", margin="0 0 10px", weight=600, color=HEADING)
     body += _meeting_block(meeting_info)
     body += _p(
@@ -706,7 +706,7 @@ def admin_notification_html(reg: dict, taken_after: int, capacity: int) -> str:
         size=13,
         color=MUTED,
     )
-    body += _kv_table([(str(k), str(v)) for k, v in reg.items()], size=14)
+    body += _kv_table([(str(k), escape_html(str(v))) for k, v in reg.items()], size=14)
     return _shell("New registration", "New registration (pending)", body)
 
 
@@ -718,7 +718,7 @@ def admin_notification_html(reg: dict, taken_after: int, capacity: int) -> str:
 
 
 def login_link_html(full_name: str, link: str, minutes: int) -> str:
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
     body = _p(greeting)
     body += _p(
         "Here's your sign-in link. It works once and expires in "
@@ -746,7 +746,7 @@ def purchase_welcome_html(
     full_name: str, course_title: str, link: str, minutes: int,
     bank_pending: bool = False,
 ) -> str:
-    greeting = f"Welcome aboard, {full_name}." if full_name else "Welcome aboard."
+    greeting = f"Welcome aboard, {escape_html(full_name)}." if full_name else "Welcome aboard."
     body = _p(greeting)
     body += _p(
         f"Your payment for <strong>{course_title}</strong> went through and your "
@@ -812,7 +812,7 @@ def enrollment_granted_html(
     `valid_for` is the link lifetime as words ("7 days"); when given, the
     footer says so instead of leaving the reader to discover an expired link.
     """
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
     body = _p(greeting)
     body += _p(
         f"You've been given access to <strong>{course_title}</strong> on the "
@@ -835,7 +835,7 @@ def payment_receipt_html(
     full_name: str, course_title: str, amount_display: str, reference: str
 ) -> str:
     """Receipt for a live-cohort seat paid online (PayPal or Stripe)."""
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
     rows = [("Course", course_title)]
     if amount_display:
         rows.append(("Amount", f"<strong>{amount_display}</strong>"))
@@ -860,7 +860,7 @@ def settlement_failed_html(
     full_name: str, course_title: str, course_url: str
 ) -> str:
     """Recorded product: the bank debit never cleared — access is paused."""
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
     body = _p(greeting)
     body += _p(
         f"Your bank payment for <strong>{course_title}</strong> didn't clear, so "
@@ -884,7 +884,7 @@ def live_bank_failed_html(
     full_name: str, course_title: str, course_url: str
 ) -> str:
     """Live cohort seat: the bank debit never cleared — the seat is still held."""
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
     body = _p(greeting)
     body += _p(
         f"Your bank payment for <strong>{course_title}</strong> didn't clear. "
@@ -1351,7 +1351,7 @@ def advanced_purchased_html(
 ) -> str:
     """Registration confirmed. With no price this is a complimentary place
     the instructor opened — it must not thank anyone for a payment."""
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
     body = _p(greeting)
     if price_display:
         body += _p(
@@ -1377,7 +1377,7 @@ def advanced_exam_passed_html(
     full_name: str, course_title: str, score: float, slots_url: str, fee_due_display: str = "",
     *, self_booking: bool = False,
 ) -> str:
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
     body = _p(greeting)
     body += _p(
         f"You passed the advanced written examination for <strong>{course_title}</strong> "
@@ -1418,13 +1418,13 @@ def advanced_slots_admin_html(
     slots_lines: "list[str]", note: str, admin_url: str,
 ) -> str:
     body = _p(
-        f"<strong>{learner_name or learner_email}</strong> ({learner_email}) passed the "
+        f"<strong>{escape_html(learner_name or learner_email)}</strong> ({escape_html(learner_email)}) passed the "
         f"written examination for <strong>{course_title}</strong> and proposed these "
         "windows for the live oral examination:"
     )
     body += _p("<br>".join(slots_lines), margin="0 0 18px")
     if note:
-        body += _p(f"Note from the candidate: <em>{note}</em>")
+        body += _p(f"Note from the candidate: <em>{escape_html(note)}</em>")
     body += _cta_button("Confirm a slot in the admin panel", admin_url)
     return _shell("Oral examination requested", "A candidate is waiting for a time", body)
 
@@ -1438,7 +1438,7 @@ def advanced_scheduled_html(
     the instructor's Google Calendar and Google has sent the invitation from
     that address (no .ics attached then). `moved`: a new time for an
     examination that was already booked."""
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
     body = _p(greeting)
     what = "re-examination" if interview_no > 1 else "oral examination"
     if moved:
@@ -1476,7 +1476,7 @@ def advanced_outcome_retake_html(
     full_name: str, course_title: str, retake_after: str, dashboard_url: str,
     *, self_booking: bool = False,
 ) -> str:
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
     body = _p(greeting)
     body += _p(
         f"Thank you for your oral examination in <strong>{course_title}</strong>. "
@@ -1496,7 +1496,7 @@ def advanced_outcome_retake_html(
 
 
 def advanced_outcome_failed_html(full_name: str, course_title: str) -> str:
-    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
     body = _p(greeting)
     body += _p(
         f"Thank you for your re-examination in <strong>{course_title}</strong>. "
@@ -1953,7 +1953,9 @@ def integrity_alert_html(
     is not a verdict, and the person named may turn out to be innocent.
     """
     body = _p(meaning)
-    body += _kv_table(facts, size=14)
+    # The page address and time zone come from whoever opened the copy, so
+    # they are shown as text, never as markup.
+    body += _kv_table([(k, escape_html(str(v))) for k, v in facts], size=14)
     body += _p(next_steps, size=14)
     body += _cta_button("Open the Integrity tab", integrity_url)
     body += _p(

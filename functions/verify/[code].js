@@ -22,6 +22,9 @@ const TIER_BLURB = {
     'completed every lesson of the programme and passed every module evaluation and mastery check, as verified by the ProReadyEngineer learning platform.',
   verified:
     'completed the programme, passed an advanced written examination, and was examined live, one-on-one by the instructor, who attested to a verified command of every key principle of the subject.',
+  // Attendance records presence only; the wording follows the certificate itself.
+  attendance:
+    'was present for and participated in the live, instructor-led delivery of this programme in full; the certificate records attendance and participation only.',
 };
 
 function esc(s) {
@@ -53,7 +56,7 @@ export async function onRequestGet(context) {
   if (!shell.ok) return shell;
 
   let cert = null;
-  if (/^PRE-[CV]-[0-9A-F]{4}-[0-9A-F]{4}$/.test(code) || /^PRE-[0-9A-F]{10}$/.test(code)) {
+  if (/^PRE-[CVA]-[0-9A-F]{4}-[0-9A-F]{4}$/.test(code) || /^PRE-[0-9A-F]{10}$/.test(code)) {
     try {
       cert = await lookup(code);
     } catch (_) {

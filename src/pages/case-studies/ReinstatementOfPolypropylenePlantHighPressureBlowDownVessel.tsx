@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
 const ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel = () => {
   usePageMeta('High Pressure Blow Down Vessel Reinstatement', 'Design, fabrication, inspection, and delivery of a code-compliant 145-metric-ton high pressure blow down vessel to reinstate polypropylene plant operations.');
 
@@ -29,13 +30,7 @@ const ReinstatementOfPolypropylenePlantHighPressureBlowDownVessel = () => {
             </a>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async"
-              src="/Reinstatement_of_Polypropylene_Plant_High_Pressure_Blow_Down_Vessel.png"
-              alt="Reinstatement of Polypropylene Plant – High Pressure Blow Down Vessel"
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/Reinstatement_of_Polypropylene_Plant_High_Pressure_Blow_Down_Vessel.png" alt="Reinstatement of Polypropylene Plant – High Pressure Blow Down Vessel" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
             <section>

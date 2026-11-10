@@ -214,13 +214,19 @@ def _grant_course_materials(
         }
     settings = get_settings()
     learner = academy_svc.upsert_learner(db, reg.email, reg.full_name)
-    academy_svc.grant_enrollment(
-        db,
-        learner,
-        product.code,
-        source="cohort",
-        note=f"cohort {reg.course_code} marked paid (registration #{reg.id})",
-    )
+    # Someone who already bought the recorded course (or was given it by hand)
+    # keeps that access exactly as it is. Relabelling it "cohort" here meant
+    # that cancelling the seat later also took away the course they had paid
+    # for separately, because a cancelled seat withdraws "cohort" access.
+    held = academy_svc.active_enrollment(db, learner, product.code)
+    if held is None or held.source == "cohort":
+        academy_svc.grant_enrollment(
+            db,
+            learner,
+            product.code,
+            source="cohort",
+            note=f"cohort {reg.course_code} marked paid (registration #{reg.id})",
+        )
     raw = issue_login_token(
         db, learner, next_path=f"/learn/{product.code}",
         ttl_seconds=settings.WELCOME_LINK_TTL_SECONDS,

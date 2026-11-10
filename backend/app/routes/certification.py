@@ -407,10 +407,33 @@ def submit_advanced_exam(
 ) -> dict:
     product = _product_or_404(db, code)
     row = _advanced_row(db, learner, code)
+    # Hand-ins are taken one at a time per candidate. Two requests arriving
+    # together (a double press, two tabs) used to be graded as two papers and
+    # counted as one attempt; the second now waits, then sees the first's
+    # result. (SQLite, used in tests, has no row locks and ignores this.)
+    db.refresh(row, with_for_update=True)
     if not adv.exam_open(row):
         raise HTTPException(status_code=409, detail="The written examination is not open at this step.")
+    # A hand-in is graded only against the paper it answers. When the first
+    # hand-in was graded but its reply never reached the browser (connection
+    # dropped, laptop closed), pressing Submit again used to draw a NEW paper,
+    # mark the old answers against it (0 %) and spend the candidate's last
+    # attempt. Such a hand-in is now refused, and no attempt is used.
+    responses = body.responses or {}
+    not_this_paper = HTTPException(
+        status_code=409,
+        detail=(
+            "This is not the paper currently open for you: it was already handed in, or the "
+            "examination was reopened. No attempt has been used. Go back to your course page "
+            "to see your result and open the examination again."
+        ),
+    )
+    if not row.exam_item_codes:
+        raise not_this_paper
     sat = {i.code for i in adv.served_items(db, code, row)}
-    attempt = adv.grade_exam(db, learner, product, row, body.responses or {})
+    if any(key not in sat for key in responses):
+        raise not_this_paper
+    attempt = adv.grade_exam(db, learner, product, row, responses)
     items = {c: True for c in sat}
     settings = get_settings()
     return {

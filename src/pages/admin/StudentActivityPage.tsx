@@ -262,7 +262,7 @@ function ProgressBar({ c, wide }: { c: CourseProgress; wide?: boolean }) {
   return (
     <div className="min-w-[150px]" title={`${c.title}: ${c.lessons_done}/${c.lessons_total} lessons, ${c.sets_passed}/${c.sets_total} evaluations`}>
       <div className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
-        <span className={wide ? 'text-sm text-white' : 'truncate max-w-[150px]'}>{c.title}</span>
+        <span className={wide ? 'text-sm text-white' : 'break-words max-w-[150px]'}>{c.title}</span>
         <span className={c.complete ? 'text-emerald-300' : 'text-slate-400'}>{pct}%</span>
       </div>
       <div className="h-1.5 rounded bg-slate-800 mt-1 overflow-hidden">

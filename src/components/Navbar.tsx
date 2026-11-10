@@ -12,6 +12,7 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { academy, Me } from '../lib/academyApi';
+import Img from './Img';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -98,6 +99,16 @@ const Navbar = () => {
       document.removeEventListener('keydown', onKey);
     };
   }, [menuOpen]);
+
+  // Escape closes the mobile navigation too.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen]);
 
   const signOut = async () => {
     setMenuOpen(false);
@@ -219,11 +230,9 @@ const Navbar = () => {
       <div className="container-site">
         <div className="flex justify-between items-center">
           <Link to="/" className="flex items-center space-x-3 shrink-0">
-            <img
-              src="/Logo.jpg"
+            <Img
+              src="/Logo.jpg" sizes="40px" priority
               alt=""
-              width="40"
-              height="40"
               className="h-10 w-auto rounded-md"
             />
             <span className="font-display text-xl font-bold tracking-tight whitespace-nowrap">

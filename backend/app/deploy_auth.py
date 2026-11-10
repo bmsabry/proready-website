@@ -94,7 +94,9 @@ def require_admin_or_deployer(
     prefix = "Bearer "
     if authorization.startswith(prefix):
         token = authorization[len(prefix):].strip()
-        if settings.SIM_DEPLOY_TOKEN and secrets.compare_digest(token, settings.SIM_DEPLOY_TOKEN):
+        if settings.SIM_DEPLOY_TOKEN and secrets.compare_digest(
+            token.encode(), settings.SIM_DEPLOY_TOKEN.encode()
+        ):
             return DEPLOYER
         # an OIDC token is a JWT: three dot-separated segments
         if token.count(".") == 2 and settings.SIM_DEPLOY_GITHUB_REPO:

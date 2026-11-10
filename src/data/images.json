@@ -1,0 +1,228 @@
+{
+  "/Adam.jpg": {
+    "w": 340,
+    "h": 247,
+    "src": "/img/Adam-340.webp",
+    "srcset": "/img/Adam-96.webp 96w, /img/Adam-240.webp 240w, /img/Adam-340.webp 340w"
+  },
+  "/Ammar.jpg": {
+    "w": 444,
+    "h": 444,
+    "src": "/img/Ammar-444.webp",
+    "srcset": "/img/Ammar-96.webp 96w, /img/Ammar-240.webp 240w, /img/Ammar-444.webp 444w"
+  },
+  "/Bakr.png": {
+    "w": 896,
+    "h": 1152,
+    "src": "/img/Bakr-480.webp",
+    "srcset": "/img/Bakr-96.webp 96w, /img/Bakr-240.webp 240w, /img/Bakr-480.webp 480w"
+  },
+  "/Banner.png": {
+    "w": 1024,
+    "h": 590,
+    "src": "/img/Banner-1024.webp",
+    "srcset": "/img/Banner-480.webp 480w, /img/Banner-800.webp 800w, /img/Banner-1024.webp 1024w"
+  },
+  "/Bassam.jpg": {
+    "w": 765,
+    "h": 1024,
+    "src": "/img/Bassam-480.webp",
+    "srcset": "/img/Bassam-96.webp 96w, /img/Bassam-240.webp 240w, /img/Bassam-480.webp 480w"
+  },
+  "/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning.jpg": {
+    "w": 2752,
+    "h": 1536,
+    "src": "/img/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning-1600.webp",
+    "srcset": "/img/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning-480.webp 480w, /img/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning-800.webp 800w, /img/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning-1280.webp 1280w, /img/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning-1600.webp 1600w",
+    "og": "/img/CASE_STUDY_Fuel_Supply_Capability_Expansion__Specification_Procurement_and_Commissioning-og.jpg"
+  },
+  "/Hydrogen_Impact_on_Combustor_Performance_and_NOx_Emissions.jpg": {
+    "w": 2752,
+    "h": 1536,
+    "src": "/img/Hydrogen_Impact_on_Combustor_Performance_and_NOx_Emissions-1600.webp",
+    "srcset": "/img/Hydrogen_Impact_on_Combustor_Performance_and_NOx_Emissions-480.webp 480w, /img/Hydrogen_Impact_on_Combustor_Performance_and_NOx_Emissions-800.webp 800w, /img/Hydrogen_Impact_on_Combustor_Performance_and_NOx_Emissions-1280.webp 1280w, /img/Hydrogen_Impact_on_Combustor_Performance_and_NOx_Emissions-1600.webp 1600w",
+    "og": "/img/Hydrogen_Impact_on_Combustor_Performance_and_NOx_Emissions-og.jpg"
+  },
+  "/Impact_of_Operational_Modes_on_Gas_Turbine_Combustor_Performance.jpg": {
+    "w": 2752,
+    "h": 1536,
+    "src": "/img/Impact_of_Operational_Modes_on_Gas_Turbine_Combustor_Performance-1600.webp",
+    "srcset": "/img/Impact_of_Operational_Modes_on_Gas_Turbine_Combustor_Performance-480.webp 480w, /img/Impact_of_Operational_Modes_on_Gas_Turbine_Combustor_Performance-800.webp 800w, /img/Impact_of_Operational_Modes_on_Gas_Turbine_Combustor_Performance-1280.webp 1280w, /img/Impact_of_Operational_Modes_on_Gas_Turbine_Combustor_Performance-1600.webp 1600w",
+    "og": "/img/Impact_of_Operational_Modes_on_Gas_Turbine_Combustor_Performance-og.jpg"
+  },
+  "/John.jpg": {
+    "w": 403,
+    "h": 403,
+    "src": "/img/John-403.webp",
+    "srcset": "/img/John-96.webp 96w, /img/John-240.webp 240w, /img/John-403.webp 403w"
+  },
+  "/Logo-small.jpg": {
+    "w": 57,
+    "h": 56,
+    "src": "/img/Logo-small-57.webp",
+    "srcset": "/img/Logo-small-57.webp 57w"
+  },
+  "/Logo.jpg": {
+    "w": 573,
+    "h": 565,
+    "src": "/img/Logo-480.webp",
+    "srcset": "/img/Logo-96.webp 96w, /img/Logo-240.webp 240w, /img/Logo-480.webp 480w"
+  },
+  "/Mapping_Course_Advertisement_v2.jpg": {
+    "w": 1671,
+    "h": 941,
+    "src": "/img/Mapping_Course_Advertisement_v2-1600.webp",
+    "srcset": "/img/Mapping_Course_Advertisement_v2-480.webp 480w, /img/Mapping_Course_Advertisement_v2-800.webp 800w, /img/Mapping_Course_Advertisement_v2-1280.webp 1280w, /img/Mapping_Course_Advertisement_v2-1600.webp 1600w"
+  },
+  "/Micro_Gas_Turbine_Design_Infographic_v2.jpg": {
+    "w": 941,
+    "h": 1672,
+    "src": "/img/Micro_Gas_Turbine_Design_Infographic_v2-941.webp",
+    "srcset": "/img/Micro_Gas_Turbine_Design_Infographic_v2-480.webp 480w, /img/Micro_Gas_Turbine_Design_Infographic_v2-800.webp 800w, /img/Micro_Gas_Turbine_Design_Infographic_v2-941.webp 941w"
+  },
+  "/New_HighPerformance_Data_Acquisition_System.jpg": {
+    "w": 2752,
+    "h": 1536,
+    "src": "/img/New_HighPerformance_Data_Acquisition_System-1600.webp",
+    "srcset": "/img/New_HighPerformance_Data_Acquisition_System-480.webp 480w, /img/New_HighPerformance_Data_Acquisition_System-800.webp 800w, /img/New_HighPerformance_Data_Acquisition_System-1280.webp 1280w, /img/New_HighPerformance_Data_Acquisition_System-1600.webp 1600w",
+    "og": "/img/New_HighPerformance_Data_Acquisition_System-og.jpg"
+  },
+  "/Recovery_Reactor_Feed_Cooler_Heat_Exchanger.jpg": {
+    "w": 2752,
+    "h": 1536,
+    "src": "/img/Recovery_Reactor_Feed_Cooler_Heat_Exchanger-1600.webp",
+    "srcset": "/img/Recovery_Reactor_Feed_Cooler_Heat_Exchanger-480.webp 480w, /img/Recovery_Reactor_Feed_Cooler_Heat_Exchanger-800.webp 800w, /img/Recovery_Reactor_Feed_Cooler_Heat_Exchanger-1280.webp 1280w, /img/Recovery_Reactor_Feed_Cooler_Heat_Exchanger-1600.webp 1600w",
+    "og": "/img/Recovery_Reactor_Feed_Cooler_Heat_Exchanger-og.jpg"
+  },
+  "/Reinstatement_of_Polypropylene_Plant_High_Pressure_Blow_Down_Vessel.png": {
+    "w": 2752,
+    "h": 1536,
+    "src": "/img/Reinstatement_of_Polypropylene_Plant_High_Pressure_Blow_Down_Vessel-1600.webp",
+    "srcset": "/img/Reinstatement_of_Polypropylene_Plant_High_Pressure_Blow_Down_Vessel-480.webp 480w, /img/Reinstatement_of_Polypropylene_Plant_High_Pressure_Blow_Down_Vessel-800.webp 800w, /img/Reinstatement_of_Polypropylene_Plant_High_Pressure_Blow_Down_Vessel-1280.webp 1280w, /img/Reinstatement_of_Polypropylene_Plant_High_Pressure_Blow_Down_Vessel-1600.webp 1600w",
+    "og": "/img/Reinstatement_of_Polypropylene_Plant_High_Pressure_Blow_Down_Vessel-og.jpg"
+  },
+  "/SAC_Aerodynamics.jpg": {
+    "w": 1024,
+    "h": 848,
+    "src": "/img/SAC_Aerodynamics-1024.webp",
+    "srcset": "/img/SAC_Aerodynamics-480.webp 480w, /img/SAC_Aerodynamics-800.webp 800w, /img/SAC_Aerodynamics-1024.webp 1024w"
+  },
+  "/SAC_Design_Infographic.png": {
+    "w": 1333,
+    "h": 726,
+    "src": "/img/SAC_Design_Infographic-1333.webp",
+    "srcset": "/img/SAC_Design_Infographic-480.webp 480w, /img/SAC_Design_Infographic-800.webp 800w, /img/SAC_Design_Infographic-1280.webp 1280w, /img/SAC_Design_Infographic-1333.webp 1333w",
+    "og": "/img/SAC_Design_Infographic-og.jpg"
+  },
+  "/SAC_Dynamics.jpg": {
+    "w": 1024,
+    "h": 523,
+    "src": "/img/SAC_Dynamics-1024.webp",
+    "srcset": "/img/SAC_Dynamics-480.webp 480w, /img/SAC_Dynamics-800.webp 800w, /img/SAC_Dynamics-1024.webp 1024w"
+  },
+  "/SAC_Flow_Evolution.jpg": {
+    "w": 697,
+    "h": 425,
+    "src": "/img/SAC_Flow_Evolution-697.webp",
+    "srcset": "/img/SAC_Flow_Evolution-480.webp 480w, /img/SAC_Flow_Evolution-697.webp 697w"
+  },
+  "/Sherif.jpg": {
+    "w": 851,
+    "h": 1024,
+    "src": "/img/Sherif-480.webp",
+    "srcset": "/img/Sherif-96.webp 96w, /img/Sherif-240.webp 240w, /img/Sherif-480.webp 480w"
+  },
+  "/Test_Asset_Protection_Logic.jpg": {
+    "w": 2752,
+    "h": 1536,
+    "src": "/img/Test_Asset_Protection_Logic-1600.webp",
+    "srcset": "/img/Test_Asset_Protection_Logic-480.webp 480w, /img/Test_Asset_Protection_Logic-800.webp 800w, /img/Test_Asset_Protection_Logic-1280.webp 1280w, /img/Test_Asset_Protection_Logic-1600.webp 1600w",
+    "og": "/img/Test_Asset_Protection_Logic-og.jpg"
+  },
+  "/Vortex_Break_Down_Image.png": {
+    "w": 2752,
+    "h": 1536,
+    "src": "/img/Vortex_Break_Down_Image-1600.webp",
+    "srcset": "/img/Vortex_Break_Down_Image-480.webp 480w, /img/Vortex_Break_Down_Image-800.webp 800w, /img/Vortex_Break_Down_Image-1280.webp 1280w, /img/Vortex_Break_Down_Image-1600.webp 1600w",
+    "og": "/img/Vortex_Break_Down_Image-og.jpg"
+  },
+  "/Zaeem.jpg": {
+    "w": 268,
+    "h": 268,
+    "src": "/img/Zaeem-268.webp",
+    "srcset": "/img/Zaeem-96.webp 96w, /img/Zaeem-240.webp 240w, /img/Zaeem-268.webp 268w"
+  },
+  "/case-study-enabling-multichannel-emissions-sampling.jpg": {
+    "w": 2048,
+    "h": 1143,
+    "src": "/img/case-study-enabling-multichannel-emissions-sampling-1600.webp",
+    "srcset": "/img/case-study-enabling-multichannel-emissions-sampling-480.webp 480w, /img/case-study-enabling-multichannel-emissions-sampling-800.webp 800w, /img/case-study-enabling-multichannel-emissions-sampling-1280.webp 1280w, /img/case-study-enabling-multichannel-emissions-sampling-1600.webp 1600w",
+    "og": "/img/case-study-enabling-multichannel-emissions-sampling-og.jpg"
+  },
+  "/case-study-extending-emissions-rake-durability.jpg": {
+    "w": 2048,
+    "h": 1143,
+    "src": "/img/case-study-extending-emissions-rake-durability-1600.webp",
+    "srcset": "/img/case-study-extending-emissions-rake-durability-480.webp 480w, /img/case-study-extending-emissions-rake-durability-800.webp 800w, /img/case-study-extending-emissions-rake-durability-1280.webp 1280w, /img/case-study-extending-emissions-rake-durability-1600.webp 1600w",
+    "og": "/img/case-study-extending-emissions-rake-durability-og.jpg"
+  },
+  "/case-study-improving-gaseous-fuel-supply-system-response.jpg": {
+    "w": 2048,
+    "h": 1143,
+    "src": "/img/case-study-improving-gaseous-fuel-supply-system-response-1600.webp",
+    "srcset": "/img/case-study-improving-gaseous-fuel-supply-system-response-480.webp 480w, /img/case-study-improving-gaseous-fuel-supply-system-response-800.webp 800w, /img/case-study-improving-gaseous-fuel-supply-system-response-1280.webp 1280w, /img/case-study-improving-gaseous-fuel-supply-system-response-1600.webp 1600w",
+    "og": "/img/case-study-improving-gaseous-fuel-supply-system-response-og.jpg"
+  },
+  "/case-study-oil-filtration-and-particle-removal-in-sensitive-optics-cooling-air.jpg": {
+    "w": 2048,
+    "h": 1143,
+    "src": "/img/case-study-oil-filtration-and-particle-removal-in-sensitive-optics-cooling-air-1600.webp",
+    "srcset": "/img/case-study-oil-filtration-and-particle-removal-in-sensitive-optics-cooling-air-480.webp 480w, /img/case-study-oil-filtration-and-particle-removal-in-sensitive-optics-cooling-air-800.webp 800w, /img/case-study-oil-filtration-and-particle-removal-in-sensitive-optics-cooling-air-1280.webp 1280w, /img/case-study-oil-filtration-and-particle-removal-in-sensitive-optics-cooling-air-1600.webp 1600w",
+    "og": "/img/case-study-oil-filtration-and-particle-removal-in-sensitive-optics-cooling-air-og.jpg"
+  },
+  "/case-study-specifying-procuring-and-installing-a-dualmode-liquidfuel-pumping-system.jpg": {
+    "w": 2048,
+    "h": 1143,
+    "src": "/img/case-study-specifying-procuring-and-installing-a-dualmode-liquidfuel-pumping-system-1600.webp",
+    "srcset": "/img/case-study-specifying-procuring-and-installing-a-dualmode-liquidfuel-pumping-system-480.webp 480w, /img/case-study-specifying-procuring-and-installing-a-dualmode-liquidfuel-pumping-system-800.webp 800w, /img/case-study-specifying-procuring-and-installing-a-dualmode-liquidfuel-pumping-system-1280.webp 1280w, /img/case-study-specifying-procuring-and-installing-a-dualmode-liquidfuel-pumping-system-1600.webp 1600w",
+    "og": "/img/case-study-specifying-procuring-and-installing-a-dualmode-liquidfuel-pumping-system-og.jpg"
+  },
+  "/case2-study-enhancing-test-execution-cost-efficiency.jpg": {
+    "w": 2048,
+    "h": 1143,
+    "src": "/img/case2-study-enhancing-test-execution-cost-efficiency-1600.webp",
+    "srcset": "/img/case2-study-enhancing-test-execution-cost-efficiency-480.webp 480w, /img/case2-study-enhancing-test-execution-cost-efficiency-800.webp 800w, /img/case2-study-enhancing-test-execution-cost-efficiency-1280.webp 1280w, /img/case2-study-enhancing-test-execution-cost-efficiency-1600.webp 1600w",
+    "og": "/img/case2-study-enhancing-test-execution-cost-efficiency-og.jpg"
+  },
+  "/impact-secondary-air-emissions.jpg": {
+    "w": 1024,
+    "h": 501,
+    "src": "/img/impact-secondary-air-emissions-1024.webp",
+    "srcset": "/img/impact-secondary-air-emissions-480.webp 480w, /img/impact-secondary-air-emissions-800.webp 800w, /img/impact-secondary-air-emissions-1024.webp 1024w"
+  },
+  "/optimizing-test-cell-assembly.png": {
+    "w": 2048,
+    "h": 1143,
+    "src": "/img/optimizing-test-cell-assembly-1600.webp",
+    "srcset": "/img/optimizing-test-cell-assembly-480.webp 480w, /img/optimizing-test-cell-assembly-800.webp 800w, /img/optimizing-test-cell-assembly-1280.webp 1280w, /img/optimizing-test-cell-assembly-1600.webp 1600w",
+    "og": "/img/optimizing-test-cell-assembly-og.jpg"
+  },
+  "/certificates/sample-attendance.jpg": {
+    "w": 1600,
+    "h": 1237,
+    "src": "/img/certificates-sample-attendance-1600.webp",
+    "srcset": "/img/certificates-sample-attendance-480.webp 480w, /img/certificates-sample-attendance-800.webp 800w, /img/certificates-sample-attendance-1280.webp 1280w, /img/certificates-sample-attendance-1600.webp 1600w"
+  },
+  "/certificates/sample-completion.jpg": {
+    "w": 1600,
+    "h": 1237,
+    "src": "/img/certificates-sample-completion-1600.webp",
+    "srcset": "/img/certificates-sample-completion-480.webp 480w, /img/certificates-sample-completion-800.webp 800w, /img/certificates-sample-completion-1280.webp 1280w, /img/certificates-sample-completion-1600.webp 1600w"
+  },
+  "/certificates/sample-verified.jpg": {
+    "w": 1600,
+    "h": 1237,
+    "src": "/img/certificates-sample-verified-1600.webp",
+    "srcset": "/img/certificates-sample-verified-480.webp 480w, /img/certificates-sample-verified-800.webp 800w, /img/certificates-sample-verified-1280.webp 1280w, /img/certificates-sample-verified-1600.webp 1600w"
+  }
+}

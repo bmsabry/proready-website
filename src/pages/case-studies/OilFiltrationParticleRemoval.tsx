@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
 const OilFiltrationParticleRemoval = () => {
   usePageMeta('Oil Filtration for Sensitive Optics Cooling Air', 'A dual-branch, multi-stage filtration system with health monitoring delivered ultra-clean cooling air, long filter life, and maintenance without interrupting testing.');
 
@@ -29,13 +30,7 @@ const OilFiltrationParticleRemoval = () => {
             </a>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async" 
-              src="/case-study-oil-filtration-and-particle-removal-in-sensitive-optics-cooling-air.jpg" 
-              alt="Oil Filtration and Particle Removal" 
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/case-study-oil-filtration-and-particle-removal-in-sensitive-optics-cooling-air.jpg" alt="Oil Filtration and Particle Removal" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
             <section>

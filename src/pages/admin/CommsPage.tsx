@@ -12,6 +12,7 @@ import {
   type AcademyProduct,
   type EmailLogRow,
   type NotifyResult,
+  broadcastFailureText,
 } from './lib';
 import { LabeledSelect, MessageEditor, Notice, RefreshButton, Section } from './ui';
 import { dayLabel, EmailRow, EmailViewer, useEmailViewer } from './EmailViewer';
@@ -130,12 +131,12 @@ export default function CommsPage({ onAuthError }: { onAuthError: () => void }) 
         `/api/admin/products/${encodeURIComponent(productCode)}/notify`,
         { method: 'POST', body: JSON.stringify({ subject: subject.trim(), body_html: bodyHtml }) },
       );
-      setFlash(
-        `Broadcast sent to ${data.recipients} buyer${data.recipients === 1 ? '' : 's'}` +
-          (data.failures > 0 ? ` (${data.failures} failed)` : '') +
-          '.',
-      );
-      window.setTimeout(() => setFlash(null), 6000);
+      if (data.failures > 0) {
+        setError(broadcastFailureText(data, 'buyer'));
+      } else {
+        setFlash(`Broadcast sent to ${data.recipients} buyer${data.recipients === 1 ? '' : 's'}.`);
+        window.setTimeout(() => setFlash(null), 6000);
+      }
       setSubject('');
       setBody('');
       void load();

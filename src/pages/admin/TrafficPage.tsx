@@ -330,7 +330,7 @@ export default function TrafficPage({ onAuthError }: { onAuthError: () => void }
                             href={`https://proreadyengineer.com${p.path}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="block truncate text-slate-200 hover:text-cyan-300"
+                            className="block break-all text-slate-200 hover:text-cyan-300"
                             title={p.path}
                           >
                             {p.path}

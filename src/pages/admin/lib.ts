@@ -8,6 +8,8 @@
  * a 401 throws AuthError so callers can bounce to /admin/login.
  */
 
+import { apiErrorMessage } from '../../lib/apiError';
+
 export const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
 
 /** For the few raw fetch() calls that bypass api() (chat widget, telemetry). */
@@ -39,8 +41,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     }
   }
   if (!res.ok) {
-    const detail = (data as { detail?: unknown }).detail;
-    throw new Error(typeof detail === 'string' ? detail : `Request failed (${res.status})`);
+    throw new Error(apiErrorMessage(data, `Request failed (${res.status})`));
   }
   return data as T;
 }
@@ -555,6 +556,17 @@ export type NotifyResult = {
   failures: number;
   failed_addresses?: string[];
 };
+
+/** What to tell the owner when a broadcast did not reach everyone. */
+export function broadcastFailureText(result: NotifyResult, noun: string): string {
+  const reached = `${result.recipients} ${noun}${result.recipients === 1 ? '' : 's'}`;
+  const failed = result.failed_addresses ?? [];
+  return (
+    `Sent to ${reached}, but ${result.failures} could not be delivered` +
+    (failed.length ? `: ${failed.join(', ')}.` : '.') +
+    ' Those people did not receive this message.'
+  );
+}
 
 /** One upcoming-course waitlist, from GET /api/admin/interest/summary. */
 export type InterestSummary = {

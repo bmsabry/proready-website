@@ -118,7 +118,7 @@ export default function SoftwarePage({ slug, openSlug, onAuthError }: Props) {
         <div className="flex flex-wrap items-center gap-3 mb-6">
           <div className="min-w-0">
             <div className="text-xs font-mono text-slate-400">{slug}</div>
-            <h1 className="text-2xl font-bold text-white truncate">{item?.name ?? slug}</h1>
+            <h1 className="text-2xl font-bold text-white break-words">{item?.name ?? slug}</h1>
           </div>
           {item && <StatusBadge status={item.status} />}
           {item?.latest_version && (
@@ -566,7 +566,7 @@ function DownloadsSection({ slug, onAuthError }: { slug: string; onAuthError: ()
                 <ul className="space-y-2">
                   {stats.by_referrer.map((r) => (
                     <li key={r.referrer} className="flex items-center justify-between text-sm gap-4">
-                      <span className="text-slate-300 truncate">{r.referrer}</span>
+                      <span className="text-slate-300 min-w-0 break-all">{r.referrer}</span>
                       <span className="text-slate-400 shrink-0">{r.count.toLocaleString()}</span>
                     </li>
                   ))}
@@ -597,8 +597,8 @@ function DownloadsSection({ slug, onAuthError }: { slug: string; onAuthError: ()
                       <td className="py-2 pr-4 whitespace-nowrap">
                         {[r.city, r.region, countryName(r.country)].filter(Boolean).join(', ') || '(unknown)'}
                       </td>
-                      <td className="py-2 pr-4 max-w-[240px] truncate">{r.referrer || '—'}</td>
-                      <td className="py-2 max-w-[260px] truncate text-slate-400">{r.user_agent}</td>
+                      <td className="py-2 pr-4 max-w-[240px] break-all">{r.referrer || '—'}</td>
+                      <td className="py-2 max-w-[260px] break-all text-slate-400">{r.user_agent}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -25,6 +25,9 @@ const fmtDate = (iso: string | null | undefined) =>
         year: 'numeric',
         month: 'long',
         day: 'numeric',
+        // The certificate prints its dates in UTC; without this a viewer in
+        // the Americas reads the day before the one on the PDF.
+        timeZone: 'UTC',
       })
     : 'n/a';
 
@@ -127,13 +130,17 @@ const Verify: React.FC = () => {
         <p className="text-slate-300 mt-3 max-w-2xl">
           <span className="font-mono text-white">{data.code}</span> does not match any credential
           issued by ProReadyEngineer LLC. Check the ID on the certificate (it has the form
-          PRE-C-XXXX-XXXX or PRE-V-XXXX-XXXX) or contact info@proreadyengineer.com.
+          PRE-C-XXXX-XXXX, PRE-V-XXXX-XXXX or PRE-A-XXXX-XXXX) or contact info@proreadyengineer.com.
         </p>
       </Shell>
     );
   }
 
   const verified = data.tier === 'verified';
+  // A Certificate of Attendance records presence at the live course. It must
+  // never be described with the completion wording (lessons done, evaluations
+  // passed): the sentence below is the one printed on the certificate itself.
+  const attendance = data.tier === 'attendance';
   const revoked = data.status === 'revoked';
   const tampered = !revoked && data.signature_valid === false;
 
@@ -248,7 +255,9 @@ const Verify: React.FC = () => {
             <p className="text-sm text-slate-300 mt-4">
               {verified
                 ? 'Attests that the holder completed the full programme, all module evaluations and mastery checks, passed an advanced written examination, and was then examined live by the instructor, who confirmed a sound grasp of every key principle of the subject.'
-                : 'Attests that the holder completed every lesson of the programme and passed every module evaluation and mastery check at or above the 80% mastery threshold, as verified by the ProReadyEngineer learning platform.'}
+                : attendance
+                  ? 'Attests that the holder was present for and participated in the live, instructor-led delivery of this programme in full. It records attendance and participation only; it is not an examination or an assessment of the holder’s knowledge or competency.'
+                  : 'Attests that the holder completed every lesson of the programme and passed every module evaluation and mastery check at or above the 80% mastery threshold, as verified by the ProReadyEngineer learning platform.'}
             </p>
             {verified && (data.competencies?.length ?? 0) > 0 && (
               <div className="mt-4">

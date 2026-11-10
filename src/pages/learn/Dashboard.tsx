@@ -661,8 +661,21 @@ const Dashboard: React.FC = () => {
     noindex: true,
   });
 
+  // "Set a new one" on the course list links to ?password=1 while this page is
+  // already open, so the form must also open when the address changes.
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('password') === '1') setPwOpen(true);
+  }, [location.search]);
+
   useEffect(() => {
     let cancelled = false;
+    // One instance of this page serves both the course list and each course.
+    // Moving between them must start clean: without this the "We couldn't
+    // open your course" card flashed while the next course loaded, and an old
+    // error stayed on screen over a course that had loaded fine.
+    setLoading(true);
+    setError('');
+    setCourse(null);
     (async () => {
       try {
         const me = await academy.me();

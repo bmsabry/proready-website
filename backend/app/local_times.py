@@ -56,6 +56,45 @@ CITY_ZONES: dict[str, str] = {
     "los angeles": "America/Los_Angeles",
     "san francisco": "America/Los_Angeles",
     "seattle": "America/Los_Angeles",
+    "san diego": "America/Los_Angeles",
+    "san jose": "America/Los_Angeles",
+    "sacramento": "America/Los_Angeles",
+    "las vegas": "America/Los_Angeles",
+    "salt lake city": "America/Denver",
+    "san antonio": "America/Chicago",
+    "austin": "America/Chicago",
+    "fort worth": "America/Chicago",
+    "oklahoma city": "America/Chicago",
+    "tulsa": "America/Chicago",
+    "new orleans": "America/Chicago",
+    "baton rouge": "America/Chicago",
+    "minneapolis": "America/Chicago",
+    "st louis": "America/Chicago",
+    "indianapolis": "America/Indiana/Indianapolis",
+    "detroit": "America/Detroit",
+    "pittsburgh": "America/New_York",
+    "philadelphia": "America/New_York",
+    "baltimore": "America/New_York",
+    # "Washington, DC" and "Washington, D.C." (punctuation is removed before
+    # matching). Without these the bare word reads as Washington State.
+    "washington dc": "America/New_York",
+    "washington d c": "America/New_York",
+    "schenectady": "America/New_York",
+    "greenville": "America/New_York",
+    "charlotte": "America/New_York",
+    "orlando": "America/New_York",
+    "tampa": "America/New_York",
+    "miami": "America/New_York",
+    "jacksonville": "America/New_York",
+    "hartford": "America/New_York",
+    "anchorage": "America/Anchorage",
+    "honolulu": "Pacific/Honolulu",
+    "winnipeg": "America/Winnipeg",
+    "regina": "America/Regina",
+    "saskatoon": "America/Regina",
+    "halifax": "America/Halifax",
+    "mississauga": "America/Toronto",
+    "quebec city": "America/Toronto",
     # UK / Europe
     "london": "Europe/London",
     "kingston upon thames": "Europe/London",
@@ -242,49 +281,150 @@ REGION_ZONES: dict[str, str] = {
     "washington": "America/Los_Angeles",
     "oklahoma": "America/Chicago",
     "louisiana": "America/Chicago",
+    "new brunswick": "America/Moncton",
+    "district of columbia": "America/New_York",
+    "virginia": "America/New_York",  # also matches West Virginia: same zone
+    "north carolina": "America/New_York",
+    "south carolina": "America/New_York",
+    "massachusetts": "America/New_York",
+    "connecticut": "America/New_York",
+    "new jersey": "America/New_York",
+    "new hampshire": "America/New_York",
+    "maryland": "America/New_York",
+    "michigan": "America/Detroit",
+    "wisconsin": "America/Chicago",
+    "minnesota": "America/Chicago",
+    "missouri": "America/Chicago",
+    "alabama": "America/Chicago",
+    "mississippi": "America/Chicago",
+    "arkansas": "America/Chicago",
+    "iowa": "America/Chicago",
+    "new mexico": "America/Denver",  # must be found before the country "mexico"
+    "utah": "America/Denver",
+    "arizona": "America/Phoenix",
+    "nevada": "America/Los_Angeles",
 }
 
-# Bare country words that appear inside longer strings ("Kitimat, BC, CAN").
-COUNTRY_SUFFIX: dict[str, str] = {
-    "can": "America/Toronto",
-    "canada": "America/Toronto",
-    "usa": "America/New_York",
-    "us": "America/New_York",
-    "united states": "America/New_York",
+# Two-letter state and province codes, read only where they are written the
+# usual way: straight after a comma ("Midland, TX"). Anywhere else two letters
+# are too easily part of something different (a company called "NH Industries",
+# the word "ok"). Only codes whose letters mean nothing else a registrant is
+# likely to type are listed. Left out on purpose: codes that are also a
+# country's (CA Canada, DE Germany, IL Israel, MA Morocco, TN Tunisia,
+# CO Colombia, IN India, PA Panama, GA Gabon, AZ Azerbaijan...), WA (also
+# Western Australia), and states that straddle two zones.
+REGION_CODES: dict[str, str] = {
+    "tx": "America/Chicago",
+    "ok": "America/Chicago",
+    "wi": "America/Chicago",
+    "fl": "America/New_York",
+    "ny": "America/New_York",
+    "nj": "America/New_York",
+    "nh": "America/New_York",
+    "ct": "America/New_York",
+    "oh": "America/New_York",
+    "dc": "America/New_York",
+    "va": "America/New_York",
+    "nc": "America/New_York",
+    "sc": "America/New_York",
+    "mi": "America/Detroit",
+    "nm": "America/Denver",
+    "ut": "America/Denver",
+    "nv": "America/Los_Angeles",
+    "mb": "America/Winnipeg",
+    "ns": "America/Halifax",
+    "nb": "America/Moncton",
 }
+
+
+def _code_after_comma(raw: str) -> Optional[tuple[str, str]]:
+    for code in re.findall(r",\s*([a-z]{2})(?![a-z])", raw):
+        if code in REGION_CODES:
+            return code, REGION_CODES[code]
+    return None
+
+
+def _find(table: dict[str, str], text: str) -> Optional[tuple[str, str]]:
+    """(key, zone) for the longest key of `table` that appears in `text` as
+    whole words. Longest first so "new york" beats "york" and "south africa"
+    beats "africa"."""
+    for key in sorted(table, key=len, reverse=True):
+        if re.search(rf"(?<![a-z]){re.escape(key)}(?![a-z])", text):
+            return key, table[key]
+    return None
 
 
 def resolve_zone(location: str) -> Optional[str]:
     """Best IANA zone for a free-text location, or None if we can't tell.
 
-    Order matters: city beats region beats country, because "Kitimat, BC,
-    CAN" is Pacific and matching on "CAN" first would put it on Toronto
-    time — three hours out.
+    City beats region beats country, because "Kitimat, BC, CAN" is Pacific and
+    matching on the country would put it three hours out. One exception: a
+    state or province outranks a city that only shares its name with one
+    elsewhere, so "London, Ontario" is Toronto time, "Lima, Ohio" is not Peru,
+    "Manchester, NH" is not England and "Vancouver, Washington" is not British
+    Columbia. The state counts when it is spelled out, or when its two-letter
+    code is written the usual way, straight after a comma.
+
+    A country that spans several zones is never used on its own. "Midland,
+    USA" could be Texas or Michigan, and this module would rather print the
+    UTC time alone than a confident local time that is an hour or three out.
     """
     if not location or not location.strip():
         return None
     raw = location.lower().strip()
-    # Normalise separators and strip accents-insensitive comparison is not
-    # needed because the tables carry both spellings (montreal/montréal).
+    # Accent-insensitive comparison is not needed because the tables carry
+    # both spellings (montreal/montréal).
     cleaned = re.sub(r"[.,/()]+", " ", raw)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    tokens = cleaned.split(" ")
 
-    for table in (CITY_ZONES, REGION_ZONES, COUNTRY_ZONES):
-        # Longest key first so "new york" beats "york", "south africa"
-        # beats "africa".
-        for key in sorted(table, key=len, reverse=True):
-            if re.search(rf"(?<![a-z]){re.escape(key)}(?![a-z])", cleaned):
-                return table[key]
-
-    for key, zone in COUNTRY_SUFFIX.items():
-        if key in tokens:
-            return zone
-    return None
+    city = _find(CITY_ZONES, cleaned)
+    # Look for the region in what is left once the city's own words are taken
+    # out, so the "washington" of "washington dc" is not read as the state.
+    region = _find(REGION_ZONES, cleaned.replace(city[0], " ") if city else cleaned)
+    if region and len(region[0]) == 2 and not re.search(
+        rf",\s*{re.escape(region[0])}(?![a-z])", raw
+    ):
+        # "bc", "ab", "on", "qc" away from a comma still place an unknown town
+        # ("Fort St John BC"), but do not outrank a city: "on" is also a word.
+        region_outranks_city = False
+    else:
+        region_outranks_city = True
+    region = region or _code_after_comma(raw)
+    if city and region and region[1] != city[1] and region_outranks_city:
+        return region[1]
+    if city:
+        return city[1]
+    country = _find(COUNTRY_ZONES, cleaned)
+    if region and not (country and not region_outranks_city):
+        return region[1]
+    # A named country beats a stray two-letter word: "Stratford on Avon, UK".
+    return country[1] if country else None
 
 
 def _fmt(dt: datetime) -> str:
     return dt.strftime("%H:%M")
+
+
+# Three Canadian provinces stopped changing clocks in 2026 and stay on what
+# used to be their summer time. The IANA database labels that with the name of
+# the zone to the east ("MST" for Vancouver, "CST" for Edmonton, "EST" for
+# Winnipeg), which reads as the wrong time zone to someone who lives there:
+# each province still calls its own time Pacific, Mountain and Central. The
+# hour is right either way; this only fixes the label a person sees.
+_LOCAL_NAME_FOR_BORROWED_ABBREV: dict[str, tuple[str, str]] = {
+    "America/Vancouver": ("MST", "PT"),
+    "America/Edmonton": ("CST", "MT"),
+    "America/Winnipeg": ("EST", "CT"),
+}
+
+
+def zone_abbrev(local: datetime) -> str:
+    """The zone abbreviation to print next to a local time (e.g. "EDT", "PT")."""
+    abbrev = local.strftime("%Z")
+    borrowed, own = _LOCAL_NAME_FOR_BORROWED_ABBREV.get(
+        getattr(local.tzinfo, "key", ""), ("", "")
+    )
+    return own if abbrev == borrowed and own else abbrev
 
 
 # -----------------------------------------------------------------------------
@@ -525,7 +665,7 @@ def local_schedule(
                     "weekday": start.strftime("%A"),
                     "start": _fmt(start),
                     "end": _fmt(end) if dur else "",
-                    "abbrev": start.strftime("%Z"),
+                    "abbrev": zone_abbrev(start),
                     # The offset ON THIS DATE — it changes across a clock change.
                     "utc_offset": start.strftime("%z"),
                     # True when the local calendar day differs from the UTC

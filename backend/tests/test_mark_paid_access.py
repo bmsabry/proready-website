@@ -182,3 +182,44 @@ def test_an_email_failure_is_reported_not_hidden(client, db, world, monkeypatch)
     row = db.execute(select(EmailLog).where(EmailLog.recipient == "paid-five@example.com",
                                             EmailLog.template == "materials_ready")).scalar_one()
     assert row.ok is False
+
+
+# ----- access held another way survives the seat being cancelled --------------
+
+def test_cancelling_a_seat_does_not_take_away_a_course_bought_separately(client, db, world):
+    """Someone who bought the recorded course by card, then also took a seat in
+    the live cohort, must keep the recorded course when that seat is cancelled.
+    Marking the seat paid used to relabel their purchase as cohort access, and
+    cancelling the seat then revoked it."""
+    from app import academy as academy_svc
+
+    email = "paid-bought-first@example.com"
+    learner = academy_svc.upsert_learner(db, email, "Bought First")
+    academy_svc.grant_enrollment(db, learner, PRODUCT, source="stripe", note="card purchase")
+    db.commit()
+
+    reg_id = _register(client, LINKED, email)
+    r = client.post("/api/admin/mark-paid", json={"registration_id": reg_id}, headers=ADMIN)
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    row = db.execute(select(Enrollment).where(Enrollment.learner_id == learner.id)).scalar_one()
+    assert (row.status, row.source, row.note) == ("active", "stripe", "card purchase")
+
+    r = client.post("/api/admin/cancel", json={"registration_id": reg_id}, headers=ADMIN)
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    row = db.execute(select(Enrollment).where(Enrollment.learner_id == learner.id)).scalar_one()
+    assert (row.status, row.source) == ("active", "stripe")
+
+
+def test_access_that_came_with_the_seat_still_goes_when_the_seat_is_cancelled(client, db, world):
+    email = "paid-seat-only@example.com"
+    reg_id = _register(client, LINKED, email)
+    assert client.post("/api/admin/mark-paid", json={"registration_id": reg_id}, headers=ADMIN).status_code == 200
+    learner = db.execute(select(Learner).where(Learner.email == email)).scalar_one()
+    row = db.execute(select(Enrollment).where(Enrollment.learner_id == learner.id)).scalar_one()
+    assert (row.status, row.source) == ("active", "cohort")
+    assert client.post("/api/admin/cancel", json={"registration_id": reg_id}, headers=ADMIN).status_code == 200
+    db.expire_all()
+    row = db.execute(select(Enrollment).where(Enrollment.learner_id == learner.id)).scalar_one()
+    assert row.status == "revoked"

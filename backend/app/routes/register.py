@@ -61,8 +61,11 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
             registration_id=None,
         )
 
+    # The course row is locked until this registration is saved, so two people
+    # submitting in the same instant cannot both be counted into the last seat.
+    # (SQLite, used in tests and local runs, has no row locks and ignores it.)
     course = db.execute(
-        select(Course).where(Course.code == course_code)
+        select(Course).where(Course.code == course_code).with_for_update()
     ).scalar_one_or_none()
     if course is None:
         raise HTTPException(

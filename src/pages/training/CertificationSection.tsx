@@ -1,6 +1,7 @@
 import React from 'react';
 import { Award, BadgeCheck, Check, Linkedin, QrCode, ShieldCheck } from 'lucide-react';
 import { Reveal } from '../../components/ui';
+import Img from '../../components/Img';
 
 /* Certification section for every course advertisement page.
  *
@@ -65,12 +66,9 @@ const CertificationSection: React.FC<Props> = ({
               className="block bg-white border-b border-slate-800"
               aria-label="Open a sample Certificate of Attendance"
             >
-              <img
-                src="/certificates/sample-attendance.jpg"
+              <Img
+                src="/certificates/sample-attendance.jpg" sizes="(min-width: 1024px) 400px, 100vw"
                 alt={`Sample Certificate of Attendance for ${courseTitle}, marked SAMPLE`}
-                width={1600}
-                height={1237}
-                loading="lazy"
                 className="w-full h-auto block"
               />
             </a>
@@ -114,12 +112,9 @@ const CertificationSection: React.FC<Props> = ({
             className="block bg-white border-b border-slate-800"
             aria-label="Open a sample Certificate of Completion"
           >
-            <img
-              src="/certificates/sample-completion.jpg"
+            <Img
+              src="/certificates/sample-completion.jpg" sizes="(min-width: 1024px) 400px, 100vw"
               alt={`Sample Certificate of Completion for ${courseTitle}, marked SAMPLE`}
-              width={1600}
-              height={1237}
-              loading="lazy"
               className="w-full h-auto block"
             />
           </a>
@@ -161,12 +156,9 @@ const CertificationSection: React.FC<Props> = ({
             className="block bg-white border-b border-slate-800"
             aria-label="Open a sample Certificate of Verified Competency"
           >
-            <img
-              src="/certificates/sample-verified.jpg"
+            <Img
+              src="/certificates/sample-verified.jpg" sizes="(min-width: 1024px) 400px, 100vw"
               alt={`Sample Certificate of Verified Competency for ${courseTitle}, signed by the instructor, marked SAMPLE`}
-              width={1600}
-              height={1237}
-              loading="lazy"
               className="w-full h-auto block"
             />
           </a>
@@ -238,7 +230,7 @@ const CertificationSection: React.FC<Props> = ({
           </div>
         ))}
       </Reveal>
-      <p className="text-center text-xs text-slate-500 mt-8 max-w-3xl mx-auto">
+      <p className="text-center text-xs text-slate-400 mt-8 max-w-3xl mx-auto">
         Specimens above are marked SAMPLE and were not issued to anyone. Each certificate attests
         to what it describes — attendance, completion, or examined competency; none is a
         professional engineering licence.

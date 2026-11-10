@@ -241,17 +241,28 @@ export default function AcademyPage({ onAuthError }: { onAuthError: () => void }
                       </div>
                       <button
                         disabled={busy === p.code || edited === undefined}
-                        onClick={() =>
-                          patchProduct(p.code, {
-                            price_cents: Math.round(Number(priceValue) * 100),
+                        onClick={() => {
+                          const dollars = Number(priceValue);
+                          if (priceValue.trim() === '' || !Number.isFinite(dollars) || dollars < 0) {
+                            setError('Enter a price before saving.');
+                            return;
+                          }
+                          if (dollars === 0 && p.status === 'live') {
+                            setError(
+                              'A live course cannot be priced at $0: every checkout would fail. Unpublish it first, or enter a price.',
+                            );
+                            return;
+                          }
+                          void patchProduct(p.code, {
+                            price_cents: Math.round(dollars * 100),
                           }).then(() =>
                             setPriceEdits((s) => {
                               const n = { ...s };
                               delete n[p.code];
                               return n;
                             }),
-                          )
-                        }
+                          );
+                        }}
                         className="btn-secondary text-sm disabled:opacity-40"
                       >
                         Save price

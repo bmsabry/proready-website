@@ -3,6 +3,7 @@ import { ArrowLeft, Calendar, User, Tag, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
 const OptimizingTestCellAssembly = () => {
   usePageMeta('Optimizing Test Cell Assembly', 'Reducing test cell assembly time from 2 weeks to 5 days, delivering $125K in annual savings per cell.');
 
@@ -29,13 +30,7 @@ const OptimizingTestCellAssembly = () => {
             </a>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async"
-              src="/optimizing-test-cell-assembly.png"
-              alt="Optimizing Test Cell Assembly"
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/optimizing-test-cell-assembly.png" alt="Optimizing Test Cell Assembly" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed">
             <p className="text-xl text-white font-semibold mb-6">

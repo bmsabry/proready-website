@@ -26,6 +26,7 @@ should not sit and watch that happen.
 """
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -41,6 +42,7 @@ from .. import support_service as svc
 from ..config import get_settings
 from ..db import SessionLocal, get_db
 from ..deps import require_admin
+from .delivery import verify_signature
 from ..learner_auth import require_learner
 from ..models import (
     AISettings,
@@ -426,9 +428,29 @@ async def resend_inbound(
     Async only to read the request body; the handler is synchronous ORM
     work, so it runs in the threadpool rather than blocking the loop.
     """
+    raw = await request.body()
+    # Signed by Resend (Svix) exactly like the delivery-events webhook. Checked
+    # once the signing secret is configured; until then the endpoint behaves as
+    # before and says so in the log. A bad signature is the one case answered
+    # with an error: it is not Resend, so there is nothing to make retry.
+    secret = (get_settings().RESEND_INBOUND_WEBHOOK_SECRET or "").strip()
+    if secret:
+        if not verify_signature(
+            secret,
+            request.headers.get("svix-id", ""),
+            request.headers.get("svix-timestamp", ""),
+            raw,
+            request.headers.get("svix-signature", ""),
+        ):
+            raise HTTPException(status_code=401, detail="Bad signature.")
+    else:
+        log.warning(
+            "[support] inbound webhook accepted WITHOUT a signature check: "
+            "set RESEND_INBOUND_WEBHOOK_SECRET"
+        )
     try:
-        body = await request.json()
-    except Exception:
+        body = json.loads(raw or b"{}")
+    except ValueError:
         log.warning("[support] inbound webhook: body was not JSON")
         return {"ok": True}
     if not isinstance(body, dict):

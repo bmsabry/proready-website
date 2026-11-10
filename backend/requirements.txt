@@ -14,7 +14,11 @@ cryptography==43.0.3
 PyJWT==2.9.0
 stripe==12.5.1
 pillow==11.3.0
-tzdata==2025.2
+# IANA time-zone database. Deliberately NOT pinned: it is data, and a newer
+# release is always more correct (2026 alone changed British Columbia, Alberta,
+# Manitoba and Morocco). Each deploy installs the current one; app/__init__.py
+# makes zoneinfo read it instead of the host's copy.
+tzdata>=2026.6
 reportlab==4.4.10
 qrcode==8.2
 pymupdf==1.26.4

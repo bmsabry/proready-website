@@ -31,6 +31,8 @@ import FormatSwitcher from './FormatSwitcher';
 import IndependenceNotice from './IndependenceNotice';
 import CertificationSection from './CertificationSection';
 import { formatIsoDate, snapshotStartLabel } from '../../data/courseSnapshot';
+import { CohortPhase, clockFromApi, cohortPhase } from '../../lib/sessionTimes';
+import Img from '../../components/Img';
 
 /* ---------------------------------------------------------------------------
    Micro Gas Turbine Design — on-demand course sales page.
@@ -408,11 +410,11 @@ const BuyFlow = ({
             autoComplete="email"
             className="w-full bg-slate-900/60 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
           />
-          <p className="text-xs text-slate-500">Your course access and receipt go here.</p>
+          <p className="text-xs text-slate-400">Your course access and receipt go here.</p>
         </div>
         <div className="space-y-1.5">
           <label htmlFor={`${uid}-name`} className="text-xs font-medium text-slate-300 uppercase tracking-wider">
-            Full name <span className="normal-case font-normal text-slate-500">(for your certificate)</span>
+            Full name <span className="normal-case font-normal text-slate-400">(for your certificate)</span>
           </label>
           <input
             id={`${uid}-name`}
@@ -433,7 +435,7 @@ const BuyFlow = ({
       <p className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-2">Pay with PayPal</p>
       <PayPalButtons createOrder={createOrder} onApprove={captureOrder} disabled={!emailOk} />
       {!emailOk && (
-        <p className="text-xs text-slate-500 mt-1.5">Enter your email above to enable payment.</p>
+        <p className="text-xs text-slate-400 mt-1.5">Enter your email above to enable payment.</p>
       )}
       <button
         type="button"
@@ -460,6 +462,8 @@ const MicroGasTurbineDesign: React.FC = () => {
   // Live-cohort facts for the format chooser (price + next start date).
   const [livePriceCents, setLivePriceCents] = useState<number>(FALLBACK_LIVE_PRICE_CENTS);
   const [liveCohortDate, setLiveCohortDate] = useState<string>(DEFAULT_LIVE_COHORT_DATE);
+  // Set once the live course record arrives: where that cohort stands today.
+  const [liveCohortPhase, setLiveCohortPhase] = useState<CohortPhase>('upcoming');
 
   const price = formatPrice(priceCents, currency);
   const livePrice = formatPrice(livePriceCents);
@@ -557,6 +561,13 @@ const MicroGasTurbineDesign: React.FC = () => {
         if (typeof startIso === 'string' && startIso) {
           setLiveCohortDate(formatIsoDate(startIso));
         }
+        setLiveCohortPhase(
+          cohortPhase(
+            clockFromApi(data),
+            Array.isArray(data.day_dates) && data.day_dates.length > 0 ? data.day_dates : [startIso],
+            Date.now(),
+          ),
+        );
       } catch {
         /* keep the fallbacks */
       }
@@ -643,7 +654,13 @@ const MicroGasTurbineDesign: React.FC = () => {
                       key: 'live',
                       title: 'Live Online Cohort',
                       price: `${livePrice} per seat`,
-                      meta: `Next cohort ${liveCohortDate} · 7 days × 4 hours`,
+                      meta: `${
+                        liveCohortPhase === 'ended'
+                          ? 'Next cohort to be announced'
+                          : liveCohortPhase === 'running'
+                            ? `In progress since ${liveCohortDate}`
+                            : `Next cohort ${liveCohortDate}`
+                      } · 7 days × 4 hours`,
                       to: '/training/micro-gas-turbine-design-live',
                     },
                     {
@@ -743,14 +760,10 @@ const MicroGasTurbineDesign: React.FC = () => {
       <section className="pb-4">
         <div className="container-site">
           <Reveal>
-            <img
-              src="/Micro_Gas_Turbine_Design_Infographic_v2.jpg"
+            <Img
+              src="/Micro_Gas_Turbine_Design_Infographic_v2.jpg" sizes="(min-width: 720px) 672px, 100vw"
               alt="Micro Gas Turbine Design: design a single-shaft turbojet end to end: engine architecture and gas path, centrifugal compressor, evaporative combustor, axial turbine, compressor maps and surge, turbomachinery CFD, and combustor analysis. Seven modules, 28.5 hours, 16 hours of video, lifetime access."
               className="w-full max-w-2xl mx-auto rounded-2xl border border-slate-800"
-              width={941}
-              height={1672}
-              loading="lazy"
-              decoding="async"
             />
           </Reveal>
         </div>

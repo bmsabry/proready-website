@@ -3,6 +3,8 @@ import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePageMeta } from '../../lib/meta';
+import { ArticleFigure } from '../../components/ui';
+import Img from '../../components/Img';
 const SACDynamics = () => {
   usePageMeta('Combustion Dynamics in SAC Sectors', 'Technical analysis of thermo-acoustic instabilities in Single Annular Combustor sectors, where unsteady heat release couples with acoustic pressure oscillations.');
 
@@ -34,7 +36,7 @@ const SACDynamics = () => {
           <div className="flex items-center justify-between gap-4 mb-12 pb-12 border-b border-slate-800">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
-                <img loading="lazy" decoding="async" src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" className="w-full h-full object-cover" />
+                <Img src="/Bassam.jpg" alt="Dr. Bassam Abdelnabi" sizes="48px" className="w-full h-full object-cover" />
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-200">Dr. Bassam Abdelnabi</p>
@@ -52,13 +54,7 @@ const SACDynamics = () => {
             </div>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden mb-12">
-            <img loading="lazy" decoding="async" 
-              src="/SAC_Dynamics.jpg" 
-              alt="Combustion Dynamics in SAC Sectors" 
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <ArticleFigure src="/SAC_Dynamics.jpg" alt="Combustion Dynamics in SAC Sectors" />
 
           <div className="prose prose-lg prose-invert max-w-none text-slate-300 leading-relaxed space-y-10">
             <section>
