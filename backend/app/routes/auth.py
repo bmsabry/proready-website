@@ -66,7 +66,7 @@ def login(body: LoginIn, response: Response) -> MeOut:
 
     # Always hash even if email is wrong, to keep timing roughly flat.
     password_ok = _verify_password(body.password, settings.ADMIN_PASSWORD_HASH)
-    email_ok = _secrets.compare_digest(email_norm, admin_email_norm)
+    email_ok = _secrets.compare_digest(email_norm.encode(), admin_email_norm.encode())
 
     if not (email_ok and password_ok):
         log.warning("Admin login failed for email=%r", email_norm)

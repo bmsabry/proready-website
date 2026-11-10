@@ -115,9 +115,17 @@ def _send(db: Session | None, *, subject: str, html: str, template: str,
 def _already_alerted(db: Session, ping: AssetPing) -> bool:
     """Another alert-status ping for the same copy inside the window."""
     since = datetime.now(timezone.utc) - DEDUP_WINDOW
+    # An id the platform never issued has no copy behind it, so "same copy" can
+    # never match: every made-up id used to be a fresh alert email, and anyone
+    # could send as many as they liked. All unknown ids share one alert a day.
+    same_source = (
+        AssetPing.status == prov.PING_UNKNOWN
+        if ping.status == prov.PING_UNKNOWN
+        else AssetPing.token == ping.token
+    )
     prior = db.execute(
         select(AssetPing.id).where(
-            AssetPing.token == ping.token,
+            same_source,
             AssetPing.id != ping.id,
             AssetPing.status.in_(list(prov.ALERT_STATUSES)),
             AssetPing.seen_at >= since,

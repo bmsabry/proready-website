@@ -2,7 +2,9 @@
 
 2026 clock changes these tests lean on:
   Europe (London, Paris, Berlin) leaves summer time  Sun 25 Oct 2026
-  US and Canada leave daylight time                  Sun  1 Nov 2026
+  The US and most of Canada leave daylight time      Sun  1 Nov 2026
+  British Columbia does NOT: it stays on UTC-7 for good from 2026, so
+  Vancouver is an hour ahead of Seattle from November to March.
   Saudi Arabia (UTC+3) and Algeria (UTC+1) never change.
 """
 from __future__ import annotations
@@ -73,7 +75,9 @@ def test_nine_am_new_york_in_november_everywhere(db):
     assert [s.strftime("%H:%M") for s in starts] == ["14:00"] * 4
     s = starts[0]
     assert _at(s, "America/New_York") == "09:00"
-    assert _at(s, "America/Vancouver") == "06:00"
+    # British Columbia no longer falls back: 07:00, not the 06:00 of old rules.
+    assert _at(s, "America/Vancouver") == "07:00"
+    assert _at(s, "America/Los_Angeles") == "06:00"
     assert _at(s, "Africa/Algiers") == "15:00"
     assert _at(s, "Asia/Riyadh") == "17:00"
 
@@ -84,7 +88,7 @@ def test_same_new_york_time_in_summer_moves_the_other_countries_not_him(db):
     s = session_starts_utc(c)[0]
     assert s.strftime("%H:%M") == "13:00"
     assert _at(s, "America/New_York") == "09:00"
-    assert _at(s, "America/Vancouver") == "06:00"  # both change together
+    assert _at(s, "America/Vancouver") == "06:00"  # both on summer time in September
     assert _at(s, "Africa/Algiers") == "14:00"
     assert _at(s, "Asia/Riyadh") == "16:00"
 

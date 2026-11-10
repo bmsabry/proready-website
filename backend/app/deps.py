@@ -66,7 +66,7 @@ def require_admin(
         prefix = "Bearer "
         if authorization.startswith(prefix):
             token = authorization[len(prefix) :].strip()
-            if secrets.compare_digest(token, settings.ADMIN_TOKEN):
+            if secrets.compare_digest(token.encode(), settings.ADMIN_TOKEN.encode()):
                 return settings.ADMIN_EMAIL
 
     raise HTTPException(

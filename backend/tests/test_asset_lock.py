@@ -273,12 +273,36 @@ def test_expired_session_is_told_to_sign_in_not_alerted(client, setup, outbox):
     assert outbox == []
 
 
+def _forget_unknown_id_pings():
+    """Unknown ids share one alert a day, so start from a day with none."""
+    from app import provenance as prov
+    from app.models import AssetPing
+    db = SessionLocal()
+    try:
+        db.query(AssetPing).filter(AssetPing.status == prov.PING_UNKNOWN).delete()
+        db.commit()
+    finally:
+        db.close()
+
+
 def test_unknown_id_is_refused_and_alerts(client, setup, outbox):
+    _forget_unknown_id_pings()
     s = _sign_in(OWNER_A)
     r = s.get("/api/academy/asset-key/aaaabbbbccccddddeeee", headers=ON_SITE)
     assert r.status_code == 404
     assert len(outbox) == 1
     assert "never issued" in outbox[0]["subject"]
+
+
+def test_made_up_ids_cannot_flood_the_owner_with_alerts(client, setup, outbox):
+    """Anyone can request a key for an id that was never issued. Each new id
+    used to send the owner another email; now they share one alert a day."""
+    _forget_unknown_id_pings()
+    anon = TestClient(app, base_url="https://testserver")
+    for n in range(6):
+        r = anon.get(f"/api/academy/asset-key/ffffeeeeddddcccc{n:04d}", headers=ON_SITE)
+        assert r.status_code == 404
+    assert len(outbox) == 1
 
 
 def test_copy_expires_after_its_ttl(client, setup, outbox):

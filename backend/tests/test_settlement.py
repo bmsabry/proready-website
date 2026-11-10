@@ -548,3 +548,53 @@ def test_live_async_failure_keeps_seat_pending_and_emails(client, monkeypatch):
     assert _post_webhook(client, monkeypatch, failed).status_code == 200
     assert len(_logs("live_bank_failed", LIVE_FAIL_BUYER)) == 1
     assert len(_admin_logs("live_bank_failed_admin", LIVE_FAIL_BUYER)) == 1
+
+
+# ----- refunds ---------------------------------------------------------------
+# Stripe sends `charge.refunded` for a partial refund as well as a full one.
+# Only a full refund (the charge's `refunded` flag) takes the course away.
+
+REFUND_BUYER = "refund-buyer@example.com"
+
+
+def _refund_event(session_id: str, amount_refunded: int, amount: int = 49900) -> dict:
+    return {
+        "type": "charge.refunded",
+        "data": {
+            "object": {
+                "payment_intent": f"pi_{session_id}",
+                "amount": amount,
+                "amount_refunded": amount_refunded,
+                "refunded": amount_refunded >= amount,
+            }
+        },
+    }
+
+
+def test_a_partial_refund_keeps_the_course_and_a_full_refund_takes_it(client, monkeypatch):
+    paid = _recorded_event("checkout.session.completed", "cs_refund_case", REFUND_BUYER, "paid")
+    assert _post_webhook(client, monkeypatch, paid).status_code == 200
+    assert _has_access(REFUND_BUYER)
+
+    # A 50.00 goodwill refund on a 499.00 order: the learner keeps the course.
+    assert _post_webhook(client, monkeypatch, _refund_event("cs_refund_case", 5000)).status_code == 200
+    assert _order("cs_refund_case").status == "paid"
+    assert _enrollment(REFUND_BUYER).status == "active"
+    assert _has_access(REFUND_BUYER)
+
+    # The whole amount returned: access is withdrawn, as before.
+    assert _post_webhook(client, monkeypatch, _refund_event("cs_refund_case", 49900)).status_code == 200
+    assert _order("cs_refund_case").status == "refunded"
+    assert _enrollment(REFUND_BUYER).status == "revoked"
+    assert not _has_access(REFUND_BUYER)
+
+
+def test_a_refund_event_without_amounts_is_still_treated_as_full(client, monkeypatch):
+    """An event that does not say how much was refunded keeps the old, safe
+    reading: money went back, access goes."""
+    buyer = "refund-bare@example.com"
+    paid = _recorded_event("checkout.session.completed", "cs_refund_bare", buyer, "paid")
+    assert _post_webhook(client, monkeypatch, paid).status_code == 200
+    bare = {"type": "charge.refunded", "data": {"object": {"payment_intent": "pi_cs_refund_bare"}}}
+    assert _post_webhook(client, monkeypatch, bare).status_code == 200
+    assert _order("cs_refund_bare").status == "refunded"

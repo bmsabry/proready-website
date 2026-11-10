@@ -1366,7 +1366,7 @@ def _fallback_classification(
     customer's latest message, which is more use in the list than "triage
     failed".
     """
-    name = (ticket.submitter_name or "").strip().split(" ")[0]
+    name = html_escape((ticket.submitter_name or "").strip().split(" ")[0])
     greeting = f"<p>Hi {name},</p>" if name else "<p>Hello,</p>"
     cat = (
         FORM_KINDS.get(str((ticket.meta or {}).get("kind") or ""))
@@ -1663,7 +1663,7 @@ def _send_acknowledgement(
     db: Session, ticket: SupportTicket, *, human_soon: bool = False
 ) -> None:
     """Stock 'we got it' reply. The one message that must never fail to go."""
-    name = (ticket.submitter_name or "").strip().split(" ")[0]
+    name = html_escape((ticket.submitter_name or "").strip().split(" ")[0])
     greeting = f"<p>Hi {name},</p>" if name else "<p>Hello,</p>"
     tail = (
         "<p>I'm passing this to Bassam directly so you get a proper answer rather "
@@ -1674,7 +1674,7 @@ def _send_acknowledgement(
     html = (
         f"{greeting}"
         f"<p>Thanks for contacting ProReadyEngineer — your message about "
-        f"<strong>{ticket.subject}</strong> has reached us.</p>{tail}"
+        f"<strong>{html_escape(ticket.subject or '')}</strong> has reached us.</p>{tail}"
     )
     delivered, mid = send_ticket_email(db, ticket, body_html=html)
     add_message(

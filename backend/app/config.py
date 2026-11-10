@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     # (whsec_...). Empty = the webhook endpoint refuses everything and the
     # 10-minute sweep is the only detector.
     RESEND_WEBHOOK_SECRET: str = ""
+    # Signing secret of the OTHER Resend webhook, the one that delivers inbound
+    # mail to the support desk at /api/webhooks/resend-inbound (whsec_..., shown
+    # on that webhook in the Resend dashboard). While this is empty the endpoint
+    # accepts unsigned payloads, as it always has, so anyone who knows the URL
+    # can post a made-up email "from" any customer. Once it is set, only
+    # payloads signed by Resend are accepted.
+    RESEND_INBOUND_WEBHOOK_SECRET: str = ""
     # The instructor's own mailboxes at other providers (comma-separated),
     # emailed once a day so a provider that starts refusing our mail is seen
     # on a test mailbox before a trainee. Kept out of the public repo.

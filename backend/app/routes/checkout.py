@@ -553,7 +553,19 @@ async def stripe_webhook(
         else:
             _payment_failed(db, dict(obj))
     elif kind == "charge.refunded":
-        _revoke_for_payment(db, str(obj.get("payment_intent") or ""), "refunded")
+        # Stripe sends this event for a partial refund too (a goodwill
+        # discount, a fee adjustment); only `refunded: true` means the whole
+        # amount went back. A partial refund leaves the learner's access alone.
+        partial = obj.get("refunded") is False and int(obj.get("amount_refunded") or 0) < int(
+            obj.get("amount") or 0
+        )
+        if partial:
+            log.info(
+                "Partial refund on %s (%s of %s): access kept",
+                obj.get("payment_intent"), obj.get("amount_refunded"), obj.get("amount"),
+            )
+        else:
+            _revoke_for_payment(db, str(obj.get("payment_intent") or ""), "refunded")
     elif kind == "charge.dispute.created":
         _revoke_for_payment(db, str(obj.get("payment_intent") or ""), "disputed")
     else:

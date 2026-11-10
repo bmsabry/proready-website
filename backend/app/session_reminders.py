@@ -42,6 +42,7 @@ from .local_times import (
     resolve_zone,
     session_start_utc,
     session_timezone,
+    zone_abbrev,
 )
 from .models import Course, EmailLog, Registration
 
@@ -137,7 +138,7 @@ def when_lines(start_utc: datetime, location: str) -> tuple[list[str], str]:
             return lines, ""
         day_note = "" if local.date() == start_utc.date() else local.strftime(" (%A)")
         lines.append(
-            f"{local.strftime('%H:%M %Z')} in {location.strip()}{day_note} — your local time"
+            f"{local.strftime('%H:%M')} {zone_abbrev(local)} in {location.strip()}{day_note} — your local time"
         )
     return lines, zone
 

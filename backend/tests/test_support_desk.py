@@ -2049,6 +2049,63 @@ def test_ambiguous_places_resolve_to_nothing(ambiguous):
     assert resolve_zone(ambiguous) is None
 
 
+@pytest.mark.parametrize(
+    "location,expected",
+    [
+        # A state or province outranks a city that shares its name with one elsewhere.
+        ("London, Ontario", "America/Toronto"),
+        ("London, ON", "America/Toronto"),
+        ("Lima, Ohio", "America/New_York"),
+        ("Manchester, NH", "America/New_York"),
+        ("Alexandria, VA", "America/New_York"),
+        ("Alexandria, Egypt", "Africa/Cairo"),
+        ("Vancouver, Washington", "America/Los_Angeles"),
+        ("Paris, Texas", "America/Chicago"),
+        ("Sydney, Nova Scotia", "America/Halifax"),
+        # The capital is not the state.
+        ("Washington, DC", "America/New_York"),
+        ("Washington, D.C.", "America/New_York"),
+        ("Seattle, Washington", "America/Los_Angeles"),
+        # Two-letter state and province codes.
+        ("Midland, TX, USA", "America/Chicago"),
+        ("Tulsa, OK, USA", "America/Chicago"),
+        ("Greenville, SC", "America/New_York"),
+        ("Regina, SK, Canada", "America/Regina"),
+        ("Halifax, NS, Canada", "America/Halifax"),
+        ("Winnipeg, MB, Canada", "America/Winnipeg"),
+        ("Albuquerque, New Mexico", "America/Denver"),
+        # A two-letter COUNTRY code after a city must not be read as a US state.
+        ("Berlin, DE", "Europe/Berlin"),
+        ("Casablanca, MA", "Africa/Casablanca"),
+        ("Tunis, TN", "Africa/Tunis"),
+        ("Bogota, CO", "America/Bogota"),
+        ("Chennai, IN", "Asia/Kolkata"),
+        ("Perth, WA", "Australia/Perth"),
+        ("Calgary, AB", "America/Edmonton"),
+        # "on" is a word as well as Ontario; a named country settles it.
+        ("Stratford on Avon, UK", "Europe/London"),
+        ("Fort St John BC", "America/Vancouver"),
+        # Two letters that are not after a comma are not a state.
+        ("NH Industries", None),
+        ("OK Industries LLC", None),
+    ],
+)
+def test_north_american_places_and_their_namesakes(location, expected):
+    from app.local_times import resolve_zone
+
+    assert resolve_zone(location) == expected
+
+
+@pytest.mark.parametrize("location", ["Somewhere, USA", "Smalltown, Canada", "Bakersfield, CA, USA", "USA", "Canada"])
+def test_a_country_with_several_zones_is_never_guessed(location):
+    """The form's own placeholder is "Cincinnati, USA", so "<town>, USA" is the
+    commonest thing typed. An unknown town there gets the UTC line only: an
+    Eastern-time guess is three hours wrong for California."""
+    from app.local_times import resolve_zone
+
+    assert resolve_zone(location) is None
+
+
 def test_country_substring_does_not_beat_the_city():
     """'south africa' must not be matched by 'africa', and 'new york' the
     city must not be swallowed by the 'york' in another word."""

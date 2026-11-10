@@ -13,6 +13,7 @@ from .academy_seed import seed_academy
 from .config import get_settings
 from .db import Base, SessionLocal, engine
 from .models import Course, SoftwareProduct
+from .origin_guard import install as install_origin_guard
 from .progress_guard import install as install_progress_guard
 from .routes import academy as academy_routes
 from .routes import academy_admin as academy_admin_routes
@@ -456,6 +457,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+# Cross-site request protection for the cookie sessions (see origin_guard.py).
+install_origin_guard(app)
 
 _register_gate_handler(app)
 
