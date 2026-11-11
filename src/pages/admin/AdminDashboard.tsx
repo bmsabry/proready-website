@@ -12,12 +12,14 @@ import {
   Activity,
   Award,
   BookOpen,
+  CalendarClock,
   GraduationCap,
   LayoutDashboard,
   LogOut,
   LifeBuoy,
   LineChart,
   Mail,
+  MessageCircle,
   MonitorDown,
   Sparkles,
 } from 'lucide-react';
@@ -43,6 +45,8 @@ import SoftwarePage from './SoftwarePage';
 import CommsPage from './CommsPage';
 import SupportPage from './SupportPage';
 import AiPage from './AiPage';
+import ConsultPage from './ConsultPage';
+import PublicChatPage from './PublicChatPage';
 import ChatWidget from './ChatWidget';
 import ViewErrorBoundary from './ViewErrorBoundary';
 
@@ -56,6 +60,8 @@ const NAV: { page: ViewState['page']; label: string; icon: LucideIcon }[] = [
   { page: 'software', label: 'Software', icon: MonitorDown },
   { page: 'comms', label: 'Comms', icon: Mail },
   { page: 'support', label: 'Support', icon: LifeBuoy },
+  { page: 'consult', label: 'Consulting', icon: CalendarClock },
+  { page: 'chat', label: 'Site Assistant', icon: MessageCircle },
   { page: 'ai', label: 'AI Settings', icon: Sparkles },
 ];
 
@@ -237,6 +243,12 @@ export default function AdminDashboard() {
       content = (
         <SupportPage refOpen={view.ref ?? null} go={go} onAuthError={onAuthError} />
       );
+      break;
+    case 'consult':
+      content = <ConsultPage view={view} go={go} onAuthError={onAuthError} />;
+      break;
+    case 'chat':
+      content = <PublicChatPage view={view} go={go} onAuthError={onAuthError} />;
       break;
     case 'ai':
       content = <AiPage onAuthError={onAuthError} />;

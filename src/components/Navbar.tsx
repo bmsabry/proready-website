@@ -8,11 +8,13 @@ import {
   ChevronDown,
   BookOpen,
   LogOut,
+  CalendarClock,
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { academy, Me } from '../lib/academyApi';
 import Img from './Img';
+import { CONSULT_PUBLIC } from '../lib/features';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -150,6 +152,7 @@ const Navbar = () => {
   const isActive = (path: string) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
   const learnActive = location.pathname.startsWith('/learn');
+  const consultActive = location.pathname.startsWith('/consult');
 
   const learnerPill = signedIn ? (
     <div className="relative" ref={menuRef}>
@@ -168,7 +171,8 @@ const Navbar = () => {
             aria-hidden="true"
           />
         </span>
-        <span><span className="hidden 2xl:inline">My </span>Learning</span>
+        {/* With the Book button the desktop bar needs the room "My " took at 2xl. */}
+        <span>{CONSULT_PUBLIC ? null : <span className="hidden 2xl:inline">My </span>}Learning</span>
         <ChevronDown
           className={cn('w-3.5 h-3.5 transition-transform', menuOpen && 'rotate-180')}
           aria-hidden="true"
@@ -218,7 +222,7 @@ const Navbar = () => {
       title="Sign in to see your courses and certificates"
     >
       <GraduationCap className="w-4 h-4" aria-hidden="true" />
-      <span><span className="hidden 2xl:inline">Learner </span>Sign In</span>
+      <span>{CONSULT_PUBLIC ? null : <span className="hidden 2xl:inline">Learner </span>}Sign In</span>
     </Link>
   );
 
@@ -243,7 +247,9 @@ const Navbar = () => {
           {/* Desktop Nav */}
           {/* The full bar needs about 1,000 px beside the logo; below xl the
               menu button takes over and the learner pill stays visible. */}
-          <div className="hidden xl:flex items-center gap-4 2xl:gap-6 ml-6">
+          {/* Hidden release: production's bar, except the 2xl link gap (24 -> 22 px):
+              at 24 px it ran 4 px (signed out) / 8 px (signed in) past the container. */}
+          <div className={cn('hidden xl:flex items-center ml-6', CONSULT_PUBLIC ? 'gap-3' : 'gap-4 2xl:gap-[22px]')}>
             {navLinks.map((link) => (
               <Link
                 key={link.name}
@@ -260,16 +266,48 @@ const Navbar = () => {
                 )}
               </Link>
             ))}
-            <div className="flex items-center gap-2.5 ml-1">
+            <div className={cn('flex items-center ml-1', CONSULT_PUBLIC ? 'gap-2' : 'gap-2.5')}>
               {learnerPill}
-              <Link to="/contact" className="btn-primary py-2.5 px-3.5 text-sm whitespace-nowrap">
+              {CONSULT_PUBLIC && (
+              <Link
+                to="/consult"
+                className={cn(
+                  'btn-secondary py-2.5 px-3 text-sm whitespace-nowrap',
+                  consultActive && 'border-cyan-500/60 text-cyan-300'
+                )}
+                aria-current={consultActive ? 'page' : undefined}
+                aria-label="Book a call with an expert"
+                title="Book a call with an expert"
+              >
+                <CalendarClock className="w-4 h-4" aria-hidden="true" />
+                {/* The desktop bar is always 1,216 px wide (the container stops
+                    growing at 1,280). "Book a Call" fits beside "Sign In"; beside
+                    the wider signed-in "Learning" menu only "Book" does
+                    (measured: tools/consult/header.mjs). */}
+                <span>{signedIn ? 'Book' : 'Book a Call'}</span>
+              </Link>
+              )}
+              <Link to="/contact" className={cn('btn-primary py-2.5 text-sm whitespace-nowrap', CONSULT_PUBLIC ? 'px-3' : 'px-3.5')}>
                 Get in Touch <ArrowRight className="w-4 h-4" aria-hidden="true" />
               </Link>
             </div>
           </div>
 
           {/* Mobile and tablet: the learner pill stays visible next to the menu button */}
-          <div className="xl:hidden flex items-center gap-2">
+          <div className={cn('xl:hidden flex items-center', CONSULT_PUBLIC ? 'gap-1.5 sm:gap-2' : 'gap-2')}>
+            {CONSULT_PUBLIC && (
+            <Link
+              to="/consult"
+              className={cn(
+                'btn-secondary px-2.5 sm:px-3 py-2 text-sm whitespace-nowrap',
+                consultActive && 'border-cyan-500/60 text-cyan-300'
+              )}
+              aria-label="Book a call with an expert"
+            >
+              <CalendarClock className="w-4 h-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Book a Call</span>
+            </Link>
+            )}
             <Link
               to={signedIn ? '/learn' : '/learn/signin'}
               className={cn(pillClass, 'px-3 py-2', learnActive && 'bg-cyan-500/20 text-white')}
@@ -336,6 +374,15 @@ const Navbar = () => {
                 className={cn(pillClass, 'w-full justify-center py-3')}
               >
                 <GraduationCap className="w-4 h-4" aria-hidden="true" /> Learner Sign In
+              </Link>
+            )}
+            {CONSULT_PUBLIC && (
+              <Link
+                to="/consult"
+                onClick={() => setIsOpen(false)}
+                className="btn-secondary w-full text-center"
+              >
+                <CalendarClock className="w-4 h-4" aria-hidden="true" /> Book a Call with an Expert
               </Link>
             )}
             <Link

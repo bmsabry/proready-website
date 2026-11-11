@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Flame, Brain, GraduationCap, CheckCircle2, ArrowRight, Briefcase, UserCheck, Presentation } from 'lucide-react';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
+import ConsultCallout from '../components/ConsultCallout';
 
 type Practice = {
   id: string;
@@ -296,6 +297,8 @@ const Services = () => {
           </div>
         </div>
       </section>
+
+      <ConsultCallout />
 
       <CTABand
         secondaryLabel="Browse Training Courses"

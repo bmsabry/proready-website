@@ -621,6 +621,8 @@ export type ViewState =
   | { page: 'software'; slug?: string }
   | { page: 'comms' }
   | { page: 'support'; ref?: string }
+  | { page: 'consult'; booking?: number; tab?: 'bookings' | 'settings' }
+  | { page: 'chat'; conversation?: number; tab?: 'conversations' | 'try' | 'bans' | 'settings' }
   | { page: 'ai' };
 
 export function hashFor(v: ViewState): string {
@@ -643,6 +645,12 @@ export function hashFor(v: ViewState): string {
       return '#comms';
     case 'support':
       return v.ref ? `#support/${encodeURIComponent(v.ref)}` : '#support';
+    case 'consult':
+      if (v.booking) return `#consult/booking/${v.booking}`;
+      return v.tab === 'settings' ? '#consult/settings' : '#consult';
+    case 'chat':
+      if (v.conversation) return `#chat/conversation/${v.conversation}`;
+      return v.tab === 'try' || v.tab === 'bans' || v.tab === 'settings' ? `#chat/${v.tab}` : '#chat';
     case 'ai':
       return '#ai';
     default:
@@ -687,6 +695,18 @@ export function parseHash(raw: string): ViewState {
       return { page: 'comms' };
     case 'support':
       return a ? { page: 'support', ref: a } : { page: 'support' };
+    case 'consult': {
+      if (a === 'settings') return { page: 'consult', tab: 'settings' };
+      const id = Number(b);
+      if (a === 'booking' && Number.isInteger(id) && id > 0) return { page: 'consult', booking: id };
+      return { page: 'consult' };
+    }
+    case 'chat': {
+      if (a === 'try' || a === 'bans' || a === 'settings') return { page: 'chat', tab: a };
+      const id = Number(b);
+      if (a === 'conversation' && Number.isInteger(id) && id > 0) return { page: 'chat', conversation: id };
+      return { page: 'chat' };
+    }
     case 'ai':
       return { page: 'ai' };
     default:

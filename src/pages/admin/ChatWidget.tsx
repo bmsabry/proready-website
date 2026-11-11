@@ -77,6 +77,16 @@ function describeCurrentView(): string {
       return 'Admin → AI Assistant settings.';
     case 'certification':
       return 'Admin → Certification (examined-tier candidates, fee waivers, interviews and outcomes, across all courses).';
+    case 'consult':
+      return view.booking
+        ? `Admin → Consulting → booking id ${view.booking}. "this booking" means consulting booking ${view.booking}.`
+        : view.tab === 'settings'
+          ? 'Admin → Consulting → Settings (booking hours, durations, rates per urgency tier, fees, hold and settlement timing).'
+          : 'Admin → Consulting (paid expert-call bookings: list, status, attendance and payments).';
+    case 'chat':
+      return view.conversation
+        ? `Admin → Site Assistant → conversation id ${view.conversation} of the public AI chat.`
+        : 'Admin → Site Assistant (the public AI chat on the marketing pages: conversations, bans, decisions log and settings).';
     default:
       return 'Admin → Overview.';
   }

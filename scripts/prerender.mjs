@@ -84,8 +84,10 @@ for (const route of PRERENDER_ROUTES) {
   }
 }
 
-// Sitemap
-const urls = PRERENDER_ROUTES.map((r) => {
+// Sitemap: pages released hidden (sitemap: false, see src/lib/features.ts) are
+// prerendered above so they work by direct URL, but are not listed.
+const listed = PRERENDER_ROUTES.filter((r) => r.sitemap !== false);
+const urls = listed.map((r) => {
   const loc = ORIGIN + (r.path === '/' ? '/' : r.path);
   return `  <url><loc>${loc}</loc><lastmod>${r.lastmod}</lastmod><changefreq>${r.changefreq ?? 'monthly'}</changefreq><priority>${(r.priority ?? 0.6).toFixed(1)}</priority></url>`;
 });
@@ -93,7 +95,7 @@ writeFileSync(
   'dist/sitemap.xml',
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`
 );
-console.log(`  ✓ sitemap.xml (${PRERENDER_ROUTES.length} URLs)`);
+console.log(`  ✓ sitemap.xml (${listed.length} URLs${listed.length < PRERENDER_ROUTES.length ? `; ${PRERENDER_ROUTES.length - listed.length} hidden page(s) prerendered but not listed` : ''})`);
 
 // -----------------------------------------------------------------------------
 // Render-blocking check

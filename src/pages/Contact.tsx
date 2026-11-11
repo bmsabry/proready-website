@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Send, CheckCircle2, Youtube, ShieldCheck, Clock, Users } from 'lucide-react';
 import { Reveal, PageHero } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
+import { CONSULT_PUBLIC } from '../lib/features';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? '';
 
@@ -109,7 +111,17 @@ const Contact = () => {
           </>
         }
         subtitle="Combustion analysis, a custom AI model, or specialized training for your team: tell us what you are working on."
-      />
+      >
+        {CONSULT_PUBLIC && (
+          <p className="mt-6 text-sm text-slate-300">
+            Need to talk sooner?{' '}
+            <Link to="/consult" className="font-semibold text-cyan-400 hover:text-cyan-300 underline-offset-4 hover:underline">
+              Book a video call with an expert
+            </Link>
+            , as soon as today.
+          </p>
+        )}
+      </PageHero>
 
       <section className="pb-20 lg:pb-28">
         <div className="container-site">

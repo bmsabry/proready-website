@@ -3,11 +3,15 @@
  * listed in sitemap.xml. Admin routes are intentionally excluded.
  * Bump `lastmod` when a page's content meaningfully changes.
  */
+import { CONSULT_PUBLIC, PROFILE_PUBLIC } from './lib/features';
+
 export type RouteEntry = {
   path: string;
   lastmod: string;
   priority?: number;
   changefreq?: 'weekly' | 'monthly' | 'yearly';
+  /** false: still prerendered (works by direct URL) but left out of sitemap.xml. */
+  sitemap?: boolean;
 };
 
 const M = '2026-06-10'; // site-wide template update
@@ -27,6 +31,8 @@ export const PRERENDER_ROUTES: RouteEntry[] = [
   { path: '/case-studies', lastmod: M, priority: 0.8 },
   { path: '/testimonials', lastmod: M, priority: 0.7 },
   { path: '/contact', lastmod: M, priority: 0.7 },
+  { path: '/consult', lastmod: '2026-11-09', priority: 0.9, changefreq: 'weekly', sitemap: CONSULT_PUBLIC },
+  { path: '/about/bassam-abdelnabi', lastmod: '2026-11-10', priority: 0.8, sitemap: PROFILE_PUBLIC },
   { path: '/case-studies/optimizing-test-cell-assembly', lastmod: M },
   { path: '/case-studies/enhancing-test-execution-cost-efficiency', lastmod: M },
   { path: '/case-studies/multichannel-emissions-sampling', lastmod: M },

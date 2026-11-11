@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../../components/ui';
 import { usePageMeta } from '../../lib/meta';
+import ConsultCallout from '../../components/ConsultCallout';
 
 const capabilities = [
   'Physics-informed machine learning grounded in the governing equations of your system',
@@ -171,6 +172,11 @@ const IndustrialAIConsulting = () => {
           </div>
         </div>
       </section>
+
+      <ConsultCallout
+        title="Talk through your data problem with an expert"
+        subtitle="Book a one-to-one video call on Google Meet about combustion and test data, digital twins or test automation, as soon as the same day. Pick a time from the live calendar; nothing is charged until after the meeting."
+      />
 
       <CTABand
         title="Have data you suspect is worth more?"

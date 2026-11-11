@@ -30,7 +30,8 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -464,6 +465,7 @@ def fulfil_advanced_cert(db: Session, session_obj: dict) -> None:
 @router.post("/webhook/stripe")
 async def stripe_webhook(
     request: Request,
+    background: BackgroundTasks,
     stripe_signature: str = Header(default="", alias="Stripe-Signature"),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -503,6 +505,55 @@ async def stripe_webhook(
 
     def _is_advanced_cert(session_obj: dict) -> bool:
         return (session_obj.get("metadata") or {}).get("kind") == "advanced_cert"
+
+    # Consulting calls (app/consult.py) are handled first and completely, so
+    # the branches below never see their events. Their card page is a setup-
+    # mode session tagged metadata.kind == 'consult': completing it saves the
+    # card and confirms the booking (idempotent, in any order of delivery; a
+    # failure to read the card or the calendar raises, and Stripe delivers
+    # the event again). A refund on one of their payments is noted on the
+    # booking's ledger.
+    #
+    # This handler is `async`, so anything called directly here runs on the
+    # server's one event loop and stops every other request while it waits
+    # for Stripe, Google or the email service. The consulting work therefore
+    # runs in the thread pool, and what follows a confirmation (two emails,
+    # and the hold when the call is near) runs after the answer has gone to
+    # Stripe: a slow answer is what makes Stripe deliver an event again.
+    if kind.startswith("checkout.session.") and (obj.get("metadata") or {}).get("kind") == "consult":
+        if kind == "checkout.session.completed":
+            from .. import consult  # noqa: PLC0415
+
+            created = event["created"] if "created" in event else None
+            outcome = await run_in_threadpool(
+                consult.on_checkout_completed, db, dict(obj), None,
+                event_created=created, defer_confirmation=True,
+            )
+            log.info("Consult checkout %s: %s", obj.get("id"), outcome)
+            if outcome == "confirmed":
+                try:
+                    booking_id = int((obj.get("metadata") or {}).get("booking_id") or 0)
+                except (TypeError, ValueError):
+                    booking_id = 0
+                if booking_id:
+                    background.add_task(consult.finish_confirmation_later, booking_id)
+        return {"received": True}
+    if kind == "charge.refunded":
+        from .. import consult_money  # noqa: PLC0415
+
+        if await run_in_threadpool(
+            consult_money.note_stripe_refund,
+            db, str(obj.get("payment_intent") or ""), int(obj.get("amount_refunded") or 0),
+        ):
+            return {"received": True}
+    if kind in ("charge.dispute.created", "charge.dispute.closed"):
+        # A dispute on a consulting payment goes on that booking's timeline
+        # and to the owner (idempotent). Any other disputed payment is not
+        # theirs: note_dispute says so and the branches below run as before.
+        from .. import consult_auto  # noqa: PLC0415
+
+        if await run_in_threadpool(consult_auto.note_dispute, db, kind, dict(obj)):
+            return {"received": True}
 
     if kind == "checkout.session.completed" and _is_advanced_cert(obj):
         # Examined-tier purchase: no enrollment to grant — open the written

@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
 import PageErrorBoundary from './components/PageErrorBoundary';
+import ChatMount from './components/chat/ChatMount';
 import { CTABand } from './components/ui';
 import Home from './pages/Home';
 
@@ -27,7 +28,11 @@ const LearnLesson = lazy(() => import('./pages/learn/Lesson'));
 const LearnQuiz = lazy(() => import('./pages/learn/Quiz'));
 const LearnAdvancedExam = lazy(() => import('./pages/learn/AdvancedExam'));
 const VerifyCredential = lazy(() => import('./pages/Verify'));
+const Consult = lazy(() => import('./pages/Consult'));
+// Client-only (token in the URL), like /verify: not in routes.ts.
+const ConsultBooking = lazy(() => import('./pages/ConsultBookingPage'));
 const LearnWelcome = lazy(() => import('./pages/learn/Welcome'));
+const AboutBassamAbdelnabi = lazy(() => import('./pages/about/BassamAbdelnabi'));
 
 const GasTurbineCombustionConsulting = lazy(() => import('./pages/services/GasTurbineCombustionConsulting'));
 const IndustrialAIConsulting = lazy(() => import('./pages/services/IndustrialAIConsulting'));
@@ -165,6 +170,9 @@ function App() {
               <Route path="/insights/sac-aerodynamics" element={<SACAerodynamics />} />
               </Route>
               <Route path="/contact" element={<Contact />} />
+              <Route path="/consult" element={<Consult />} />
+              <Route path="/consult/booking/:ref" element={<ConsultBooking />} />
+              <Route path="/about/bassam-abdelnabi" element={<AboutBassamAbdelnabi />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="*" element={<NotFound />} />
@@ -174,6 +182,9 @@ function App() {
         </main>
         <Footer />
       </div>
+      {/* Public AI assistant: draws nothing until the page has settled, and
+          never on /learn, /admin, /verify or /consult/booking. */}
+      <ChatMount />
     </>
   );
 }

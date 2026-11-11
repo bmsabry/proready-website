@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { Reveal, SectionHeading, StatCounter, CTABand } from '../components/ui';
 import { usePageMeta } from '../lib/meta';
 import Img from '../components/Img';
+import ConsultCallout from '../components/ConsultCallout';
 
 /* ---------------- Data ---------------- */
 
@@ -286,6 +287,9 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+      {/* ---------- Consult an expert ---------- */}
+      <ConsultCallout />
 
       {/* ---------- Why ProReadyEngineer ---------- */}
       <section className="section-pad">
