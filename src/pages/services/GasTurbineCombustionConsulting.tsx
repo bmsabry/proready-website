@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../../components/ui';
 import { usePageMeta } from '../../lib/meta';
+import ConsultCallout from '../../components/ConsultCallout';
 
 const capabilities = [
   'DLN/DLE combustion system design, tuning, and troubleshooting',
@@ -178,6 +179,11 @@ const GasTurbineCombustionConsulting = () => {
           </div>
         </div>
       </section>
+
+      <ConsultCallout
+        title="Combustor misbehaving? Talk to an expert today"
+        subtitle="Book a one-to-one video call on Google Meet about dynamics, blowout, emissions or fuel flexibility, as soon as the same day. Pick a time from the live calendar; nothing is charged until after the meeting."
+      />
 
       <CTABand
         title="Tell us what your combustor is doing"

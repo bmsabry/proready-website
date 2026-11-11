@@ -102,8 +102,8 @@ def _log_email(
                 reply_to=(reply_to or "")[:320],
                 cc=(cc or "")[:640],
                 bcc=(bcc or "")[:640],
-                body_html=redact_secrets(html or ""),
-                body_text=redact_secrets(text or ""),
+                body_html=_redact(html or ""),
+                body_text=_redact(text or ""),
                 attachments=names[:1000],
                 copy_source="sent" if (html or text) else "",
                 error=(error or "")[:500],
@@ -113,6 +113,16 @@ def _log_email(
     except Exception:
         log.exception("EmailLog write failed for recipient=%s", recipient)
         db.rollback()
+
+
+# The manage link of a consulting booking carries its token as ?t=…; like a
+# sign-in token, it is blanked in the copy kept in the email log.
+_CONSULT_TOKEN_RE = re.compile(r"(/consult/booking/[A-Za-z0-9-]+\?t=)[A-Za-z0-9_\-]+")
+
+
+def _redact(body: str) -> str:
+    """What is kept of an email body: no sign-in token, no manage token."""
+    return redact_secrets(_CONSULT_TOKEN_RE.sub(r"\1(hidden)", body or ""))
 
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -1588,10 +1598,19 @@ def advanced_booked_admin_html(
 
 
 def exam_calendar_problem_html(error: str, admin_url: str) -> str:
-    """To the instructor: booking from his calendar stopped working."""
+    """To the instructor: booking from his calendar stopped working. One
+    calendar connection serves oral examinations and consulting calls, so
+    the email says what stops for each."""
     body = _p(
-        "Candidates cannot book oral examinations from your calendar right now. Until this "
-        "is fixed they are asked to propose times instead, and you confirm one as before."
+        "Your Google calendar could not be read, so nothing can be booked from it right now."
+    )
+    body += _p(
+        "<strong>Oral examinations:</strong> candidates cannot pick a time from your calendar. "
+        "Until this is fixed they are asked to propose times instead, and you confirm one as before."
+    )
+    body += _p(
+        "<strong>Consulting calls:</strong> the booking page shows no open times and takes no new "
+        "bookings until the calendar can be read again. Calls that are already booked are not affected."
     )
     body += _kv_table([("What Google said", escape_html(error or "unknown error"))], size=14)
     body += _p(
@@ -1964,3 +1983,401 @@ def integrity_alert_html(
         size=13, color=MUTED, margin="0",
     )
     return _shell("Integrity alert", headline, body)
+
+
+# -----------------------------------------------------------------------------
+# Consulting calls
+# -----------------------------------------------------------------------------
+# Every value in these four is typed by a stranger (name, company, topic) or
+# built from what they typed, so every value is escaped here, at the point it
+# meets the markup. Callers pass plain text.
+
+def _list(items: "list[str]", *, size: int = 14) -> str:
+    """Plain-text lines as bulleted paragraphs (escaped here). Paragraphs,
+    not <li>, so the plain-text part keeps one line per item."""
+    lines = "".join(
+        f'<p style="margin:0 0 8px;padding:0 0 0 14px;font-family:{FONT};font-size:{size}px;'
+        f'line-height:1.55;color:{INK};">&bull; {escape_html(str(item))}</p>'
+        for item in items
+    )
+    return f'<div style="margin:0 0 18px;">{lines}</div>'
+
+
+def consult_confirmed_html(
+    *,
+    full_name: str,
+    when: str,
+    minutes: int,
+    meet_url: str,
+    manage_url: str,
+    ref: str,
+    total: str,
+    card: str,
+    hold_when: str,
+    free_cancel_until: str,
+    fee: str,
+    fee_percent: int,
+    terms: "list[str]",
+    invite_from: str = "",
+    expert: str = "",
+) -> str:
+    """To the client: the call is booked. Their time, the Meet link, what
+    they agreed to, and the link to manage the booking."""
+    e = escape_html
+    meet = e(meet_url)
+    manage = e(manage_url)
+    body = _hi(full_name)
+    body += _p(
+        f"Your one-to-one consulting call{' with ' + e(expert) if expert else ''} is confirmed. "
+        "Nothing has been charged."
+    )
+    body += _kv_table([
+        ("When", e(when)),
+        ("Length", f"{int(minutes)} minutes"),
+        ("Where", _link(meet, meet) if meet_url else "Google Meet: the link is in the calendar invitation"),
+        ("Total", f"<strong>{e(total)}</strong>, charged only after the meeting"),
+        ("Card", e(card) if card else "Saved with Stripe"),
+        ("Reference", e(ref)),
+    ])
+    if meet_url:
+        body += _cta_button("Join on Google Meet", meet)
+    if invite_from:
+        body += _p(
+            f"A calendar invitation from {e(invite_from)} is on its way: accept it and the "
+            "call is in your calendar with the link."
+        )
+    body += _p("<strong>What happens with your card</strong>", margin="0 0 8px", color=HEADING)
+    body += _list([
+        f"A temporary hold for {total} is placed on your card on {hold_when}. A hold is not a charge."
+        if hold_when != "shortly"
+        else f"A temporary hold for {total} is placed on your card shortly. A hold is not a charge.",
+        f"You can cancel free of charge until {free_cancel_until}.",
+        f"After that, or if you do not join the call, the fee is {int(fee_percent)}% of the booked "
+        f"amount ({fee}).",
+    ])
+    body += _p("<strong>To cancel or to replace your card</strong>", margin="0 0 8px", color=HEADING)
+    body += _cta_button("Manage your booking", manage)
+    body += _p(
+        f"If the button does not work, paste this into your browser:<br>{_link(manage, manage)}",
+        size=13, color=MUTED,
+    )
+    if terms:
+        body += _p("<strong>The terms you agreed to</strong>", margin="0 0 8px", color=HEADING)
+        body += _list(terms, size=13)
+    return _shell("Consulting call confirmed", "Your call is booked", body)
+
+
+def consult_cancelled_html(
+    *,
+    full_name: str,
+    when: str,
+    kind: str,
+    money_line: str,
+    note: str = "",
+    rebook_url: str = "",
+    ref: str = "",
+) -> str:
+    """To the client: the call is off. kind 'client' (they cancelled),
+    'owner' (we did), 'slot_lost' (by the time the card was saved the time
+    was no longer free, so the booking was never confirmed), 'hold_failed'
+    (no hold could be placed on their card in time)."""
+    e = escape_html
+    body = _hi(full_name)
+    if kind == "slot_lost":
+        heading = "We could not confirm your call"
+        body += _p(
+            "The time you chose is held for a short while during card entry. By the time "
+            "your card was saved, that time was no longer free, so the call could not be "
+            "confirmed."
+        )
+    elif kind == "hold_failed":
+        heading = "Your call has been cancelled"
+        body += _p(
+            "We could not place the temporary hold on your card, and no other card was "
+            "provided in time, so your consulting call has been cancelled."
+        )
+    elif kind == "owner":
+        heading = "Your call has been cancelled"
+        body += _p("We are sorry: we have had to cancel your consulting call.")
+    else:
+        heading = "Your call is cancelled"
+        body += _p("Your consulting call is cancelled, as you asked.")
+    body += _kv_table([("Was booked for", e(when)), ("Reference", e(ref))])
+    if note:
+        body += _p(f"A note from us: <em>{e(note)}</em>")
+    body += _p(e(money_line))
+    if rebook_url:
+        body += _p("You are welcome to pick another time.", margin="0 0 18px")
+        body += _cta_button("See open times", e(rebook_url))
+    eyebrow = "Consulting call not confirmed" if kind == "slot_lost" else "Consulting call cancelled"
+    return _shell(eyebrow, heading, body)
+
+
+def consult_owner_new_html(
+    *,
+    rows: "list[tuple[str, str]]",
+    topic: str,
+    meet_url: str = "",
+    calendar_problem: str = "",
+    admin_url: str = "",
+) -> str:
+    """To the owner: a client booked a call and saved a card."""
+    e = escape_html
+    body = _p("A client booked a consulting call and saved a card. Nothing has been charged.")
+    body += _kv_table([(e(str(k)), e(str(v))) for k, v in rows], size=14)
+    body += _p("<strong>What they want to talk about</strong>", margin="0 0 8px", color=HEADING)
+    body += (
+        f'<div style="margin:0 0 18px;padding:14px 16px;background-color:{FOOTER_BG};'
+        f'border:1px solid {CARD_BORDER};border-radius:8px;font-family:{FONT};font-size:15px;'
+        f'line-height:1.6;color:{HEADING};word-break:break-word;">'
+        f'{"<br>".join(e(line) for line in (topic or "").splitlines()) or "(nothing written)"}</div>'
+    )
+    if calendar_problem:
+        body += _p(f"<strong>Needs your attention:</strong> {e(calendar_problem)}")
+    elif meet_url:
+        body += _p(f"Meeting link: {_link(e(meet_url), e(meet_url))}. It is on your calendar; they have the invitation.")
+    if admin_url:
+        body += _cta_button("Open Consulting in the admin panel", e(admin_url))
+    return _shell("Consulting", "New consulting booking", body)
+
+
+def consult_owner_update_html(
+    *,
+    headline: str,
+    detail: str,
+    rows: "list[tuple[str, str]]",
+    admin_url: str = "",
+    extra_link: "tuple[str, str] | None" = None,
+) -> str:
+    """To the owner: what happened to a booking's money (a charge went
+    through or failed, a fee, a refund), that a client cancelled, that a
+    hold failed, or that a payment is disputed. `extra_link` is a second
+    button, (label, url)."""
+    e = escape_html
+    body = "".join(_p(e(part)) for part in (detail or "").split("\n\n") if part.strip())
+    body += _kv_table([(e(str(k)), e(str(v))) for k, v in rows], size=14)
+    if admin_url:
+        body += _cta_button("Open the booking", e(admin_url))
+    if extra_link:
+        body += _cta_button(e(extra_link[0]), e(extra_link[1]))
+    return _shell("Consulting", e(headline), body)
+
+
+# -- Consulting: what follows a confirmed booking (app/consult_auto.py) --------
+# Same rule as above: callers pass plain text, every value is escaped here.
+
+def consult_reminder_html(
+    *,
+    full_name: str,
+    when: str,
+    minutes: int,
+    kind: str,
+    in_words: str,
+    meet_url: str,
+    manage_url: str,
+    ref: str,
+    cancel_line: str = "",
+    expert: str = "",
+) -> str:
+    """To the client: the call is coming up. kind 'first' (sent while
+    cancelling is still free; `in_words` is "in two days") or 'last' (shortly
+    before the start; `in_words` is "in about an hour")."""
+    e = escape_html
+    meet = e(meet_url)
+    manage = e(manage_url)
+    soon = kind == "last"
+    body = _hi(full_name)
+    who = f" with {e(expert)}" if expert else ""
+    body += _p(
+        f"Your consulting call{who} starts {e(in_words)}." if soon
+        else f"A reminder that your consulting call{who} is {e(in_words)}."
+    )
+    body += _kv_table([
+        ("When", e(when)),
+        ("Length", f"{int(minutes)} minutes"),
+        ("Where", _link(meet, meet) if meet_url else "Google Meet: the link is in your calendar invitation"),
+        ("Reference", e(ref)),
+    ])
+    if meet_url:
+        body += _cta_button("Join on Google Meet", meet)
+    body += _p(
+        "Please do not share third-party proprietary or export-controlled information, in the "
+        "call or in any message.",
+        size=14,
+    )
+    if cancel_line:
+        body += _p(e(cancel_line), size=14 if soon else 15)
+    body += _p(
+        f"To cancel or to replace your card: {_link(manage, 'manage your booking')}.",
+        size=14,
+    )
+    return _shell(
+        "Consulting call reminder",
+        f"Your call starts {e(in_words)}" if soon else f"Your call is {e(in_words)}",
+        body,
+    )
+
+
+def consult_hold_placed_html(
+    *,
+    full_name: str,
+    when: str,
+    amount: str,
+    card: str,
+    manage_url: str,
+    ref: str,
+    fee_percent: int,
+    fee: str,
+) -> str:
+    """To the client: the temporary hold is on their card. Not a charge."""
+    e = escape_html
+    manage = e(manage_url)
+    body = _hi(full_name)
+    body += _p(
+        f"As set out in your booking terms, a temporary hold for <strong>{e(amount)}</strong> has "
+        f"been placed on your card{' (' + e(card) + ')' if card else ''} ahead of your consulting call."
+    )
+    body += _kv_table([("Call", e(when)), ("Hold", e(amount)), ("Reference", e(ref))])
+    body += _list([
+        "A hold is not a charge. Your bank may show it as pending.",
+        "After the call the booked amount is charged from this hold.",
+        f"If you cancel after your free-cancellation time, or do not join the call, the fee of "
+        f"{int(fee_percent)}% ({fee}) is charged and the rest of the hold is released.",
+        "If the call does not take place because of us, the whole hold is released.",
+    ])
+    body += _p(f"Your booking: {_link(manage, 'manage your booking')}.", size=14)
+    return _shell("Consulting call", "A temporary hold is on your card", body)
+
+
+def consult_hold_failed_html(
+    *,
+    full_name: str,
+    when: str,
+    amount: str,
+    card: str,
+    reason: str,
+    deadline: str,
+    manage_url: str,
+    ref: str,
+) -> str:
+    """To the client: the hold was refused; here is the link to give
+    another card, and until when."""
+    e = escape_html
+    manage = e(manage_url)
+    body = _hi(full_name)
+    body += _p(
+        f"We tried to place the temporary hold for <strong>{e(amount)}</strong> on your card"
+        f"{' (' + e(card) + ')' if card else ''} for your consulting call, and the card did not "
+        "accept it. Nothing was charged."
+    )
+    rows = [("Call", e(when)), ("Reference", e(ref))]
+    if reason:
+        rows.insert(1, ("What the bank said", e(reason)))
+    body += _kv_table(rows)
+    body += _p(
+        f"<strong>Please add another card by {e(deadline)}.</strong> The hold is placed on the new "
+        "card as soon as you save it. If no hold can be placed by then, the call is cancelled "
+        "and nothing is charged."
+    )
+    body += _cta_button("Replace your card", manage)
+    body += _p(
+        f"If the button does not work, paste this into your browser:<br>{_link(manage, manage)}",
+        size=13, color=MUTED,
+    )
+    return _shell("Consulting call", "Your card needs attention", body)
+
+
+def consult_receipt_html(
+    *,
+    full_name: str,
+    kind: str,
+    when: str,
+    amount: str,
+    card: str,
+    charged_on: str,
+    ref: str,
+    minutes_line: str = "",
+    fee_percent: int = 0,
+    from_hold: bool = False,
+) -> str:
+    """To the client, after money was taken. kind 'meeting' (the receipt for
+    the call), 'no_show_fee' or 'late_cancel_fee' (the fee notice). Each says
+    how to contest the charge."""
+    e = escape_html
+    body = _hi(full_name)
+    paid_with = f" to your card ({e(card)})" if card else " to your card"
+    if kind == "no_show_fee":
+        eyebrow, heading = "Consulting call: no-show fee", "No-show fee charged"
+        body += _p(
+            "Our records show that nobody joined your consulting call from your side. As set out in "
+            f"the terms you agreed to when booking, the no-show fee of {int(fee_percent)}% of the "
+            f"booked amount, <strong>{e(amount)}</strong>, was charged{paid_with}."
+        )
+        what = "No-show fee"
+    elif kind == "late_cancel_fee":
+        eyebrow, heading = "Consulting call: cancellation fee", "Late-cancellation fee charged"
+        body += _p(
+            "Your consulting call was cancelled after the free-cancellation time. As set out in the "
+            f"terms you agreed to when booking, the fee of {int(fee_percent)}% of the booked amount, "
+            f"<strong>{e(amount)}</strong>, was charged{paid_with}."
+        )
+        what = "Late-cancellation fee"
+    else:
+        eyebrow, heading = "Consulting call: receipt", "Your receipt"
+        body += _p(
+            f"Thank you for your consulting call. <strong>{e(amount)}</strong> was charged{paid_with}."
+        )
+        what = "Consulting call"
+    rows = [("For", e(what)), ("Call", e(when))]
+    if minutes_line:
+        rows.append(("Billed", e(minutes_line)))
+    rows += [("Amount charged", f"<strong>{e(amount)}</strong>"), ("Charged on", e(charged_on)), ("Reference", e(ref))]
+    body += _kv_table(rows)
+    if from_hold:
+        body += _p(
+            "The amount was taken from the temporary hold on your card. Any part of the hold "
+            "that was not charged has been released; your bank may take a few days to show that.",
+            size=14,
+        )
+    body += _p(
+        "<strong>To contest this charge</strong>, reply to this email and say why. Our support "
+        "team handles every request.",
+        size=14,
+    )
+    return _shell(eyebrow, heading, body)
+
+
+def consult_owner_summary_html(
+    *,
+    intro: str,
+    rows: "list[tuple[str, str]]",
+    participants: "list[str]",
+    default_line: str,
+    deadline: str,
+    choices: "list[tuple[str, str]]",
+    admin_url: str = "",
+) -> str:
+    """To the owner, at the scheduled end of a call: who joined, what will
+    happen by itself and when, and three links to decide otherwise. Each
+    link opens a page that asks for a click; opening it changes nothing."""
+    e = escape_html
+    body = _p(e(intro))
+    body += _kv_table([(e(str(k)), e(str(v))) for k, v in rows], size=14)
+    if participants:
+        body += _p("<strong>Who joined, according to Google Meet</strong>", margin="0 0 8px", color=HEADING)
+        body += _list(participants)
+    body += _p(f"<strong>If you do nothing:</strong> {e(default_line)}")
+    if choices:
+        body += _p(
+            f"<strong>To decide yourself</strong>, choose one before {e(deadline)}. Each link opens "
+            "a page that asks you to confirm; nothing happens until you press the button there.",
+        )
+        for label, url in choices:
+            body += _cta_button(e(label), e(url))
+    if admin_url:
+        body += _p(
+            f"You can also decide, or charge for fewer minutes, in the admin panel: "
+            f"{_link(e(admin_url), 'open the booking')}.",
+            size=14,
+        )
+    return _shell("Consulting", "Your call has ended: confirm the outcome", body)

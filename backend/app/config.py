@@ -150,6 +150,13 @@ class Settings(BaseSettings):
     # encrypted); the admin panel's values win.
     GOOGLE_OAUTH_CLIENT_ID: str = ""
     GOOGLE_OAUTH_CLIENT_SECRET: str = ""
+    # Consulting reads who joined a call from the Google Meet API, which
+    # needs one more permission on Google's consent screen
+    # (meetings.space.readonly). Set this to false to leave that permission
+    # out of the request: the way back if Google ever refuses the consent
+    # screen because of it. The calendar then connects exactly as before and
+    # attendance reads "unknown".
+    GOOGLE_REQUEST_MEET_SCOPE: bool = True
     # LinkedIn "Add to profile" pre-fill. The numeric Company Page id makes
     # the issuer show with the ProReadyEngineer logo; empty falls back to the
     # organisation name as text.

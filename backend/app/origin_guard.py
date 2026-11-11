@@ -17,7 +17,14 @@ Left alone, on purpose:
   * requests without a session cookie (the public forms, and the quiz apps,
     which authenticate with a bearer token);
   * the call-home beacon and the usage pings, which are posted from files
-    opened off-site by design.
+    opened off-site by design;
+  * the owner's decision page for a consulting call (/api/consult/decision):
+    its authority is the signed, expiring, single-use token in the link, and
+    no session cookie is read there. Its confirm page is served with
+    `Referrer-Policy: no-referrer` (the token must not leak in a Referer), so
+    a browser posts its form with `Origin: null`; in a browser that is also
+    signed in to the admin panel that POST carried the admin cookie and was
+    refused here, and the owner's choice was lost.
 """
 from __future__ import annotations
 
@@ -38,6 +45,7 @@ _OPEN_PATHS = (
     "/api/track/",
     "/api/academy/webhook/",
     "/api/webhooks/",
+    "/api/consult/decision",
 )
 
 

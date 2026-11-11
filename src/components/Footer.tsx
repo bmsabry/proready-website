@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Youtube, Mail, ArrowRight } from 'lucide-react';
 import Img from './Img';
+import { CONSULT_PUBLIC, PROFILE_PUBLIC } from '../lib/features';
 
 const FooterHeading = ({ children }: { children: React.ReactNode }) => (
   <h2 className="text-xs font-mono font-semibold uppercase tracking-[0.18em] text-slate-400 mb-6">
@@ -52,6 +53,7 @@ const Footer = () => {
               <FooterLink to="/services/test-cell-design">Test Cell Design &amp; Commissioning</FooterLink>
               <FooterLink to="/services/industrial-ai">Industrial AI &amp; Data Analytics</FooterLink>
               <FooterLink to="/services">All Services</FooterLink>
+              {CONSULT_PUBLIC && <FooterLink to="/consult">Book an Expert Call</FooterLink>}
               <FooterLink to="/training">Training &amp; Workshops</FooterLink>
               <FooterLink to="/learn">Learner Sign In</FooterLink>
             </ul>
@@ -64,6 +66,7 @@ const Footer = () => {
               <FooterLink to="/case-studies">Case Studies</FooterLink>
               <FooterLink to="/insights">Research Insights</FooterLink>
               <FooterLink to="/testimonials">Testimonials</FooterLink>
+              {PROFILE_PUBLIC && <FooterLink to="/about/bassam-abdelnabi">About Dr. Bassam Abdelnabi</FooterLink>}
               <FooterLink to="/contact">Contact Us</FooterLink>
             </ul>
           </nav>

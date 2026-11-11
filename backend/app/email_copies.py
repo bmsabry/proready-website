@@ -102,6 +102,27 @@ KIND_LABELS: dict[str, str] = {
     "purchase_welcome": "Purchase: you're in",
     "delivery_canary": "Daily email check (canary)",
     "email_setup_problem": "Email setup problem (alert)",
+    # Consulting calls (app/consult.py, app/consult_auto.py). To the client:
+    "consult_confirmed": "Consulting: booking confirmed",
+    "consult_slot_lost": "Consulting: booking not confirmed (time no longer free)",
+    "consult_cancelled": "Consulting: booking cancelled",
+    "consult_reminder_first": "Consulting: reminder while cancelling is still free",
+    "consult_reminder_last": "Consulting: reminder shortly before the call",
+    "consult_hold_placed": "Consulting: hold placed on the card",
+    "consult_hold_failed": "Consulting: card refused, another card requested",
+    "consult_receipt": "Consulting: receipt",
+    "consult_fee_notice": "Consulting: fee notice (no-show or late cancellation)",
+    # To the owner:
+    "consult_owner_new": "Consulting: new booking (alert)",
+    "consult_owner_cancelled": "Consulting: client cancelled (alert)",
+    "consult_owner_charge_result": "Consulting: charge result (alert)",
+    "consult_owner_summary": "Consulting: call ended, confirm the outcome (alert)",
+    "consult_owner_hold_failed": "Consulting: hold refused (alert)",
+    "consult_owner_hold_cancelled": "Consulting: cancelled, no hold could be placed (alert)",
+    "consult_owner_calendar_fixed": "Consulting: meeting added to the calendar (alert)",
+    "consult_owner_dispute": "Consulting: payment dispute (alert)",
+    "consult_owner_needs_review": "Consulting: payment to check in Stripe (alert)",
+    "consult_owner_tick_stopped": "Consulting: the automation has stopped (alert)",
 }
 
 # (label, tone, what it means) — tone drives the colour: good/neutral/warn/bad.

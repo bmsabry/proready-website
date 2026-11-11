@@ -41,9 +41,10 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import local_times
 from .config import get_settings
 from .crypto import CryptoNotConfigured, decrypt, encrypt
-from .models import AdvancedCertification, ExamCalendar
+from .models import AdvancedCertification, Course, ExamCalendar
 
 log = logging.getLogger(__name__)
 
@@ -52,11 +53,17 @@ TOKEN_URL = "https://oauth2.googleapis.com/token"
 REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 API = "https://www.googleapis.com/calendar/v3"
 CALLBACK_PATH = "/api/admin/academy/calendar/google/callback"
-# Busy times across calendars he can see, and events on his own calendars.
+# Who joined a consulting call (the Google Meet REST API's conference records
+# and participants; read-only). Asked for at the next connect; the calendar
+# works without it, and attendance then reads "unknown" (app/consult_auto.py).
+MEET_SCOPE = "https://www.googleapis.com/auth/meetings.space.readonly"
+# Busy times across calendars he can see, events on his own calendars, and
+# the attendance of his own meetings.
 SCOPES = (
     "openid email "
     "https://www.googleapis.com/auth/calendar.freebusy "
-    "https://www.googleapis.com/auth/calendar.events"
+    "https://www.googleapis.com/auth/calendar.events "
+    + MEET_SCOPE
 )
 DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 DEFAULT_HOURS = {d: ([["09:00", "17:00"]] if i < 5 else []) for i, d in enumerate(DAYS)}
@@ -287,6 +294,14 @@ def _signer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(get_settings().SESSION_SECRET or "dev-only", salt="exam-calendar-oauth")
 
 
+def requested_scopes() -> str:
+    """What the consent screen asks for: SCOPES, without the Meet permission
+    when GOOGLE_REQUEST_MEET_SCOPE is switched off."""
+    if get_settings().GOOGLE_REQUEST_MEET_SCOPE:
+        return SCOPES
+    return " ".join(s for s in SCOPES.split() if s != MEET_SCOPE)
+
+
 def authorization_url(db: Session, admin_email: str) -> str:
     """Google's consent page for the calendar permissions."""
     cal = settings_row(db)
@@ -298,7 +313,7 @@ def authorization_url(db: Session, admin_email: str) -> str:
         "client_id": client_id,
         "redirect_uri": redirect_uri(),
         "response_type": "code",
-        "scope": SCOPES,
+        "scope": requested_scopes(),
         "access_type": "offline",
         "prompt": "consent",
         "include_granted_scopes": "true",
@@ -427,6 +442,23 @@ def _api(cal: ExamCalendar, method: str, path: str, *, json_body=None, params=No
     if status == 401:  # the cached token expired early: once more, fresh
         _TOKEN.clear()
         status, body = _google(method, f"{API}{path}", token=_access_token(cal), json_body=json_body, params=params)
+    return status, body
+
+
+def has_scope(cal: ExamCalendar | None, scope: str) -> bool:
+    """Whether the connected account granted `scope` at its last connect."""
+    return bool(cal and cal.refresh_token_encrypted and scope in (cal.scopes or "").split())
+
+
+def google_get(cal: ExamCalendar, url: str, *, params: dict | None = None) -> tuple[int, dict]:
+    """GET another Google API as the connected account, through the same
+    seam and token as the calendar calls (consulting reads the Meet API's
+    conference records this way). Raises CalendarError when Google cannot be
+    reached or the connection is gone; an HTTP refusal is returned."""
+    status, body = _google("GET", url, token=_access_token(cal), params=params)
+    if status == 401:  # the cached token expired early: once more, fresh
+        _TOKEN.clear()
+        status, body = _google("GET", url, token=_access_token(cal), params=params)
     return status, body
 
 
@@ -568,13 +600,38 @@ def booked_exam_starts(db: Session, *, exclude_row: int | None = None) -> list[d
     ]
 
 
+def course_blocks(db: Session, low: datetime, high: datetime) -> list[tuple[datetime, datetime]]:
+    """The site's own live course sessions between `low` and `high`: every
+    Course day at the session clock time, for the session length. A day with
+    no clock time blocks whole; a session with no length blocks to the end
+    of its day. He is teaching then, whether or not it is on a calendar, so
+    neither an oral examination nor a consulting call is offered."""
+    out: list[tuple[datetime, datetime]] = []
+    for course in db.execute(select(Course)).scalars().all():
+        tzname = local_times.session_timezone(course)
+        for day in local_times.course_days(course):
+            midnight = local_times.wall_clock_to_utc(day, "00:00", tzname)
+            next_midnight = local_times.wall_clock_to_utc(day + timedelta(days=1), "00:00", tzname)
+            start = local_times.session_start_utc(course, day)
+            if start is None:
+                start, end = midnight, next_midnight
+            else:
+                length = int(course.session_duration_minutes or 0)
+                end = start + timedelta(minutes=length) if length > 0 else next_midnight
+                end = max(end, start + timedelta(hours=1))
+            if end > low and start < high:
+                out.append((start, end))
+    return out
+
+
 def open_slots(
     db: Session, *, earliest: datetime | None = None, now: datetime | None = None,
     record: bool = True, exclude_row: int | None = None,
 ) -> list[datetime]:
-    """Open slots from the live calendars. Raises CalendarError if any
-    checked calendar cannot be read. `record=False` leaves the transaction
-    alone (the booking holds a lock until it commits)."""
+    """Open slots from the live calendars, clear of the site's own course
+    sessions. Raises CalendarError if any checked calendar cannot be read.
+    `record=False` leaves the transaction alone (the booking holds a lock
+    until it commits)."""
     cal = settings_row(db)
     r = rules(cal)
     now = now or _utcnow()
@@ -586,6 +643,9 @@ def open_slots(
         return []
     pad = timedelta(minutes=r.buffer, hours=1)
     busy = busy_blocks(cal, low - pad, high + pad)
+    # The course sessions the site itself schedules are busy time too (the
+    # owner's decision of 10 Nov 2026), the same source consulting uses.
+    busy = busy + course_blocks(db, low - pad, high + pad)
     slots = compute_slots(
         r, now=now, busy=busy, booked=booked_exam_starts(db, exclude_row=exclude_row), earliest=earliest
     )

@@ -13,6 +13,7 @@ from .academy_seed import seed_academy
 from .config import get_settings
 from .db import Base, SessionLocal, engine
 from .models import Course, SoftwareProduct
+from .access_log import install as install_access_log_filter
 from .origin_guard import install as install_origin_guard
 from .progress_guard import install as install_progress_guard
 from .routes import academy as academy_routes
@@ -24,8 +25,14 @@ from .routes import certification_admin as certification_admin_routes
 from .routes import admin as admin_routes
 from .routes import ai as ai_routes
 from .routes import auth as auth_routes
+# Public AI assistant. Importing the routes also registers the chat_* tables
+# (app/chat_models.py) before create_all runs below.
+from .routes import chat as chat_routes
 from .routes import checkout as checkout_routes
 from .routes import comms as comms_routes
+# Consulting calls. Importing the routes also registers the consult_* tables
+# (app/consult_models.py) before create_all runs below.
+from .routes import consult as consult_routes
 from .routes import compat as compat_routes
 from .routes import courses as courses_routes
 from .routes import exam_calendar_admin as exam_calendar_admin_routes
@@ -351,6 +358,28 @@ def _run_column_migrations() -> None:
         ("delivery_detail", "VARCHAR(1000) NOT NULL DEFAULT ''"),
     ):
         _ensure_column("email_log", column, ddl)
+    # Consulting (2026-11). The consult_* tables are new (create_all builds
+    # them complete); these lines are for a database that already holds the
+    # consult tables from before the settlement work added these columns.
+    _ensure_column("consult_settings", "last_tick_at", "TIMESTAMP WITH TIME ZONE")
+    _ensure_column("consult_settings", "tick_alert_at", "TIMESTAMP WITH TIME ZONE")
+    _ensure_column("consult_bookings", "card_event_at", "TIMESTAMP WITH TIME ZONE")
+    _ensure_column("consult_bookings", "owner_notified_at", "TIMESTAMP WITH TIME ZONE")
+    _ensure_column("consult_bookings", "email_tries", "JSON")
+    _ensure_column("consult_charges", "card_brand", "VARCHAR(32) NOT NULL DEFAULT ''")
+    _ensure_column("consult_charges", "card_last4", "VARCHAR(8) NOT NULL DEFAULT ''")
+    _ensure_column("consult_settings", "reminder_before_deadline_hours", "INTEGER NOT NULL DEFAULT 24")
+    _ensure_column("consult_settings", "reminder_before_start_hours", "INTEGER NOT NULL DEFAULT 1")
+    _ensure_column("consult_bookings", "disputed_cents", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column("consult_bookings", "dispute_lost_cents", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column("consult_bookings", "dispute_state", "VARCHAR(16) NOT NULL DEFAULT ''")
+    # Public assistant (2026-11). The chat_* tables are new (create_all builds
+    # them complete); these lines are for a database that already holds them
+    # from before retention and the admin test were added.
+    _ensure_column("chat_settings", "retention_days", "INTEGER NOT NULL DEFAULT 90")
+    _ensure_column("chat_settings", "last_purge_at", "TIMESTAMP WITH TIME ZONE")
+    _ensure_column("chat_conversations", "admin_test", "BOOLEAN NOT NULL DEFAULT FALSE")
+    _ensure_column("chat_conversations", "admin_email", "VARCHAR(320) NOT NULL DEFAULT ''")
 
 
 _run_column_migrations()
@@ -460,6 +489,8 @@ app.add_middleware(
 
 # Cross-site request protection for the cookie sessions (see origin_guard.py).
 install_origin_guard(app)
+# Signed tokens that travel in a URL are kept out of the access log.
+install_access_log_filter()
 
 _register_gate_handler(app)
 
@@ -493,6 +524,10 @@ app.include_router(academy_admin_routes.router)
 app.include_router(comms_routes.router)
 app.include_router(support_routes.public_router)
 app.include_router(support_routes.admin_router)
+app.include_router(consult_routes.public_router)
+app.include_router(consult_routes.admin_router)
+app.include_router(chat_routes.public_router)
+app.include_router(chat_routes.admin_router)
 # Legacy contract for the standalone quiz apps. Mounted at /auth and
 # /learning (no /api prefix) because that is what those apps already call.
 app.include_router(compat_routes.auth_router)

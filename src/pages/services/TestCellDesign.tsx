@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Reveal, SectionHeading, CTABand, PageHero } from '../../components/ui';
 import { usePageMeta } from '../../lib/meta';
+import ConsultCallout from '../../components/ConsultCallout';
 
 const capabilities = [
   'High-pressure combustion test cell design, from concept through commissioning',
@@ -172,6 +173,11 @@ const TestCellDesign = () => {
           </div>
         </div>
       </section>
+
+      <ConsultCallout
+        title="Planning or upgrading a test facility?"
+        subtitle="Book a one-to-one video call on Google Meet to talk through fuel systems, emissions sampling, data acquisition or protection logic, as soon as the same day. Nothing is charged until after the meeting."
+      />
 
       <CTABand
         title="Planning a test facility, or fighting one?"
