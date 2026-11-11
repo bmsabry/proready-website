@@ -10,7 +10,7 @@
  */
 
 /** /consult (paid expert calls) and every call-to-action that leads to it. */
-export const CONSULT_PUBLIC = false;
+export const CONSULT_PUBLIC = true;
 
 /** /about/bassam-abdelnabi (the expert's profile) and the links to it. */
-export const PROFILE_PUBLIC = false;
+export const PROFILE_PUBLIC = true;

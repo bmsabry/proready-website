@@ -11,7 +11,7 @@ public: no real consulting rate appears here, and none is in the code.
 from __future__ import annotations
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import select
@@ -638,3 +638,23 @@ def test_a_provider_failure_never_shows_the_visitor_the_provider(client, clock, 
         assert secret not in shown(r)
     (event,) = db.execute(select(ChatEvent).where(ChatEvent.kind == "model_error")).scalars().all()
     assert "llm.invalid" in event.detail, "the reason is kept for the owner"
+
+
+def test_the_model_is_told_todays_date_on_the_companys_clock(clock):
+    """Production, 10 Nov 2026: asked for "the next live course", the
+    assistant named a cohort that had started on 2 November. The pages carry
+    dates; without today's date the model cannot tell which are behind us."""
+    pages = [{"path": "/training", "title": "Training", "text": "The live cohort starts November 2."}]
+    messages, _ = chat.build_messages("When is the next live course?", [], pages)
+    system = messages[0]["content"]
+    assert system.startswith(chat.SYSTEM_PROMPT)
+    assert "Today is Monday, March 1, 2032 (US Eastern time)." in system          # chat_support.NOW, 12:00 UTC
+    assert "earlier than today is in the past" in system
+    assert system.index("TODAY\n") < system.index("PUBLIC SITE PAGES (your only source")
+    # The company's day, not UTC's: 03:30 UTC on 2 March is still 1 March in New York.
+    clock.now = datetime(2032, 3, 2, 3, 30, tzinfo=timezone.utc)
+    assert "Today is Monday, March 1, 2032" in chat.build_messages("x", [], pages)[0][0]["content"]
+    clock.now = datetime(2032, 3, 2, 5, 30, tzinfo=timezone.utc)
+    assert "Today is Tuesday, March 2, 2032" in chat.build_messages("x", [], pages)[0][0]["content"]
+    # The date line is no secret: a reply that states the date is not a leak of the instructions.
+    assert not chat.leaks_instructions("Today is Monday, March 1, 2032, so that cohort has already started.")

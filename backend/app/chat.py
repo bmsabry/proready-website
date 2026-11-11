@@ -52,6 +52,7 @@ import unicodedata
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import Any, Optional
 
 import httpx
@@ -887,13 +888,29 @@ def build_grounding(
     return "\n".join(lines)
 
 
+def today_line(now: Optional[datetime] = None) -> str:
+    """The date the model has to reason from, on the company's clock.
+
+    The pages name dates (a cohort's first day, a session). Without today's
+    date the model cannot tell which of them are behind us: asked for "the
+    next live course", it gave one that had started eight days earlier."""
+    local = (now or utcnow()).astimezone(ZoneInfo("America/New_York"))
+    return (
+        "TODAY\n"
+        f"Today is {local.strftime('%A')}, {local.strftime('%B')} {local.day}, {local.year} (US Eastern time). "
+        "A date on a page that is earlier than today is in the past: never call it upcoming, next or scheduled. "
+        "Say that it has started or has passed, give the next date that is still ahead if the pages show one, "
+        "and otherwise name the page where the visitor can see the current dates."
+    )
+
+
 def build_messages(
     question: str, history: list[dict[str, str]], pages: list[dict[str, str]]
 ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     """What goes to the model, and the pages quoted in it ({path, title})."""
     previous = next((m["content"] for m in reversed(history) if m["role"] == "user"), "")
     excerpts = relevant_excerpts(question, pages, previous) if pages else []
-    system = SYSTEM_PROMPT + "\n\n" + build_grounding(question, pages, previous, excerpts)
+    system = "\n\n".join((SYSTEM_PROMPT, today_line(), build_grounding(question, pages, previous, excerpts)))
     messages = [{"role": "system", "content": system}, *history, {"role": "user", "content": question}]
     return messages, [{"path": e["path"], "title": e["title"]} for e in excerpts]
 
