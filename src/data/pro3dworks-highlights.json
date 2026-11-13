@@ -1,7 +1,11 @@
 {
-  "version": "2.68.5",
-  "name": "OpenRouter host selection and sampling controls",
+  "version": "2.69.0",
+  "name": "Local native SolidWorks/NX viewing, Parasolid acceleration and inspection tools",
   "highlights": [
+    "Actual supported SolidWorks (.sldprt/.sldasm) and NX (.prt) roots with supplied references can open through a separately installed local native helper and entitled external NVIDIA runtime. Conversion stays local; the HTML contains no proprietary decoder. Results are tessellated viewing geometry with unverified native coverage, not exact editable B-rep or universal version/configuration support.",
+    "Parasolid text (.x_t) assemblies open with a lightweight bounds preview, camera-prioritized refinement, and bounded IndexedDB visual caching; preview and incomplete geometry retain their engineering limitations.",
+    "Saved-display SolidWorks (.sldprt/.sldasm) preview meshes with assembly occurrence transforms and worker-backed Siemens NX (.prt) / JT 9 structure inspection report explicit provenance and codec boundaries without claiming exact native B-rep parity.",
+    "Photo studio presets apply quality, tone-mapping, backdrop and floor settings without altering physical part materials, paired with movable callouts, part-anchored 3D redlines, provenance-aware envelope summaries, and CSV/Markdown inspection exports.",
     "Choose the serving host within OpenRouter and set sampling temperature explicitly. Connection tests and AI tools share these settings; diagnostics record the sent route and temperature.",
     "AI requests no longer automatically repeat when the endpoint exhausts its output budget before answering. Errors explain reported reasoning usage and provider selection; active auto-orient diagnostics include elapsed timings.",
     "Auto-orient shows elapsed waits and JSON repair attempts, supports cancellation, and exports timing diagnostics without sharing API keys or CAD images.",
