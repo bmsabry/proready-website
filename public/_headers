@@ -22,3 +22,16 @@
 /*
   Strict-Transport-Security: max-age=31536000
   X-Frame-Options: SAMEORIGIN
+
+# Pro3DWorks download is a qualified offline application, not a web page.
+# Preserve the exact artifact: disable CDN HTML/email/analytics rewriting.
+# Cover both Pages' canonical extensionless route and the public .html link.
+/downloads/Pro3DWorks
+  Content-Type: application/octet-stream
+  Content-Disposition: attachment; filename="Pro3DWorks.html"
+  Cache-Control: public, no-transform
+
+/downloads/Pro3DWorks.html
+  Content-Type: application/octet-stream
+  Content-Disposition: attachment; filename="Pro3DWorks.html"
+  Cache-Control: public, no-transform
