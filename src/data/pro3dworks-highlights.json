@@ -1,21 +1,40 @@
 {
   "version": "2.69.1",
-  "name": "SolidWorks compatibility repair and local native CAD viewing",
+  "name": "SolidWorks previews, outline-first Parasolid assemblies and a sharper review kit",
+  "summary": "The 2.69 releases widen what you can open and make a review easier to read. Every feature shown below runs inside the one file you download.",
   "highlights": [
-    "Repairs bounded SolidWorks native preflight for modern XML15000 parts, legacy CFB/XML4700 parts, and selected CFB/XML6000 assemblies with their supplied native references. All eight qualified native-opening journeys and real missing-reference refusal were verified through the project-root launcher; standalone legacy geometry still requires the separately installed local native route.",
-    "Actual supported SolidWorks (.sldprt/.sldasm) and NX (.prt) roots with supplied references can open through a separately installed local native helper and entitled external NVIDIA runtime. Conversion stays local; the HTML contains no proprietary decoder. Results are tessellated viewing geometry with unverified native coverage, not exact editable B-rep or universal version/configuration support.",
-    "Parasolid text (.x_t) assemblies open with a lightweight bounds preview, camera-prioritized refinement, and bounded IndexedDB visual caching; preview and incomplete geometry retain their engineering limitations.",
-    "Saved-display SolidWorks (.sldprt/.sldasm) preview meshes with assembly occurrence transforms and worker-backed Siemens NX (.prt) / JT 9 structure inspection report explicit provenance and codec boundaries without claiming exact native B-rep parity.",
-    "Photo studio presets apply quality, tone-mapping, backdrop and floor settings without altering physical part materials, paired with movable callouts, part-anchored 3D redlines, provenance-aware envelope summaries, and CSV/Markdown inspection exports.",
-    "Choose the serving host within OpenRouter and set sampling temperature explicitly. Connection tests and AI tools share these settings; diagnostics record the sent route and temperature.",
-    "AI requests no longer automatically repeat when the endpoint exhausts its output budget before answering. Errors explain reported reasoning usage and provider selection; active auto-orient diagnostics include elapsed timings.",
-    "Auto-orient shows elapsed waits and JSON repair attempts, supports cancellation, and exports timing diagnostics without sharing API keys or CAD images.",
-    "AI batches preserve provider thinking defaults. Reasoning changes are explicit settings, and optional price lookups no longer delay auto-orient or component identification.",
-    "AI output-token and request-time limits are user-configurable, with no application-imposed limit by default. OpenRouter connection tests explain provider, credit, authentication and browser-network failures.",
-    "Model loading and cached reopening are more responsive, with stronger source-identity checks and safeguards against incomplete assembly imports.",
-    "Photoreal rendering reuses shader preparation more effectively, recovers from interrupted GPU warm-up, and improves material scaling and smooth-glass behavior.",
-    "AI design review links suggested checks to local measurements and component evidence, distinguishes facts from suggestions, and invalidates outdated results when the model changes.",
-    "AI connection tests can be cancelled, reject malformed replies and stop when settings change; large-assembly review preparation stays interactive while counting candidate pairs.",
-    "Engineering readouts preserve calculation precision, distinguish known mass from incomplete totals, and keep saved review evidence tied to the correct model session."
+    {
+      "title": "See inside SolidWorks files",
+      "text": "Open a .sldprt or .sldasm to view the display preview saved inside it. Assembly parts are placed when their files are opened with it, and anything unresolved is listed. Older legacy-format files are not previewed."
+    },
+    {
+      "title": "Parasolid assemblies, outline first",
+      "text": "A text Parasolid (.x_t) assembly shows its structure and outline first, then fills in detail starting with what the camera is looking at. Finished views are cached for the next time you open it."
+    },
+    {
+      "title": "Inspect NX and JT structure",
+      "text": "Look inside a Siemens NX .prt or a JT 9 file: its streams, references and embedded documents. Structure only; the geometry is not decoded."
+    },
+    {
+      "title": "Six studio looks for renders",
+      "text": "Choose a preset such as Neutral engineering, Polished product or Blueprint illustration to set quality, tone mapping, backdrop and floor in one click. Your part materials stay as they are."
+    },
+    {
+      "title": "Callouts and 3D notes that stay put",
+      "text": "Drag measurement callouts to where they read best. 3D notes stay anchored to the part when the view changes, and inspection summaries export as CSV or Markdown."
+    },
+    {
+      "title": "Isolate a single PMI callout",
+      "text": "In the PMI review of a STEP AP242 file, isolate any graphical annotation so it is shown on its own, with a label that states how it is linked to the source."
+    }
+  ],
+  "notes": [
+    "v2.69.1 is a SolidWorks compatibility repair for the optional local native-viewing route. That route runs on Windows through a separately installed helper and a separately licensed converter; neither is part of this download.",
+    "SolidWorks previews come from the display data saved inside the file. Units are unverified, exact B-rep and PMI are not decoded, and an assembly needs its component files opened together with it. Missing or unresolved components are listed, not hidden. Older files in the legacy compound-file container are not previewed.",
+    "Siemens NX (.prt) and JT 9 support is structure inspection only: containers, streams, references and embedded JT documents. NX and JT geometry is not decoded in the browser.",
+    "Text Parasolid (.x_t) opens as a visual model for viewing. Binary Parasolid (.x_b) and exact Parasolid topology need a qualified external provider.",
+    "Studio presets change presentation only: quality, tone mapping, backdrop and floor. They do not change part materials.",
+    "Coordinates of unknown unit are shown as model units. No millimetre or inch value is invented.",
+    "The inspection table copied from the Measure panel as CSV neutralises text that a spreadsheet could read as a formula."
   ]
 }

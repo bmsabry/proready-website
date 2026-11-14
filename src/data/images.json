@@ -87,6 +87,24 @@
     "srcset": "/img/New_HighPerformance_Data_Acquisition_System-480.webp 480w, /img/New_HighPerformance_Data_Acquisition_System-800.webp 800w, /img/New_HighPerformance_Data_Acquisition_System-1280.webp 1280w, /img/New_HighPerformance_Data_Acquisition_System-1600.webp 1600w",
     "og": "/img/New_HighPerformance_Data_Acquisition_System-og.jpg"
   },
+  "/Pro3DWorks_PMI_Review.png": {
+    "w": 1600,
+    "h": 1000,
+    "src": "/img/Pro3DWorks_PMI_Review-1600.webp",
+    "srcset": "/img/Pro3DWorks_PMI_Review-480.webp 480w, /img/Pro3DWorks_PMI_Review-800.webp 800w, /img/Pro3DWorks_PMI_Review-1280.webp 1280w, /img/Pro3DWorks_PMI_Review-1600.webp 1600w"
+  },
+  "/Pro3DWorks_Printability_Audit.png": {
+    "w": 1600,
+    "h": 1000,
+    "src": "/img/Pro3DWorks_Printability_Audit-1600.webp",
+    "srcset": "/img/Pro3DWorks_Printability_Audit-480.webp 480w, /img/Pro3DWorks_Printability_Audit-800.webp 800w, /img/Pro3DWorks_Printability_Audit-1280.webp 1280w, /img/Pro3DWorks_Printability_Audit-1600.webp 1600w"
+  },
+  "/Pro3DWorks_Section_View.png": {
+    "w": 1600,
+    "h": 1000,
+    "src": "/img/Pro3DWorks_Section_View-1600.webp",
+    "srcset": "/img/Pro3DWorks_Section_View-480.webp 480w, /img/Pro3DWorks_Section_View-800.webp 800w, /img/Pro3DWorks_Section_View-1280.webp 1280w, /img/Pro3DWorks_Section_View-1600.webp 1600w"
+  },
   "/Recovery_Reactor_Feed_Cooler_Heat_Exchanger.jpg": {
     "w": 2752,
     "h": 1536,
