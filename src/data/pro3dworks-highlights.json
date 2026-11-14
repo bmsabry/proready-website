@@ -1,7 +1,8 @@
 {
-  "version": "2.69.0",
-  "name": "Local native SolidWorks/NX viewing, Parasolid acceleration and inspection tools",
+  "version": "2.69.1",
+  "name": "SolidWorks compatibility repair and local native CAD viewing",
   "highlights": [
+    "Repairs bounded SolidWorks native preflight for modern XML15000 parts, legacy CFB/XML4700 parts, and selected CFB/XML6000 assemblies with their supplied native references. All eight qualified native-opening journeys and real missing-reference refusal were verified through the project-root launcher; standalone legacy geometry still requires the separately installed local native route.",
     "Actual supported SolidWorks (.sldprt/.sldasm) and NX (.prt) roots with supplied references can open through a separately installed local native helper and entitled external NVIDIA runtime. Conversion stays local; the HTML contains no proprietary decoder. Results are tessellated viewing geometry with unverified native coverage, not exact editable B-rep or universal version/configuration support.",
     "Parasolid text (.x_t) assemblies open with a lightweight bounds preview, camera-prioritized refinement, and bounded IndexedDB visual caching; preview and incomplete geometry retain their engineering limitations.",
     "Saved-display SolidWorks (.sldprt/.sldasm) preview meshes with assembly occurrence transforms and worker-backed Siemens NX (.prt) / JT 9 structure inspection report explicit provenance and codec boundaries without claiming exact native B-rep parity.",
