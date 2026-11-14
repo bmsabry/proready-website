@@ -70,7 +70,7 @@ const capabilities: Capability[] = [
   {
     icon: <Boxes aria-hidden="true" className="w-5 h-5" />,
     title: 'Opens STEP, IGES and 50+ more',
-    lead: 'True faces, edges and vertices from STEP, IGES and BREP, a visual model from the other formats, and a label that tells you which one you are looking at.',
+    lead: 'True faces, edges and vertices from STEP, IGES and BREP, a visual model from mesh, text Parasolid and SolidWorks files, and a label that tells you which one you are looking at.',
     points: [
       'STEP, IGES and BREP through a built-in CAD kernel, with true faces, edges and vertices to measure from',
       'More than 50 mesh and scene file types: STL, OBJ, 3MF, GLB/glTF, PLY, FBX, DAE, USD and others',
@@ -91,7 +91,7 @@ const capabilities: Capability[] = [
       'Model health, geometry quality and standard-hardware checks: click a finding to select the parts it concerns',
       'Units from millimetres to feet and inches, including fractions down to 1/64',
     ],
-    note: 'Exact measurement comes from STEP, IGES and BREP files. Parasolid and SolidWorks models open for viewing.',
+    note: 'Measuring from true faces, edges and vertices needs a STEP, IGES or BREP file. Text Parasolid files and SolidWorks previews open for viewing only.',
   },
   {
     icon: <ClipboardCheck aria-hidden="true" className="w-5 h-5" />,
@@ -187,7 +187,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Do my models leave my computer?',
-    a: 'Your CAD files never do. The geometry is read and processed on your machine, and ProReadyEngineer never receives your models or file names. One thing is of your own choosing: if you connect the AI Engineer to a cloud endpoint, the screenshots and part data needed for the job you run go to that endpoint, never the source CAD file. Use LM Studio and even that stays on your computer. Models you open are cached in your own browser so they reopen quickly; File, then Cache manager, in the app deletes those caches.',
+    a: 'Your CAD files never do. The geometry is read and processed on your machine, and ProReadyEngineer never receives your models or file names. One thing is of your own choosing: if you connect the AI Engineer to a cloud endpoint, the screenshots and part data needed for the job you run go to that endpoint, never the source CAD file. Use LM Studio and even that stays on your computer. STEP, IGES, BREP and text Parasolid models you open are cached in your own browser so they reopen quickly; File, then Cache manager, in the app deletes those caches.',
   },
   {
     q: 'What do I need to run it?',
@@ -195,7 +195,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'How large a model can it open?',
-    a: 'The truck in the built-in lessons is a 40.8 MB STEP assembly with 189 parts and 3.5 million triangles; in our own tests it opened in about 13 seconds on a 32-thread workstation and about 85 seconds on a 2-core machine, and a model you have opened before reopens from a local cache. A single STEP file is practical up to roughly 250 to 450 MB, depending on what is in it, and needs about four to eight times its size in memory while it is read.',
+    a: 'The truck in the built-in lessons is a 40.8 MB STEP assembly with 189 parts and 3.5 million triangles; in our own tests it opened in about 13 seconds on a 32-thread workstation and a little over two minutes on a 2-core test machine, and a model you have opened before reopens from a local cache. A single STEP file is practical up to roughly 250 to 450 MB, depending on what is in it, and needs about four to eight times its size in memory while it is read.',
   },
   {
     q: 'Does it open SolidWorks and NX files?',
@@ -211,7 +211,7 @@ const networkTouches: { name: string; detail: string }[] = [
   { name: 'Update check', detail: 'At launch the app asks proreadyengineer.com once whether a newer free version exists. The request carries only the app name and version; the site logs it with an approximate location (country, region, city) and does not store your network address. On by default, with a switch to turn it off.' },
   { name: 'Anonymous usage ping', detail: 'Off unless you switch it on. If you do: app version, minutes open and feature counts, kept with an approximate city and region. No model data, no file names, no account, no installation ID.' },
   { name: 'Links you click', detail: 'Buttons that open this site carry the app version in the address. Nothing is sent in the background.' },
-  { name: 'AI price list', detail: 'The first time you run an AI feature against a cloud endpoint with no prices entered, and whenever you ask for a price lookup, the app downloads a public list of AI model prices.' },
+  { name: 'AI price list', detail: 'While no prices are entered for a cloud endpoint, running an AI feature or changing the model name makes the app download the public list of AI model prices from OpenRouter; the price lookup button does the same. With LM Studio selected it is never requested.' },
 ];
 
 /* A real screenshot of the app in a plain window frame. */
@@ -497,8 +497,8 @@ export default function Products() {
                   Pro3DWorks is one HTML file that runs on your machine and works offline. Your
                   models and file names are never sent to ProReadyEngineer. The{' '}
                   <span className="text-slate-100">?</span> button in the app lists the Internet
-                  requests it can make, and holds the switches for the two that run on their own:
-                  the update check and the usage ping.
+                  requests it can make, and holds the on/off switches for the update check and the
+                  usage ping.
                 </p>
                 <p className="text-sm text-slate-400 leading-relaxed">
                   If you run the AI Engineer, the screenshots and part data for that job go to the
