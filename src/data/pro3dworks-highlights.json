@@ -1,23 +1,23 @@
 {
   "version": "2.70.0",
-  "name": "Measurements corrected, a rebuilt drawing sheet, and an app that says what it stores",
-  "summary": "Version 2.70 comes out of a full audit of the free download: wrong measurements and drawing views were fixed, exports were made safe to open, and the app now tells you plainly what it keeps and sends.",
+  "name": "Precise measurement, a true-projection drawing sheet, and full control of your data",
+  "summary": "Version 2.70 measures tube walls, arcs and edge-to-face distances directly, draws sheets in true projection, opens every export cleanly, and shows you exactly what the app keeps.",
   "highlights": [
     {
-      "title": "Measurements you can rely on",
-      "text": "Tube walls, edge-to-face, arc and parallel-edge distances are now computed correctly, a part buried inside another is reported as interference, and distances taken on the tessellation are labelled as such."
+      "title": "Measure walls, arcs and edges",
+      "text": "Pick a tube's outside and its bore to get the wall thickness, measure between arcs and from an edge to a face, and see a part placed inside another flagged as interference. Mesh-based distances are labelled as such."
     },
     {
       "title": "A drawing sheet in true projection",
-      "text": "The isometric view is a real isometric, views line up correctly for either up axis, curved parts get their outlines, bores show their true width, and the title block carries the scale, units and projection symbol."
+      "text": "A true isometric view, orthographic views aligned for either up axis, outlines on curved parts, bores at their true width, and a title block with the scale, units and projection symbol."
     },
     {
-      "title": "Exports that open safely",
-      "text": "Every CSV export is guarded against spreadsheet formulas, symbols such as ° and ± open correctly in Excel, and file names built from your model's name keep it in any language, Arabic and Chinese included."
+      "title": "Exports that open cleanly",
+      "text": "CSV exports are protected against spreadsheet formulas, symbols such as ° and ± display correctly in Excel, and file names keep your model's name in any language, Arabic and Chinese included."
     },
     {
       "title": "Units read from the file",
-      "text": "COLLADA and 3MF models open at their true size, STEP and IGES models are labelled in millimetres, and empty or damaged STL, STEP and IGES files get a plain message instead of a technical error."
+      "text": "COLLADA and 3MF models open at their true size, STEP and IGES models are labelled in millimetres, and an empty or damaged STL, STEP or IGES file gets a clear, plain message."
     },
     {
       "title": "Your data, visible and removable",
@@ -25,17 +25,15 @@
     },
     {
       "title": "Hardened against hostile files",
-      "text": "Part names, file names, project files and AI replies are always shown as text. They can no longer inject script into the app, its drawings or its reports."
+      "text": "Part names, file names, project files and AI replies are always displayed as plain text, never run as script, in the app, its drawings and its reports."
     }
   ],
   "notes": [
-    "Every item above works in the single downloaded file. The optional local native helper was not re-qualified for this version; v2.69.1 remains its last qualified build.",
-    "Measurement changes: nested parallel cylinders, straight edge to face, vertex to circle, circle to circle, arcs, and staggered parallel edges. \"Distance (parallel)\" is now the perpendicular offset; the gap between the bounded edges is listed separately when it differs.",
+    "Measurement: \"Distance (parallel)\" is the perpendicular offset between parallel edges, and the gap between the bounded edges is listed separately when it differs. Arc and edge-to-face distances are taken along the edges themselves.",
     "Drawing sheets: new sheets follow the viewer's Up axis; the isometric view shows no hidden lines and states its own scale when it differs from the orthographic views.",
-    "The 4K export is now called \"PNG image (4K, Realistic style)\". It is a raster capture 3840 pixels wide, not a ray-traced render.",
+    "The 4K export is called \"PNG image (4K, Realistic style)\": a raster capture 3,840 pixels wide.",
     "Tolerance stacks: the RSS card, CSV and report say when a contributor uses a distribution that RSS does not model. The CSV states units and writes numbers to 12 significant digits.",
-    "Working in the app: Close all models now asks before discarding unsaved review work, Escape closes the top dialog, the Dark frame theme is readable, and the navigation bar stays visible in windows down to 930 pixels wide.",
-    "Tutorial narration: voices produced by a browser vendor's online speech service are marked \"online\" in the voice list.",
-    "Known and unchanged: touching parts are still reported as interference; nested STEP assemblies still show kernel body names; the tolerance panel prints eight significant digits."
+    "Working in the app: Close all models asks before discarding unsaved review work, Escape closes the top dialog, and the navigation bar stays visible in windows down to 930 pixels wide.",
+    "Tutorial narration: voices produced by a browser vendor's online speech service are marked \"online\" in the voice list."
   ]
 }
