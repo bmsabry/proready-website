@@ -1,40 +1,41 @@
 {
-  "version": "2.69.1",
-  "name": "SolidWorks previews, outline-first Parasolid assemblies and a sharper review kit",
-  "summary": "The 2.69 releases widen what you can open and make a review easier to read. Every feature shown below runs inside the one file you download.",
+  "version": "2.70.0",
+  "name": "Measurements corrected, a rebuilt drawing sheet, and an app that says what it stores",
+  "summary": "Version 2.70 comes out of a full audit of the free download: wrong measurements and drawing views were fixed, exports were made safe to open, and the app now tells you plainly what it keeps and sends.",
   "highlights": [
     {
-      "title": "See inside SolidWorks files",
-      "text": "Open a .sldprt or .sldasm to view the display preview saved inside it. Assembly parts are placed when their files are opened with it, and anything unresolved is listed. Older legacy-format files are not previewed."
+      "title": "Measurements you can rely on",
+      "text": "Tube walls, edge-to-face, arc and parallel-edge distances are now computed correctly, a part buried inside another is reported as interference, and distances taken on the tessellation are labelled as such."
     },
     {
-      "title": "Parasolid assemblies, outline first",
-      "text": "A text Parasolid (.x_t) assembly shows its structure and outline first, then fills in detail starting with what the camera is looking at. Finished views are cached for the next time you open it."
+      "title": "A drawing sheet in true projection",
+      "text": "The isometric view is a real isometric, views line up correctly for either up axis, curved parts get their outlines, bores show their true width, and the title block carries the scale, units and projection symbol."
     },
     {
-      "title": "Inspect NX and JT structure",
-      "text": "Look inside a Siemens NX .prt or a JT 9 file: its streams, references and embedded documents. Structure only; the geometry is not decoded."
+      "title": "Exports that open safely",
+      "text": "Every CSV export is guarded against spreadsheet formulas, symbols such as ° and ± open correctly in Excel, and file names built from your model's name keep it in any language, Arabic and Chinese included."
     },
     {
-      "title": "Six studio looks for renders",
-      "text": "Choose a preset such as Neutral engineering, Polished product or Blueprint illustration to set quality, tone mapping, backdrop and floor in one click. Your part materials stay as they are."
+      "title": "Units read from the file",
+      "text": "COLLADA and 3MF models open at their true size, STEP and IGES models are labelled in millimetres, and empty or damaged STL, STEP and IGES files get a plain message instead of a technical error."
     },
     {
-      "title": "Callouts and 3D notes that stay put",
-      "text": "Drag measurement callouts to where they read best. 3D notes stay anchored to the part when the view changes, and inspection summaries export as CSV or Markdown."
+      "title": "Your data, visible and removable",
+      "text": "AI features send nothing until you set up your own endpoint. The privacy dialog lists what the app keeps in your browser, and one button removes all of it. The licence is readable inside the app."
     },
     {
-      "title": "Isolate a single PMI callout",
-      "text": "In the PMI review of a STEP AP242 file, isolate any graphical annotation so it is shown on its own, with a label that states how it is linked to the source."
+      "title": "Hardened against hostile files",
+      "text": "Part names, file names, project files and AI replies are always shown as text. They can no longer inject script into the app, its drawings or its reports."
     }
   ],
   "notes": [
-    "v2.69.1 is a SolidWorks compatibility repair for the optional local native-viewing route. That route runs on Windows through a separately installed helper and a separately licensed converter; neither is part of this download.",
-    "SolidWorks previews come from the display data saved inside the file. Units are unverified, exact B-rep and PMI are not decoded, and an assembly needs its component files opened together with it. Missing or unresolved components are listed, not hidden. Older files in the legacy compound-file container are not previewed.",
-    "Siemens NX (.prt) and JT 9 support is structure inspection only: containers, streams, references and embedded JT documents. NX and JT geometry is not decoded in the browser.",
-    "Text Parasolid (.x_t) opens as a visual model for viewing. Binary Parasolid (.x_b) and exact Parasolid topology need a qualified external provider.",
-    "Studio presets change presentation only: quality, tone mapping, backdrop and floor. They do not change part materials.",
-    "Coordinates of unknown unit are shown as model units. No millimetre or inch value is invented.",
-    "The inspection table copied from the Measure panel as CSV neutralises text that a spreadsheet could read as a formula."
+    "Every item above works in the single downloaded file. The optional local native helper was not re-qualified for this version; v2.69.1 remains its last qualified build.",
+    "Measurement changes: nested parallel cylinders, straight edge to face, vertex to circle, circle to circle, arcs, and staggered parallel edges. \"Distance (parallel)\" is now the perpendicular offset; the gap between the bounded edges is listed separately when it differs.",
+    "Drawing sheets: new sheets follow the viewer's Up axis; the isometric view shows no hidden lines and states its own scale when it differs from the orthographic views.",
+    "The 4K export is now called \"PNG image (4K, Realistic style)\". It is a raster capture 3840 pixels wide, not a ray-traced render.",
+    "Tolerance stacks: the RSS card, CSV and report say when a contributor uses a distribution that RSS does not model. The CSV states units and writes numbers to 12 significant digits.",
+    "Working in the app: Close all models now asks before discarding unsaved review work, Escape closes the top dialog, the Dark frame theme is readable, and the navigation bar stays visible in windows down to 930 pixels wide.",
+    "Tutorial narration: voices produced by a browser vendor's online speech service are marked \"online\" in the voice list.",
+    "Known and unchanged: touching parts are still reported as interference; nested STEP assemblies still show kernel body names; the tolerance panel prints eight significant digits."
   ]
 }

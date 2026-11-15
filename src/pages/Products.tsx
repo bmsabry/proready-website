@@ -328,7 +328,7 @@ export default function Products() {
                     next line with a text search. Keep its wording and its place in
                     this file exactly as they are, or the next release cannot publish. */}
                 <p className="text-sm text-slate-400">
-                  v2.69.1 · single HTML file · ~23&nbsp;MB · Windows / Mac / Linux · works offline
+                  v2.70.0 · single HTML file · ~24&nbsp;MB · Windows / Mac / Linux · works offline
                   {downloads !== null && downloads > 0 && (
                     <> · <span className="text-cyan-300">{downloads.toLocaleString()} download{downloads === 1 ? '' : 's'}</span></>
                   )}
