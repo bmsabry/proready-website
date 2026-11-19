@@ -1,39 +1,32 @@
 {
-  "version": "2.70.0",
-  "name": "Precise measurement, a true-projection drawing sheet, and full control of your data",
-  "summary": "Version 2.70 measures tube walls, arcs and edge-to-face distances directly, draws sheets in true projection, opens every export cleanly, and shows you exactly what the app keeps.",
+  "version": "2.70.1",
+  "name": "SolidWorks-style 3D section triad, multi-view quads, and workflow AI Engineer",
+  "summary": "Slide and tilt multi-plane sections with a 3D reference triad and solid hatched caps, inspect in synchronized quad viewports, or run multi-step workflows straight from AI Engineer Chat.",
   "highlights": [
     {
-      "title": "Measure walls, arcs and edges",
-      "text": "Pick a tube's outside and its bore to get the wall thickness, measure between arcs and from an edge to a face, and see a part placed inside another flagged as interference. Mesh-based distances are labelled as such."
+      "title": "3D section triad & solid cap faces",
+      "text": "Drag a SolidWorks-style 3D reference triad to slide and tilt up to three planes in Planar, Zonal, or Slab modes, with triangulated polygon cap faces, ISO cross-hatching, component exclusions, and outer ghosting."
     },
     {
-      "title": "A drawing sheet in true projection",
-      "text": "A true isometric view, orthographic views aligned for either up axis, outlines on curved parts, bores at their true width, and a title block with the scale, units and projection symbol."
+      "title": "Live section properties & cut snap",
+      "text": "Compute real-time cut area, perimeter, hydraulic diameter Dh, centroid, and principal moments on every plane, snap Measure directly onto cut bores, or export a 1:1 2D SVG profile."
     },
     {
-      "title": "Exports that open cleanly",
-      "text": "CSV exports are protected against spreadsheet formulas, symbols such as ° and ± display correctly in Excel, and file names keep your model's name in any language, Arabic and Chinese included."
+      "title": "Synchronized multi-view layouts",
+      "text": "Switch between Single, 2-View Split, 4-View Quad, and Section Quad viewports with lockable orthographic panes, persistent active sectioning while measuring, and labeled multi-view captures."
     },
     {
-      "title": "Units read from the file",
-      "text": "COLLADA and 3MF models open at their true size, STEP and IGES models are labelled in millimetres, and an empty or damaged STL, STEP or IGES file gets a clear, plain message."
+      "title": "Actionable AI Engineer workflows",
+      "text": "Propose and approve multi-step cross-section, multi-view, isolation, measurement, and HTML report workflows in AI Engineer Chat or locally with zero API key, complete with one-click view restore."
     },
     {
-      "title": "Your data, visible and removable",
-      "text": "AI features send nothing until you set up your own endpoint. The privacy dialog lists what the app keeps in your browser, and one button removes all of it. The licence is readable inside the app."
-    },
-    {
-      "title": "Hardened against hostile files",
-      "text": "Part names, file names, project files and AI replies are always displayed as plain text, never run as script, in the app, its drawings and its reports."
+      "title": "Preview older SolidWorks & Parasolid",
+      "text": "Open saved-display previews for supported older SolidWorks assemblies and read pointer-list text Parasolid models (viewing preview, not exact B-rep geometry) with unit limits shown."
     }
   ],
   "notes": [
-    "Measurement: \"Distance (parallel)\" is the perpendicular offset between parallel edges, and the gap between the bounded edges is listed separately when it differs. Arc and edge-to-face distances are taken along the edges themselves.",
-    "Drawing sheets: new sheets follow the viewer's Up axis; the isometric view shows no hidden lines and states its own scale when it differs from the orthographic views.",
-    "The 4K export is called \"PNG image (4K, Realistic style)\": a raster capture 3,840 pixels wide.",
-    "Tolerance stacks: the RSS card, CSV and report say when a contributor uses a distribution that RSS does not model. The CSV states units and writes numbers to 12 significant digits.",
-    "Working in the app: Close all models asks before discarding unsaved review work, Escape closes the top dialog, and the navigation bar stays visible in windows down to 930 pixels wide.",
-    "Tutorial narration: voices produced by a browser vendor's online speech service are marked \"online\" in the voice list."
+    "Local native SolidWorks (.SLDPRT/.SLDASM, including 3400/4100/4700/6000/15000 profiles) and Siemens NX (.prt) geometry viewing uses the separate Windows Native Kit (Setup-Pro3DWorks-Native.cmd) and a separately installed NVIDIA usd-convert-cad 0.3.0 runtime under NVIDIA's licence terms.",
+    "Legacy saved-display support in the single-file download applies to the exercised SolidWorks 2800 carrier profile and saved active configuration. All required companion files must be supplied and match intrinsic type, creation, configuration and save data.",
+    "Conversational cloud AI responses require your configured OpenAI-compatible or local LM Studio endpoint; deterministic Local workflows, section properties, and multi-view layouts run entirely in the browser."
   ]
 }
