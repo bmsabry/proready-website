@@ -259,6 +259,7 @@ const DownloadButton = ({ label = 'Download Pro3DWorks, free' }: { label?: strin
 const NativeKitButton = ({ label = 'Download Windows Native Kit (SolidWorks & NX)' }: { label?: string }) => (
   <a
     href={NATIVE_KIT_DOWNLOAD_URL}
+    download="Pro3DWorks-Windows-Native-Kit.zip"
     className="btn-ghost border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/10"
   >
     <Download className="w-4 h-4 text-cyan-400" aria-hidden="true" />

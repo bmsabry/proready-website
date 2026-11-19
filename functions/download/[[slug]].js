@@ -28,11 +28,7 @@ const REGISTRY_TIMEOUT_MS = 6000;
 // Safety net for API downtime. Registry entries win whenever it's reachable.
 const STATIC_ASSET_PATHS = {
   pro3dworks: '/downloads/Pro3DWorks.html',
-};
-
-// Tracked external release assets (keeps large archives on GitHub Releases while logging downloads here).
-const EXTERNAL_DOWNLOAD_REDIRECTS = {
-  'pro3dworks-native-kit': 'https://github.com/bmsabry/Pro3DWorks/releases/latest/download/Pro3DWorks-Windows-Native-Kit.zip',
+  'pro3dworks-native-kit': '/downloads/Pro3DWorks-Windows-Native-Kit.zip',
 };
 
 async function lookupAssetPath(slug, waitUntil) {
@@ -73,8 +69,7 @@ export async function onRequestGet(context) {
     assetPath = null; // registry unreachable — fall through to the static map
   }
   if (!assetPath) assetPath = STATIC_ASSET_PATHS[slug] || null;
-  const externalRedirectUrl = !assetPath ? (EXTERNAL_DOWNLOAD_REDIRECTS[slug] || null) : null;
-  if (!assetPath && !externalRedirectUrl) return new Response('Not found', { status: 404 });
+  if (!assetPath) return new Response('Not found', { status: 404 });
 
   waitUntil(
     fetch(`${API_BASE}/api/track/download`, {
@@ -92,16 +87,6 @@ export async function onRequestGet(context) {
       }),
     }).catch(() => {})
   );
-
-  if (externalRedirectUrl) {
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: externalRedirectUrl,
-        'Cache-Control': 'no-store',
-      },
-    });
-  }
 
   const assetUrl = new URL(assetPath, request.url);
   const filename = (assetPath.split('/').pop() || `${slug}.bin`).replace(/"/g, '');
