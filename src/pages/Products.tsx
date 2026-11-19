@@ -13,6 +13,7 @@ const API_BASE =
   'https://api.proreadyengineer.com';
 
 const DOWNLOAD_URL = '/download/pro3dworks';
+const NATIVE_KIT_DOWNLOAD_URL = '/download/pro3dworks-native-kit';
 const SUPPORT_URL = 'https://buy.stripe.com/dRmdRb54gg8RgBmbkCcjS00';
 
 /* ---------- "What's new": fed by the Pro3DWorks release job ----------
@@ -199,7 +200,21 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Does it open SolidWorks and NX files?',
-    a: 'It shows the display preview saved inside a SolidWorks part or assembly, and the internal structure of Siemens NX and JT 9 files. The preview is not available for older SolidWorks files in the legacy container format, and an assembly needs its part files opened together with it. For true faces, edges and vertices you can measure from, export STEP from your CAD system: Pro3DWorks reads it with a real CAD kernel. Decoding native SolidWorks and NX geometry needs a separate Windows helper and a separately licensed converter; neither is included in, or available with, this download.',
+    a: (
+      <>
+        The single HTML file opens saved-display previews inside supported SolidWorks parts and
+        assemblies, inspects Siemens NX and JT 9 structure, and reads STEP/IGES/BREP with its
+        built-in CAD kernel. For native SolidWorks (<code>.SLDPRT</code> / <code>.SLDASM</code>)
+        and Siemens NX (<code>.prt</code>) geometry viewing on Windows, download the{' '}
+        <a href="#native-cad-kit" className="text-cyan-400 hover:underline">
+          Windows Native Kit
+        </a>{' '}
+        above and run <code>Setup-Pro3DWorks-Native.cmd</code> once followed by{' '}
+        <code>Start-Pro3DWorks-Native.cmd</code>. Native assembly opens require selecting the
+        assembly folder with all referenced part files; outputs are tessellated viewing geometry
+        rather than editable B-rep.
+      </>
+    ),
   },
   {
     q: 'Can I edit or convert a model?',
@@ -237,6 +252,16 @@ const AppWindow = ({ src, alt, caption, priority, sizes }: {
 const DownloadButton = ({ label = 'Download Pro3DWorks, free' }: { label?: string }) => (
   <a href={DOWNLOAD_URL} className="btn-primary" download="Pro3DWorks.html">
     <Download className="w-4 h-4" aria-hidden="true" />
+    {label}
+  </a>
+);
+
+const NativeKitButton = ({ label = 'Download Windows Native Kit (SolidWorks & NX)' }: { label?: string }) => (
+  <a
+    href={NATIVE_KIT_DOWNLOAD_URL}
+    className="btn-ghost border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/10"
+  >
+    <Download className="w-4 h-4 text-cyan-400" aria-hidden="true" />
     {label}
   </a>
 );
@@ -347,6 +372,12 @@ export default function Products() {
                     </li>
                   ))}
                 </ol>
+                <p className="mt-4 text-xs text-slate-400">
+                  Need native SolidWorks (<code>.SLDPRT</code>/<code>.SLDASM</code>) or Siemens NX (<code>.prt</code>) geometry?{' '}
+                  <a href="#native-cad-kit" className="text-cyan-400 hover:underline font-medium">
+                    Jump to Windows Native Kit &darr;
+                  </a>
+                </p>
               </div>
               <AppWindow
                 src="/Pro3DWorks_PMI_Review.png"
@@ -414,6 +445,79 @@ export default function Products() {
           </div>
         </section>
       )}
+
+      {/* ---------- Native SolidWorks & Siemens NX on Windows ---------- */}
+      <section className="pb-10 lg:pb-14" id="native-cad-kit">
+        <div className="container-site">
+          <Reveal className="card relative overflow-hidden px-6 py-9 md:px-12 md:py-11 border border-cyan-500/25">
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <span className="eyebrow">Windows Native Kit</span>
+              <span className="font-mono text-xs uppercase tracking-widest text-slate-400">
+                v{release?.version || '2.70.1'} &middot; Windows 10/11 64-bit
+              </span>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-3">
+              Native SolidWorks &amp; Siemens NX on Windows
+            </h2>
+            <p className="text-slate-300 leading-relaxed max-w-4xl mb-6">
+              Single-file <code>Pro3DWorks.html</code> opens STEP, IGES, BREP, Parasolid, 50+ visual
+              formats, and SolidWorks saved-display previews with nothing installed. For local native
+              SolidWorks (<code>.SLDPRT</code>, <code>.SLDASM</code>) and Siemens NX (<code>.prt</code>)
+              geometry decoding on Windows, download the{' '}
+              <span className="text-slate-100 font-medium">Windows Native Kit</span> (
+              <code>Pro3DWorks-Windows-Native-Kit.zip</code>).
+            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-7">
+              <NativeKitButton label="Download Windows Native Kit (SolidWorks & NX)" />
+              <span className="text-sm text-slate-400">
+                Includes <code>Pro3DWorks.html</code> + zero-npm local helper
+              </span>
+            </div>
+            <ol className="grid md:grid-cols-3 gap-4 text-sm">
+              {[
+                [
+                  'Extract',
+                  <>
+                    Unzip <span className="text-slate-200">Pro3DWorks-Windows-Native-Kit.zip</span>{' '}
+                    into any local folder on Windows 10/11 (64-bit).
+                  </>,
+                ],
+                [
+                  'One-time setup',
+                  <>
+                    Double-click <span className="text-slate-200">Setup-Pro3DWorks-Native.cmd</span>.
+                    It checks Node.js 20+ and Python 3.12, shows the NVIDIA{' '}
+                    <code>usd-convert-cad 0.3.0</code> (HOOPS Exchange) license terms for your explicit{' '}
+                    <code>I ACCEPT</code> consent, installs the isolated runtime locally, and verifies readiness.
+                  </>,
+                ],
+                [
+                  'Launch & open',
+                  <>
+                    Double-click <span className="text-slate-200">Start-Pro3DWorks-Native.cmd</span>{' '}
+                    anytime to open Pro3DWorks with native SolidWorks &amp; NX support enabled. Future
+                    updates reuse your local runtime automatically.
+                  </>,
+                ],
+              ].map(([step, body], i) => (
+                <li key={i} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                  <span className="block font-mono text-xs uppercase tracking-widest text-cyan-400 mb-1.5">
+                    {i + 1}. {step}
+                  </span>
+                  <span className="text-slate-400 leading-relaxed">{body}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-5 text-xs text-slate-400 leading-relaxed max-w-4xl">
+              No proprietary NVIDIA/HOOPS binaries are bundled in the ZIP; NVIDIA&rsquo;s{' '}
+              <code>usd-convert-cad 0.3.0</code> package is downloaded from PyPI on your computer only
+              after you review and accept NVIDIA&rsquo;s terms. Native CAD viewing produces
+              tessellated viewing geometry rather than editable B-rep. For assemblies, open the
+              assembly folder containing all referenced parts.
+            </p>
+          </Reveal>
+        </div>
+      </section>
 
       {/* ---------- What it does ---------- */}
       <section className="section-pad pt-10 lg:pt-14">
@@ -553,6 +657,7 @@ export default function Products() {
             </p>
             <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
               <DownloadButton />
+              <NativeKitButton label="Windows Native Kit (SolidWorks & NX)" />
               <a href={SUPPORT_URL} target="_blank" rel="noopener noreferrer" className="btn-ghost">
                 <Heart className="w-4 h-4 text-amber-400" aria-hidden="true" />
                 Support development
