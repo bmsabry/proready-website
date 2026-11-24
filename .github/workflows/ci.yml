@@ -17,20 +17,34 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt pytest
-      - run: python -m pytest -q -p no:cacheprovider
+      - name: Run the tests (one more try only if the test process crashes)
+        # mini-racer (the V8 engine the simulator tests use) can segfault
+        # while the suite creates and closes many engines: on 2026-11-24 one
+        # run crashed that way (exit 139) on a commit that changed no backend
+        # code. A crash gets one more run; a failing test never does.
+        run: |
+          python -m pytest -q -p no:cacheprovider || {
+            code=$?
+            if [ "$code" -eq 139 ]; then
+              echo "::warning::The test process crashed (segfault, exit 139); running the suite once more"
+              python -m pytest -q -p no:cacheprovider
+            else
+              exit "$code"
+            fi
+          }
 
   frontend-typecheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: npm
