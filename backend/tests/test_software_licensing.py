@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+import pytest  # noqa: E402
+
 import conftest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -17,13 +19,14 @@ from app.software_licensing import verify_envelope  # noqa: E402
 ADMIN = {"Authorization": f"Bearer {conftest.ADMIN_TOKEN}"}
 
 
-def _client() -> TestClient:
-    return TestClient(app, base_url="https://testserver")
+@pytest.fixture(scope="module")
+def client():
+    with TestClient(app, base_url="https://testserver") as c:
+        yield c
 
 
-def test_plans_catalog_and_ed25519_public_key():
-    with _client() as c:
-        r = c.get("/api/software/plans?product=pro3dworks")
+def test_plans_catalog_and_ed25519_public_key(client):
+    r = client.get("/api/software/plans?product=pro3dworks")
     assert r.status_code == 200
     body = r.json()
     assert body["product"] == "pro3dworks"
@@ -38,8 +41,9 @@ def test_plans_catalog_and_ed25519_public_key():
     assert codes["perpetual"]["interval"] is None
 
 
-def test_trial_15_day_lifecycle_and_single_trial_enforcement():
-    with _client() as c:
+def test_trial_15_day_lifecycle_and_single_trial_enforcement(client):
+    c = client
+    if True:
         # 1. Start fresh 15-day trial
         r = c.post(
             "/api/software/trial/start",
@@ -122,7 +126,7 @@ def test_trial_15_day_lifecycle_and_single_trial_enforcement():
         assert r5.status_code == 409
 
 
-def test_stripe_checkout_webhook_activation_renewal_and_portal(monkeypatch):
+def test_stripe_checkout_webhook_activation_renewal_and_portal(client, monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "STRIPE_SECRET_KEY", "sk_test_software")
     monkeypatch.setattr(settings, "STRIPE_WEBHOOK_SECRET", "whsec_software")
@@ -161,7 +165,8 @@ def test_stripe_checkout_webhook_activation_renewal_and_portal(monkeypatch):
 
     monkeypatch.setattr(checkout_routes, "_stripe", lambda: FakeStripe)
 
-    with _client() as c:
+    c = client
+    if True:
         # 1. Create Checkout Session for Pro Yearly + Perpetual
         r = c.post(
             "/api/software/checkout",
@@ -333,8 +338,9 @@ def test_stripe_checkout_webhook_activation_renewal_and_portal(monkeypatch):
         assert ref_dead.json()["entitled"] is False
 
 
-def test_admin_comp_perpetual_offline_file_and_revoke():
-    with _client() as c:
+def test_admin_comp_perpetual_offline_file_and_revoke(client):
+    c = client
+    if True:
         r = c.post(
             "/api/admin/software/licenses/comp",
             headers=ADMIN,
