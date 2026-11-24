@@ -189,6 +189,7 @@ def test_stripe_checkout_webhook_activation_renewal_and_portal(client, monkeypat
         )
         assert r_perp.status_code == 200
         assert created_sessions[-1]["mode"] == "payment"
+        assert created_sessions[-1]["customer_creation"] == "always"
         assert created_sessions[-1]["line_items"][0]["price_data"]["unit_amount"] == 59900
 
         # 2. Checkout poll starts pending before webhook fires

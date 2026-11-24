@@ -450,6 +450,8 @@ def create_software_checkout(
                 "plan": plan_info["code"],
             }
         }
+    else:
+        kwargs["customer_creation"] = "always"
 
     try:
         session = stripe.checkout.Session.create(**kwargs)
