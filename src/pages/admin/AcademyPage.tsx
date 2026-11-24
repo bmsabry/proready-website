@@ -130,16 +130,16 @@ export default function AcademyPage({ onAuthError }: { onAuthError: () => void }
     setBusy('link' + email);
     setError(null);
     try {
-      const res = await api<{ link: string; expires_in_seconds: number }>(
+      const res = await api<{ link: string; expires_in_seconds: number; expires_label?: string }>(
         '/api/admin/academy/login-link',
         { method: 'POST', body: JSON.stringify({ email }) },
       );
-      const mins = Math.round(res.expires_in_seconds / 60);
+      const valid = res.expires_label || `${Math.round(res.expires_in_seconds / 60)} minutes`;
       try {
         await navigator.clipboard.writeText(res.link);
-        note(`Sign-in link for ${email} copied — valid ${mins} min, single use.`);
+        note(`Sign-in link for ${email} copied — valid ${valid}, single use. Send it by WhatsApp or text if their email isn't arriving.`);
       } catch {
-        window.prompt(`Sign-in link for ${email} (valid ${mins} min):`, res.link);
+        window.prompt(`Sign-in link for ${email} (valid ${valid}, single use):`, res.link);
       }
     } catch (e) {
       reportError(e, onAuthError, setError);
