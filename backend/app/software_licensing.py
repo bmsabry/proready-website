@@ -608,6 +608,41 @@ def fulfill_software_checkout(db: Session, session_obj: dict[str, Any]) -> Optio
     return lic
 
 
+def _extract_invoice_subscription_id(obj: dict[str, Any]) -> str:
+    """Extract Stripe subscription ID across legacy and 2025-03-31.basil+ invoices."""
+    sub_id = str(obj.get("subscription") or "").strip()
+    if sub_id:
+        return sub_id
+    parent_sub = (
+        ((obj.get("parent") or {}).get("subscription_details") or {}).get("subscription")
+    )
+    if parent_sub:
+        return str(parent_sub).strip()
+    lines = (obj.get("lines") or {}).get("data") or []
+    if lines and isinstance(lines[0], dict):
+        line_sub = (
+            ((lines[0].get("parent") or {}).get("subscription_item_details") or {}).get(
+                "subscription"
+            )
+        )
+        if line_sub:
+            return str(line_sub).strip()
+    return ""
+
+
+def _extract_invoice_payment_intent(obj: dict[str, Any]) -> str:
+    """Extract PaymentIntent ID from top-level field or basil+ invoice.payments."""
+    pi = str(obj.get("payment_intent") or "").strip()
+    if pi:
+        return pi
+    payments = (obj.get("payments") or {}).get("data") or []
+    if payments and isinstance(payments[0], dict):
+        pay_pi = ((payments[0].get("payment") or {}).get("payment_intent"))
+        if pay_pi:
+            return str(pay_pi).strip()
+    return ""
+
+
 def handle_software_stripe_event(
     db: Session, event_type: str, obj: dict[str, Any]
 ) -> bool:
@@ -642,7 +677,7 @@ def handle_software_stripe_event(
         return True
 
     if event_type in ("invoice.paid", "invoice.payment_failed"):
-        sub_id = str(obj.get("subscription") or "").strip()
+        sub_id = _extract_invoice_subscription_id(obj)
         if not sub_id:
             return False
         lic = db.execute(
@@ -660,7 +695,7 @@ def handle_software_stripe_event(
                 lic.current_period_end = datetime.fromtimestamp(float(period_ts), tz=timezone.utc)
             else:
                 lic.current_period_end = _plan_period_fallback(lic.plan, datetime.now(timezone.utc))
-            pi = str(obj.get("payment_intent") or "").strip()
+            pi = _extract_invoice_payment_intent(obj)
             if pi:
                 lic.stripe_payment_intent_id = pi
             db.commit()

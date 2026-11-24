@@ -315,6 +315,63 @@ def test_stripe_checkout_webhook_activation_renewal_and_portal(client, monkeypat
         )
         assert c.post("/api/software/webhook/stripe", json={}, headers={"Stripe-Signature": "sig"}).status_code == 200
 
+        # Also verify Stripe 2025-03-31.basil / 2026-02-25.clover invoice shape (no top-level subscription)
+        monkeypatch.setattr(
+            FakeStripe.Webhook,
+            "construct_event",
+            lambda p, s, sec: {
+                "type": "invoice.payment_failed",
+                "data": {
+                    "object": {
+                        "parent": {
+                            "type": "subscription_details",
+                            "subscription_details": {"subscription": "sub_sw_1"},
+                        }
+                    }
+                },
+            },
+        )
+        assert c.post("/api/academy/webhook/stripe", json={}, headers={"Stripe-Signature": "sig"}).status_code == 200
+        assert (
+            c.post(
+                "/api/software/license/refresh",
+                json={"product": "pro3dworks", "license_key": lic_key, "machine_id": "mach-waterjet-01"},
+            ).json()["status"]
+            == "past_due"
+        )
+
+        monkeypatch.setattr(
+            FakeStripe.Webhook,
+            "construct_event",
+            lambda p, s, sec: {
+                "type": "invoice.paid",
+                "data": {
+                    "object": {
+                        "parent": {
+                            "type": "subscription_details",
+                            "subscription_details": {"subscription": "sub_sw_1"},
+                        },
+                        "payments": {"data": [{"payment": {"payment_intent": "pi_sw_clover_3"}}]},
+                        "lines": {"data": [{"period": {"end": future_end}}]},
+                    }
+                },
+            },
+        )
+        assert c.post("/api/academy/webhook/stripe", json={}, headers={"Stripe-Signature": "sig"}).status_code == 200
+        ref_clover_ok = c.post(
+            "/api/software/license/refresh",
+            json={"product": "pro3dworks", "license_key": lic_key, "machine_id": "mach-waterjet-01"},
+        )
+        assert ref_clover_ok.json()["status"] == "active"
+        db = SessionLocal()
+        try:
+            assert (
+                db.query(SoftwareLicense).filter(SoftwareLicense.license_key == lic_key).one().stripe_payment_intent_id
+                == "pi_sw_clover_3"
+            )
+        finally:
+            db.close()
+
         monkeypatch.setattr(
             FakeStripe.Webhook,
             "construct_event",
