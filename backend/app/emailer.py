@@ -2418,3 +2418,147 @@ def consult_owner_summary_html(
             size=14,
         )
     return _shell("Consulting", "Your call has ended: confirm the outcome", body)
+
+
+def _fmt_dt_utc(dt: "Optional[object]") -> str:
+    if dt is None:
+        return "Never"
+    if hasattr(dt, "strftime") and hasattr(dt, "day"):
+        return f"{dt.strftime('%B')} {dt.day}, {dt.year}"
+    return str(dt)
+
+
+def software_trial_welcome_html(
+    *,
+    full_name: str,
+    product_name: str,
+    expires_at: object,
+    machine_name: str,
+    buy_url: str,
+    download_url: str,
+) -> str:
+    e = escape_html
+    greeting = f"Hi {e(full_name)}," if full_name else "Welcome,"
+    body = _p(greeting)
+    body += _p(
+        f"Your <strong>15-day full-feature trial of {e(product_name)}</strong> is active. "
+        "All CAD geometry, PDF-to-DXF/DWG conversions, DFM audits, tolerance stack-ups, and "
+        "renders run 100% locally on your workstation."
+    )
+    body += _kv_table(
+        [
+            ("Plan", "15-Day Free Pro Trial (No Card Required)"),
+            ("Workstation", e(machine_name or "Windows x64 PC")),
+            ("Trial ends", f"<strong>{e(_fmt_dt_utc(expires_at))}</strong>"),
+        ]
+    )
+    body += _p(
+        "When your 15 days wrap up, purchase a Founding Launch license below to keep all Pro "
+        "&amp; Waterjet exports active, or keep using Free Basic 3D Viewing at zero cost.",
+        size=14,
+    )
+    body += _cta_button("View Founding Plans", buy_url)
+    body += _p(f"Need to reinstall? {_link(download_url, 'Download Pro3DWorks Installer')}.", size=13, color=MUTED)
+    return _shell(f"{product_name} · Trial Active", "Your 15-day trial is ready", body)
+
+
+def software_license_delivered_html(
+    *,
+    full_name: str,
+    product_name: str,
+    plan_label: str,
+    license_key: str,
+    max_seats: int,
+    download_url: str,
+    portal_url: str,
+    current_period_end: object = None,
+    updates_until: object = None,
+) -> str:
+    e = escape_html
+    greeting = f"Thank you, {e(full_name)}." if full_name else "Thank you for your purchase."
+    body = _p(greeting)
+    body += _p(
+        f"Your license for <strong>{e(product_name)} ({e(plan_label)})</strong> is active. "
+        "Open Pro3DWorks on your PC, click <strong>Activate License Key</strong>, and paste the key below:"
+    )
+    body += (
+        '<div style="margin:0 0 20px;padding:16px 20px;background:#f1f5f9;border:1px solid #cbd5e1;'
+        f'border-radius:10px;font-family:Consolas,Monaco,monospace;font-size:18px;font-weight:700;'
+        f'letter-spacing:0.06em;color:{HEADING};text-align:center;">{e(license_key)}</div>'
+    )
+    rows: list[tuple[str, str]] = [
+        ("Plan", e(plan_label)),
+        ("Activations", f"Up to {int(max_seats)} workstations (transferable)"),
+    ]
+    if current_period_end is not None:
+        rows.append(("Current billing period ends", e(_fmt_dt_utc(current_period_end))))
+    if updates_until is not None:
+        rows.append(("Free updates included through", e(_fmt_dt_utc(updates_until))))
+    body += _kv_table(rows)
+    body += _cta_button("Download Pro3DWorks Desktop", download_url)
+    if portal_url:
+        body += _p(
+            f"Manage billing, VAT/tax receipts, or cancel anytime: {_link(portal_url, 'Customer License & Billing Portal')}.",
+            size=13,
+            color=MUTED,
+        )
+    return _shell(f"{product_name} · License Key", "Your license key is ready", body)
+
+
+def software_payment_failed_html(
+    *,
+    full_name: str,
+    product_name: str,
+    plan_label: str,
+    license_key: str,
+    portal_url: str,
+) -> str:
+    e = escape_html
+    greeting = f"Hi {e(full_name)}," if full_name else "Hello,"
+    body = _p(greeting)
+    body += _p(
+        f"We couldn't process the renewal payment for your <strong>{e(product_name)}</strong> subscription "
+        f"(<code>{e(license_key)}</code>, {e(plan_label)}). "
+        "Your desktop app remains active during our 14-day offline grace window so shop work isn't interrupted."
+    )
+    body += _p("Please update your payment method in Stripe to avoid falling back to Free Basic Viewer mode.")
+    body += _cta_button("Update Payment Method", portal_url)
+    return _shell(f"{product_name} · Billing", "Action needed: renewal payment failed", body)
+
+
+def software_billing_portal_html(
+    *,
+    product_name: str,
+    license_key: str,
+    plan_label: str,
+    portal_url: str,
+) -> str:
+    e = escape_html
+    body = _p(
+        f"Here is your secure link to manage your <strong>{e(product_name)}</strong> subscription, "
+        "download invoices, or update your card in Stripe:"
+    )
+    body += _kv_table([("License Key", f"<code>{e(license_key)}</code>"), ("Plan", e(plan_label))])
+    body += _cta_button("Open Billing & Invoices Portal", portal_url)
+    return _shell(f"{product_name} · Billing Portal", "Manage your subscription", body)
+
+
+def software_admin_sale_html(
+    *,
+    product_name: str,
+    plan_label: str,
+    license_key: str,
+    buyer_email: str,
+    amount_display: str,
+) -> str:
+    e = escape_html
+    body = _p(f"New commercial software purchase for <strong>{e(product_name)}</strong>:")
+    body += _kv_table(
+        [
+            ("Customer", e(buyer_email)),
+            ("Plan", e(plan_label)),
+            ("Amount", f"<strong>{e(amount_display)}</strong>"),
+            ("License Key", f"<code>{e(license_key)}</code>"),
+        ]
+    )
+    return _shell("Software Sale", f"New {product_name} order", body)

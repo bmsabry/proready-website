@@ -87,6 +87,18 @@
     "srcset": "/img/New_HighPerformance_Data_Acquisition_System-480.webp 480w, /img/New_HighPerformance_Data_Acquisition_System-800.webp 800w, /img/New_HighPerformance_Data_Acquisition_System-1280.webp 1280w, /img/New_HighPerformance_Data_Acquisition_System-1600.webp 1600w",
     "og": "/img/New_HighPerformance_Data_Acquisition_System-og.jpg"
   },
+  "/Pro3DWorks_Hero_Assembly.png": {
+    "w": 1600,
+    "h": 1000,
+    "src": "/img/Pro3DWorks_Hero_Assembly-1600.webp",
+    "srcset": "/img/Pro3DWorks_Hero_Assembly-480.webp 480w, /img/Pro3DWorks_Hero_Assembly-800.webp 800w, /img/Pro3DWorks_Hero_Assembly-1280.webp 1280w, /img/Pro3DWorks_Hero_Assembly-1600.webp 1600w"
+  },
+  "/Pro3DWorks_Native_CAD.png": {
+    "w": 1600,
+    "h": 1000,
+    "src": "/img/Pro3DWorks_Native_CAD-1600.webp",
+    "srcset": "/img/Pro3DWorks_Native_CAD-480.webp 480w, /img/Pro3DWorks_Native_CAD-800.webp 800w, /img/Pro3DWorks_Native_CAD-1280.webp 1280w, /img/Pro3DWorks_Native_CAD-1600.webp 1600w"
+  },
   "/Pro3DWorks_PMI_Review.png": {
     "w": 1600,
     "h": 1000,
@@ -104,6 +116,18 @@
     "h": 1000,
     "src": "/img/Pro3DWorks_Section_View-1600.webp",
     "srcset": "/img/Pro3DWorks_Section_View-480.webp 480w, /img/Pro3DWorks_Section_View-800.webp 800w, /img/Pro3DWorks_Section_View-1280.webp 1280w, /img/Pro3DWorks_Section_View-1600.webp 1600w"
+  },
+  "/Pro3DWorks_Tolerance_Stackup.png": {
+    "w": 1600,
+    "h": 1000,
+    "src": "/img/Pro3DWorks_Tolerance_Stackup-1600.webp",
+    "srcset": "/img/Pro3DWorks_Tolerance_Stackup-480.webp 480w, /img/Pro3DWorks_Tolerance_Stackup-800.webp 800w, /img/Pro3DWorks_Tolerance_Stackup-1280.webp 1280w, /img/Pro3DWorks_Tolerance_Stackup-1600.webp 1600w"
+  },
+  "/Pro3DWorks_Waterjet_Studio.png": {
+    "w": 1600,
+    "h": 1000,
+    "src": "/img/Pro3DWorks_Waterjet_Studio-1600.webp",
+    "srcset": "/img/Pro3DWorks_Waterjet_Studio-480.webp 480w, /img/Pro3DWorks_Waterjet_Studio-800.webp 800w, /img/Pro3DWorks_Waterjet_Studio-1280.webp 1280w, /img/Pro3DWorks_Waterjet_Studio-1600.webp 1600w"
   },
   "/Recovery_Reactor_Feed_Cooler_Heat_Exchanger.jpg": {
     "w": 2752,
@@ -212,19 +236,6 @@
     "srcset": "/img/case2-study-enhancing-test-execution-cost-efficiency-480.webp 480w, /img/case2-study-enhancing-test-execution-cost-efficiency-800.webp 800w, /img/case2-study-enhancing-test-execution-cost-efficiency-1280.webp 1280w, /img/case2-study-enhancing-test-execution-cost-efficiency-1600.webp 1600w",
     "og": "/img/case2-study-enhancing-test-execution-cost-efficiency-og.jpg"
   },
-  "/impact-secondary-air-emissions.jpg": {
-    "w": 1024,
-    "h": 501,
-    "src": "/img/impact-secondary-air-emissions-1024.webp",
-    "srcset": "/img/impact-secondary-air-emissions-480.webp 480w, /img/impact-secondary-air-emissions-800.webp 800w, /img/impact-secondary-air-emissions-1024.webp 1024w"
-  },
-  "/optimizing-test-cell-assembly.png": {
-    "w": 2048,
-    "h": 1143,
-    "src": "/img/optimizing-test-cell-assembly-1600.webp",
-    "srcset": "/img/optimizing-test-cell-assembly-480.webp 480w, /img/optimizing-test-cell-assembly-800.webp 800w, /img/optimizing-test-cell-assembly-1280.webp 1280w, /img/optimizing-test-cell-assembly-1600.webp 1600w",
-    "og": "/img/optimizing-test-cell-assembly-og.jpg"
-  },
   "/certificates/sample-attendance.jpg": {
     "w": 1600,
     "h": 1237,
@@ -242,5 +253,18 @@
     "h": 1237,
     "src": "/img/certificates-sample-verified-1600.webp",
     "srcset": "/img/certificates-sample-verified-480.webp 480w, /img/certificates-sample-verified-800.webp 800w, /img/certificates-sample-verified-1280.webp 1280w, /img/certificates-sample-verified-1600.webp 1600w"
+  },
+  "/impact-secondary-air-emissions.jpg": {
+    "w": 1024,
+    "h": 501,
+    "src": "/img/impact-secondary-air-emissions-1024.webp",
+    "srcset": "/img/impact-secondary-air-emissions-480.webp 480w, /img/impact-secondary-air-emissions-800.webp 800w, /img/impact-secondary-air-emissions-1024.webp 1024w"
+  },
+  "/optimizing-test-cell-assembly.png": {
+    "w": 2048,
+    "h": 1143,
+    "src": "/img/optimizing-test-cell-assembly-1600.webp",
+    "srcset": "/img/optimizing-test-cell-assembly-480.webp 480w, /img/optimizing-test-cell-assembly-800.webp 800w, /img/optimizing-test-cell-assembly-1280.webp 1280w, /img/optimizing-test-cell-assembly-1600.webp 1600w",
+    "og": "/img/optimizing-test-cell-assembly-og.jpg"
   }
 }

@@ -45,6 +45,7 @@ from .routes import delivery as delivery_routes
 from .routes import seats as seats_routes
 from .routes import sim as sim_routes
 from .routes import software as software_routes
+from .routes import software_billing as software_billing_routes
 from .routes import stats as stats_routes
 from .routes import support as support_routes
 
@@ -440,29 +441,40 @@ _seed_default_course()
 
 
 def _seed_software_products() -> None:
-    """Ensure the software registry knows about Pro3DWorks.
+    """Ensure the software registry knows about Pro3DWorks and its Tauri installer.
 
     The registry replaces the old hardcoded KNOWN_PRODUCTS whitelist in
     routes/downloads.py; without this seed, telemetry from Pro3DWorks
     builds already in the wild would start 400ing after deploy. Idempotent
-    — never overwrites admin edits to an existing row.
+    — never overwrites admin edits to existing rows.
     """
     db = SessionLocal()
     try:
-        existing = db.execute(
-            select(SoftwareProduct).where(SoftwareProduct.slug == "pro3dworks")
-        ).scalar_one_or_none()
-        if existing is None:
-            db.add(
-                SoftwareProduct(
-                    slug="pro3dworks",
-                    name="Pro3DWorks",
-                    asset_path="/downloads/Pro3DWorks.html",
-                    latest_version="2.53.2",
-                )
-            )
+        seeds = [
+            SoftwareProduct(
+                slug="pro3dworks",
+                name="Pro3DWorks",
+                asset_path="/downloads/Pro3DWorks-Setup-x64.exe",
+                latest_version="3.0.0",
+            ),
+            SoftwareProduct(
+                slug="pro3dworks-installer",
+                name="Pro3DWorks Desktop Installer (Windows x64)",
+                asset_path="/downloads/Pro3DWorks-Setup-x64.exe",
+                latest_version="3.0.0",
+            ),
+        ]
+        added = 0
+        for row in seeds:
+            existing = db.execute(
+                select(SoftwareProduct).where(SoftwareProduct.slug == row.slug)
+            ).scalar_one_or_none()
+            if existing is None:
+                db.add(row)
+                added += 1
+        if added:
             db.commit()
-            log.info("Seeded software product pro3dworks")
+            log.info("Seeded %d software product row(s)", added)
     finally:
         db.close()
 
@@ -513,6 +525,8 @@ app.include_router(ai_routes.router)
 app.include_router(downloads_routes.router)
 app.include_router(software_routes.public_router)
 app.include_router(software_routes.admin_router)
+app.include_router(software_billing_routes.public_router)
+app.include_router(software_billing_routes.admin_router)
 app.include_router(stats_routes.router)
 app.include_router(academy_routes.router)
 app.include_router(certification_routes.router)

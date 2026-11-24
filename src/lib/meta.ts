@@ -30,6 +30,7 @@ export function collectSsrSeo(): PageSeo | null {
 const SECTION_NAMES: Record<string, string> = {
   'case-studies': 'Case Studies',
   insights: 'Research Insights',
+  products: 'Products',
   services: 'Services',
   training: 'Training',
 };

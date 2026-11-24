@@ -44,6 +44,9 @@ _OPEN_PATHS = (
     "/api/academy/beacon",
     "/api/track/",
     "/api/academy/webhook/",
+    "/api/software/webhook/",
+    "/api/software/trial/",
+    "/api/software/license/",
     "/api/webhooks/",
     "/api/consult/decision",
 )

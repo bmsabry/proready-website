@@ -19,7 +19,8 @@ const M = '2026-06-10'; // site-wide template update
 export const PRERENDER_ROUTES: RouteEntry[] = [
   { path: '/', lastmod: M, priority: 1.0 },
   { path: '/services', lastmod: M, priority: 0.9 },
-  { path: '/products', lastmod: '2026-11-14', priority: 0.9, changefreq: 'weekly' },
+  { path: '/products', lastmod: '2026-11-24', priority: 0.9, changefreq: 'weekly' },
+  { path: '/products/pro3dworks', lastmod: '2026-11-24', priority: 0.95, changefreq: 'weekly' },
   { path: '/services/gas-turbine-combustion', lastmod: M, priority: 0.9 },
   { path: '/services/industrial-ai', lastmod: M, priority: 0.9 },
   { path: '/services/test-cell-design', lastmod: M, priority: 0.9 },

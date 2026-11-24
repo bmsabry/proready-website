@@ -555,6 +555,19 @@ async def stripe_webhook(
         if await run_in_threadpool(consult_auto.note_dispute, db, kind, dict(obj)):
             return {"received": True}
 
+    # Desktop software licenses (app/software_licensing.py): handles
+    # checkout sessions tagged metadata.kind == 'software_license', plus
+    # subscription renewals / failures / cancellations / refunds belonging to
+    # existing SoftwareLicense rows. Unrelated events fall through below.
+    if (
+        (kind.startswith("checkout.session.") and (obj.get("metadata") or {}).get("kind") == "software_license")
+        or kind in ("invoice.paid", "invoice.payment_failed", "customer.subscription.updated", "customer.subscription.deleted", "charge.refunded", "charge.dispute.created")
+    ):
+        from ..software_licensing import handle_software_stripe_event  # noqa: PLC0415
+
+        if await run_in_threadpool(handle_software_stripe_event, db, kind, dict(obj)):
+            return {"received": True}
+
     if kind == "checkout.session.completed" and _is_advanced_cert(obj):
         # Examined-tier purchase: no enrollment to grant — open the written
         # examination. Card only in practice; an unpaid (ACH) completion is

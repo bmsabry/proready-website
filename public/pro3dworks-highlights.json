@@ -1,32 +1,28 @@
 {
-  "version": "2.70.1",
-  "name": "SolidWorks-style 3D section triad, multi-view quads, and workflow AI Engineer",
-  "summary": "Slide and tilt multi-plane sections with a 3D reference triad and solid hatched caps, inspect in synchronized quad viewports, or run multi-step workflows straight from AI Engineer Chat.",
+  "version": "3.0.0",
+  "name": "Windows x64 Desktop App, Offline Waterjet PDF-to-DXF/DWG Studio & Native SolidWorks/NX",
+  "summary": "Pro3DWorks v3 ships as a dedicated offline-first Windows desktop application with a 15-day full-feature trial, integrated SolidWorks & Siemens NX local bridge, and Waterjet CAD prep.",
   "highlights": [
     {
-      "title": "3D section triad & solid cap faces",
-      "text": "Drag a SolidWorks-style 3D reference triad to slide and tilt up to three planes in Planar, Zonal, or Slab modes, with triangulated polygon cap faces, ISO cross-hatching, component exclusions, and outer ghosting."
+      "title": "Waterjet PDF → DXF / DWG Studio",
+      "text": "Extract vector contours or trace scanned blueprints with auto-deskew, refit Bézier curves to G1 biarcs, run True Overkill and Topology Doctor DFM, apply OMAX Q1–Q5 or SendCutSend R12 presets, and estimate cut time and garnet cost offline."
     },
     {
-      "title": "Live section properties & cut snap",
-      "text": "Compute real-time cut area, perimeter, hydraulic diameter Dh, centroid, and principal moments on every plane, snap Measure directly onto cut bores, or export a 1:1 2D SVG profile."
+      "title": "Native SolidWorks & Siemens NX bundled setup",
+      "text": "Windows Desktop bundles the local loopback CAD Translation Bridge and provides a one-click in-app setup wizard (under explicit NVIDIA usd-convert-cad 0.3.0 license acceptance) for .SLDPRT, .SLDASM, and NX .prt assemblies."
     },
     {
-      "title": "Synchronized multi-view layouts",
-      "text": "Switch between Single, 2-View Split, 4-View Quad, and Section Quad viewports with lockable orthographic panes, persistent active sectioning while measuring, and labeled multi-view captures."
+      "title": "15-day full Pro trial + Free Basic Viewer",
+      "text": "Every installation activates a no-card 15-day trial of all Pro tools via Ed25519 offline-capable tokens. After Day 15, upgrade on Pro Monthly ($29 founding), Yearly ($249), Shop 5-Pack, or Perpetual v3 ($599), or continue using the Free Basic 3D Viewer."
     },
     {
-      "title": "Actionable AI Engineer workflows",
-      "text": "Propose and approve multi-step cross-section, multi-view, isolation, measurement, and HTML report workflows in AI Engineer Chat or locally with zero API key, complete with one-click view restore."
-    },
-    {
-      "title": "Preview older SolidWorks & Parasolid",
-      "text": "Open saved-display previews for supported older SolidWorks assemblies and read pointer-list text Parasolid models (viewing preview, not exact B-rep geometry) with unit limits shown."
+      "title": "3D B-Rep inspection, PMI, stack-ups & photoreal studio",
+      "text": "4-GiB OpenCascade kernel, SolidWorks-style 3-plane section triad with solid hatched caps, 1D Worst-Case/RSS/Monte Carlo tolerance stack-up, GPU path tracing, and local or cloud BYOK AI Engineer."
     }
   ],
   "notes": [
-    "Local native SolidWorks (.SLDPRT/.SLDASM, including 3400/4100/4700/6000/15000 profiles) and Siemens NX (.prt) geometry viewing uses the separate Windows Native Kit (Setup-Pro3DWorks-Native.cmd) and a separately installed NVIDIA usd-convert-cad 0.3.0 runtime under NVIDIA's licence terms.",
-    "Legacy saved-display support in the single-file download applies to the exercised SolidWorks 2800 carrier profile and saved active configuration. All required companion files must be supplied and match intrinsic type, creation, configuration and save data.",
-    "Conversational cloud AI responses require your configured OpenAI-compatible or local LM Studio endpoint; deterministic Local workflows, section properties, and multi-view layouts run entirely in the browser."
+    "All CAD geometry, PDF-to-DXF/DWG conversions, DFM checks, and GPU renders run locally on your workstation — zero customer model uploads.",
+    "OpenCascade / occt-import-js (LGPL-2.1) is shipped in separate relinkable desktop files alongside LICENSE.md.",
+    "Native SolidWorks (.SLDPRT/.SLDASM) and Siemens NX (.prt) viewing via NVIDIA usd-convert-cad 0.3.0 installs locally only after explicit operator I ACCEPT license consent."
   ]
 }

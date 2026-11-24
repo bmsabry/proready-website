@@ -5,12 +5,15 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Copy,
   Download,
   Globe2,
+  KeyRound,
   MonitorDown,
   Pencil,
   Plus,
   Save,
+  ShieldBan,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -128,6 +131,7 @@ export default function SoftwarePage({ slug, openSlug, onAuthError }: Props) {
         {error && <Notice kind="error">{error}</Notice>}
         <DownloadsSection slug={slug} onAuthError={onAuthError} />
         <AppTelemetrySection slug={slug} />
+        <SoftwareLicensesSection onAuthError={onAuthError} productFilter={slug} />
       </div>
     );
   }
@@ -253,6 +257,7 @@ export default function SoftwarePage({ slug, openSlug, onAuthError }: Props) {
           </div>
         )}
       </div>
+      <SoftwareLicensesSection onAuthError={onAuthError} />
     </Section>
   );
 }
@@ -766,6 +771,435 @@ function AppTelemetrySection({ slug }: { slug: string }) {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Commercial Licenses & 15-Day Trials ---------- */
+
+type AdminLicenseRow = {
+  id: number;
+  product: string;
+  license_key: string;
+  license_key_masked: string;
+  plan: string;
+  plan_label: string;
+  tier: string;
+  status: string;
+  email: string;
+  full_name: string;
+  company: string;
+  max_seats: number;
+  seats_used: number | null;
+  amount_cents: number;
+  currency: string;
+  current_period_end: string | null;
+  updates_until: string | null;
+  valid_major_version: number;
+  allow_offline_file: boolean;
+  created_at: string | null;
+};
+
+type AdminTrialRow = {
+  id: number;
+  product: string;
+  email: string;
+  full_name: string;
+  company: string;
+  machine_id: string;
+  machine_name: string;
+  app_version: string;
+  started_at: string | null;
+  expires_at: string | null;
+};
+
+function SoftwareLicensesSection({
+  onAuthError,
+  productFilter,
+}: {
+  onAuthError: () => void;
+  productFilter?: string;
+}) {
+  const [licenses, setLicenses] = useState<AdminLicenseRow[]>([]);
+  const [trials, setTrials] = useState<AdminTrialRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
+  const [showComp, setShowComp] = useState(false);
+
+  const [compEmail, setCompEmail] = useState('');
+  const [compName, setCompName] = useState('');
+  const [compCompany, setCompCompany] = useState('');
+  const [compPlan, setCompPlan] = useState('pro_yearly');
+  const [compNotes, setCompNotes] = useState('');
+  const [compEmailUser, setCompEmailUser] = useState(true);
+  const [compBusy, setCompBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [licRows, trialRows] = await Promise.all([
+        api<AdminLicenseRow[]>('/api/admin/software/licenses'),
+        api<AdminTrialRow[]>('/api/admin/software/trials'),
+      ]);
+      setLicenses(licRows);
+      setTrials(trialRows);
+    } catch (e) {
+      reportError(e, onAuthError, setError);
+    } finally {
+      setLoading(false);
+    }
+  }, [onAuthError]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const filteredLicenses =
+    productFilter && !productFilter.includes('installer')
+      ? licenses.filter((l) => l.product === productFilter)
+      : licenses;
+  const filteredTrials =
+    productFilter && !productFilter.includes('installer')
+      ? trials.filter((t) => t.product === productFilter)
+      : trials;
+
+  const activeCount = filteredLicenses.filter((l) => l.status === 'active').length;
+  const perpetualCount = filteredLicenses.filter(
+    (l) => l.plan === 'perpetual' && l.status === 'active',
+  ).length;
+  const nowMs = Date.now();
+  const activeTrialCount = filteredTrials.filter(
+    (t) => t.expires_at && new Date(t.expires_at).getTime() > nowMs,
+  ).length;
+
+  async function issueComp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!compEmail.trim()) return;
+    setCompBusy(true);
+    setError('');
+    setMsg('');
+    try {
+      const created = await api<AdminLicenseRow & { offline_token?: string }>(
+        '/api/admin/software/licenses/comp',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            product: 'pro3dworks',
+            plan: compPlan,
+            email: compEmail.trim(),
+            full_name: compName.trim(),
+            company: compCompany.trim(),
+            notes: compNotes.trim(),
+            send_email_to_user: compEmailUser,
+          }),
+        },
+      );
+      setMsg(`Issued ${created.license_key} for ${created.email} (${created.plan_label}).`);
+      setCompEmail('');
+      setCompName('');
+      setCompCompany('');
+      setCompNotes('');
+      setShowComp(false);
+      await load();
+    } catch (err) {
+      reportError(err, onAuthError, setError);
+    } finally {
+      setCompBusy(false);
+    }
+  }
+
+  async function downloadOfflineFile(id: number) {
+    setError('');
+    setMsg('');
+    try {
+      const res = await api<{ filename: string; token: string; license_key: string }>(
+        `/api/admin/software/licenses/${id}/offline-token`,
+      );
+      const content = `# Pro3DWorks v3 Offline License (${res.license_key})\n${res.token}\n`;
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.filename || 'pro3dworks.p3dwlic';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      try {
+        await navigator.clipboard.writeText(res.token);
+      } catch {
+        /* ignore clipboard restrictions */
+      }
+      setMsg(`Downloaded ${res.filename} and copied signed P3DW1 token.`);
+    } catch (err) {
+      reportError(err, onAuthError, setError);
+    }
+  }
+
+  async function revokeLicense(row: AdminLicenseRow) {
+    const reason = window.prompt(
+      `Revoke license ${row.license_key} (${row.email})?\nOptional reason:`,
+      'Refunded / revoked by admin',
+    );
+    if (reason === null) return;
+    setError('');
+    setMsg('');
+    try {
+      await api(`/api/admin/software/licenses/${row.id}/revoke`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+      setMsg(`Revoked ${row.license_key}.`);
+      await load();
+    } catch (err) {
+      reportError(err, onAuthError, setError);
+    }
+  }
+
+  return (
+    <div className="mt-10 pt-8 border-t border-slate-800/80">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div>
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <KeyRound className="w-5 h-5 text-cyan-400" /> Licenses &amp; 15-Day Trials
+          </h2>
+          <p className="text-sm text-slate-400 mt-0.5">
+            Active desktop keys issued via Stripe or manually, offline .p3dwlic tokens, and hardware-bound trials.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowComp((v) => !v)}
+            className="btn-primary text-sm py-1.5 px-3 flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" /> Issue Comp / Manual Key
+          </button>
+          <RefreshButton onClick={() => void load()} loading={loading} />
+        </div>
+      </div>
+
+      {error && <Notice kind="error">{error}</Notice>}
+      {msg && <Notice kind="success">{msg}</Notice>}
+
+      {/* Summary metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {[
+          { label: 'Active Paid / Comp Keys', value: activeCount },
+          { label: 'Perpetual v3.x Keys', value: perpetualCount },
+          { label: 'Active 15-Day Trials', value: activeTrialCount },
+          { label: 'Total Trials Claimed', value: filteredTrials.length },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <p className="text-xs text-slate-400">{stat.label}</p>
+            <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Comp key issuer */}
+      {showComp && (
+        <form
+          onSubmit={(e) => void issueComp(e)}
+          className="rounded-xl border border-cyan-500/30 bg-slate-900/80 p-5 mb-6"
+        >
+          <p className="text-sm font-semibold text-white mb-3">
+            Issue Complimentary / Manual Desktop License
+          </p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <LabeledInput label="Recipient email" value={compEmail} onChange={setCompEmail} />
+            <LabeledInput label="Full name" value={compName} onChange={setCompName} />
+            <LabeledInput label="Company / Shop" value={compCompany} onChange={setCompCompany} />
+            <LabeledSelect label="Plan" value={compPlan} onChange={setCompPlan}>
+              <option value="pro_yearly">Pro Yearly ($249 · 3 seats)</option>
+              <option value="pro_monthly">Pro Monthly ($29 · 3 seats)</option>
+              <option value="shop_yearly">Shop 5-Pack Yearly ($1,390 · 5 seats)</option>
+              <option value="shop_monthly">Shop 5-Pack Monthly ($149 · 5 seats)</option>
+              <option value="perpetual">Perpetual v3.x ($599 · offline)</option>
+            </LabeledSelect>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3 mt-3 items-center">
+            <LabeledInput label="Internal notes" value={compNotes} onChange={setCompNotes} />
+            <label className="flex items-center gap-2 text-sm text-slate-200 mt-4">
+              <input
+                type="checkbox"
+                checked={compEmailUser}
+                onChange={(e) => setCompEmailUser(e.target.checked)}
+                className="rounded border-slate-700"
+              />
+              Email the key directly to the recipient
+            </label>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowComp(false)}
+              className="text-sm text-slate-300 hover:text-white px-3 py-1.5"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={compBusy || !compEmail.trim()}
+              className="btn-primary text-sm py-1.5 px-4 disabled:opacity-50"
+            >
+              {compBusy ? 'Issuing…' : 'Create License Key'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Licenses table */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 overflow-x-auto mb-6">
+        <p className="text-sm font-semibold text-slate-200 mb-3">
+          Issued Licenses ({filteredLicenses.length})
+        </p>
+        {filteredLicenses.length === 0 ? (
+          <p className="text-sm text-slate-400">No software licenses issued yet.</p>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-800 text-xs uppercase text-slate-400">
+              <tr>
+                <th className="py-2 pr-4">Key</th>
+                <th className="py-2 pr-4">Customer</th>
+                <th className="py-2 pr-4">Plan</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Seats</th>
+                <th className="py-2 pr-4">Period / Updates</th>
+                <th className="py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              {filteredLicenses.map((row) => (
+                <tr key={row.id}>
+                  <td className="py-2.5 pr-4 font-mono text-xs text-cyan-300 whitespace-nowrap">
+                    {row.license_key}
+                    <button
+                      type="button"
+                      title="Copy license key"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(row.license_key);
+                        setMsg(`Copied ${row.license_key}`);
+                      }}
+                      className="ml-2 text-slate-400 hover:text-white align-middle"
+                    >
+                      <Copy className="w-3.5 h-3.5 inline" />
+                    </button>
+                  </td>
+                  <td className="py-2.5 pr-4">
+                    <div className="text-white">{row.email}</div>
+                    {(row.full_name || row.company) && (
+                      <div className="text-xs text-slate-400">
+                        {[row.full_name, row.company].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-2.5 pr-4 text-xs">{row.plan_label}</td>
+                  <td className="py-2.5 pr-4">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-mono ${
+                        row.status === 'active'
+                          ? 'bg-emerald-500/15 text-emerald-300'
+                          : row.status === 'revoked'
+                            ? 'bg-red-500/15 text-red-300'
+                            : 'bg-amber-500/15 text-amber-300'
+                      }`}
+                    >
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="py-2.5 pr-4 font-mono text-xs">
+                    {row.seats_used ?? 0} / {row.max_seats}
+                  </td>
+                  <td className="py-2.5 pr-4 text-xs text-slate-400 whitespace-nowrap">
+                    {row.current_period_end
+                      ? row.current_period_end.slice(0, 10)
+                      : row.updates_until
+                        ? `Updates → ${row.updates_until.slice(0, 10)}`
+                        : '—'}
+                  </td>
+                  <td className="py-2.5 text-right whitespace-nowrap space-x-2">
+                    {row.status !== 'revoked' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void downloadOfflineFile(row.id)}
+                          className="text-xs px-2.5 py-1 rounded border border-slate-700 hover:border-cyan-500 text-cyan-300"
+                        >
+                          .p3dwlic
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void revokeLicense(row)}
+                          className="text-xs px-2.5 py-1 rounded border border-red-500/30 hover:border-red-400 text-red-300 inline-flex items-center gap-1"
+                        >
+                          <ShieldBan className="w-3 h-3" /> Revoke
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Trials table */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 overflow-x-auto">
+        <p className="text-sm font-semibold text-slate-200 mb-3">
+          Recent 15-Day Trials ({filteredTrials.length})
+        </p>
+        {filteredTrials.length === 0 ? (
+          <p className="text-sm text-slate-400">No desktop trials started yet.</p>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-800 text-xs uppercase text-slate-400">
+              <tr>
+                <th className="py-2 pr-4">Email</th>
+                <th className="py-2 pr-4">Company / PC</th>
+                <th className="py-2 pr-4">Machine ID</th>
+                <th className="py-2 pr-4">Started</th>
+                <th className="py-2 pr-4">Expires</th>
+                <th className="py-2">State</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              {filteredTrials.map((t) => {
+                const active = Boolean(t.expires_at && new Date(t.expires_at).getTime() > nowMs);
+                return (
+                  <tr key={t.id}>
+                    <td className="py-2 pr-4 text-white">{t.email}</td>
+                    <td className="py-2 pr-4 text-xs text-slate-300">
+                      {[t.full_name, t.company, t.machine_name].filter(Boolean).join(' · ') || '—'}
+                    </td>
+                    <td className="py-2 pr-4 font-mono text-xs text-slate-400">{t.machine_id}</td>
+                    <td className="py-2 pr-4 text-xs text-slate-400">
+                      {t.started_at ? t.started_at.slice(0, 10) : '—'}
+                    </td>
+                    <td className="py-2 pr-4 text-xs text-slate-400">
+                      {t.expires_at ? t.expires_at.slice(0, 10) : '—'}
+                    </td>
+                    <td className="py-2">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-mono ${
+                          active
+                            ? 'bg-cyan-500/15 text-cyan-300'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {active ? 'Active' : 'Ended'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

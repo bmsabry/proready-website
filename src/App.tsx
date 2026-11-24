@@ -10,6 +10,8 @@ import Home from './pages/Home';
 
 const Services = lazy(() => import('./pages/Services'));
 const Products = lazy(() => import('./pages/Products'));
+const Pro3DWorksProduct = lazy(() => import('./pages/products/Pro3DWorks'));
+const Pro3DWorksWelcome = lazy(() => import('./pages/products/Pro3DWorksWelcome'));
 const Training = lazy(() => import('./pages/Training'));
 const Insights = lazy(() => import('./pages/Insights'));
 const CaseStudies = lazy(() => import('./pages/CaseStudies'));
@@ -125,6 +127,8 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/services" element={<Services />} />
               <Route path="/products" element={<Products />} />
+              <Route path="/products/pro3dworks" element={<Pro3DWorksProduct />} />
+              <Route path="/products/pro3dworks/welcome" element={<Pro3DWorksWelcome />} />
               <Route path="/services/gas-turbine-combustion" element={<GasTurbineCombustionConsulting />} />
               <Route path="/services/industrial-ai" element={<IndustrialAIConsulting />} />
               <Route path="/services/test-cell-design" element={<TestCellDesign />} />

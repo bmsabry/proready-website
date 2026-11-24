@@ -27,8 +27,9 @@ const REGISTRY_TIMEOUT_MS = 6000;
 
 // Safety net for API downtime. Registry entries win whenever it's reachable.
 const STATIC_ASSET_PATHS = {
-  pro3dworks: '/downloads/Pro3DWorks.html',
-  'pro3dworks-native-kit': '/downloads/Pro3DWorks-Windows-Native-Kit.zip',
+  pro3dworks: '/downloads/Pro3DWorks-Setup-x64.exe',
+  'pro3dworks-installer': '/downloads/Pro3DWorks-Setup-x64.exe',
+  'pro3dworks-native-kit': '/downloads/Pro3DWorks-Setup-x64.exe',
 };
 
 async function lookupAssetPath(slug, waitUntil) {

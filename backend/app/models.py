@@ -1771,3 +1771,117 @@ class SupportTicketEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+
+
+# ---------------------------------------------------------------------------
+# Desktop software licensing (Pro3DWorks & future desktop products)
+# ---------------------------------------------------------------------------
+
+
+class SoftwareTrial(Base):
+    """One 15-day full-Pro desktop trial per (product, email) AND (product, machine).
+
+    Enforces single-trial integrity without blocking legitimate reinstalls during
+    an active trial window for the exact same (email, machine_id) pair.
+    """
+
+    __tablename__ = "software_trials"
+    __table_args__ = (
+        Index("ix_software_trials_prod_email", "product", "email", unique=True),
+        Index("ix_software_trials_prod_machine", "product", "machine_id", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    product: Mapped[str] = mapped_column(String(64), default="pro3dworks", index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    full_name: Mapped[str] = mapped_column(String(200), default="")
+    company: Mapped[str] = mapped_column(String(200), default="")
+    machine_id: Mapped[str] = mapped_column(String(128), index=True)
+    machine_name: Mapped[str] = mapped_column(String(200), default="")
+    app_version: Mapped[str] = mapped_column(String(32), default="")
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    token_jti: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class SoftwareLicense(Base):
+    """Commercial license record for Pro3DWorks / future desktop software.
+
+    Provisioned idempotently from Stripe webhooks (`checkout.session.completed`,
+    `invoice.paid`, `customer.subscription.*`, `charge.refunded`/`dispute`) or by
+    an admin comp/air-gapped grant.
+    """
+
+    __tablename__ = "software_licenses"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    product: Mapped[str] = mapped_column(String(64), default="pro3dworks", index=True)
+    license_key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # pro_monthly | pro_yearly | shop_monthly | shop_yearly | perpetual
+    plan: Mapped[str] = mapped_column(String(32), index=True)
+    # active | past_due | canceled | revoked
+    status: Mapped[str] = mapped_column(String(24), default="active", index=True)
+
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    full_name: Mapped[str] = mapped_column(String(200), default="")
+    company: Mapped[str] = mapped_column(String(200), default="")
+    max_seats: Mapped[int] = mapped_column(Integer, default=3)
+
+    stripe_customer_id: Mapped[str] = mapped_column(String(128), default="", index=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True, unique=True, index=True
+    )
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True, unique=True, index=True
+    )
+    stripe_payment_intent_id: Mapped[str] = mapped_column(
+        String(128), default="", index=True
+    )
+    amount_cents: Mapped[int] = mapped_column(Integer, default=0)
+    currency: Mapped[str] = mapped_column(String(8), default="usd")
+
+    current_period_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    updates_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    valid_major_version: Mapped[int] = mapped_column(Integer, default=3)
+    allow_offline_file: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str] = mapped_column(Text, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class SoftwareActivation(Base):
+    """Per-PC activation seat against a SoftwareLicense (capped by max_seats)."""
+
+    __tablename__ = "software_activations"
+    __table_args__ = (
+        Index("ix_software_act_lic_machine", "license_id", "machine_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    license_id: Mapped[int] = mapped_column(Integer, index=True)
+    machine_id: Mapped[str] = mapped_column(String(128), index=True)
+    machine_name: Mapped[str] = mapped_column(String(200), default="")
+    app_version: Mapped[str] = mapped_column(String(32), default="")
+    first_activated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    deactivated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )

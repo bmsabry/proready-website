@@ -186,6 +186,19 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_AUTOMATIC_TAX: bool = False
+
+    # --- Software Licensing (Pro3DWorks & Desktop Apps) -------------------
+    # Base64 of a 32-byte Ed25519 seed used to sign offline desktop license
+    # tokens (P3DW1.<payload>.<sig>). Keep secret and never rotate casually.
+    SOFTWARE_LICENSE_SIGNING_KEY: str = ""
+    SOFTWARE_TRIAL_DAYS: int = 15
+    SOFTWARE_OFFLINE_GRACE_DAYS: int = 14
+    STRIPE_PRICE_P3DW_PRO_MONTHLY: str = ""
+    STRIPE_PRICE_P3DW_PRO_YEARLY: str = ""
+    STRIPE_PRICE_P3DW_SHOP_MONTHLY: str = ""
+    STRIPE_PRICE_P3DW_SHOP_YEARLY: str = ""
+    STRIPE_PRICE_P3DW_PERPETUAL: str = ""
 
     # --- Payments (PayPal Orders v2) --------------------------------------
     # Credentials land later; until both are set every PayPal endpoint
