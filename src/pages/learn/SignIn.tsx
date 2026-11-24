@@ -128,8 +128,7 @@ const SignIn: React.FC = () => {
               <CheckCircle2 className="w-10 h-10 text-cyan-400 mx-auto mb-4" aria-hidden="true" />
               <h1 className="text-2xl font-bold mb-3">You're almost in</h1>
               <p className="text-slate-300 leading-relaxed">
-                Press the button to finish signing in. The link works once and
-                expires 30 minutes after it was sent.
+                Press the button to finish signing in. Each link works once.
               </p>
               <button
                 type="button"
@@ -156,6 +155,30 @@ const SignIn: React.FC = () => {
                   </>
                 )}
               </p>
+              {/* Asking again does not help when the mailbox itself refuses
+                  mail: a learner whose Gmail was full asked for 12 links in
+                  two days (2026-11-22). Say what to do instead. Worded for
+                  everyone, so it reveals nothing about whether the address
+                  has an account. */}
+              <div className="mt-6 text-left text-sm text-slate-400 leading-relaxed border-t border-slate-800 pt-4">
+                <p className="font-semibold text-slate-300 mb-2">Nothing after 5 minutes?</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Look in Spam, Promotions and Updates.</li>
+                  <li>
+                    If your mailbox is full (Gmail warns when storage runs out),
+                    no email can reach you until you free some space.
+                  </li>
+                  <li>
+                    Asking for more links won't help while the mailbox refuses
+                    mail. Instead,{' '}
+                    <Link to="/contact" className="text-cyan-400 hover:text-cyan-300">
+                      contact us
+                    </Link>{' '}
+                    with your phone or WhatsApp number and we'll send you a
+                    sign-in link that way.
+                  </li>
+                </ul>
+              </div>
               <button
                 type="button"
                 onClick={() => setState('idle')}

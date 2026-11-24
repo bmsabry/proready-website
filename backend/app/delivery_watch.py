@@ -13,7 +13,8 @@ The cron job calls `sweep` every 10 minutes:
     shows Delivered / Bounced without anyone opening the email;
   * an email that bounced, was suppressed, failed or was marked as spam,
     or that Resend never accepted, gets ONE alert to ADMIN_NOTIFY_EMAIL
-    saying who the person is and what to do.
+    saying who the person is and what to do. A sign-in or welcome link
+    (URGENT_TEMPLATES) alerts as soon as it is merely delayed.
 
 Emails to the instructor himself are not watched: an email telling him an
 email to him bounced would reach nobody.
@@ -27,11 +28,13 @@ webhook is configured (RESEND_WEBHOOK_SECRET), `apply_event` records the
 receiving server's own words on the row and alerts within seconds; the sweep
 stays as the safety net for anything the webhook misses.
 
-Two more guards run from the same cron call (`checks`):
+More guards run from the same cron call (`checks`):
 
   * the DNS records email depends on (DMARC, DKIM, SPF, the MX records for
     sending feedback, the support desk and Google Workspace) are looked up
     every run; a missing or changed record alerts at most once a day;
+  * the webhook itself: a missing RESEND_WEBHOOK_SECRET, or reports refused
+    with a bad signature, alert at most once a day (webhook_check);
   * once a day a short "canary" email goes to the instructor's own
     mailboxes at other providers (CANARY_EMAILS). The sweep watches it like
     any customer email, so a provider that starts refusing our mail shows up
@@ -55,6 +58,7 @@ from .emailer import (
     delivery_problem_html,
     email_setup_problem_html,
     send_email,
+    webhook_problem_html,
 )
 from .models import Course, EmailLog, Learner, Registration
 
@@ -73,6 +77,16 @@ SETTLED = {"delivered", "opened", "clicked", "bounced", "complained", "failed", 
 RESEND_EMAIL_PAGE = "https://resend.com/emails/{id}"
 CANARY_TEMPLATE = "delivery_canary"
 SETUP_TEMPLATE = "email_setup_problem"
+WEBHOOK_TEMPLATE = "email_webhook_problem"
+
+# Emails that are worthless if they arrive late. A sign-in link expires 30
+# minutes after it is sent, but a provider that answers "try later" (Gmail's
+# "452 4.2.2 inbox out of storage space") is retried for 14 hours before
+# Resend calls it bounced. On 2026-11-22/23 a learner asked for 12 links in
+# two days and each alert reached the instructor 14 h after the link was
+# sent, so he heard about it from the learner first. For these templates
+# "Delayed" alerts at once.
+URGENT_TEMPLATES = frozenset({"login_link", "login_link_admin", "purchase_welcome"})
 
 # Resend webhook event -> delivery state. A later state never moves back to
 # an earlier one (events can arrive out of order): RANK decides.
@@ -118,7 +132,11 @@ def _aware(dt: Optional[datetime]) -> Optional[datetime]:
 
 
 def _is_problem(row: EmailLog) -> bool:
-    return (not row.ok) or row.delivery in copies.PROBLEM_DELIVERY
+    if (not row.ok) or row.delivery in copies.PROBLEM_DELIVERY:
+        return True
+    # A delayed sign-in link is already a failure: it expires long before the
+    # provider gives up (see URGENT_TEMPLATES).
+    return row.delivery == "delivery_delayed" and row.template in URGENT_TEMPLATES
 
 
 def _person(db: Session, email: str, sent: Optional[datetime] = None) -> list[tuple[str, str]]:
@@ -183,6 +201,7 @@ def _alert(db: Session, row: EmailLog) -> bool:
         resend_url=RESEND_EMAIL_PAGE.format(id=row.provider_id) if row.provider_id else "",
         comms_url=f"{site}/admin#comms",
         canary_domain=domain if canary else "",
+        sign_in_link=row.template in URGENT_TEMPLATES,
     )
     subject = (
         f"[Email problem] {domain} refused our daily test email"
@@ -346,9 +365,82 @@ def send_canaries(db: Session, now: datetime) -> dict:
 
 
 def checks(db: Session, *, now: Optional[datetime] = None) -> dict:
-    """The DNS guard and the daily canary, for the cron call."""
+    """The DNS guard, the webhook guard and the daily canary, for the cron call."""
     now = now or datetime.now(timezone.utc)
-    return {"dns": dns_check(db, now), "canary": send_canaries(db, now)}
+    return {
+        "dns": dns_check(db, now),
+        "webhook": webhook_check(db, now),
+        "canary": send_canaries(db, now),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Webhook guard
+# ---------------------------------------------------------------------------
+# Why (2026-11-23): the Resend webhook was registered on Nov 8, but
+# RESEND_WEBHOOK_SECRET was never set on Render. Every event was answered
+# "401 Bad signature", Resend switched the webhook off after two weeks of
+# failures, and the "alert within seconds" path never ran once. Nothing said
+# so. Refusals are counted here (in memory: one process, and Resend retries
+# each event for hours, so a restart loses nothing that matters) and the cron
+# reports them, and a missing secret, at most once a day.
+
+_refusals: dict = {"count": 0, "last": None, "reason": ""}
+
+
+def note_webhook_refused(reason: str, now: Optional[datetime] = None) -> None:
+    """Called by the webhook route whenever it answers 401."""
+    _refusals["count"] += 1
+    _refusals["last"] = now or datetime.now(timezone.utc)
+    _refusals["reason"] = reason
+
+
+def reset_webhook_refusals() -> None:
+    _refusals.update(count=0, last=None, reason="")
+
+
+def webhook_check(db: Session, now: datetime) -> dict:
+    """Alert when Resend's delivery reports cannot get in; at most once a day."""
+    settings = get_settings()
+    problems: list[tuple[str, str]] = []
+    if not (settings.RESEND_WEBHOOK_SECRET or "").strip():
+        problems.append((
+            "RESEND_WEBHOOK_SECRET is not set on Render",
+            "Every delivery report from Resend is refused, so a bounced or delayed "
+            "email is only noticed by the 10-minute check, and without the provider's "
+            "reason. Copy the Signing Secret of the resend-events webhook in Resend "
+            "into RESEND_WEBHOOK_SECRET on Render.",
+        ))
+    if _refusals["count"]:
+        last = _aware(_refusals["last"])
+        when = last.strftime("%b %d, %Y %H:%M UTC") if last else ""
+        problems.append((
+            f"Resend's delivery reports were refused {_refusals['count']} time(s), last on {when}",
+            f"{_refusals['reason']} If this goes on, Resend switches the webhook off; "
+            "after fixing the secret, open the webhook in Resend and enable it again.",
+        ))
+    out = {"problems": [p[0] for p in problems], "alerted": False}
+    if not problems:
+        return out
+    since = now - timedelta(hours=24)
+    recent = db.execute(
+        select(EmailLog).where(EmailLog.template == WEBHOOK_TEMPLATE, EmailLog.ok.is_(True))
+        .order_by(EmailLog.id.desc()).limit(1)
+    ).scalars().first()
+    if recent is not None and (_aware(recent.ts) or now) >= since:
+        return out
+    to = (settings.ADMIN_NOTIFY_EMAIL or "").strip()
+    if to:
+        out["alerted"] = send_email(
+            to=to,
+            subject="[Email setup] Resend's delivery reports are not getting through",
+            html=webhook_problem_html(problems),
+            db=db, scope_kind="system", scope_code="webhook",
+            audience="admin", template=WEBHOOK_TEMPLATE,
+        )
+        if out["alerted"]:
+            reset_webhook_refusals()
+    return out
 
 
 def sweep(

@@ -57,6 +57,9 @@ The 17 env vars below MUST be present. Losing any of the bolded ones causes data
 | `COURSE_PRICE_DISPLAY` | (empty — frontend now shows the $1,000 price) |
 | `PAYMENT_INSTRUCTIONS` | text shown in admin invoice email |
 | `PYTHON_VERSION` | `3.11.9` |
+| `RESEND_WEBHOOK_SECRET` | Signing secret (`whsec_…`) of the Resend webhook `…/api/webhooks/resend-events`. **Without it every delivery report is refused (401) and Resend disables the webhook** — that happened Nov 8–23, 2026; set on 2026-11-23. The cron now alerts once a day if it is missing or refused. |
+| `RESEND_INBOUND_WEBHOOK_SECRET` | Signing secret of the `resend-inbound` webhook (support desk). Still unset as of 2026-11-23, so that endpoint accepts unsigned posts. |
+| `CANARY_EMAILS` | Your own test mailboxes at other providers, emailed daily. Should include a Gmail address that is **not** an admin address (most learners use Gmail). |
 
 ### Cloudflare Pages
 
@@ -861,3 +864,36 @@ refuses to paint the result.
 **Watch for this elsewhere:** any third-party CSS, and any self-hosted CSS added
 to `<head>` outside the Vite bundle. If Google Fonts ever needs to go away
 entirely, self-hosting the three families removes the dependency.
+
+## Incident: a learner could not get a sign-in link for two days (2026-11-22/23)
+
+**Symptom:** a learner (Gmail address) asked for 12 sign-in links between Nov 22 and
+Nov 23. The site sent every one; none arrived. He complained before any alert
+reached the instructor.
+
+**Cause, outside our control:** his Gmail inbox was full. Gmail answered every
+delivery with `452 4.2.2 The recipient's inbox is out of storage space`
+(temporary), Amazon SES behind Resend retried for 840 minutes, then reported a
+bounce. A 30-minute sign-in link is useless after the first retry.
+
+**Cause, ours:** the "within seconds" bounce alerts built on Nov 9 never ran.
+The Resend webhook `…/api/webhooks/resend-events` was created on Nov 8, but
+`RESEND_WEBHOOK_SECRET` was never added on Render, so every event was answered
+`401 Bad signature` and Resend switched the webhook off. Only the 10-minute
+sweep was left, and it only alerted on "bounced", which arrives 14 h later.
+`delivery_delayed` was never treated as a problem.
+
+**Fixed on 2026-11-23:**
+- `RESEND_WEBHOOK_SECRET` set on Render, webhook re-enabled in Resend; a
+  replayed event returned `200 {"ok":true,"result":"delivered"}`.
+- A delayed sign-in, admin sign-in or purchase-welcome link alerts at once
+  (`delivery_watch.URGENT_TEMPLATES`), with instructions to let the person in.
+- The cron alerts at most once a day when `RESEND_WEBHOOK_SECRET` is missing
+  or webhook calls are refused (`delivery_watch.webhook_check`).
+- Admin → Academy → *Sign-in link* now copies a link valid for 24 hours
+  (single use) to send by WhatsApp or text; emailed links stay 30 minutes.
+- The sign-in page's "Check your email" screen says what to do when nothing
+  arrives (spam, full mailbox, contact us for a link by phone/WhatsApp).
+
+**Still open:** `RESEND_INBOUND_WEBHOOK_SECRET` (support desk) is unset; add a
+non-admin Gmail address to `CANARY_EMAILS`.
