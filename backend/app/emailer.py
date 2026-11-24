@@ -1633,12 +1633,15 @@ def delivery_problem_html(
     resend_url: str,
     comms_url: str,
     canary_domain: str = "",
+    sign_in_link: bool = False,
 ) -> str:
     """To the instructor: an email to a customer did not reach them.
 
     `person` is what the site knows about the recipient (registration,
     learner account) as label/value pairs, in plain words. `canary_domain`
     is set when the refused email was the daily test to his own mailbox.
+    `sign_in_link` is set for sign-in and welcome links: the person is locked
+    out until they get one, so the advice is how to let them in today.
     """
     who = next((v for k, v in person if k == "Name" and v), "") or recipient
     if canary_domain:
@@ -1667,6 +1670,18 @@ def delivery_problem_html(
             "<strong>What to do:</strong> open it in Resend and read the provider's reply "
             "(click <em>See details</em>). It usually names what they want: an "
             "authentication record, a blocked sending address, or a content rule."
+        )
+    elif sign_in_link:
+        body += _p(
+            "<strong>They cannot sign in until this is solved.</strong> The provider may "
+            "keep retrying for up to 14 hours (a link they ask for expires after 30 "
+            "minutes), and asking for another link will not help. If the provider says "
+            "the inbox is full, ask them to free space in their mailbox."
+        )
+        body += _p(
+            "<strong>To let them in now:</strong> Admin &rarr; Academy &rarr; their row "
+            "&rarr; <em>Sign-in link</em>. That copies a single-use link that stays valid "
+            "for 24 hours; send it to them by WhatsApp, text or LinkedIn."
         )
     else:
         body += _p(
@@ -1727,6 +1742,28 @@ def email_setup_problem_html(failures: "list[tuple[str, str, str]]") -> str:
         "This alert repeats at most once a day while the problem lasts."
     )
     return _shell("Email setup", "A DNS record for email is missing or changed", body)
+
+
+def webhook_problem_html(problems: "list[tuple[str, str]]") -> str:
+    """To the instructor: Resend's delivery reports (the webhook) cannot get in.
+
+    `problems` holds (what is wrong, what it means and what to do).
+    """
+    body = _p(
+        "Resend reports what happens to every email (delivered, delayed, bounced) "
+        "to the website within seconds. Those reports are not getting through, so "
+        "a customer whose sign-in link never arrives is only noticed later, by the "
+        "10-minute check, and without the provider's reason."
+    )
+    for what, meaning in problems:
+        body += _kv_table([
+            ("Problem", escape_html(what)),
+            ("What it means", escape_html(meaning)),
+        ], size=14)
+    body += _p(
+        "This alert repeats at most once a day while the problem lasts.", size=14,
+    )
+    return _shell("Email setup", "Resend's delivery reports are not getting through", body)
 
 
 # -----------------------------------------------------------------------------
