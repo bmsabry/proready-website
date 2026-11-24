@@ -85,6 +85,16 @@ async def resend_events(request: Request, db: Session = Depends(get_db)) -> dict
         body,
         request.headers.get("svix-signature", ""),
     ):
+        # Said loudly and counted: for two weeks every report was refused here
+        # because the secret was never set, and nothing noticed (2026-11-23).
+        reason = (
+            "RESEND_WEBHOOK_SECRET is not set on the server."
+            if not secret else
+            "The signature did not match RESEND_WEBHOOK_SECRET (wrong secret, "
+            "or a message more than 5 minutes old)."
+        )
+        log.error("[delivery] webhook refused (401): %s", reason)
+        delivery_watch.note_webhook_refused(reason)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bad signature.")
     try:
         event = json.loads(body or b"{}")
