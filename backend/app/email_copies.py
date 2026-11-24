@@ -102,6 +102,7 @@ KIND_LABELS: dict[str, str] = {
     "purchase_welcome": "Purchase: you're in",
     "delivery_canary": "Daily email check (canary)",
     "email_setup_problem": "Email setup problem (alert)",
+    "email_webhook_problem": "Email reports blocked (alert)",
     # Consulting calls (app/consult.py, app/consult_auto.py). To the client:
     "consult_confirmed": "Consulting: booking confirmed",
     "consult_slot_lost": "Consulting: booking not confirmed (time no longer free)",
