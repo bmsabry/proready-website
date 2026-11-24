@@ -76,6 +76,11 @@ class LoginLinkIn(BaseModel):
     email: EmailStr
     next_path: str = "/learn"
     send_email: bool = False
+    # Lifetime of a COPIED link (send_email=False), for handing to someone by
+    # WhatsApp or text when email cannot reach them. Defaults to
+    # ADMIN_COPY_LINK_TTL_SECONDS (24 h). An emailed link keeps the standard
+    # 30 minutes, which is what its email says.
+    valid_hours: int | None = Field(default=None, ge=1, le=72)
 
 
 class ProductPatch(BaseModel):
@@ -627,8 +632,9 @@ def login_link(
     """Mint a sign-in link for any learner — support, debugging, lost email.
 
     Returns the raw link so it can be copied straight out of the admin panel
-    when the person never received the original. The token is single-use and
-    expires like any other, so a copied link is not a standing key.
+    when the person never received the original. The token is single-use; a
+    copied link lasts 24 hours (valid_hours to change it) so it survives the
+    hand-off by WhatsApp or text, an emailed one the usual 30 minutes.
     """
     settings = get_settings()
     email = str(body.email).lower().strip()
@@ -644,7 +650,18 @@ def login_link(
         learner = svc.upsert_learner(db, email, "")
     svc.promote_if_owner(db, learner)
 
-    raw = issue_login_token(db, learner, next_path=body.next_path or "/learn")
+    # A copied link travels by WhatsApp or text to someone whose email is not
+    # arriving (a full Gmail inbox, 2026-11-23); 30 minutes is too short for
+    # that hand-off. It is still single-use.
+    if body.send_email:
+        ttl = settings.LOGIN_LINK_TTL_SECONDS
+    elif body.valid_hours:
+        ttl = body.valid_hours * 3600
+    else:
+        ttl = settings.ADMIN_COPY_LINK_TTL_SECONDS
+    raw = issue_login_token(
+        db, learner, next_path=body.next_path or "/learn", ttl_seconds=ttl
+    )
     link = f"{settings.SITE_URL}/learn/signin?token={raw}"
     if body.send_email:
         send_email(
@@ -661,7 +678,8 @@ def login_link(
         "ok": True,
         "email": learner.email,
         "link": link,
-        "expires_in_seconds": settings.LOGIN_LINK_TTL_SECONDS,
+        "expires_in_seconds": ttl,
+        "expires_label": ttl_phrase(ttl),
         "emailed": bool(body.send_email),
     }
 
