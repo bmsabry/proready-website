@@ -438,3 +438,133 @@ def test_the_whatsapp_number_reaches_the_admin_and_the_alert(db, resend):
     resend["events"][row.provider_id] = "bounced"
     _sweep(db)
     assert "+213 555 12 34 56" in resend["sent"][-1]["html"], "the alert gives the other way to reach them"
+
+
+# ---------------------------------------------------------------------------
+# 2026-11-22/23: a learner's Gmail was full. Gmail answered "452 4.2.2 inbox
+# out of storage space", Resend retried for 14 hours, and each of his 12
+# sign-in links was reported to the instructor 14 h after it was sent. The
+# webhook that should have said so in seconds had been refused (401) since
+# the day it was created, because RESEND_WEBHOOK_SECRET was never set.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def no_refusals():
+    watch.reset_webhook_refusals()
+    yield
+    watch.reset_webhook_refusals()
+
+
+def _webhook_alerts(db):
+    db.expire_all()
+    return db.query(EmailLog).filter(EmailLog.template == watch.WEBHOOK_TEMPLATE).all()
+
+
+def test_a_delayed_sign_in_link_alerts_at_once(db, resend):
+    row = _send(db, "full-inbox@gmail.example", template="login_link",
+                subject="Your ProReadyEngineer sign-in link")
+    resend["events"][row.provider_id] = "delivery_delayed"
+    assert _sweep(db)["alerts_sent"] == 1, "a delayed sign-in link is already a failure"
+    alert = _alerts(db, row.id)[0]
+    assert alert.subject == "[Email problem] Delayed: Sign-in link to full-inbox@gmail.example"
+    html = resend["sent"][-1]["html"]
+    assert "cannot sign in until this is solved" in html
+    assert "valid for 24 hours" in html, "the alert says how to let them in today"
+    resend["events"][row.provider_id] = "bounced"
+    assert _sweep(db)["alerts_sent"] == 0, "the later bounce does not alert twice"
+    assert len(_alerts(db, row.id)) == 1
+
+
+def test_a_delayed_ordinary_email_still_waits_for_the_outcome(db, resend):
+    row = _send(db, "slow@gmail.example")  # a registration confirmation
+    resend["events"][row.provider_id] = "delivery_delayed"
+    out = _sweep(db)
+    assert out["alerts_sent"] == 0 and out["still_pending"] == 1
+    assert not _alerts(db, row.id)
+
+
+def test_a_delayed_event_from_the_webhook_alerts_within_seconds(db, resend, monkeypatch):
+    monkeypatch.setattr(get_settings(), "RESEND_WEBHOOK_SECRET", SECRET, raising=False)
+    row = _send(db, "full-inbox2@gmail.example", template="login_link",
+                subject="Your ProReadyEngineer sign-in link")
+    body, headers = _signed({"type": "email.delivery_delayed",
+                             "data": {"email_id": row.provider_id}})
+    with TestClient(app) as client:
+        r = client.post("/api/webhooks/resend-events", content=body, headers=headers)
+    assert r.status_code == 200 and r.json()["result"] == "delivery_delayed, alerted"
+    assert len(_alerts(db, row.id)) == 1
+
+
+def test_refused_webhook_reports_alert_once_a_day(db, resend, monkeypatch, no_refusals):
+    monkeypatch.setattr(get_settings(), "RESEND_WEBHOOK_SECRET", SECRET, raising=False)
+    wrong = "whsec_" + base64.b64encode(b"not-the-secret").decode()
+    body, headers = _signed(_bounce("some-email-id"), secret=wrong)
+    with TestClient(app) as client:
+        for _ in range(3):
+            assert client.post("/api/webhooks/resend-events", content=body,
+                               headers=headers).status_code == 401
+    now = datetime.now(timezone.utc)
+    out = watch.webhook_check(db, now)
+    assert out["alerted"] is True
+    assert out["problems"][0].startswith("Resend's delivery reports were refused 3 time(s)")
+    html = resend["sent"][-1]["html"]
+    assert "did not match RESEND_WEBHOOK_SECRET" in html and "enable it again" in html
+    assert resend["sent"][-1]["to"] == [ALERT_TO]
+    # The count starts again after an alert, and a new refusal the same day
+    # waits for tomorrow's alert.
+    watch.note_webhook_refused("again")
+    assert watch.webhook_check(db, now + timedelta(hours=1))["alerted"] is False
+    assert watch.webhook_check(db, now + timedelta(hours=25))["alerted"] is True
+    assert len(_webhook_alerts(db)) == 2
+
+
+def test_a_missing_webhook_secret_is_reported(db, resend, monkeypatch, no_refusals):
+    monkeypatch.setattr(get_settings(), "RESEND_WEBHOOK_SECRET", "", raising=False)
+    out = watch.webhook_check(db, datetime.now(timezone.utc))
+    assert out["alerted"] is True
+    assert out["problems"] == ["RESEND_WEBHOOK_SECRET is not set on Render"]
+    with TestClient(app) as client:
+        d = client.get(f"/api/admin/comms/log/{_webhook_alerts(db)[0].id}", headers=ADMIN).json()
+    assert d["kind_label"] == "Email reports blocked (alert)"
+
+
+def test_a_healthy_webhook_sends_nothing(db, resend, monkeypatch, no_refusals):
+    monkeypatch.setattr(get_settings(), "RESEND_WEBHOOK_SECRET", SECRET, raising=False)
+    out = watch.webhook_check(db, datetime.now(timezone.utc))
+    assert out == {"problems": [], "alerted": False}
+    assert "webhook" in watch.checks(db), "the cron call runs the webhook guard"
+
+
+def test_an_admin_copied_link_lasts_a_day_and_an_emailed_one_30_minutes(db, resend):
+    from app.models import Learner, LoginToken
+    email = "copied-link@gmail.example"
+    if not db.query(Learner).filter(Learner.email == email).first():
+        db.add(Learner(email=email, full_name="Copied Link", status="active"))
+        db.commit()
+    with TestClient(app) as client:
+        copied = client.post("/api/admin/academy/login-link", headers=ADMIN,
+                             json={"email": email}).json()
+        emailed = client.post("/api/admin/academy/login-link", headers=ADMIN,
+                              json={"email": email, "send_email": True}).json()
+        short = client.post("/api/admin/academy/login-link", headers=ADMIN,
+                            json={"email": email, "valid_hours": 2}).json()
+        too_long = client.post("/api/admin/academy/login-link", headers=ADMIN,
+                               json={"email": email, "valid_hours": 500})
+    assert copied["expires_in_seconds"] == 24 * 3600 and copied["expires_label"] == "1 day"
+    assert emailed["expires_in_seconds"] == 30 * 60 and emailed["expires_label"] == "30 minutes"
+    assert short["expires_in_seconds"] == 2 * 3600 and short["expires_label"] == "2 hours"
+    assert too_long.status_code == 422
+    db.expire_all()
+    learner = db.query(Learner).filter(Learner.email == email).one()
+    tokens = db.query(LoginToken).filter(LoginToken.learner_id == learner.id).all()
+    lifetimes = sorted(
+        round((watch._aware(t.expires_at) - watch._aware(t.created_at)).total_seconds() / 60)
+        for t in tokens
+    )
+    assert lifetimes == [30, 120, 24 * 60], "the stored token matches what the admin is told"
+    with TestClient(app, base_url="https://testserver") as c:
+        token = copied["link"].split("token=")[1]
+        assert c.post("/api/academy/auth/verify", json={"token": token}).status_code == 200
+        assert c.post("/api/academy/auth/verify", json={"token": token}).status_code == 400, \
+            "still single-use"
