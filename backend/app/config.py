@@ -98,6 +98,9 @@ class Settings(BaseSettings):
     # purchase welcome, admin grant) live longer: people read those when
     # they get to them, not within half an hour. Still single-use.
     WELCOME_LINK_TTL_SECONDS: int = 60 * 60 * 24 * 7  # 7 days
+    # A link the admin copies for someone whose email is not arriving, to send
+    # by WhatsApp or text. Still single-use.
+    ADMIN_COPY_LINK_TTL_SECONDS: int = 60 * 60 * 24  # 24 hours
     # Sign-in links are rate limited per email to blunt inbox flooding.
     LOGIN_LINK_MAX_PER_HOUR: int = 5
 
