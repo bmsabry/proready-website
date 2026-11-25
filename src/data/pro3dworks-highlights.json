@@ -1,28 +1,28 @@
 {
-  "version": "3.1.1",
-  "name": "AI-Integrated RFQ Intake, Direct DXF Preflight & Verified Screening Reports",
-  "summary": "Pro3DWorks v3.1.1 integrates AI Engineer (Chat, Command Palette, Local Engineer & Design Review) directly with Single-Part RFQ Intake Screening and Direct DXF Preflight, keeping CAD geometry 100% offline on your PC.",
+  "version": "3.2.0",
+  "name": "Feature-Level CNC DFM, Evidence-Linked Release Review & Managed Offline Desktop",
+  "summary": "Pro3DWorks v3.2.0 delivers the full engineering workflow from RFQ intake through release sign-off — adding feature-level CNC DFM checks inside RFQ Intake, deterministic STEP/Drawing/BOM Release Review with human sign-off, and IT Managed Offline Desktop policy enforcement with CycloneDX SBOM & Outbound-Data Matrix.",
   "highlights": [
     {
-      "title": "Single-Part RFQ Intake Screening & AI Engineer Integration",
-      "text": "Compute PCA Oriented Bounding Box (OBB) stock envelopes alongside AABB, verify watertight volume and mass (withheld instead of 0 when unverified), summarize STEP AP242 PMI, track Customer PDFs separately, copy free clarification questions, or run RFQ screening directly from AI Engineer Chat and Command Palette."
+      "title": "Feature-Level CNC DFM in RFQ Intake & Machining Readiness",
+      "text": "Named, versioned 3-axis rules evaluate bore/cavity access, concave internal corners vs. candidate cutter radius, and narrow/deep slot accessibility against Illustrative Guideline or Local Shop profiles — separating outside-profile blockers, cost drivers, and honest not_evaluated coverage gates with 3D locator focus and reviewer dispositions."
     },
     {
-      "title": "Direct DXF Preflight in Waterjet 2D Studio",
-      "text": "Inspect uploaded R12–R2018 ASCII DXFs with unitless/$INSUNITS conflict gating, side-by-side mm vs. inch bounds, unsupported entity blocking, Origin (0,0) & 1:1 extents, and explicit Overkill diff approval before clean-copy export — plus live DXF Preflight telemetry shared with AI Engineer."
+      "title": "Evidence-Linked Release Review (STEP / Drawing / BOM)",
+      "text": "Reconciles confirmed 3D model, governing PDF drawing, AP242 PMI relationships, and external BOM CSVs (with explicit user-approved occurrence mappings), enforces snapshot stale detection, links discrete evidence IDs to AI review suggestions, and requires explicit human sign-off to resolve discrepancies."
     },
     {
-      "title": "Shared p3dw.finding/1 Contract & HTML Review Packets",
-      "text": "Every RFQ and DXF preflight finding records explicit status, method, unit basis, and parser coverage inside self-contained Pro HTML Review & Screening Reports."
+      "title": "Managed Offline Desktop Policy & Enterprise Runbook",
+      "text": "Supports HKLM Group Policy Registry, %ProgramData% policy.json, and PRO3DWORKS_POLICY_PATH with strict fail-closed validation ('no_external_network' disables updates, telemetry, cloud AI, and online licensing while allowing pre-staged local loopback bridges & signed offline Ed25519 keys), accompanied by a CycloneDX SBOM, Outbound-Data Matrix, and IT Deployment Runbook."
     },
     {
-      "title": "15-Day Pro Trial, Free Basic 3D Viewer & SolidWorks / NX Native Bridge",
-      "text": "Full 15-day no-card Pro trial unlocking PDF/DXF waterjet exports, bundled local SolidWorks (.SLDPRT/.SLDASM) & Siemens NX (.prt) setup, 4-GiB OCCT kernel, AP242 PMI, 1D Tolerance Stack-Up, and GPU photoreal renders — falling back cleanly to Free Basic 3D Viewing & RFQ screening forever."
+      "title": "Single-Part RFQ Intake, Direct DXF Preflight & AI Engineer Integration",
+      "text": "PCA OBB stock envelopes, withheld-on-invalid solid mass, Waterjet 2D Studio DXF preflight & Overkill diff approval, plus full AI Engineer Chat, Command Palette, Local Engineer Q&A, and Design Review integration."
     }
   ],
   "notes": [
-    "All CAD geometry, RFQ intake screening, DXF preflight, PDF-to-DXF/DWG conversions, and GPU renders run locally on your workstation — zero customer model uploads.",
-    "OpenCascade / occt-import-js (LGPL-2.1) is shipped in separate relinkable desktop files alongside LICENSE.md.",
-    "Native SolidWorks (.SLDPRT/.SLDASM) and Siemens NX (.prt) viewing via NVIDIA usd-convert-cad 0.3.0 installs locally only after explicit operator I ACCEPT license consent."
+    "All CAD geometry, RFQ intake, CNC DFM, DXF preflight, Release Review reconciliation, PDF-to-DXF/DWG conversions, and GPU renders run locally on your workstation — zero customer model uploads.",
+    "Managed offline mode ('no_external_network') provides technical egress controls and is not a claim of organizational ISO/IEC 27001 certification or TISAX assessment.",
+    "OpenCascade / occt-import-js (LGPL-2.1) is shipped in separate relinkable desktop files alongside LICENSE.md; see docs/SBOM.cdx.json."
   ]
 }

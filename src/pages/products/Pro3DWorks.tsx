@@ -52,7 +52,7 @@ const GALLERY_TABS: GalleryTab[] = [
     label: '3D CAD & AP242 PMI',
     badge: '4-GiB OCCT Kernel',
     src: '/Pro3DWorks_Hero_Assembly.png',
-    alt: 'Pro3DWorks v3.1 Dark Graphite workspace inspecting NIST STEP AP242 CAD geometry with semantic and graphical PMI/GD&T callouts',
+    alt: 'Pro3DWorks v3.2 Dark Graphite workspace inspecting NIST STEP AP242 CAD geometry with semantic and graphical PMI/GD&T callouts',
     title: 'Zero-Cloud-Upload 3D STEP, IGES, SolidWorks & NX Inspection',
     caption:
       'Inspect exact B-Rep geometry locally in Studio Light or Graphite Dark themes. Read AP242 semantic + graphical GD&T datums cleanly alongside full assembly trees.',
@@ -122,10 +122,17 @@ const COMPARISON_ROWS = [
     onlinePdf: false,
   },
   {
-    feature: '3-Plane Triad Sectioning, Interference, Printability & 6-Axis CNC DFM',
+    feature: '3-Plane Triad Sectioning, Interference, Printability & Feature-Level 3-Axis CNC DFM',
     pro3d: true,
     legacyPdf: false,
     cadSeat: true,
+    onlinePdf: false,
+  },
+  {
+    feature: 'Evidence-Linked Release Review (STEP / Drawing / BOM, human sign-off) & Managed Offline Policy',
+    pro3d: 'Pro + IT Policy + SBOM',
+    legacyPdf: false,
+    cadSeat: 'Enterprise PDM',
     onlinePdf: false,
   },
   {
@@ -158,7 +165,7 @@ const FAQS = [
   },
   {
     q: 'What happens on Day 16 if I do not buy a license yet?',
-    a: 'Pro3DWorks gracefully transitions to Free Basic 3D Viewer & Intake mode. Forever free: open STEP, IGES, STL, GLB, and OBJ models offline, measure and run quality/mass checks, run Single-Part RFQ Intake & copy customer questions, and inspect PDFs/DXFs in Waterjet 2D Studio Preflight. Pro tools—Waterjet .DXF/.DWG/QA export, self-contained HTML Screening & Review Reports, .p3dproject saves, SolidWorks/NX & Parasolid decoding, 3-Plane Section Pro, Interference, Draft, Printability, CNC Readiness, AP242 PMI, Stack-Up, Photoreal 4K, and BYOK AI Engineer—pause until you activate a paid key.',
+    a: 'Pro3DWorks gracefully transitions to Free Basic 3D Viewer & Intake mode. Forever free: open STEP, IGES, STL, GLB, and OBJ models offline, measure and run quality/mass checks, run Single-Part RFQ Intake & copy customer questions, and inspect PDFs/DXFs in Waterjet 2D Studio Preflight. Pro tools—Feature-Level CNC DFM, Evidence-Linked Release Review, Waterjet .DXF/.DWG/QA export, self-contained HTML Screening & Review Reports, .p3dproject saves, SolidWorks/NX & Parasolid decoding, 3-Plane Section Pro, Interference, Draft, Printability, CNC Readiness, AP242 PMI, Stack-Up, Photoreal 4K, and BYOK AI Engineer—pause until you activate a paid key.',
   },
   {
     q: 'How is money collected through Stripe and when am I charged?',
@@ -170,14 +177,14 @@ const FAQS = [
   },
   {
     q: 'Can our air-gapped shop floor computer run Pro3DWorks offline?',
-    a: 'Yes. All CAD, DXF, PDF, and RFQ geometry processing runs 100% locally with zero file uploads. Trial/Pro key activation requires one brief online check and caches signed Ed25519 tokens locally with a 14-day offline renewal grace window. For permanently disconnected CNC/waterjet PCs, Shop / Team 5-Pack and Perpetual v3.x support offline .p3dwlic license files imported inside the app with zero internet access.',
+    a: 'Yes. All CAD, DXF, PDF, RFQ, CNC DFM, and Release Review processing runs 100% locally with zero file uploads. Trial/Pro key activation requires one brief online check and caches signed Ed25519 tokens locally with a 14-day offline renewal grace window. For permanently disconnected CNC/waterjet PCs, Shop / Team 5-Pack and Perpetual v3.x support offline .p3dwlic license files plus IT-managed no_external_network policies via HKLM Group Policy Registry or %ProgramData%\\ProReadyEngineer\\Pro3DWorks\\policy.json, backed by an Outbound-Data Matrix, IT Deployment Runbook, and CycloneDX SBOM (note: managed offline mode provides technical egress controls and is not a claim of organizational ISO/IEC 27001 certification or TISAX assessment).',
   },
 ];
 
 export default function Pro3DWorksProduct() {
   usePageMeta(
-    'Pro3DWorks v3.1 — Single-Part RFQ Intake, DXF Preflight, Waterjet PDF-to-DWG & Native CAD',
-    'Screen single-part STEP/IGES RFQs, verify incoming DXFs, open SolidWorks & NX locally, and convert shop PDFs into verified .DXF and .DWG cut files. Start a 15-day free Pro trial on Windows x64 — Founding Launch from $29/mo or $249/yr.',
+    'Pro3DWorks v3.2 — CNC DFM, Evidence-Linked Release Review, RFQ Intake & Waterjet CAD',
+    'Screen single-part STEP/IGES RFQs with feature-level CNC DFM, run evidence-linked STEP/Drawing/BOM Release Review with human sign-off, verify incoming DXFs, open SolidWorks & NX locally, and enforce IT-managed offline policy on Windows x64.',
     {
       image: 'https://proreadyengineer.com/Pro3DWorks_Hero_Assembly.png',
       jsonLd: {
@@ -903,9 +910,9 @@ export default function Pro3DWorksProduct() {
                     'Unlimited Waterjet PDF & cleaned DXF → verified .DXF & .DWG exports + QA reports',
                     'OMAX Q1–Q5 & SendCutSend R12 presets + Topology Doctor',
                     'Self-contained HTML Review & RFQ Screening Reports + .p3dproject saves',
-                    'Bundled SolidWorks (.SLDPRT/.SLDASM), NX (.prt) & Parasolid XT readers',
-                    '3-Plane Section Pro, Interference, CNC, Printability & Draft + AP242 PMI & Stack-Up',
-                    'Photoreal 4K, AI Engineer (incl. RFQ Intake & DXF Preflight tools) & seat transfer (14d offline grace)',
+                    'Feature-Level 3-Axis CNC DFM & Evidence-Linked Release Review (STEP / Drawing / BOM with human sign-off)',
+                    'Bundled SolidWorks (.SLDPRT/.SLDASM), NX (.prt) & Parasolid XT readers + 3-Plane Section, AP242 PMI & Stack-Up',
+                    'Photoreal 4K, AI Engineer (incl. RFQ Intake, CNC DFM, Release Review & DXF Preflight tools) & seat transfer (14d offline grace)',
                   ].map((f) => (
                     <li key={f} className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
@@ -949,6 +956,7 @@ export default function Pro3DWorksProduct() {
                   {[
                     'All Pro features unlocked across 5 shop & engineering PCs',
                     'Request signed offline .p3dwlic files for disconnected CNC/waterjet PCs',
+                    'IT Managed Offline Policy (no_external_network via GPO/JSON), Outbound-Data Matrix & CycloneDX SBOM',
                     'Single Stripe invoice & VAT/Tax-ID receipt for accounting',
                     'Shared review reports & BOM workflows across programmers',
                     'Priority engineering support response',
@@ -1058,7 +1066,7 @@ export default function Pro3DWorksProduct() {
         </div>
       </section>
 
-      {/* What's New in v3.0.0 Strip */}
+      {/* Release Notes Strip */}
       <section className="section-pad border-b border-slate-800/80 bg-slate-900/20">
         <div className="container-site">
           <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
