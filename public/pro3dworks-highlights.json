@@ -1,23 +1,23 @@
 {
-  "version": "3.2.3",
-  "name": "Lead ME Shop-Floor Audit Fixes, Mixed-Material Mass, CAM/PMI & Waterjet Refinement Release",
-  "summary": "Pro3DWorks v3.2.3 delivers Lead Mechanical Engineer shop-floor accuracy and usability upgrades across metrology, assembly interference, mixed-material mass properties, 19-alloy shop materials, CNC DFM, printability, AP242 PMI & Cp/Cpk tolerance stacks, SendCutSend/OMAX DXF waterjet preflight, SolidWorks meter-to-mm scaling, and dark/720p ergonomics.",
+  "version": "3.2.4",
+  "name": "Six-Vendor CAD, MBD/PMI, Surfacing & Multi-Provider AI Audit Release",
+  "summary": "Pro3DWorks v3.2.4 resolves findings from a six-vendor expert audit spanning SolidWorks, Siemens NX, CATIA, Google Gemini, OpenAI, and Anthropic: native Anthropic/Gemini/o3-gpt-5 protocol adapters, cached & reasoning token cost accuracy, chiral BOM/revision comparison, full SolidWorks/JT/AP242 PMI/CNC-DFM/RFQ/Release Review accuracy, CATIA surface-model splitting & non-manifold region merging, and project state persistence.",
   "highlights": [
     {
-      "title": "Metrology, Section Caps, AP242 PMI & Tolerance Stacks",
-      "text": "Open-arc classification, BVH unsegmented face measurement, multi-region body mass and shell-depth cavity preservation, multi-plane Zonal 2D boolean caps with section inertia unit scaling, semantic AP242 PMI priority and common datums, and synchronized tolerance-stack limit conversion."
+      "title": "SolidWorks Assemblies, Sections, Drawings & Chiral BOM",
+      "text": "Guards v4 .SLDASM configuration stamps and child visibility inheritance, extracts Zonal section cut entities and cap loops accurately, prevents smooth pin-in-bore contact false positives, transforms drawing vertex normals correctly, preserves curved radial measurements, and adds rotation-invariant chiral PCA identity keys."
     },
     {
-      "title": "Importers, Gzip STEP, RFQ Intake & CNC DFM",
-      "text": "Quote/comment-aware Part-21 splitting, .step.gz/.stp.gz decompression, unitless BREP detection, rotating-calipers RFQ OBB display in active units, mirror-safe winding in CNC DFM, local pocket entry raycasting, and exact cofactor surface-area draft classification."
+      "title": "Siemens NX JT Inspector, AP242 PMI, CNC DFM & Mirrored Revisions",
+      "text": "Adds standalone .jt header/segment inspection, per-datum [M] modifiers, COMMON_DATUM, P, and UZ AP242 PMI parsing, full active-unit CNC DFM CSV/text formatting and persisted disposition notes, and chiral mirrored revision matching."
     },
     {
-      "title": "PDF-to-DWG Waterjet Studio, Mesh Repair & Fastener Recognition",
-      "text": "Full CTM raster compositing, CropBox clipping, ±20° deskew, segment-level web clearance, reference/etch preservation across Overkill & Nesting, auto-injected DXF $INSUNITS/$MEASUREMENT headers, 1e-4 mm default mesh seam welding, and geometry-based hex/SHCS/nut/washer detection."
+      "title": "CATIA Surfacing, Release Review, RFQ & PDF-to-DXF Integrity",
+      "text": "Supports multi-shell SHELL_BASED_SURFACE_MODEL STEP splitting, all *SHAPE_REPRESENTATION inch unit detection, quote/comment-safe Part-21 references, #010101 PDF RGB stroke preservation, order-independent non-manifold face regions, persistent Release Review manual BOM pairing, and active-unit RFQ lot mass."
     },
     {
-      "title": "Desktop CSP, External LGPL OCCT & Fail-Closed Policy",
-      "text": "Ships unmodified OCCT 4-GiB files externally under output/occt-resources/ via IPC, removes script-src unsafe-eval and data: script/worker CSP allowances, enforces ::1 loopback and Tauri bridge tokens, preserves offline .lic refresh, and verifies pre-dated clock bounds."
+      "title": "OpenAI, Gemini & Anthropic Protocol, Cost & Prompt Hardening",
+      "text": "Adds native Anthropic /v1/messages & Gemini /v1beta/openai routing, reasoning/temperature rules across gpt-5/o3/minimal/xhigh, key redaction and nonce-delimited prompt sanitization, cached/reasoning token cost accounting, strict-schema fallbacks, confirm gating for material edits, and bounded transient retries."
     }
   ],
   "notes": [
