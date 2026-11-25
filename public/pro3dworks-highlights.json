@@ -1,23 +1,23 @@
 {
-  "version": "3.2.1",
-  "name": "NIST IV&V Metrology, CNC DFM, Release Review & Offline Security Verification Release",
-  "summary": "Pro3DWorks v3.2.1 resolves every critical and high-priority engineering, geometry, unit-conversion, security, and browser lifecycle finding identified in the 8-domain NIST IV&V audit — hardening watertight mass validation, zonal cut perimeters, rotating-calipers RFQ OBBs, CNC DFM bore/slot/corner reach, strict biarc G1 chord tolerance, deterministic Release Review reconciliation, AI prompt-injection defenses, and strict offline egress blocking.",
+  "version": "3.2.2",
+  "name": "Round 2 Engineering Accuracy, Importers, Waterjet/DXF, AI Materials & Desktop Hardening Release",
+  "summary": "Pro3DWorks v3.2.2 completes end-to-end engineering, metrology, importer, CAM/DFM, rendering, and desktop security hardening — adding AP242 semantic PMI dedup & area units, multi-plane Zonal boolean caps, shell-depth winding checks, full-CTM PDF extraction & affine raster trace, endpoint-to-segment web clearance, $INSUNITS DXF export parity, physically accurate zinc/epoxy/chrome/coating gates, external relinkable OCCT resources, strict CSP without unsafe-eval, and fail-closed loopback policy validation.",
   "highlights": [
     {
-      "title": "Feature-Level CNC DFM in RFQ Intake & Machining Readiness",
-      "text": "Named, versioned 3-axis rules evaluate bore/cavity access, concave internal corners vs. candidate cutter radius, and narrow/deep slot accessibility against Illustrative Guideline or Local Shop profiles — separating outside-profile blockers, cost drivers, and honest not_evaluated coverage gates with 3D locator focus and reviewer dispositions."
+      "title": "Metrology, Section Caps, AP242 PMI & Tolerance Stacks",
+      "text": "Open-arc classification, BVH unsegmented face measurement, multi-region body mass and shell-depth cavity preservation, multi-plane Zonal 2D boolean caps with section inertia unit scaling, semantic AP242 PMI priority and common datums, and synchronized tolerance-stack limit conversion."
     },
     {
-      "title": "Evidence-Linked Release Review (STEP / Drawing / BOM)",
-      "text": "Reconciles confirmed 3D model, governing PDF drawing, AP242 PMI relationships, and external BOM CSVs (with explicit user-approved occurrence mappings), enforces snapshot stale detection, links discrete evidence IDs to AI review suggestions, and requires explicit human sign-off to resolve discrepancies."
+      "title": "Importers, Gzip STEP, RFQ Intake & CNC DFM",
+      "text": "Quote/comment-aware Part-21 splitting, .step.gz/.stp.gz decompression, unitless BREP detection, rotating-calipers RFQ OBB display in active units, mirror-safe winding in CNC DFM, local pocket entry raycasting, and exact cofactor surface-area draft classification."
     },
     {
-      "title": "Managed Offline Desktop Policy & Enterprise Runbook",
-      "text": "Supports HKLM Group Policy Registry, %ProgramData% policy.json, and PRO3DWORKS_POLICY_PATH with strict fail-closed validation ('no_external_network' disables updates, telemetry, cloud AI, and online licensing while allowing pre-staged local loopback bridges & signed offline Ed25519 keys), accompanied by a CycloneDX SBOM, Outbound-Data Matrix, and IT Deployment Runbook."
+      "title": "PDF-to-DWG Waterjet Studio, Mesh Repair & Fastener Recognition",
+      "text": "Full CTM raster compositing, CropBox clipping, ±20° deskew, segment-level web clearance, reference/etch preservation across Overkill & Nesting, auto-injected DXF $INSUNITS/$MEASUREMENT headers, 1e-4 mm default mesh seam welding, and geometry-based hex/SHCS/nut/washer detection."
     },
     {
-      "title": "Single-Part RFQ Intake, Direct DXF Preflight & AI Engineer Integration",
-      "text": "PCA OBB stock envelopes, withheld-on-invalid solid mass, Waterjet 2D Studio DXF preflight & Overkill diff approval, plus full AI Engineer Chat, Command Palette, Local Engineer Q&A, and Design Review integration."
+      "title": "Desktop CSP, External LGPL OCCT & Fail-Closed Policy",
+      "text": "Ships unmodified OCCT 4-GiB files externally under output/occt-resources/ via IPC, removes script-src unsafe-eval and data: script/worker CSP allowances, enforces ::1 loopback and Tauri bridge tokens, preserves offline .lic refresh, and verifies pre-dated clock bounds."
     }
   ],
   "notes": [
