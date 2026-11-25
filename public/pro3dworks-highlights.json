@@ -1,7 +1,7 @@
 {
-  "version": "3.2.2",
-  "name": "Round 2 Engineering Accuracy, Importers, Waterjet/DXF, AI Materials & Desktop Hardening Release",
-  "summary": "Pro3DWorks v3.2.2 completes end-to-end engineering, metrology, importer, CAM/DFM, rendering, and desktop security hardening — adding AP242 semantic PMI dedup & area units, multi-plane Zonal boolean caps, shell-depth winding checks, full-CTM PDF extraction & affine raster trace, endpoint-to-segment web clearance, $INSUNITS DXF export parity, physically accurate zinc/epoxy/chrome/coating gates, external relinkable OCCT resources, strict CSP without unsafe-eval, and fail-closed loopback policy validation.",
+  "version": "3.2.3",
+  "name": "Lead ME Shop-Floor Audit Fixes, Mixed-Material Mass, CAM/PMI & Waterjet Refinement Release",
+  "summary": "Pro3DWorks v3.2.3 delivers Lead Mechanical Engineer shop-floor accuracy and usability upgrades across metrology, assembly interference, mixed-material mass properties, 19-alloy shop materials, CNC DFM, printability, AP242 PMI & Cp/Cpk tolerance stacks, SendCutSend/OMAX DXF waterjet preflight, SolidWorks meter-to-mm scaling, and dark/720p ergonomics.",
   "highlights": [
     {
       "title": "Metrology, Section Caps, AP242 PMI & Tolerance Stacks",
