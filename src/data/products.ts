@@ -31,7 +31,7 @@ export const PRODUCTS: SoftwareProduct[] = [
     slug: 'pro3dworks',
     name: 'Pro3DWorks',
     tagline: 'Single-Part RFQ Intake, Direct DXF Preflight, Waterjet PDF-to-DWG Studio & Native SolidWorks/NX',
-    version: '3.1.0',
+    version: '3.1.1',
     category: 'RFQ Intake · DXF Preflight · CAD · Waterjet CAM Prep',
     status: 'live',
     route: '/products/pro3dworks',
@@ -49,7 +49,7 @@ export const PRODUCTS: SoftwareProduct[] = [
     summary:
       'Built for fabrication shops, mechanical engineers, and quality teams. Screen single-part STEP/IGES RFQs with OBB stock envelopes and honest withhold-never-zero mass, run unit-verified Direct DXF Preflight or convert shop PDFs to verified .DXF/.DWG cut files, and inspect SolidWorks, NX, and Parasolid assemblies offline on your desktop.',
     highlights: [
-      'Single-Part RFQ Intake Screening with PCA OBB stock envelope, watertight mass (withheld if unverified), AP242 PMI summary, separate PDF tracking & free customer questions',
+      'Single-Part RFQ Intake Screening with PCA OBB stock envelope, watertight mass (withheld if unverified), AP242 PMI summary, separate PDF tracking & free customer questions — plus full AI Engineer Chat & Command Palette tool support',
       'Direct DXF Preflight & Waterjet PDF → .DXF/.DWG Studio with unit-conflict gates, G1 biarc fitting, Topology Doctor DFM, and OMAX/SendCutSend presets',
       'Bundled SolidWorks (.SLDPRT/.SLDASM) & Siemens NX (.prt) local native setup wizard plus 4-GiB B-Rep OCCT engine',
       '15-day full Pro trial with Free Basic 3D Viewer & RFQ Screening forever; online activation + 14-day offline grace + air-gapped .p3dwlic for Shop/Perpetual',

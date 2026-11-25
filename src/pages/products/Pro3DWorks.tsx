@@ -905,7 +905,7 @@ export default function Pro3DWorksProduct() {
                     'Self-contained HTML Review & RFQ Screening Reports + .p3dproject saves',
                     'Bundled SolidWorks (.SLDPRT/.SLDASM), NX (.prt) & Parasolid XT readers',
                     '3-Plane Section Pro, Interference, CNC, Printability & Draft + AP242 PMI & Stack-Up',
-                    'Photoreal 4K, BYOK AI Engineer & seat transfer anytime (14d offline grace)',
+                    'Photoreal 4K, AI Engineer (incl. RFQ Intake & DXF Preflight tools) & seat transfer (14d offline grace)',
                   ].map((f) => (
                     <li key={f} className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />

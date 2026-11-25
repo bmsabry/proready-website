@@ -1,22 +1,22 @@
 {
-  "version": "3.1.0",
-  "name": "Direct DXF Preflight, Single-Part RFQ Intake Screening & Verified Reporting",
-  "summary": "Pro3DWorks v3.1 adds Direct DXF Preflight inside Waterjet 2D Studio, Single-Part RFQ Intake Screening from the first screen, and a unified p3dw.finding/1 contract with HTML screening reports — while keeping CAD & DXF geometry 100% offline on your PC.",
+  "version": "3.1.1",
+  "name": "AI-Integrated RFQ Intake, Direct DXF Preflight & Verified Screening Reports",
+  "summary": "Pro3DWorks v3.1.1 integrates AI Engineer (Chat, Command Palette, Local Engineer & Design Review) directly with Single-Part RFQ Intake Screening and Direct DXF Preflight, keeping CAD geometry 100% offline on your PC.",
   "highlights": [
     {
-      "title": "Single-Part RFQ Intake Screening",
-      "text": "Compute Oriented Bounding Box (OBB) stock envelopes alongside AABB, verify watertight volume and material mass (strictly withheld rather than zero when topology or units are unverified), summarize STEP AP242 PMI, track Customer PDF drawings separately, and copy ready-to-send clarification questions for free."
+      "title": "Single-Part RFQ Intake Screening & AI Engineer Integration",
+      "text": "Compute PCA Oriented Bounding Box (OBB) stock envelopes alongside AABB, verify watertight volume and mass (withheld instead of 0 when unverified), summarize STEP AP242 PMI, track Customer PDFs separately, copy free clarification questions, or run RFQ screening directly from AI Engineer Chat and Command Palette."
     },
     {
       "title": "Direct DXF Preflight in Waterjet 2D Studio",
-      "text": "Inspect uploaded R12–R2018 ASCII DXFs without blind assumptions: catch missing or conflicting $INSUNITS/$MEASUREMENT headers, preview side-by-side mm vs. inch bounds, block unsupported splines/inserts/3D polylines, visualize Origin (0,0) and 1:1 extent boxes, and approve before/after Overkill cleanup before exporting a clean copy."
+      "text": "Inspect uploaded R12–R2018 ASCII DXFs with unitless/$INSUNITS conflict gating, side-by-side mm vs. inch bounds, unsupported entity blocking, Origin (0,0) & 1:1 extents, and explicit Overkill diff approval before clean-copy export — plus live DXF Preflight telemetry shared with AI Engineer."
     },
     {
       "title": "Shared p3dw.finding/1 Contract & HTML Review Packets",
       "text": "Every RFQ and DXF preflight finding records explicit status, method, unit basis, and parser coverage inside self-contained Pro HTML Review & Screening Reports."
     },
     {
-      "title": "Waterjet PDF → DXF/DWG, Native SolidWorks/NX & 15-Day Pro Trial",
+      "title": "15-Day Pro Trial, Free Basic 3D Viewer & SolidWorks / NX Native Bridge",
       "text": "Full 15-day no-card Pro trial unlocking PDF/DXF waterjet exports, bundled local SolidWorks (.SLDPRT/.SLDASM) & Siemens NX (.prt) setup, 4-GiB OCCT kernel, AP242 PMI, 1D Tolerance Stack-Up, and GPU photoreal renders — falling back cleanly to Free Basic 3D Viewing & RFQ screening forever."
     }
   ],
