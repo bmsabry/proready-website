@@ -1,7 +1,7 @@
 {
-  "version": "3.2.0",
-  "name": "Feature-Level CNC DFM, Evidence-Linked Release Review & Managed Offline Desktop",
-  "summary": "Pro3DWorks v3.2.0 delivers the full engineering workflow from RFQ intake through release sign-off — adding feature-level CNC DFM checks inside RFQ Intake, deterministic STEP/Drawing/BOM Release Review with human sign-off, and IT Managed Offline Desktop policy enforcement with CycloneDX SBOM & Outbound-Data Matrix.",
+  "version": "3.2.1",
+  "name": "NIST IV&V Metrology, CNC DFM, Release Review & Offline Security Verification Release",
+  "summary": "Pro3DWorks v3.2.1 resolves every critical and high-priority engineering, geometry, unit-conversion, security, and browser lifecycle finding identified in the 8-domain NIST IV&V audit — hardening watertight mass validation, zonal cut perimeters, rotating-calipers RFQ OBBs, CNC DFM bore/slot/corner reach, strict biarc G1 chord tolerance, deterministic Release Review reconciliation, AI prompt-injection defenses, and strict offline egress blocking.",
   "highlights": [
     {
       "title": "Feature-Level CNC DFM in RFQ Intake & Machining Readiness",
