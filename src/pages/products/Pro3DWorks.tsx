@@ -52,7 +52,7 @@ const GALLERY_TABS: GalleryTab[] = [
     label: '3D CAD & AP242 PMI',
     badge: '4-GiB OCCT Kernel',
     src: '/Pro3DWorks_Hero_Assembly.png',
-    alt: 'Pro3DWorks v3.0 Dark Graphite workspace inspecting NIST STEP AP242 CAD geometry with semantic and graphical PMI/GD&T callouts',
+    alt: 'Pro3DWorks v3.1 Dark Graphite workspace inspecting NIST STEP AP242 CAD geometry with semantic and graphical PMI/GD&T callouts',
     title: 'Zero-Cloud-Upload 3D STEP, IGES, SolidWorks & NX Inspection',
     caption:
       'Inspect exact B-Rep geometry locally in Studio Light or Graphite Dark themes. Read AP242 semantic + graphical GD&T datums cleanly alongside full assembly trees.',
@@ -101,7 +101,14 @@ const GALLERY_TABS: GalleryTab[] = [
 
 const COMPARISON_ROWS = [
   {
-    feature: 'Vector + Scanned PDF → Verified .DWG & .DXF (G1 biarcs, OMAX/SendCutSend)',
+    feature: 'Single-Part RFQ Intake (PCA OBB stock, withhold-never-zero mass, free questions)',
+    pro3d: 'Free tier + HTML Pro',
+    legacyPdf: false,
+    cadSeat: 'Manual',
+    onlinePdf: 'Cloud risk',
+  },
+  {
+    feature: 'Direct DXF Preflight + PDF → Verified .DWG & .DXF (unit gate, G1 biarcs, OMAX/SendCutSend)',
     pro3d: true,
     legacyPdf: 'Partial (2D only)',
     cadSeat: 'Built-in ($1.9k+)',
@@ -147,11 +154,11 @@ const COMPARISON_ROWS = [
 const FAQS = [
   {
     q: 'Do I need a credit card to start the 15-day Pro trial?',
-    a: 'No. Download Pro3DWorks-Setup-x64.exe, install on Windows 10/11 x64, and enter your email inside the desktop app. Your full 15-day Pro trial activates immediately without entering payment details.',
+    a: 'No. Download Pro3DWorks-Setup-x64.exe, install on Windows 10/11 x64, and enter your email inside the desktop app with internet once to activate your cryptographic Ed25519 15-day Pro trial—zero credit card required.',
   },
   {
     q: 'What happens on Day 16 if I do not buy a license yet?',
-    a: 'Pro3DWorks gracefully transitions to Free Basic 3D Viewer mode. You keep opening STEP, IGES, STL, GLB, and OBJ models, navigating the assembly tree, taking basic 3D measurements, and visually previewing PDFs in Waterjet Studio forever for free. Pro exports (.DWG/.DXF), native SolidWorks/NX decoding, Stack-Up, Photoreal, and AI Engineer pause until you activate a paid key.',
+    a: 'Pro3DWorks gracefully transitions to Free Basic 3D Viewer & Intake mode. Forever free: open STEP, IGES, STL, GLB, and OBJ models offline, measure and run quality/mass checks, run Single-Part RFQ Intake & copy customer questions, and inspect PDFs/DXFs in Waterjet 2D Studio Preflight. Pro tools—Waterjet .DXF/.DWG/QA export, self-contained HTML Screening & Review Reports, .p3dproject saves, SolidWorks/NX & Parasolid decoding, 3-Plane Section Pro, Interference, Draft, Printability, CNC Readiness, AP242 PMI, Stack-Up, Photoreal 4K, and BYOK AI Engineer—pause until you activate a paid key.',
   },
   {
     q: 'How is money collected through Stripe and when am I charged?',
@@ -163,21 +170,21 @@ const FAQS = [
   },
   {
     q: 'Can our air-gapped shop floor computer run Pro3DWorks offline?',
-    a: 'Yes. Individual Pro subscriptions cache signed Ed25519 tokens locally with a 14-day offline grace window beyond each billing renewal. Shop / Team 5-Pack and Perpetual v3.x licenses also support downloadable .p3dwlic files imported directly offline inside Pro3DWorks without internet access on the shop floor PC.',
+    a: 'Yes. All CAD, DXF, PDF, and RFQ geometry processing runs 100% locally with zero file uploads. Trial/Pro key activation requires one brief online check and caches signed Ed25519 tokens locally with a 14-day offline renewal grace window. For permanently disconnected CNC/waterjet PCs, Shop / Team 5-Pack and Perpetual v3.x support offline .p3dwlic license files imported inside the app with zero internet access.',
   },
 ];
 
 export default function Pro3DWorksProduct() {
   usePageMeta(
-    'Pro3DWorks v3.0 — 3D CAD Viewer, Waterjet PDF-to-DWG Studio & Native SolidWorks/NX',
-    'Open SolidWorks, NX, STEP & IGES locally and convert shop PDFs into verified .DXF and .DWG cut files. Start a 15-day free Pro trial on Windows x64 — Founding Launch from $29/mo or $249/yr.',
+    'Pro3DWorks v3.1 — Single-Part RFQ Intake, DXF Preflight, Waterjet PDF-to-DWG & Native CAD',
+    'Screen single-part STEP/IGES RFQs, verify incoming DXFs, open SolidWorks & NX locally, and convert shop PDFs into verified .DXF and .DWG cut files. Start a 15-day free Pro trial on Windows x64 — Founding Launch from $29/mo or $249/yr.',
     {
       image: 'https://proreadyengineer.com/Pro3DWorks_Hero_Assembly.png',
       jsonLd: {
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
         name: 'Pro3DWorks',
-        softwareVersion: '3.0.0',
+        softwareVersion: highlightsData.version,
         operatingSystem: 'Windows 10, Windows 11 (x64)',
         applicationCategory: 'DesignApplication',
         offers: {
@@ -342,7 +349,7 @@ export default function Pro3DWorksProduct() {
           <div className="lg:col-span-6 min-w-0">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="eyebrow">
-                <Monitor className="w-3.5 h-3.5" /> Windows 10/11 x64 Desktop App · v3.0.0
+                <Monitor className="w-3.5 h-3.5" /> Windows 10/11 x64 Desktop App · v{highlightsData.version}
               </span>
               <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono">
                 No Credit Card for Trial
@@ -350,13 +357,13 @@ export default function Pro3DWorksProduct() {
             </div>
 
             <h1 className="font-display text-4xl sm:text-5xl lg:text-5xl xl:text-[3.35rem] font-bold tracking-tight text-white leading-[1.08] mb-5">
-              Convert Waterjet PDFs to Clean{' '}
-              <span className="text-gradient">.DWG &amp; .DXF</span> — Plus SolidWorks &amp; NX
+              RFQ Intake, DXF Preflight &amp; Waterjet{' '}
+              <span className="text-gradient">.DWG / .DXF</span> — Plus SolidWorks &amp; NX
               Inspection Offline
             </h1>
 
             <p className="text-base sm:text-lg text-slate-300 leading-relaxed mb-7">
-              Stop redrawing spline-riddled PDFs before cutting parts or paying $4,000+ per CAD seat just to inspect assemblies. Pro3DWorks v3 gives fabricators and mechanical engineers a single, fast local desktop workbench from{' '}
+              Screen single-part RFQs before quoting, catch unitless or broken customer DXFs, stop redrawing spline-riddled PDFs, and inspect SolidWorks/NX/STEP assemblies locally—without paying $4,000+ per CAD seat. Pro3DWorks v{highlightsData.version} starts at{' '}
               <strong className="text-white">$29/mo or $249/yr</strong>.
             </p>
 
@@ -376,10 +383,10 @@ export default function Pro3DWorksProduct() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-sm text-slate-300">
               {[
-                '15-day full Pro trial → Free Basic 3D Viewer forever',
+                '15-day full Pro trial → Free Basic Viewer & RFQ Intake forever',
+                'Single-Part RFQ OBB stock envelope + Direct DXF Preflight gate',
                 'Dual-verified Waterjet AC1015 DWG & SendCutSend R12 DXF',
-                'Bundled SolidWorks & NX Native Bridge setup wizard',
-                '4-GiB OCCT kernel · AP242 PMI · Stack-Up · BYOK AI',
+                'Bundled SolidWorks & NX Native Bridge + AP242 PMI & Stack-Up',
               ].map((pt) => (
                 <div key={pt} className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
@@ -489,17 +496,17 @@ export default function Pro3DWorksProduct() {
                 <Wrench className="w-3.5 h-3.5" /> Built for Waterjet &amp; Laser Shops
               </div>
               <h3 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-                PDF Drawing → Waterjet .DXF &amp; .DWG Studio
+                PDF Drawing → .DXF / .DWG &amp; Direct DXF Preflight Studio
               </h3>
               <p className="text-slate-300 leading-relaxed mb-5">
-                Generic PDF converters dump thousands of exploded Bezier segments, dimension arrows, borders, and cross-hatch noise that crash CAM nesting software. Pro3DWorks cleans and refits paths specifically for abrasive waterjet cutting:
+                Stop letting unitless DXFs or spline-riddled shop PDFs wreck waterjet nests. Preflight incoming R12–R2018 DXFs directly or convert vector and scanned PDF prints into clean cut files:
               </p>
               <ul className="space-y-2.5 text-sm text-slate-200">
                 {[
-                  'True G1 biarc / ARC / CIRCLE fitting instead of faceted polygon chords',
-                  'Automatic removal of title blocks, hidden OCG layers, hatch fills & dimension callouts',
-                  'Exploded dash joining, Overkill deduping & gap healing down to configurable tolerance',
-                  'Raster scan auto-deskew & 2-point reference calibration for scanned shop prints',
+                  'Direct DXF Preflight: catches unitless or $INSUNITS/$MEASUREMENT conflicts with side-by-side mm vs. inch bounds',
+                  'Blocks non-planar/unsupported entities (SPLINE/INSERT/3D polyline), visualizes Origin (0,0) + 1:1 extents & requires explicit Overkill cleanup approval before exporting a clean copy',
+                  'True G1 biarc / ARC / CIRCLE fitting instead of faceted polygon chords on PDF contours',
+                  'Automatic removal of title blocks, hidden OCG layers, hatch fills & dimension callouts + raster auto-deskew & 2-point scaling',
                   'Topology Doctor flags thin webs, sharp pierce corners, self-intersections & tipping slugs',
                   'OMAX Q1-Q5 ACI color mapping & SendCutSend R12 DXF presets + live garnet/cut estimator',
                 ].map((item) => (
@@ -565,18 +572,18 @@ export default function Pro3DWorksProduct() {
                 <Layers className="w-3.5 h-3.5" /> Quantitative Engineering QA
               </div>
               <h3 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-                1D Tolerance Stack-Up, AP242 PMI, 3-Plane Section &amp; Design Review Packs
+                Single-Part RFQ Intake, 1D Stack-Up, AP242 PMI &amp; Design Review Packs
               </h3>
               <p className="text-slate-300 leading-relaxed mb-5">
-                Designed for real hardware review gates—so procurement, DFM, and metrology teams get hard numbers without tying up full MCAD licenses:
+                Built for quoting and engineering review gates—so estimators, DFM, and metrology teams get honest numbers without guessing unverified properties or tying up full MCAD licenses:
               </p>
               <ul className="space-y-2.5 text-sm text-slate-200">
                 {[
+                  'Single-Part RFQ Intake: PCA Oriented Bounding Box stock envelope vs AABB, watertight volume & mass (explicitly withheld rather than zero on invalid/unverified inputs), separate PDF tracking & free customer clarification questions',
                   'NIST-benchmarked 1D linear loop stack-up solver: Worst-Case, RSS, and 20k+ Monte Carlo',
                   'AP242 semantic & graphical GD&T datum isolation with explicit face/entity provenance',
                   '3-plane Triad Sectioning with solid hatched caps, cut area & hydraulic diameter Dh',
-                  '3D Printability, 6-axis CNC reachability, Draft angle & Collision interference audits',
-                  'Export self-contained offline HTML review reports & Bring-Your-Own-Key AI Engineer workflows',
+                  'Export self-contained Pro HTML RFQ Screening & Review Reports + Bring-Your-Own-Key AI Engineer workflows',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5">
                     <Check className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
@@ -847,9 +854,9 @@ export default function Pro3DWorksProduct() {
                 <ul className="space-y-2.5 text-sm text-slate-300 mb-6">
                   {[
                     'Includes full 15-day Pro trial on Day 1',
-                    'Open STEP, IGES, STL, GLB, OBJ models offline',
-                    'Orbit, zoom, fit, tree isolate & basic distance measure',
-                    'Waterjet PDF visual preview & QA inspection',
+                    'Open STEP, IGES, STL, GLB, OBJ models offline + basic measure & quality checks',
+                    'Single-Part RFQ Intake Screening & Copy Customer Questions',
+                    'Waterjet PDF & Direct DXF Preflight inspection (bounds, unit gate & diff review)',
                   ].map((f) => (
                     <li key={f} className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
@@ -893,12 +900,12 @@ export default function Pro3DWorksProduct() {
                 </p>
                 <ul className="space-y-2.5 text-sm text-slate-200 mb-6">
                   {[
-                    'Unlimited Waterjet PDF → verified .DXF & .DWG exports',
+                    'Unlimited Waterjet PDF & cleaned DXF → verified .DXF & .DWG exports + QA reports',
                     'OMAX Q1–Q5 & SendCutSend R12 presets + Topology Doctor',
-                    'Bundled SolidWorks (.SLDPRT/.SLDASM) & NX (.prt) bridge',
-                    '3-Plane Section Pro, Interference, CNC, Printability & Draft',
-                    'AP242 PMI, 1D Stack-Up, 4K Render & BYOK AI Engineer',
-                    'Transfer seats anytime in Desktop License Manager',
+                    'Self-contained HTML Review & RFQ Screening Reports + .p3dproject saves',
+                    'Bundled SolidWorks (.SLDPRT/.SLDASM), NX (.prt) & Parasolid XT readers',
+                    '3-Plane Section Pro, Interference, CNC, Printability & Draft + AP242 PMI & Stack-Up',
+                    'Photoreal 4K, BYOK AI Engineer & seat transfer anytime (14d offline grace)',
                   ].map((f) => (
                     <li key={f} className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />

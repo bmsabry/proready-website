@@ -1,27 +1,27 @@
 {
-  "version": "3.0.0",
-  "name": "Windows x64 Desktop App, Offline Waterjet PDF-to-DXF/DWG Studio & Native SolidWorks/NX",
-  "summary": "Pro3DWorks v3 ships as a dedicated offline-first Windows desktop application with a 15-day full-feature trial, integrated SolidWorks & Siemens NX local bridge, and Waterjet CAD prep.",
+  "version": "3.1.0",
+  "name": "Direct DXF Preflight, Single-Part RFQ Intake Screening & Verified Reporting",
+  "summary": "Pro3DWorks v3.1 adds Direct DXF Preflight inside Waterjet 2D Studio, Single-Part RFQ Intake Screening from the first screen, and a unified p3dw.finding/1 contract with HTML screening reports — while keeping CAD & DXF geometry 100% offline on your PC.",
   "highlights": [
     {
-      "title": "Waterjet PDF → DXF / DWG Studio",
-      "text": "Extract vector contours or trace scanned blueprints with auto-deskew, refit Bézier curves to G1 biarcs, run True Overkill and Topology Doctor DFM, apply OMAX Q1–Q5 or SendCutSend R12 presets, and estimate cut time and garnet cost offline."
+      "title": "Single-Part RFQ Intake Screening",
+      "text": "Compute Oriented Bounding Box (OBB) stock envelopes alongside AABB, verify watertight volume and material mass (strictly withheld rather than zero when topology or units are unverified), summarize STEP AP242 PMI, track Customer PDF drawings separately, and copy ready-to-send clarification questions for free."
     },
     {
-      "title": "Native SolidWorks & Siemens NX bundled setup",
-      "text": "Windows Desktop bundles the local loopback CAD Translation Bridge and provides a one-click in-app setup wizard (under explicit NVIDIA usd-convert-cad 0.3.0 license acceptance) for .SLDPRT, .SLDASM, and NX .prt assemblies."
+      "title": "Direct DXF Preflight in Waterjet 2D Studio",
+      "text": "Inspect uploaded R12–R2018 ASCII DXFs without blind assumptions: catch missing or conflicting $INSUNITS/$MEASUREMENT headers, preview side-by-side mm vs. inch bounds, block unsupported splines/inserts/3D polylines, visualize Origin (0,0) and 1:1 extent boxes, and approve before/after Overkill cleanup before exporting a clean copy."
     },
     {
-      "title": "15-day full Pro trial + Free Basic Viewer",
-      "text": "Every installation activates a no-card 15-day trial of all Pro tools via Ed25519 offline-capable tokens. After Day 15, upgrade on Pro Monthly ($29 founding), Yearly ($249), Shop 5-Pack, or Perpetual v3 ($599), or continue using the Free Basic 3D Viewer."
+      "title": "Shared p3dw.finding/1 Contract & HTML Review Packets",
+      "text": "Every RFQ and DXF preflight finding records explicit status, method, unit basis, and parser coverage inside self-contained Pro HTML Review & Screening Reports."
     },
     {
-      "title": "3D B-Rep inspection, PMI, stack-ups & photoreal studio",
-      "text": "4-GiB OpenCascade kernel, SolidWorks-style 3-plane section triad with solid hatched caps, 1D Worst-Case/RSS/Monte Carlo tolerance stack-up, GPU path tracing, and local or cloud BYOK AI Engineer."
+      "title": "Waterjet PDF → DXF/DWG, Native SolidWorks/NX & 15-Day Pro Trial",
+      "text": "Full 15-day no-card Pro trial unlocking PDF/DXF waterjet exports, bundled local SolidWorks (.SLDPRT/.SLDASM) & Siemens NX (.prt) setup, 4-GiB OCCT kernel, AP242 PMI, 1D Tolerance Stack-Up, and GPU photoreal renders — falling back cleanly to Free Basic 3D Viewing & RFQ screening forever."
     }
   ],
   "notes": [
-    "All CAD geometry, PDF-to-DXF/DWG conversions, DFM checks, and GPU renders run locally on your workstation — zero customer model uploads.",
+    "All CAD geometry, RFQ intake screening, DXF preflight, PDF-to-DXF/DWG conversions, and GPU renders run locally on your workstation — zero customer model uploads.",
     "OpenCascade / occt-import-js (LGPL-2.1) is shipped in separate relinkable desktop files alongside LICENSE.md.",
     "Native SolidWorks (.SLDPRT/.SLDASM) and Siemens NX (.prt) viewing via NVIDIA usd-convert-cad 0.3.0 installs locally only after explicit operator I ACCEPT license consent."
   ]
