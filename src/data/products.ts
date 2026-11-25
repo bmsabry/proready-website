@@ -37,7 +37,7 @@ export const PRODUCTS: SoftwareProduct[] = [
     route: '/products/pro3dworks',
     downloadSlug: 'pro3dworks-installer',
     downloadLabel: 'Download Windows x64 Installer (.exe)',
-    platform: 'Windows 10 / 11 x64 (~18 MB installer)',
+    platform: 'Windows 10 / 11 x64 (~17 MB installer)',
     badge: '15-Day Free Pro Trial · No Card Required',
     trialDays: 15,
     startingMonthlyPrice: 29,
