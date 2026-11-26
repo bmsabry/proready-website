@@ -11,9 +11,10 @@ import {
 } from 'lucide-react';
 import { API_BASE } from '../../lib/academyApi';
 import { usePageMeta } from '../../lib/meta';
+import highlightsData from '../../data/pro3dworks-highlights.json';
 
 type CheckoutLookup = {
-  paid: boolean;
+  paid?: boolean;
   status?: string;
   license_key?: string;
   plan?: string;
@@ -45,6 +46,7 @@ export default function Pro3DWorksWelcome() {
     let attempt = 0;
 
     async function poll() {
+      let fulfilled = false;
       while (!cancelled && attempt < 12) {
         attempt++;
         try {
@@ -55,14 +57,18 @@ export default function Pro3DWorksWelcome() {
           if (res.ok) {
             const json = (await res.json()) as CheckoutLookup;
             if (!cancelled) setData(json);
-            if (json.paid && json.license_key) return;
+            const isPaid = Boolean((json.paid === true || json.status === 'active') && json.license_key);
+            if (isPaid) {
+              fulfilled = true;
+              return;
+            }
           }
         } catch {
           // retry transiently while webhook commits
         }
         await new Promise((r) => setTimeout(r, 1500));
       }
-      if (!cancelled && !data?.license_key) {
+      if (!cancelled && !fulfilled) {
         setError(
           'Your payment completed, and Stripe is finishing key delivery. Check your email inbox in a minute or refresh this page.',
         );
@@ -121,7 +127,7 @@ export default function Pro3DWorksWelcome() {
                 Return to Pro3DWorks
               </Link>
             </div>
-          ) : data?.paid && data.license_key ? (
+          ) : (data?.paid === true || data?.status === 'active') && data?.license_key ? (
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono mb-4">
                 <CheckCircle2 className="w-4 h-4" /> Payment Confirmed · Key Issued
@@ -164,7 +170,7 @@ export default function Pro3DWorksWelcome() {
               <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-5 mb-6 space-y-3 text-sm text-slate-200">
                 <h2 className="font-bold text-white">Activate in 30 seconds:</h2>
                 <ol className="list-decimal list-inside space-y-1.5 text-slate-300">
-                  <li>Download &amp; install Pro3DWorks v3.0.0 on Windows x64 if not already installed.</li>
+                  <li>Download &amp; install Pro3DWorks v{highlightsData.version} on Windows x64 if not already installed.</li>
                   <li>Open Pro3DWorks and click the License pill (top right) or <strong>Help → License, Trial &amp; Billing</strong>.</li>
                   <li>Paste your <code className="text-cyan-300">{data.license_key}</code> key and click <strong>Activate</strong>.</li>
                 </ol>

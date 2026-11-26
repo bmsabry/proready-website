@@ -1,23 +1,27 @@
 {
-  "version": "3.2.4",
-  "name": "Six-Vendor CAD, MBD/PMI, Surfacing & Multi-Provider AI Audit Release",
-  "summary": "Pro3DWorks v3.2.4 resolves findings from a six-vendor expert audit spanning SolidWorks, Siemens NX, CATIA, Google Gemini, OpenAI, and Anthropic: native Anthropic/Gemini/o3-gpt-5 protocol adapters, cached & reasoning token cost accuracy, chiral BOM/revision comparison, full SolidWorks/JT/AP242 PMI/CNC-DFM/RFQ/Release Review accuracy, CATIA surface-model splitting & non-manifold region merging, and project state persistence.",
+  "version": "3.2.5",
+  "name": "5-Persona End-to-End Audit & Precision Release",
+  "summary": "Pro3DWorks v3.2.5 resolves all 81 verified findings from a five-persona end-to-end audit across an ME student, medical clinician, busy engineering manager, chief engineer (PE), and business opportunity officer: Stripe checkout polling & Shop 5-Pack licensing, WCAG AA Studio/Graphite contrast & responsive topbar, 3D issue pins & overlay captures, clinical no-cache session mode, unit-consistent tolerance/section/draft/drawing exports, curved-contact interference & Cartesian inertia rigor, symmetric alloy/temper BOM reconciliation with mandatory reviewer sign-off, and RFQ/Release report integrity.",
   "highlights": [
     {
-      "title": "SolidWorks Assemblies, Sections, Drawings & Chiral BOM",
-      "text": "Guards v4 .SLDASM configuration stamps and child visibility inheritance, extracts Zonal section cut entities and cap loops accurately, prevents smooth pin-in-bore contact false positives, transforms drawing vertex normals correctly, preserves curved radial measurements, and adds rotation-invariant chiral PCA identity keys."
+      "title": "Chief Engineer Metrology, Section Pro, Drawings & Release Sign-Off",
+      "text": "Adds active-unit Section Pro SVG with I1/I2/Polar J, Slab cut healing, ANSI-A/B/C drawings with 4th title-block row, Cartesian inertia & radii of gyration, radial pin-in-bore interference detection, lower Float32 snap residue, strict symmetric alloy/temper BOM checks, reviewer attribution with required rationale, and tolerance/draft traceability columns."
     },
     {
-      "title": "Siemens NX JT Inspector, AP242 PMI, CNC DFM & Mirrored Revisions",
-      "text": "Adds standalone .jt header/segment inspection, per-datum [M] modifiers, COMMON_DATUM, P, and UZ AP242 PMI parsing, full active-unit CNC DFM CSV/text formatting and persisted disposition notes, and chiral mirrored revision matching."
+      "title": "Busy Manager RFQ Intake, HTML Review Reports, BOM & Revision Compare",
+      "text": "Fixes [object Object] RFQ material rendering, preserves Withheld stock envelope extents, hides empty report sections cleanly, adds mass/BOM/interference/revision/PMI/repair report blocks, persists RFQ state in .p3dproject files with PDF page counts, adds BOM XLSX export from BOM Cleanup, and includes volume & envelope deltas in Revision CSV."
     },
     {
-      "title": "CATIA Surfacing, Release Review, RFQ & PDF-to-DXF Integrity",
-      "text": "Supports multi-shell SHELL_BASED_SURFACE_MODEL STEP splitting, all *SHAPE_REPRESENTATION inch unit detection, quote/comment-safe Part-21 references, #010101 PDF RGB stroke preservation, order-independent non-manifold face regions, persistent Release Review manual BOM pairing, and active-unit RFQ lot mass."
+      "title": "Clinician & Medical Workflow Precision, Annotations & Privacy Controls",
+      "text": "Adds 3D issue pin & redline compositing onto PNG captures and Review Report covers, Surface Point picking for mesh/STL models, clinical session no-cache privacy toggle, `#no-update-check` post-wipe reload, automatic log clear on model close, explicit unitless STL warning banners with one-click Scale trigger, and WCAG AA Studio/Graphite contrast."
     },
     {
-      "title": "OpenAI, Gemini & Anthropic Protocol, Cost & Prompt Hardening",
-      "text": "Adds native Anthropic /v1/messages & Gemini /v1beta/openai routing, reasoning/temperature rules across gpt-5/o3/minimal/xhigh, key redaction and nonce-delimited prompt sanitization, cached/reasoning token cost accounting, strict-schema fallbacks, confirm gating for material edits, and bounded transient retries."
+      "title": "ME Student Learning Flow & Offline Basics Tutorial",
+      "text": "Adds offline-first Basics tutorial, fixes Studio/Realistic tutorial display cycling, section/explode cleanup, modal shortcut isolation, Show All filter resets, expanded local palette commands (switch units, volume query, default explode, help), and zero-scroll Start Card usability at 1280×720."
+    },
+    {
+      "title": "Commercial Licensing, Stripe Key Delivery & Docs Alignment",
+      "text": "Fixes post-purchase Stripe polling & paid status confirmation, adds Shop 5-Pack Monthly ($149/mo) alongside yearly/perpetual checkout, shows full copiable workstation IDs, clarifies managed offline policies, adds Free vs Pro matrix & footer navigation, and removes desktop donation chrome when licensed desktop builds run."
     }
   ],
   "notes": [

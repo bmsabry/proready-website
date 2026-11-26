@@ -196,6 +196,7 @@ def test_stripe_checkout_webhook_activation_renewal_and_portal(client, monkeypat
         r_poll = c.get("/api/software/checkout/cs_sw_pro_yearly_1")
         assert r_poll.status_code == 200
         assert r_poll.json()["status"] == "pending"
+        assert r_poll.json()["paid"] is False
 
         # 3. Fire checkout.session.completed on existing /api/academy/webhook/stripe
         event_completed = {
@@ -238,6 +239,7 @@ def test_stripe_checkout_webhook_activation_renewal_and_portal(client, monkeypat
         # 4. Checkout poll now returns license key
         r_poll2 = c.get("/api/software/checkout/cs_sw_pro_yearly_1")
         assert r_poll2.json()["status"] == "active"
+        assert r_poll2.json()["paid"] is True
         assert r_poll2.json()["license_key"] == lic_key
 
         # 5. Pre-activated PC refreshes/activates, plus up to 3 seats total, 4th blocked

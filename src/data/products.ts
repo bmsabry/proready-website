@@ -31,7 +31,7 @@ export const PRODUCTS: SoftwareProduct[] = [
     slug: 'pro3dworks',
     name: 'Pro3DWorks',
     tagline: 'RFQ Intake + CNC DFM, Evidence-Linked Release Review, Direct DXF Preflight & Waterjet Studio',
-    version: '3.2.4',
+    version: '3.2.5',
     category: 'RFQ Intake · CNC DFM · Release Review · Waterjet CAM · Native CAD',
     status: 'live',
     route: '/products/pro3dworks',

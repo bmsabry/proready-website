@@ -16,8 +16,8 @@ import { Reveal } from '../components/ui';
 
 export default function Products() {
   usePageMeta(
-    'Engineering Software Products | Pro3DWorks v3.0',
-    'Desktop engineering software built by ProReadyEngineer LLC. Explore Pro3DWorks v3.0 for Windows x64 — 3D CAD inspection, SolidWorks & NX native viewing, and Waterjet PDF-to-DXF/DWG conversion.',
+    'Engineering Software Products | Pro3DWorks v3',
+    'Desktop engineering software built by ProReadyEngineer LLC. Explore Pro3DWorks v3 for Windows x64 — 3D CAD inspection, SolidWorks & NX native viewing, and Waterjet PDF-to-DXF/DWG conversion.',
     { image: 'https://proreadyengineer.com/Pro3DWorks_Hero_Assembly.png' },
   );
 

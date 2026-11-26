@@ -474,9 +474,10 @@ def software_checkout_status(session_id: str, db: Session = Depends(get_db)) -> 
         )
     ).scalar_one_or_none()
     if lic is None:
-        return {"status": "pending"}
+        return {"status": "pending", "paid": False}
     info = PLAN_CATALOG.get(lic.plan, {})
     return {
+        "paid": lic.status in ("active", "past_due"),
         "status": lic.status,
         "license_key": lic.license_key,
         "plan": lic.plan,

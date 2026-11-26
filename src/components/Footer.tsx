@@ -53,6 +53,7 @@ const Footer = () => {
               <FooterLink to="/services/test-cell-design">Test Cell Design &amp; Commissioning</FooterLink>
               <FooterLink to="/services/industrial-ai">Industrial AI &amp; Data Analytics</FooterLink>
               <FooterLink to="/services">All Services</FooterLink>
+              <FooterLink to="/products/pro3dworks">Pro3DWorks</FooterLink>
               {CONSULT_PUBLIC && <FooterLink to="/consult">Book an Expert Call</FooterLink>}
               <FooterLink to="/training">Training &amp; Workshops</FooterLink>
               <FooterLink to="/learn">Learner Sign In</FooterLink>
