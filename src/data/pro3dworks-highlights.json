@@ -4,24 +4,24 @@
   "summary": "Pro3DWorks v3.2.6 strengthens mirrored-part CNC and printability geometry transforms, active-unit report and CSV exports, STEP AP242 and DXF parser resilience, strict clinical no-cache and air-gapped enterprise policy isolation, command-palette accuracy, and online/Stripe license revocation and seat reliability.",
   "highlights": [
     {
-      "title": "Mirrored CAD Transforms, Mass Inertia & Reports",
-      "text": "Preserves exact handedness and winding orientation across mirrored assembly parts during 3-axis CNC machining readiness and 3D printability checks, refines Cartesian inertia and center-of-mass validation, and ensures clean customer-facing formatting in exported RFQ and design review HTML reports."
+      "title": "Mirrored-Part CNC Readiness & Printability Geometry Transforms",
+      "text": "Preserves accurate winding, face normals, pocket accessibility, overhang angles, and wall-thickness sampling across mirrored assembly occurrences and negative-determinant world transforms."
     },
     {
-      "title": "Active-Unit Exports & STEP/DXF Parsing",
-      "text": "Aligns CSV, BOM, tolerance, and metrology report exports to the active workspace unit system, hardens STEP AP242 semantic and graphical PMI extraction against malformed entities, and improves Direct DXF Preflight resilience on non-standard header and layer definitions."
+      "title": "Active-Unit Report & CSV Export Consistency",
+      "text": "Keeps Review Report HTML packages, RFQ material summaries, tolerance stack-ups, draft angle tables, and revision comparisons aligned with active display units, complete traceability fields, and clean empty-section suppression."
     },
     {
-      "title": "Clinical No-Cache & Enterprise Offline Security",
-      "text": "Enforces strict no-cache isolation for clinical sessions without retaining recent models or thumbnails on disk, strengthens fail-closed enterprise offline policy enforcement for air-gapped deployments, and isolates diagnostic logs from sensitive part metadata."
+      "title": "STEP AP242 PMI & Waterjet DXF Parser Resilience",
+      "text": "Hardens bounded STEP AP242 semantic and graphical PMI extraction and Waterjet 2D Studio DXF preflight geometry parsing against edge-case entities, nested blocks, and unit scaling without external network dependencies."
     },
     {
-      "title": "Command Palette & Session Lifecycle Consistency",
-      "text": "Aligns command-palette actions and keyboard shortcuts with active workspace permissions and view modes, and cleans up section planes, issue overlays, and temporary session state reliably when switching or closing models."
+      "title": "Clinical No-Cache Privacy & Air-Gapped Enterprise Policy Isolation",
+      "text": "Enforces machine-level registry and ProgramData policy precedence with fail-closed unreadable-policy protection, clinical no-cache session hygiene, and redacted error diagnostics that never expose local paths or license tokens."
     },
     {
-      "title": "Licensing Revocation, Concurrency & Web Portal",
-      "text": "Hardens online license refresh, deactivation, and Stripe webhook handling so revoked or refunded keys stay blocked, protects multi-seat activations with database concurrency guards, and improves checkout verification polling and billing portal feedback on the web portal."
+      "title": "Command-Palette Accuracy & Licensing Seat Reliability",
+      "text": "Refines deterministic local command matching and guarded step execution while hardening online and Stripe seat activation, revocation refresh synchronization, and offline signed license file import."
     }
   ],
   "notes": [
