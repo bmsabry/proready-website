@@ -134,7 +134,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)) -> RegisterOut:
 
     # Cohort label for the confirmation email: use the course's real start
     # date when available; otherwise fall back to the configured label.
-    cohort_label = course.start_date.strftime("%B %-d, %Y") if course.start_date else settings.COHORT_LABEL
+    cohort_label = course.start_date.strftime(f"%B {course.start_date.day}, %Y") if course.start_date else settings.COHORT_LABEL
 
     # Confirmation email to applicant.
     send_email(

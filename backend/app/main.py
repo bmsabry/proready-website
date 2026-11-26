@@ -455,13 +455,13 @@ def _seed_software_products() -> None:
                 slug="pro3dworks",
                 name="Pro3DWorks",
                 asset_path="/downloads/Pro3DWorks-Setup-x64.exe",
-                latest_version="3.2.5",
+                latest_version="3.2.6",
             ),
             SoftwareProduct(
                 slug="pro3dworks-installer",
                 name="Pro3DWorks Desktop Installer (Windows x64)",
                 asset_path="/downloads/Pro3DWorks-Setup-x64.exe",
-                latest_version="3.2.5",
+                latest_version="3.2.6",
             ),
         ]
         added = 0

@@ -28,6 +28,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PublicKey,
 )
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .config import get_settings
@@ -295,6 +296,47 @@ def issue_license_token(lic: SoftwareLicense, *, machine_id: str) -> str:
     return sign_envelope(payload)
 
 
+def _match_existing_trial(
+    db: Session,
+    *,
+    product: str,
+    clean_email: str,
+    clean_machine: str,
+    now: datetime,
+    max_trial_days: int,
+) -> Optional[tuple[str, SoftwareTrial, dict[str, Any]]]:
+    matches = db.execute(
+        select(SoftwareTrial).where(
+            SoftwareTrial.product == product,
+            or_(
+                SoftwareTrial.email == clean_email,
+                SoftwareTrial.machine_id == clean_machine,
+            ),
+        )
+    ).scalars().all()
+
+    exact = next(
+        (t for t in matches if t.email == clean_email and t.machine_id == clean_machine),
+        None,
+    )
+    if exact is not None:
+        exp = _ensure_utc(exact.expires_at)
+        if exp is not None and exp > now:
+            days_left = max(1, int((exp - now).total_seconds() // 86400) + 1)
+            return "resumed", exact, {"days_remaining": min(max_trial_days, days_left)}
+        return "expired", exact, {"days_remaining": 0}
+
+    machine_taken = next((t for t in matches if t.machine_id == clean_machine), None)
+    if machine_taken is not None:
+        return "machine_used", machine_taken, {"days_remaining": 0}
+
+    email_taken = next((t for t in matches if t.email == clean_email), None)
+    if email_taken is not None:
+        return "email_used", email_taken, {"days_remaining": 0}
+
+    return None
+
+
 def start_or_resume_trial(
     db: Session,
     *,
@@ -315,34 +357,16 @@ def start_or_resume_trial(
     clean_machine = machine_id.strip().lower()
     now = datetime.now(timezone.utc)
 
-    matches = db.execute(
-        select(SoftwareTrial).where(
-            SoftwareTrial.product == product,
-            or_(
-                SoftwareTrial.email == clean_email,
-                SoftwareTrial.machine_id == clean_machine,
-            ),
-        )
-    ).scalars().all()
-
-    exact = next(
-        (t for t in matches if t.email == clean_email and t.machine_id == clean_machine),
-        None,
+    existing = _match_existing_trial(
+        db,
+        product=product,
+        clean_email=clean_email,
+        clean_machine=clean_machine,
+        now=now,
+        max_trial_days=settings.SOFTWARE_TRIAL_DAYS,
     )
-    if exact is not None:
-        exp = _ensure_utc(exact.expires_at)
-        if exp is not None and exp > now:
-            days_left = max(1, int((exp - now).total_seconds() // 86400) + 1)
-            return "resumed", exact, {"days_remaining": min(settings.SOFTWARE_TRIAL_DAYS, days_left)}
-        return "expired", exact, {"days_remaining": 0}
-
-    machine_taken = next((t for t in matches if t.machine_id == clean_machine), None)
-    if machine_taken is not None:
-        return "machine_used", machine_taken, {"days_remaining": 0}
-
-    email_taken = next((t for t in matches if t.email == clean_email), None)
-    if email_taken is not None:
-        return "email_used", email_taken, {"days_remaining": 0}
+    if existing is not None:
+        return existing
 
     trial_days = max(1, int(settings.SOFTWARE_TRIAL_DAYS))
     expires_at = now + timedelta(days=trial_days)
@@ -359,8 +383,22 @@ def start_or_resume_trial(
         token_jti=secrets.token_hex(16),
     )
     db.add(row)
-    db.commit()
-    db.refresh(row)
+    try:
+        db.commit()
+        db.refresh(row)
+    except IntegrityError:
+        db.rollback()
+        raced = _match_existing_trial(
+            db,
+            product=product,
+            clean_email=clean_email,
+            clean_machine=clean_machine,
+            now=now,
+            max_trial_days=settings.SOFTWARE_TRIAL_DAYS,
+        )
+        if raced is not None:
+            return raced
+        raise
 
     buy_url = f"{settings.SITE_URL}/products/pro3dworks#pricing"
     download_url = f"{settings.SITE_URL}/download/pro3dworks-installer"
@@ -384,6 +422,24 @@ def start_or_resume_trial(
     return "started", row, {"days_remaining": trial_days}
 
 
+def _reuse_activation_seat(
+    db: Session,
+    seat: SoftwareActivation,
+    *,
+    now: datetime,
+    machine_name: str,
+    app_version: str,
+    used_seats: int,
+) -> tuple[bool, str, int]:
+    seat.last_seen_at = now
+    if machine_name.strip():
+        seat.machine_name = machine_name.strip()[:200]
+    if app_version.strip():
+        seat.app_version = app_version.strip()[:32]
+    db.commit()
+    return True, "reused", used_seats
+
+
 def activate_machine_seat(
     db: Session,
     lic: SoftwareLicense,
@@ -396,6 +452,15 @@ def activate_machine_seat(
     clean_machine = machine_id.strip().lower()
     now = datetime.now(timezone.utc)
 
+    if db.bind is not None and db.bind.dialect.name != "sqlite":
+        locked = db.execute(
+            select(SoftwareLicense)
+            .where(SoftwareLicense.id == lic.id)
+            .with_for_update()
+        ).scalar_one_or_none()
+        if locked is not None:
+            lic = locked
+
     active_rows = db.execute(
         select(SoftwareActivation).where(
             SoftwareActivation.license_id == lic.id,
@@ -405,13 +470,14 @@ def activate_machine_seat(
 
     existing = next((r for r in active_rows if r.machine_id == clean_machine), None)
     if existing is not None:
-        existing.last_seen_at = now
-        if machine_name.strip():
-            existing.machine_name = machine_name.strip()[:200]
-        if app_version.strip():
-            existing.app_version = app_version.strip()[:32]
-        db.commit()
-        return True, "reused", len(active_rows)
+        return _reuse_activation_seat(
+            db,
+            existing,
+            now=now,
+            machine_name=machine_name,
+            app_version=app_version,
+            used_seats=len(active_rows),
+        )
 
     if len(active_rows) >= int(lic.max_seats or 1):
         return False, "seat_limit", len(active_rows)
@@ -426,7 +492,31 @@ def activate_machine_seat(
             last_seen_at=now,
         )
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        active_after = db.execute(
+            select(SoftwareActivation).where(
+                SoftwareActivation.license_id == lic.id,
+                SoftwareActivation.deactivated_at.is_(None),
+            )
+        ).scalars().all()
+        existing_after = next(
+            (r for r in active_after if r.machine_id == clean_machine), None
+        )
+        if existing_after is not None:
+            return _reuse_activation_seat(
+                db,
+                existing_after,
+                now=now,
+                machine_name=machine_name,
+                app_version=app_version,
+                used_seats=len(active_after),
+            )
+        if len(active_after) >= int(lic.max_seats or 1):
+            return False, "seat_limit", len(active_after)
+        raise
     return True, "activated", len(active_rows) + 1
 
 
@@ -457,7 +547,10 @@ def _fetch_stripe_subscription(sub_id: str) -> Optional[dict[str, Any]]:
         from .routes.checkout import _stripe  # noqa: PLC0415
 
         stripe = _stripe()
-        sub = stripe.Subscription.retrieve(sub_id)
+        sub = stripe.Subscription.retrieve(
+            sub_id,
+            expand=["latest_invoice.payment_intent", "latest_invoice.payments"],
+        )
         return dict(sub)
     except Exception as exc:
         log.info("Could not retrieve subscription %s (using fallback): %s", sub_id, exc)
@@ -517,12 +610,17 @@ def fulfill_software_checkout(db: Session, session_obj: dict[str, Any]) -> Optio
     sub_id = str(session_obj.get("subscription") or "").strip() or None
     period_end: Optional[datetime] = None
     updates_until: Optional[datetime] = None
+    payment_intent_id = str(session_obj.get("payment_intent") or "").strip()
 
     if plan == "perpetual":
         updates_until = now + timedelta(days=365)
     else:
         sub_obj = _fetch_stripe_subscription(sub_id) if sub_id else None
         period_end = _extract_sub_period_end(sub_obj) or _plan_period_fallback(plan, now)
+        if not payment_intent_id and sub_obj:
+            latest_inv = sub_obj.get("latest_invoice")
+            if isinstance(latest_inv, dict):
+                payment_intent_id = _extract_invoice_payment_intent(latest_inv)
 
     lic_key = generate_license_key()
     while db.execute(
@@ -541,7 +639,7 @@ def fulfill_software_checkout(db: Session, session_obj: dict[str, Any]) -> Optio
         stripe_customer_id=str(session_obj.get("customer") or ""),
         stripe_subscription_id=sub_id,
         stripe_checkout_session_id=session_id,
-        stripe_payment_intent_id=str(session_obj.get("payment_intent") or ""),
+        stripe_payment_intent_id=payment_intent_id,
         amount_cents=int(session_obj.get("amount_total") or plan_info["amount_cents"]),
         currency=str(session_obj.get("currency") or plan_info["currency"]).lower(),
         current_period_end=period_end,
@@ -550,8 +648,29 @@ def fulfill_software_checkout(db: Session, session_obj: dict[str, Any]) -> Optio
         allow_offline_file=bool(plan_info["allow_offline_file"]),
     )
     db.add(lic)
-    db.commit()
-    db.refresh(lic)
+    try:
+        db.commit()
+        db.refresh(lic)
+    except IntegrityError:
+        db.rollback()
+        existing = db.execute(
+            select(SoftwareLicense).where(
+                SoftwareLicense.stripe_checkout_session_id == session_id
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            log.info("Concurrent fulfillment for software checkout %s — ignoring", session_id)
+            return existing
+        if sub_id:
+            existing_sub = db.execute(
+                select(SoftwareLicense).where(
+                    SoftwareLicense.stripe_subscription_id == sub_id
+                )
+            ).scalar_one_or_none()
+            if existing_sub is not None:
+                log.info("Concurrent fulfillment for subscription %s — ignoring", sub_id)
+                return existing_sub
+        raise
 
     pre_machine = str(meta.get("machine_id") or "").strip().lower()
     if pre_machine and len(pre_machine) >= 8:
@@ -630,16 +749,31 @@ def _extract_invoice_subscription_id(obj: dict[str, Any]) -> str:
     return ""
 
 
+def _pi_id_from_value(val: Any) -> str:
+    if isinstance(val, dict):
+        return str(val.get("id") or "").strip()
+    if val:
+        return str(val).strip()
+    return ""
+
+
 def _extract_invoice_payment_intent(obj: dict[str, Any]) -> str:
     """Extract PaymentIntent ID from top-level field or basil+ invoice.payments."""
-    pi = str(obj.get("payment_intent") or "").strip()
+    if not isinstance(obj, dict):
+        return ""
+    pi = _pi_id_from_value(obj.get("payment_intent"))
     if pi:
         return pi
     payments = (obj.get("payments") or {}).get("data") or []
     if payments and isinstance(payments[0], dict):
-        pay_pi = ((payments[0].get("payment") or {}).get("payment_intent"))
+        pay_pi = _pi_id_from_value(payments[0].get("payment_intent"))
         if pay_pi:
-            return str(pay_pi).strip()
+            return pay_pi
+        nested_pi = _pi_id_from_value(
+            (payments[0].get("payment") or {}).get("payment_intent")
+        )
+        if nested_pi:
+            return nested_pi
     return ""
 
 
@@ -656,7 +790,7 @@ def handle_software_stripe_event(
 
     if event_type == "checkout.session.completed" and meta.get("kind") == "software_license":
         pay_status = str(obj.get("payment_status") or "").lower()
-        if pay_status in ("paid", "no_payment_required", ""):
+        if pay_status in ("paid", "no_payment_required"):
             fulfill_software_checkout(db, obj)
         else:
             log.info("Software checkout %s completed unpaid (%s); waiting for async success", obj.get("id"), pay_status)
@@ -685,6 +819,14 @@ def handle_software_stripe_event(
         ).scalar_one_or_none()
         if lic is None:
             return False
+        if lic.status == "revoked":
+            log.info(
+                "Ignoring %s for revoked software license %s (sub %s)",
+                event_type,
+                lic.license_key,
+                sub_id,
+            )
+            return True
         if event_type == "invoice.paid":
             lic.status = "active"
             period_ts = None
@@ -730,6 +872,14 @@ def handle_software_stripe_event(
         ).scalar_one_or_none()
         if lic is None:
             return False
+        if lic.status == "revoked":
+            log.info(
+                "Ignoring %s for revoked software license %s (sub %s)",
+                event_type,
+                lic.license_key,
+                sub_id,
+            )
+            return True
         if event_type == "customer.subscription.deleted":
             lic.status = "canceled"
         else:

@@ -39,5 +39,5 @@ def get_seats(
     return SeatsOut(
         taken=count_active(db, course_code),
         capacity=course.total_seats,
-        cohort=course.start_date.strftime("%B %-d, %Y"),
+        cohort=course.start_date.strftime(f"%B {course.start_date.day}, %Y"),
     )

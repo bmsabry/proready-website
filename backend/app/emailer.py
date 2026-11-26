@@ -602,7 +602,9 @@ def applicant_confirmation_html(
 
 def _fmt_date(d: date) -> str:
     """Format a date like 'May 15, 2026' — matches the COHORT_LABEL style."""
-    return d.strftime("%B %-d, %Y") if hasattr(d, "strftime") else str(d)
+    if hasattr(d, "strftime") and hasattr(d, "day"):
+        return d.strftime(f"%B {d.day}, %Y")
+    return str(d)
 
 
 def start_date_updated_html(

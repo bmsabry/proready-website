@@ -110,7 +110,7 @@ def test_public_software_list_has_seeded_pro3dworks(client, monkeypatch):
     row = next(p for p in products if p["slug"] == "pro3dworks")
     assert set(row) == {"slug", "name", "blurb", "latest_version", "download_count", "asset_path"}
     assert row["name"] == "Pro3DWorks"
-    assert row["latest_version"] == "3.2.5"
+    assert row["latest_version"] == "3.2.6"
     assert row["download_count"] == 0
 
 

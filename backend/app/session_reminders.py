@@ -129,7 +129,7 @@ def when_lines(start_utc: datetime, location: str) -> tuple[list[str], str]:
     Returns the lines and the zone used ("" when the location did not
     resolve — then only the UTC line is given, never a guessed local time).
     """
-    lines = [start_utc.strftime("%H:%M UTC on %A, %B %-d")]
+    lines = [start_utc.strftime(f"%H:%M UTC on %A, %B {start_utc.day}")]
     zone = resolve_zone(location or "") or ""
     if zone:
         try:

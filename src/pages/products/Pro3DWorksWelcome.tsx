@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
+  AlertCircle,
   Check,
   CheckCircle2,
   Copy,
@@ -10,13 +11,14 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { API_BASE } from '../../lib/academyApi';
+import { apiErrorMessage } from '../../lib/apiError';
 import { usePageMeta } from '../../lib/meta';
 import highlightsData from '../../data/pro3dworks-highlights.json';
 
 type CheckoutLookup = {
   paid?: boolean;
   status?: string;
-  license_key?: string;
+  license_key?: string | null;
   plan?: string;
   plan_label?: string;
   email?: string;
@@ -24,6 +26,8 @@ type CheckoutLookup = {
   amount_cents?: number;
   currency?: string;
 };
+
+type PollState = 'polling' | 'ready' | 'timeout' | 'inactive' | 'unconfigured';
 
 export default function Pro3DWorksWelcome() {
   usePageMeta(
@@ -36,56 +40,115 @@ export default function Pro3DWorksWelcome() {
   const sessionId = params.get('session_id') ?? '';
 
   const [data, setData] = useState<CheckoutLookup | null>(null);
+  const [pollState, setPollState] = useState<PollState>(() =>
+    !API_BASE ? 'unconfigured' : 'polling',
+  );
+  const [pollNonce, setPollNonce] = useState(0);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [portalBusy, setPortalBusy] = useState(false);
+  const [portalError, setPortalError] = useState('');
+  const copyTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!sessionId || !API_BASE) return;
+    return () => {
+      if (copyTimerRef.current !== null) {
+        window.clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    if (!API_BASE) {
+      setPollState('unconfigured');
+      setError(
+        'Online checkout verification is not configured in this preview build. Check your email inbox for your license key or contact support.',
+      );
+      return;
+    }
+
+    const controller = new AbortController();
     let cancelled = false;
+    let pollTimer: number | null = null;
     let attempt = 0;
 
+    setPollState('polling');
+    setError('');
+
     async function poll() {
-      let fulfilled = false;
       while (!cancelled && attempt < 12) {
         attempt++;
         try {
           const res = await fetch(
             `${API_BASE}/api/software/checkout/${encodeURIComponent(sessionId)}`,
-            { cache: 'no-store' },
+            { cache: 'no-store', signal: controller.signal },
           );
           if (res.ok) {
             const json = (await res.json()) as CheckoutLookup;
-            if (!cancelled) setData(json);
-            const isPaid = Boolean((json.paid === true || json.status === 'active') && json.license_key);
+            if (cancelled) return;
+            setData(json);
+            const isPaid = Boolean(
+              (json.paid === true || json.status === 'active') && json.license_key,
+            );
             if (isPaid) {
-              fulfilled = true;
+              setPollState('ready');
+              return;
+            }
+            if (json.status && json.status !== 'pending') {
+              setPollState('inactive');
+              setError(
+                json.status === 'revoked'
+                  ? 'This license has been revoked and cannot be activated. Contact support if you need help.'
+                  : `Checkout status is "${json.status}" and no active license key is available.`,
+              );
               return;
             }
           }
         } catch {
+          if (cancelled || controller.signal.aborted) return;
           // retry transiently while webhook commits
         }
-        await new Promise((r) => setTimeout(r, 1500));
+        if (cancelled || attempt >= 12) break;
+        await new Promise<void>((resolve) => {
+          pollTimer = window.setTimeout(() => {
+            pollTimer = null;
+            resolve();
+          }, 1500);
+        });
       }
-      if (!cancelled && !fulfilled) {
+      if (!cancelled) {
+        setPollState('timeout');
         setError(
-          'Your payment completed, and Stripe is finishing key delivery. Check your email inbox in a minute or refresh this page.',
+          'Your payment completed, and Stripe is finishing key delivery. Check your email inbox in a minute or click Retry below.',
         );
       }
     }
+
     void poll();
     return () => {
       cancelled = true;
+      controller.abort();
+      if (pollTimer !== null) {
+        window.clearTimeout(pollTimer);
+        pollTimer = null;
+      }
     };
-  }, [sessionId]);
+  }, [sessionId, pollNonce]);
 
   async function copyKey() {
     if (!data?.license_key) return;
     try {
       await navigator.clipboard.writeText(data.license_key);
+      if (copyTimerRef.current !== null) {
+        window.clearTimeout(copyTimerRef.current);
+      }
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      copyTimerRef.current = window.setTimeout(() => {
+        setCopied(false);
+        copyTimerRef.current = null;
+      }, 2500);
     } catch {
       setCopied(false);
     }
@@ -93,6 +156,7 @@ export default function Pro3DWorksWelcome() {
 
   async function openPortal() {
     if (!data?.license_key || !API_BASE) return;
+    setPortalError('');
     setPortalBusy(true);
     try {
       const res = await fetch(`${API_BASE}/api/software/billing-portal`, {
@@ -101,9 +165,21 @@ export default function Pro3DWorksWelcome() {
         body: JSON.stringify({ license_key: data.license_key }),
       });
       const json = await res.json().catch(() => ({}));
-      if (res.ok && json.url) {
-        window.open(String(json.url), '_blank', 'noopener');
+      if (!res.ok) {
+        throw new Error(
+          apiErrorMessage(json, `Could not open Customer Billing Portal (${res.status}).`),
+        );
       }
+      if (!json.url) {
+        throw new Error('Billing portal URL was missing from the server response.');
+      }
+      window.open(String(json.url), '_blank', 'noopener');
+    } catch (err) {
+      setPortalError(
+        err instanceof Error
+          ? err.message
+          : 'Could not reach Customer Billing Portal. Please try again.',
+      );
     } finally {
       setPortalBusy(false);
     }
@@ -193,8 +269,13 @@ export default function Pro3DWorksWelcome() {
                   Product Overview →
                 </Link>
               </div>
+              {portalError && (
+                <p className="mt-4 text-sm text-red-300" role="alert">
+                  {portalError}
+                </p>
+              )}
             </div>
-          ) : (
+          ) : pollState === 'polling' ? (
             <div className="text-center py-6">
               <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin mx-auto mb-3" />
               <h1 className="text-2xl font-bold text-white mb-2">
@@ -203,7 +284,33 @@ export default function Pro3DWorksWelcome() {
               <p className="text-slate-300 text-sm max-w-md mx-auto">
                 Hold on a moment while Stripe notifies our licensing server and generates your Ed25519 license key.
               </p>
-              {error && <p className="mt-4 text-sm text-amber-300">{error}</p>}
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <AlertCircle className="w-8 h-8 text-amber-400 mx-auto mb-3" />
+              <h1 className="text-2xl font-bold text-white mb-2">
+                {pollState === 'inactive'
+                  ? 'License Not Active'
+                  : pollState === 'unconfigured'
+                    ? 'Checkout Verification Unavailable'
+                    : 'Still Waiting on Key Delivery'}
+              </h1>
+              <p className="text-slate-300 text-sm max-w-md mx-auto" role="status">
+                {error ||
+                  'We could not confirm your license key yet. Retry below or check your email inbox.'}
+              </p>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPollNonce((n) => n + 1)}
+                  className="btn-primary text-sm"
+                >
+                  <RefreshCw className="w-4 h-4" /> Retry
+                </button>
+                <Link to="/products/pro3dworks#manage-license" className="btn-secondary text-sm">
+                  Customer Billing Portal
+                </Link>
+              </div>
             </div>
           )}
         </div>

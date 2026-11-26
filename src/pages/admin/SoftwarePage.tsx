@@ -763,7 +763,9 @@ function AppTelemetrySection({ slug }: { slug: string }) {
               <ul className="space-y-2">
                 {launches.by_version.map((v) => (
                   <li key={v.version} className="flex items-center justify-between text-sm">
-                    <span className="text-slate-300">v{v.version}</span>
+                    <span className="text-slate-300">
+                      v{String(v.version || '').replace(/^v/i, '')}
+                    </span>
                     <span className="text-slate-400">{v.count.toLocaleString()}</span>
                   </li>
                 ))}

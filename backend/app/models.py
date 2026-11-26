@@ -26,6 +26,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -1869,6 +1870,14 @@ class SoftwareActivation(Base):
     __tablename__ = "software_activations"
     __table_args__ = (
         Index("ix_software_act_lic_machine", "license_id", "machine_id"),
+        Index(
+            "ix_software_activations_active_lic_machine",
+            "license_id",
+            "machine_id",
+            unique=True,
+            sqlite_where=text("deactivated_at IS NULL"),
+            postgresql_where=text("deactivated_at IS NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)

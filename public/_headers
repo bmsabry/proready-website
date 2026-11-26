@@ -35,3 +35,9 @@
   Content-Type: application/octet-stream
   Content-Disposition: attachment; filename="Pro3DWorks.html"
   Cache-Control: public, no-transform
+
+/downloads/Pro3DWorks-Setup-x64.exe
+  Content-Type: application/octet-stream
+  Content-Disposition: attachment; filename="Pro3DWorks-Setup-x64.exe"
+  X-Content-Type-Options: nosniff
+  Cache-Control: public, no-transform

@@ -765,7 +765,10 @@ def read_attendance(db: Session, booking: ConsultBooking, now: datetime | None =
     tz = consult.zone(consult.settings_row(db))
 
     def clock(at: datetime | None) -> str:
-        return at.astimezone(tz).strftime("%-I:%M %p %Z") if at else "time not given"
+        if not at:
+            return "time not given"
+        local = at.astimezone(tz)
+        return local.strftime(f"{local.hour % 12 or 12}:%M %p %Z")
 
     # The host is the connected Google account on however many devices (the
     # same Google user is one person here). Anyone else counts as the client

@@ -28,7 +28,9 @@ const Welcome: React.FC = () => {
     }
     let tries = 0;
     let cancelled = false;
+    let timerId: number | undefined;
     const tick = async () => {
+      if (cancelled) return;
       tries += 1;
       try {
         const res = await academy.checkoutStatus(sessionId);
@@ -42,12 +44,14 @@ const Welcome: React.FC = () => {
       } catch {
         /* keep polling — a cold start can lose the first request */
       }
+      if (cancelled) return;
       if (tries >= 12) setStatus('slow');
-      else if (!cancelled) window.setTimeout(tick, 2500);
+      else timerId = window.setTimeout(tick, 2500);
     };
     tick();
     return () => {
       cancelled = true;
+      if (timerId !== undefined) window.clearTimeout(timerId);
     };
   }, [sessionId]);
 

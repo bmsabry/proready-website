@@ -328,6 +328,15 @@ def refresh_license(body: LicenseActivateIn, db: Session = Depends(get_db)) -> d
             SoftwareActivation.deactivated_at.is_(None),
         )
     ).scalars().all()
+    if lic.status == "revoked":
+        return {
+            "ok": True,
+            "entitled": False,
+            "status": "revoked",
+            "token": None,
+            "seats_used": len(active_rows),
+            "max_seats": lic.max_seats,
+        }
     seat = next((r for r in active_rows if r.machine_id == clean_machine), None)
     if seat is None:
         return {
@@ -372,17 +381,19 @@ def deactivate_license(body: LicenseDeactivateIn, db: Session = Depends(get_db))
     if lic is None:
         raise HTTPException(status_code=404, detail="License key not found.")
 
-    row = db.execute(
+    rows = db.execute(
         select(SoftwareActivation).where(
             SoftwareActivation.license_id == lic.id,
             SoftwareActivation.machine_id == clean_machine,
             SoftwareActivation.deactivated_at.is_(None),
         )
-    ).scalar_one_or_none()
-    if row is None:
+    ).scalars().all()
+    if not rows:
         return {"ok": True, "released": False}
 
-    row.deactivated_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    for row in rows:
+        row.deactivated_at = now
     db.commit()
     return {"ok": True, "released": True}
 
@@ -476,10 +487,11 @@ def software_checkout_status(session_id: str, db: Session = Depends(get_db)) -> 
     if lic is None:
         return {"status": "pending", "paid": False}
     info = PLAN_CATALOG.get(lic.plan, {})
+    entitled_view = lic.status in ("active", "past_due")
     return {
-        "paid": lic.status in ("active", "past_due"),
+        "paid": entitled_view,
         "status": lic.status,
-        "license_key": lic.license_key,
+        "license_key": lic.license_key if entitled_view else None,
         "plan": lic.plan,
         "plan_label": info.get("label", lic.plan),
         "email": lic.email,

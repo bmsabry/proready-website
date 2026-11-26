@@ -1,27 +1,27 @@
 {
-  "version": "3.2.5",
-  "name": "5-Persona End-to-End Audit & Precision Release",
-  "summary": "Pro3DWorks v3.2.5 resolves all 81 verified findings from a five-persona end-to-end audit across an ME student, medical clinician, busy engineering manager, chief engineer (PE), and business opportunity officer: Stripe checkout polling & Shop 5-Pack licensing, WCAG AA Studio/Graphite contrast & responsive topbar, 3D issue pins & overlay captures, clinical no-cache session mode, unit-consistent tolerance/section/draft/drawing exports, curved-contact interference & Cartesian inertia rigor, symmetric alloy/temper BOM reconciliation with mandatory reviewer sign-off, and RFQ/Release report integrity.",
+  "version": "3.2.6",
+  "name": "Engineering Metrology, Offline Security & Licensing Hardening",
+  "summary": "Pro3DWorks v3.2.6 strengthens mirrored-part CNC and printability geometry transforms, active-unit report and CSV exports, STEP AP242 and DXF parser resilience, strict clinical no-cache and air-gapped enterprise policy isolation, command-palette accuracy, and online/Stripe license revocation and seat reliability.",
   "highlights": [
     {
-      "title": "Chief Engineer Metrology, Section Pro, Drawings & Release Sign-Off",
-      "text": "Adds active-unit Section Pro SVG with I1/I2/Polar J, Slab cut healing, ANSI-A/B/C drawings with 4th title-block row, Cartesian inertia & radii of gyration, radial pin-in-bore interference detection, lower Float32 snap residue, strict symmetric alloy/temper BOM checks, reviewer attribution with required rationale, and tolerance/draft traceability columns."
+      "title": "Mirrored CAD Transforms, Mass Inertia & Reports",
+      "text": "Preserves exact handedness and winding orientation across mirrored assembly parts during 3-axis CNC machining readiness and 3D printability checks, refines Cartesian inertia and center-of-mass validation, and ensures clean customer-facing formatting in exported RFQ and design review HTML reports."
     },
     {
-      "title": "Busy Manager RFQ Intake, HTML Review Reports, BOM & Revision Compare",
-      "text": "Fixes [object Object] RFQ material rendering, preserves Withheld stock envelope extents, hides empty report sections cleanly, adds mass/BOM/interference/revision/PMI/repair report blocks, persists RFQ state in .p3dproject files with PDF page counts, adds BOM XLSX export from BOM Cleanup, and includes volume & envelope deltas in Revision CSV."
+      "title": "Active-Unit Exports & STEP/DXF Parsing",
+      "text": "Aligns CSV, BOM, tolerance, and metrology report exports to the active workspace unit system, hardens STEP AP242 semantic and graphical PMI extraction against malformed entities, and improves Direct DXF Preflight resilience on non-standard header and layer definitions."
     },
     {
-      "title": "Clinician & Medical Workflow Precision, Annotations & Privacy Controls",
-      "text": "Adds 3D issue pin & redline compositing onto PNG captures and Review Report covers, Surface Point picking for mesh/STL models, clinical session no-cache privacy toggle, `#no-update-check` post-wipe reload, automatic log clear on model close, explicit unitless STL warning banners with one-click Scale trigger, and WCAG AA Studio/Graphite contrast."
+      "title": "Clinical No-Cache & Enterprise Offline Security",
+      "text": "Enforces strict no-cache isolation for clinical sessions without retaining recent models or thumbnails on disk, strengthens fail-closed enterprise offline policy enforcement for air-gapped deployments, and isolates diagnostic logs from sensitive part metadata."
     },
     {
-      "title": "ME Student Learning Flow & Offline Basics Tutorial",
-      "text": "Adds offline-first Basics tutorial, fixes Studio/Realistic tutorial display cycling, section/explode cleanup, modal shortcut isolation, Show All filter resets, expanded local palette commands (switch units, volume query, default explode, help), and zero-scroll Start Card usability at 1280×720."
+      "title": "Command Palette & Session Lifecycle Consistency",
+      "text": "Aligns command-palette actions and keyboard shortcuts with active workspace permissions and view modes, and cleans up section planes, issue overlays, and temporary session state reliably when switching or closing models."
     },
     {
-      "title": "Commercial Licensing, Stripe Key Delivery & Docs Alignment",
-      "text": "Fixes post-purchase Stripe polling & paid status confirmation, adds Shop 5-Pack Monthly ($149/mo) alongside yearly/perpetual checkout, shows full copiable workstation IDs, clarifies managed offline policies, adds Free vs Pro matrix & footer navigation, and removes desktop donation chrome when licensed desktop builds run."
+      "title": "Licensing Revocation, Concurrency & Web Portal",
+      "text": "Hardens online license refresh, deactivation, and Stripe webhook handling so revoked or refunded keys stay blocked, protects multi-seat activations with database concurrency guards, and improves checkout verification polling and billing portal feedback on the web portal."
     }
   ],
   "notes": [

@@ -2298,7 +2298,8 @@ def when_text(at: datetime, tz_name: str) -> str:
     """'Tuesday, November 10, 2026 at 3:00 PM EST (America/New_York)'."""
     name = tz_name if valid_zone(tz_name) else "UTC"
     local = aware(at).astimezone(ZoneInfo(name))
-    return f"{local.strftime('%A, %B %-d, %Y at %-I:%M %p %Z')} ({name})"
+    hour12 = local.hour % 12 or 12
+    return f"{local.strftime(f'%A, %B {local.day}, %Y at {hour12}:%M %p %Z')} ({name})"
 
 
 def _admin_url(booking: ConsultBooking | None = None) -> str:

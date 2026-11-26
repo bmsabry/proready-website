@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -72,8 +72,8 @@ const GALLERY_TABS: GalleryTab[] = [
     label: 'Machining & Native Bridge',
     badge: 'Local Native Helper',
     src: '/Pro3DWorks_Native_CAD.png',
-    alt: 'Pro3DWorks CNC Machining Readiness workspace screening 6-axis tool access, deep pockets, and stock bounds in Graphite theme',
-    title: '6-Axis CNC Readiness + Bundled SolidWorks & NX Native Bridge',
+    alt: 'Pro3DWorks CNC Machining Readiness workspace screening 6-direction 3-axis tool access, deep pockets, and stock bounds in Graphite theme',
+    title: '6-Direction 3-Axis CNC Readiness + Bundled SolidWorks & NX Native Bridge',
     caption:
       'Screen deep pockets, cutter reach, and stock bounding boxes locally—and install the guided Native Bridge wizard inside File to open .SLDPRT, .SLDASM, and Siemens NX .prt assemblies locally.',
   },
@@ -227,6 +227,14 @@ export default function Pro3DWorksProduct() {
   const [hourlyRate, setHourlyRate] = useState<number>(85);
 
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  useEffect(() => {
+    const resetBusyOnPageShow = () => {
+      setBusyPlan(null);
+    };
+    window.addEventListener('pageshow', resetBusyOnPageShow);
+    return () => window.removeEventListener('pageshow', resetBusyOnPageShow);
+  }, []);
 
   const activeTab = useMemo(
     () => GALLERY_TABS.find((t) => t.id === activeTabId) ?? GALLERY_TABS[0],
@@ -823,10 +831,14 @@ export default function Pro3DWorksProduct() {
             </div>
 
             <div className="w-full max-w-md">
-              <label className="block text-xs text-slate-400 mb-1 text-center">
+              <label
+                htmlFor="checkout-receipt-email"
+                className="block text-xs text-slate-400 mb-1 text-center"
+              >
                 Optional receipt &amp; license key delivery email (pre-fills Stripe Checkout)
               </label>
               <input
+                id="checkout-receipt-email"
                 type="email"
                 value={buyerEmail}
                 onChange={(e) => setBuyerEmail(e.target.value)}
@@ -1041,6 +1053,7 @@ export default function Pro3DWorksProduct() {
               <form onSubmit={openBillingPortal} className="md:col-span-6 min-w-0 flex flex-col sm:flex-row gap-2.5">
                 <input
                   type="text"
+                  aria-label="License key or purchase email address for Stripe Customer Billing Portal"
                   value={portalInput}
                   onChange={(e) => setPortalInput(e.target.value)}
                   placeholder="P3DW-XXXX-... or billing@company.com"
