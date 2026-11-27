@@ -45,6 +45,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import require_admin
 from ..models import AdvancedCertification, AssetBlob, Certificate, Learner, Product, QuizItem
+from .reminders import require_admin_or_cron
 
 log = logging.getLogger(__name__)
 
@@ -494,6 +495,27 @@ def reopen(row_id: int, db: Session = Depends(get_db), _: str = Depends(require_
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return adv.admin_out(db, row)
+
+
+@router.post("/advanced/{row_id}/hand-in-saved")
+def hand_in_saved(row_id: int, db: Session = Depends(get_db), admin: str = Depends(require_admin)) -> dict:
+    """Grade the answers a candidate saved on their open paper, when their own
+    hand-in never reached the site. Uses an attempt and sends the result."""
+    row, _learner, _product = _row(db, row_id)
+    try:
+        attempt = adv.admin_hand_in(db, row, admin)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    out = adv.admin_out(db, row)
+    out["graded"] = {"score_pct": attempt.score_pct, "passed": attempt.passed}
+    return out
+
+
+@router.post("/exam-watch")
+def exam_watch(db: Session = Depends(get_db), _who: str = Depends(require_admin_or_cron)) -> dict:
+    """Papers open a day without a hand-in: alert the instructor, remind the
+    candidate. Run by the 10-minute cron job (scripts/session_reminders_cron.py)."""
+    return adv.sweep_open_papers(db)
 
 
 @router.post("/advanced/{row_id}/reset-exam")

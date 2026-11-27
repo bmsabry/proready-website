@@ -55,7 +55,11 @@ from .emailer import (
     advanced_slots_admin_html,
     advanced_waiver_declined_html,
     advanced_waiver_request_admin_html,
+    advanced_exam_not_passed_admin_html,
+    advanced_exam_not_passed_html,
     exam_calendar_problem_html,
+    exam_paper_open_admin_html,
+    exam_paper_open_reminder_html,
     send_email,
 )
 from .models import (
@@ -614,9 +618,30 @@ def _codes_already_sat(db: Session, learner_id: int, product_code: str) -> set[s
     return seen
 
 
+EXAM_LOG_KEEP = 200
+
+
+def _aware(dt: datetime | None) -> datetime | None:
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def log_exam(row: AdvancedCertification, event: str, **detail) -> None:
+    """Append to the paper's record. The caller commits.
+
+    Events: paper_drawn, paper_redrawn, handed_in, hand_in_refused,
+    hand_in_failed, stale_alert. A new list is assigned so the JSON column
+    is seen as changed."""
+    entry = {"at": datetime.now(timezone.utc).isoformat(), "event": event}
+    entry.update({k: v for k, v in detail.items() if v is not None})
+    row.exam_log = (list(row.exam_log or []) + [entry])[-EXAM_LOG_KEEP:]
+
+
 def served_items(db: Session, product_code: str, row: AdvancedCertification) -> list[QuizItem]:
     """The paper for the attempt that is open, drawing one if there is none yet."""
     pool = exam_items(db, product_code)
+    redrawn = False
     if row.exam_item_codes:
         by_code = {i.code: i for i in pool}
         kept = [by_code[c] for c in row.exam_item_codes if c in by_code]
@@ -624,13 +649,61 @@ def served_items(db: Session, product_code: str, row: AdvancedCertification) -> 
             return kept
         # The bank was edited under an open paper; draw a fresh one rather than
         # grading the candidate on questions that no longer exist.
+        redrawn = True
     drawn = _balanced_draw(
         pool, get_settings().ADVANCED_EXAM_SERVE_COUNT,
         avoid=_codes_already_sat(db, row.learner_id, product_code),
     )
     row.exam_item_codes = [i.code for i in drawn]
+    row.exam_opened_at = datetime.now(timezone.utc)
+    # Answers saved against the old paper stay in the log, not on the new one.
+    if redrawn and row.exam_draft:
+        log_exam(row, "paper_redrawn", reason="question bank edited",
+                 answers_dropped=len(row.exam_draft))
+    row.exam_draft = {}
+    row.exam_draft_saved_at = None
+    row.exam_stale_alerted_at = None
+    log_exam(row, "paper_drawn", questions=len(drawn), attempt_no=(row.exam_attempts or 0) + 1)
     db.commit()
     return drawn
+
+
+def _answered(responses: dict | None) -> dict:
+    """The answers that say something: blanks are not answers."""
+    return {k: v for k, v in (responses or {}).items() if v is not None and v != "" and v != {}}
+
+
+def paper_codes(row: AdvancedCertification) -> set[str]:
+    return set(row.exam_item_codes or [])
+
+
+def save_draft(db: Session, row: AdvancedCertification, responses: dict) -> AdvancedCertification:
+    """Keep the answers so far on the server. Raises ValueError when there is
+    no open paper or an answer is to a question not on it."""
+    codes = paper_codes(row)
+    if not exam_open(row) or not codes:
+        raise ValueError("no open paper")
+    if any(k not in codes for k in (responses or {})):
+        raise ValueError("not this paper")
+    kept = _answered(responses)
+    # Short answers are free text; cap each so one field cannot fill the row.
+    row.exam_draft = {k: (v[:4000] if isinstance(v, str) else v) for k, v in kept.items()}
+    row.exam_draft_saved_at = datetime.now(timezone.utc)
+    db.commit()
+    return row
+
+
+def paper_status(row: AdvancedCertification | None) -> dict | None:
+    """What the candidate and the instructor see about the paper that is open."""
+    if row is None or not exam_open(row) or not row.exam_item_codes:
+        return None
+    return {
+        "opened_at": _aware(row.exam_opened_at),
+        "questions": len(row.exam_item_codes),
+        "answered": len(_answered(row.exam_draft)),
+        "saved_at": _aware(row.exam_draft_saved_at),
+        "stale_alerted_at": _aware(row.exam_stale_alerted_at),
+    }
 
 
 def serve_count(db: Session, product_code: str) -> int:
@@ -696,8 +769,11 @@ def competency_breakdown(db: Session, product: Product, attempt: QuizAttempt | N
 
 
 def grade_exam(
-    db: Session, learner: Learner, product: Product, row: AdvancedCertification, responses: dict
+    db: Session, learner: Learner, product: Product, row: AdvancedCertification, responses: dict,
+    *, by: str = "candidate",
 ) -> QuizAttempt:
+    """Grade the open paper and close it. `by` is 'candidate', or
+    'admin:<email>' when the instructor hands in the saved answers."""
     settings = get_settings()
     items = served_items(db, product.code, row)
     detail: dict = {}
@@ -729,6 +805,16 @@ def grade_exam(
     row.exam_item_codes = []
     row.exam_attempts = (row.exam_attempts or 0) + 1
     row.exam_best_pct = max(row.exam_best_pct or 0.0, score)
+    opened = _aware(row.exam_opened_at)
+    log_exam(
+        row, "handed_in", by=by, attempt_no=row.exam_attempts, score_pct=score, passed=passed,
+        answered=len(_answered(responses)), questions=len(items),
+        minutes_open=round((datetime.now(timezone.utc) - opened).total_seconds() / 60) if opened else None,
+    )
+    row.exam_draft = {}
+    row.exam_draft_saved_at = None
+    row.exam_opened_at = None
+    row.exam_stale_alerted_at = None
     if passed:
         row.status = "exam_passed"
         row.exam_passed_at = datetime.now(timezone.utc)
@@ -736,6 +822,9 @@ def grade_exam(
         row.status = "exam_failed"
     db.commit()
     db.refresh(attempt)
+
+    if not passed:
+        _send_not_passed(db, learner, product, row, attempt, by=by)
 
     if passed:
         send_email(
@@ -780,6 +869,137 @@ def grade_exam(
             template="advanced_exam_passed_admin",
         )
     return attempt
+
+
+def _send_not_passed(
+    db: Session, learner: Learner, product: Product, row: AdvancedCertification,
+    attempt: QuizAttempt, *, by: str,
+) -> None:
+    """Every hand-in is a result both sides hear about, pass or not: the
+    candidate gets their score, the instructor gets the alert. Before this
+    only a pass was announced, so a fail (or nothing at all) looked alike."""
+    settings = get_settings()
+    course_url = f"{settings.SITE_URL}/learn/{product.code}"
+    send_email(
+        to=learner.email,
+        subject=f"Written examination result — {product.title}",
+        html=advanced_exam_not_passed_html(
+            learner.full_name or "", product.title, attempt.score_pct,
+            settings.ADVANCED_EXAM_THRESHOLD_PCT, row.exam_attempts,
+            settings.ADVANCED_EXAM_MAX_ATTEMPTS, course_url,
+        ),
+        db=db, scope_kind="product", scope_code=product.code,
+        template="advanced_exam_not_passed",
+    )
+    _notify_admin(
+        db, product,
+        subject=(
+            f"[Written exam not passed] {learner.full_name or learner.email} — {product.title} — "
+            f"{attempt.score_pct:g}% (attempt {row.exam_attempts} of {settings.ADVANCED_EXAM_MAX_ATTEMPTS})"
+        ),
+        html=advanced_exam_not_passed_admin_html(
+            learner_name=learner.full_name or "",
+            learner_email=learner.email,
+            course_title=product.title,
+            score=attempt.score_pct,
+            threshold=settings.ADVANCED_EXAM_THRESHOLD_PCT,
+            attempt_no=row.exam_attempts,
+            attempts_max=settings.ADVANCED_EXAM_MAX_ATTEMPTS,
+            breakdown=competency_breakdown(db, product, attempt),
+            handed_in_by="you, from the answers the candidate had saved" if by.startswith("admin") else "",
+            admin_url=admin_cert_url(db, product.code),
+        ),
+        template="advanced_exam_not_passed_admin",
+    )
+
+
+def admin_hand_in(db: Session, row: AdvancedCertification, by: str) -> QuizAttempt:
+    """The instructor hands in the answers a candidate saved, when their own
+    hand-in never arrived. Graded and announced exactly like the candidate's."""
+    if not exam_open(row) or not row.exam_item_codes:
+        raise ValueError("This candidate has no open paper to hand in.")
+    answers = _answered(row.exam_draft)
+    if not answers:
+        raise ValueError(
+            "No answers have been saved on this paper, so there is nothing to grade. "
+            "Ask the candidate to open the examination and answer it."
+        )
+    learner = db.get(Learner, row.learner_id)
+    product = db.get(Product, row.product_code)
+    if learner is None or product is None:
+        raise ValueError("Candidate or course not found.")
+    return grade_exam(db, learner, product, row, dict(answers), by=f"admin:{by}")
+
+
+# A paper open this long without a hand-in is announced, once per paper.
+STALE_PAPER_AFTER = timedelta(hours=24)
+
+
+def sweep_open_papers(db: Session, now: datetime | None = None) -> dict:
+    """Alert the instructor (and remind the candidate) about every written
+    examination that has been open for a day without being handed in.
+
+    Called by the 10-minute cron job. A paper drawn before its opening time
+    was recorded carries no opened_at: the instructor is alerted about it,
+    but the candidate is not reminded, since when they opened it is unknown."""
+    now = now or datetime.now(timezone.utc)
+    settings = get_settings()
+    alerted: list[int] = []
+    for row in db.execute(
+        select(AdvancedCertification).where(
+            AdvancedCertification.status == "purchased",
+            AdvancedCertification.exam_stale_alerted_at.is_(None),
+        )
+    ).scalars().all():
+        if not row.exam_item_codes:
+            continue
+        opened = _aware(row.exam_opened_at)
+        since = opened or _aware(row.updated_at) or _aware(row.created_at)
+        if since is None or now - since < STALE_PAPER_AFTER:
+            continue
+        learner = db.get(Learner, row.learner_id)
+        product = db.get(Product, row.product_code)
+        if learner is None or product is None:
+            continue
+        status = paper_status(row) or {}
+        saved = _aware(row.exam_draft_saved_at)
+        _notify_admin(
+            db, product,
+            subject=(
+                f"[Written exam not handed in] {learner.full_name or learner.email} — "
+                f"{product.title} — open since {since:%b %d}"
+            ),
+            html=exam_paper_open_admin_html(
+                learner_name=learner.full_name or "",
+                learner_email=learner.email,
+                course_title=product.title,
+                opened_display=f"{since:%B %d, %Y %H:%M} UTC" + ("" if opened else " (or earlier)"),
+                answered=status.get("answered", 0),
+                questions=status.get("questions", len(row.exam_item_codes)),
+                saved_display=f"{saved:%B %d, %Y %H:%M} UTC" if saved else "",
+                admin_url=admin_cert_url(db, product.code),
+            ),
+            template="exam_paper_open_admin",
+        )
+        reminded = False
+        if opened is not None:
+            send_email(
+                to=learner.email,
+                subject=f"Your written examination is not handed in yet — {product.title}",
+                html=exam_paper_open_reminder_html(
+                    learner.full_name or "", product.title,
+                    status.get("answered", 0), status.get("questions", len(row.exam_item_codes)),
+                    f"{settings.SITE_URL}/learn/advanced-exam/{product.code}",
+                ),
+                db=db, scope_kind="product", scope_code=product.code,
+                template="exam_paper_open_reminder",
+            )
+            reminded = True
+        row.exam_stale_alerted_at = now
+        log_exam(row, "stale_alert", answered=status.get("answered", 0), candidate_reminded=reminded)
+        db.commit()
+        alerted.append(row.id)
+    return {"alerted": len(alerted), "rows": alerted}
 
 
 # -----------------------------------------------------------------------------
@@ -1385,6 +1605,9 @@ def learner_out(db: Session, learner: Learner, product: Product, row: AdvancedCe
         "exam_attempts": row.exam_attempts,
         "exam_best_pct": row.exam_best_pct,
         "exam_open": exam_open(row),
+        # The paper they are in the middle of: opened, answers saved, not
+        # handed in. The course page says so in as many words.
+        "paper": paper_status(row),
         "can_propose": can_prop,
         "propose_blocked_reason": why,
         # 'calendar': pick an open slot on the instructor's calendar;
@@ -1461,6 +1684,22 @@ def admin_out(db: Session, row: AdvancedCertification) -> dict:
         "fee_log": list(row.fee_log or []),
         "calendar_event_id": row.calendar_event_id or "",
         "booked_via": row.booked_via or "",
+        # The open paper (answers saved so far) and the record of every
+        # paper drawn, hand-in and refused hand-in, newest first.
+        "exam_paper": _admin_paper(row),
+        "exam_log": list(reversed(list(row.exam_log or [])))[:50],
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }
+
+
+def _admin_paper(row: AdvancedCertification) -> dict | None:
+    status = paper_status(row)
+    if status is None:
+        return None
+    if status["opened_at"] is None:
+        # Drawn before opening times were recorded: the row's last change is
+        # the moment it was drawn, unless something else touched it since.
+        status["opened_at"] = _aware(row.updated_at)
+        status["opened_estimated"] = True
+    return status

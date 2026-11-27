@@ -1009,9 +1009,27 @@ const CertificationPanel: React.FC<{
                           <> · best so far {state.exam_best_pct}%</>
                         )}
                       </Step>
+                      {state.paper && (
+                        <div className="mt-4 text-sm text-amber-100 bg-amber-950/40 border border-amber-800/60 rounded-lg px-4 py-3">
+                          <strong>Your paper is open and has not been handed in.</strong>{' '}
+                          {state.paper.answered} of {state.paper.questions} answers are saved
+                          {state.paper.saved_at
+                            ? ` (last saved ${new Date(state.paper.saved_at).toLocaleString(undefined, {
+                                dateStyle: 'medium',
+                                timeStyle: 'short',
+                              })})`
+                            : ''}
+                          . Nothing is graded until you open it and press Submit for grading; you
+                          then see your score and receive it by email.
+                        </div>
+                      )}
                       <Link to={`/learn/advanced-exam/${code}`} className="btn-primary mt-4">
                         <ClipboardCheck className="w-4 h-4" aria-hidden="true" />
-                        {state.exam_attempts > 0 ? 'Retake the written examination' : 'Start the written examination'}
+                        {state.paper
+                          ? 'Continue the written examination'
+                          : state.exam_attempts > 0
+                            ? 'Retake the written examination'
+                            : 'Start the written examination'}
                       </Link>
                       {state.fee_status === 'waived' && (
                         <p className="text-xs text-slate-400 mt-3">

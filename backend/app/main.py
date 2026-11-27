@@ -299,6 +299,14 @@ def _run_column_migrations() -> None:
         # calendar settings themselves are a new table (create_all).
         ("calendar_event_id", "VARCHAR(256) NOT NULL DEFAULT ''"),
         ("booked_via", "VARCHAR(16) NOT NULL DEFAULT ''"),
+        # The open paper kept on the server (2026-11-27): autosaved answers
+        # and the record of every hand-in, refused or graded.
+        ("exam_opened_at", "TIMESTAMP WITH TIME ZONE"),
+        ("exam_draft", "JSON NOT NULL DEFAULT "
+         + ("'{}'::json" if engine.dialect.name == "postgresql" else "'{}'")),
+        ("exam_draft_saved_at", "TIMESTAMP WITH TIME ZONE"),
+        ("exam_stale_alerted_at", "TIMESTAMP WITH TIME ZONE"),
+        ("exam_log", f"JSON NOT NULL DEFAULT {json_empty_list}"),
     ):
         _ensure_column("academy_advanced_certifications", column, ddl)
     # The admin's test booking on the oral-exam calendar (2026-10-18).

@@ -1609,6 +1609,115 @@ def advanced_exam_passed_admin_html(
     return _shell("Written examination passed", "A candidate is ready for the oral examination", body)
 
 
+def advanced_exam_not_passed_html(
+    full_name: str, course_title: str, score: float, threshold: float,
+    attempts_used: int, attempts_max: int, course_url: str,
+) -> str:
+    """To the candidate after a hand-in below the pass mark: the result, and
+    what is left. Every hand-in gets an email, so a candidate always has a
+    written record of what the site received."""
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
+    left = max(0, attempts_max - attempts_used)
+    body = _p(greeting)
+    body += _p(
+        f"Your written examination for <strong>{escape_html(course_title)}</strong> was received "
+        f"and graded: <strong>{score:g}%</strong>. The pass mark is {threshold:g}%."
+    )
+    body += _kv_table([
+        ("Attempt", f"{attempts_used} of {attempts_max}"),
+        ("Attempts left", str(left)),
+    ], size=14)
+    if left:
+        body += _p(
+            "Your next attempt draws a new paper. Review the course material first; "
+            "you can start it from your course page whenever you are ready."
+        )
+        body += _cta_button("Open your course", course_url)
+    else:
+        body += _p(
+            "Both attempts are used. Reply to this email if you would like to discuss "
+            "the next step with your instructor."
+        )
+    return _shell("Written examination result", f"{score:g}% on {escape_html(course_title)}", body)
+
+
+def advanced_exam_not_passed_admin_html(
+    *,
+    learner_name: str,
+    learner_email: str,
+    course_title: str,
+    score: float,
+    threshold: float,
+    attempt_no: int,
+    attempts_max: int,
+    breakdown: "list[dict]",
+    handed_in_by: str,
+    admin_url: str,
+) -> str:
+    """To the instructor on every hand-in below the pass mark."""
+    body = _p(
+        f"{_who(learner_name, learner_email)} handed in the written examination for "
+        f"<strong>{escape_html(course_title)}</strong>: <strong>{score:g}%</strong> "
+        f"(pass mark {threshold:g}%), attempt {attempt_no} of {attempts_max}."
+    )
+    if handed_in_by:
+        body += _p(f"Handed in by {escape_html(handed_in_by)}.", color=MUTED, size=14)
+    body += _competency_rows(breakdown)
+    body += _cta_button("Open the candidate", admin_url)
+    return _shell("Written examination not passed", "A candidate's written examination result", body)
+
+
+def exam_paper_open_admin_html(
+    *,
+    learner_name: str,
+    learner_email: str,
+    course_title: str,
+    opened_display: str,
+    answered: int,
+    questions: int,
+    saved_display: str,
+    admin_url: str,
+) -> str:
+    """To the instructor: a written examination has been open for a day and
+    was never handed in. If the candidate believes they handed it in, this is
+    the record that they did not, and what they had saved."""
+    body = _p(
+        f"{_who(learner_name, learner_email)} opened the written examination for "
+        f"<strong>{escape_html(course_title)}</strong> and has not handed it in."
+    )
+    body += _kv_table([
+        ("Opened", escape_html(opened_display)),
+        ("Answers saved on the site", f"{answered} of {questions}"),
+        ("Last saved", escape_html(saved_display) if saved_display else "Nothing saved yet"),
+    ], size=14)
+    body += _p(
+        "Nothing has been graded and no attempt is used. If the candidate tells you they handed "
+        "it in, they did not reach the site: a hand-in is graded and emailed the moment it "
+        "arrives. From the candidate's card you can hand in the answers they saved."
+    )
+    body += _cta_button("Open the candidate", admin_url)
+    return _shell("Written examination not handed in", "A paper has been open for a day", body)
+
+
+def exam_paper_open_reminder_html(
+    full_name: str, course_title: str, answered: int, questions: int, exam_url: str,
+) -> str:
+    """To the candidate: their paper is open and not handed in."""
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
+    body = _p(greeting)
+    body += _p(
+        f"Your written examination for <strong>{escape_html(course_title)}</strong> is open but "
+        "<strong>has not been handed in</strong>, so it has not been graded."
+    )
+    body += _p(
+        f"Answers saved so far: <strong>{answered} of {questions}</strong>. Open the examination, "
+        "finish it, and press <strong>Submit for grading</strong>. You will see your score on the "
+        "page and receive it by email; until then, nothing has been handed in."
+    )
+    body += _cta_button("Continue the examination", exam_url)
+    return _shell("Not handed in yet", f"Your {escape_html(course_title)} written examination", body)
+
+
 def advanced_booked_admin_html(
     *,
     learner_name: str,
