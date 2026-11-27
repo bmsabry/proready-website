@@ -34,6 +34,7 @@ const Consult = lazy(() => import('./pages/Consult'));
 // Client-only (token in the URL), like /verify: not in routes.ts.
 const ConsultBooking = lazy(() => import('./pages/ConsultBookingPage'));
 const LearnWelcome = lazy(() => import('./pages/learn/Welcome'));
+const LearnOffer = lazy(() => import('./pages/learn/Offer'));
 const AboutBassamAbdelnabi = lazy(() => import('./pages/about/BassamAbdelnabi'));
 
 const GasTurbineCombustionConsulting = lazy(() => import('./pages/services/GasTurbineCombustionConsulting'));
@@ -141,6 +142,7 @@ function App() {
               <Route path="/learn" element={<LearnDashboard />} />
               <Route path="/learn/signin" element={<LearnSignIn />} />
               <Route path="/learn/welcome" element={<LearnWelcome />} />
+              <Route path="/learn/offer/:token" element={<LearnOffer />} />
               <Route path="/learn/lesson/:lessonId" element={<LearnLesson />} />
               <Route path="/learn/quiz/:moduleId/:itemSet" element={<LearnQuiz />} />
               <Route path="/learn/advanced-exam/:productCode" element={<LearnAdvancedExam />} />
