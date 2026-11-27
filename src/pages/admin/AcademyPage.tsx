@@ -26,6 +26,7 @@ import {
 } from './lib';
 import { ConfirmButton, Notice, RefreshButton, Section, SettlementBadge, StatusBadge } from './ui';
 import LearnerRequestsSection from './LearnerRequestsSection';
+import PrivateOffersSection from './PrivateOffersSection';
 
 export default function AcademyPage({ onAuthError }: { onAuthError: () => void }) {
   const [products, setProducts] = useState<AcademyProduct[] | null>(null);
@@ -378,6 +379,9 @@ export default function AcademyPage({ onAuthError }: { onAuthError: () => void }
           </p>
         </form>
       </section>
+
+      {/* ---------- Private price offers ---------- */}
+      <PrivateOffersSection products={products} onAuthError={onAuthError} />
 
       {/* ---------- Owner access ---------- */}
       <section>
