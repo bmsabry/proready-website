@@ -186,3 +186,23 @@ def test_a_fresh_paper_is_not_announced(client):
     db.close()
     r = client.post("/api/admin/academy/certification/exam-watch", headers=ADMIN).json()
     assert STATE["row_id"] not in r["rows"]
+
+
+def test_a_paper_from_before_opening_times_keeps_its_date(client):
+    """A paper drawn before opening times were recorded is dated by the row's
+    last change. The alert writes to the row, so that date is kept first."""
+    drawn = datetime(2026, 10, 18, 23, 8, 1, tzinfo=timezone.utc)
+    db = SessionLocal()
+    row = db.get(AdvancedCertification, STATE["row_id"])
+    row.exam_opened_at = None
+    row.exam_stale_alerted_at = None
+    row.updated_at = drawn
+    db.commit()
+    db.close()
+    r = client.post("/api/admin/academy/certification/exam-watch", headers=ADMIN).json()
+    assert STATE["row_id"] in r["rows"]
+    c = _candidate(client)
+    assert c["exam_paper"]["opened_at"].startswith("2026-10-18T23:08:01")
+    assert c["exam_log"][0]["event"] == "stale_alert"
+    assert c["exam_log"][0]["candidate_reminded"] is False
+    assert _mail("exam_paper_open_reminder", EMAIL) == 1, "no reminder when the opening time is unknown"

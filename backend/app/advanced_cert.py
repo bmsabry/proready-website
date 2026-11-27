@@ -686,6 +686,10 @@ def save_draft(db: Session, row: AdvancedCertification, responses: dict) -> Adva
     if any(k not in codes for k in (responses or {})):
         raise ValueError("not this paper")
     kept = _answered(responses)
+    if row.exam_opened_at is None:
+        # A paper drawn before opening times were recorded: its last change
+        # is when it was drawn, and this write is about to move it.
+        row.exam_opened_at = _aware(row.updated_at)
     # Short answers are free text; cap each so one field cannot fill the row.
     row.exam_draft = {k: (v[:4000] if isinstance(v, str) else v) for k, v in kept.items()}
     row.exam_draft_saved_at = datetime.now(timezone.utc)
@@ -996,7 +1000,12 @@ def sweep_open_papers(db: Session, now: datetime | None = None) -> dict:
             )
             reminded = True
         row.exam_stale_alerted_at = now
-        log_exam(row, "stale_alert", answered=status.get("answered", 0), candidate_reminded=reminded)
+        if opened is None:
+            # This write moves updated_at, the only clue to when a paper
+            # drawn before opening times were recorded was opened: keep it.
+            row.exam_opened_at = since
+        log_exam(row, "stale_alert", answered=status.get("answered", 0), candidate_reminded=reminded,
+                 opened_estimated=None if opened else since.isoformat())
         db.commit()
         alerted.append(row.id)
     return {"alerted": len(alerted), "rows": alerted}
