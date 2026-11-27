@@ -67,8 +67,58 @@ export type Candidate = {
   // 'candidate' (picked an open time) or 'admin' (confirmed here).
   calendar_event_id: string;
   booked_via: string;
+  // The paper open right now (answers autosaved, not handed in) and the
+  // record of every paper drawn, hand-in and refused hand-in, newest first.
+  exam_paper?: {
+    opened_at: string | null;
+    opened_estimated?: boolean;
+    questions: number;
+    answered: number;
+    saved_at: string | null;
+    stale_alerted_at: string | null;
+  } | null;
+  exam_log?: ExamLogEntry[];
   created_at: string;
 };
+
+export type ExamLogEntry = {
+  at: string;
+  event: string;
+  by?: string;
+  reason?: string;
+  score_pct?: number;
+  passed?: boolean;
+  answered?: number;
+  answers_sent?: number;
+  questions?: number;
+  attempt_no?: number;
+  minutes_open?: number;
+  error?: string;
+};
+
+const EXAM_EVENT: Record<string, string> = {
+  paper_drawn: 'Paper opened',
+  paper_redrawn: 'Paper re-drawn (question bank changed)',
+  handed_in: 'Handed in and graded',
+  hand_in_refused: 'Hand-in refused',
+  hand_in_failed: 'Hand-in failed on the server',
+  stale_alert: 'Open a day without a hand-in: you were alerted',
+};
+
+function examLogLine(e: ExamLogEntry): string {
+  const bits: string[] = [];
+  if (e.event === 'handed_in') {
+    bits.push(`${e.score_pct}%${e.passed ? ' (passed)' : ''}`);
+    if (e.answered !== undefined && e.questions) bits.push(`${e.answered}/${e.questions} answered`);
+    if (e.by && e.by !== 'candidate') bits.push('handed in by you from saved answers');
+    if (e.minutes_open !== undefined) bits.push(`open ${e.minutes_open} min`);
+  }
+  if (e.event === 'paper_drawn' && e.questions) bits.push(`${e.questions} questions, attempt ${e.attempt_no}`);
+  if (e.reason) bits.push(e.reason);
+  if (e.answers_sent !== undefined) bits.push(`${e.answers_sent} answers sent`);
+  if (e.error) bits.push(e.error);
+  return bits.join(' · ');
+}
 
 type CertRow = {
   code: string;
@@ -610,7 +660,33 @@ export function CandidateCard({
             <div>
               Written exam: {c.exam_attempts} attempt{c.exam_attempts === 1 ? '' : 's'}
               {c.exam_attempts > 0 && <> · best {c.exam_best_pct}%</>}
+              {c.exam_paper && (
+                <div className="mt-1 text-xs text-amber-200">
+                  Paper open, not handed in · opened {fmt(c.exam_paper.opened_at)}
+                  {c.exam_paper.opened_estimated ? ' (or earlier)' : ''} ·{' '}
+                  {c.exam_paper.answered} of {c.exam_paper.questions} answers saved
+                  {c.exam_paper.saved_at ? ` · last saved ${fmt(c.exam_paper.saved_at)}` : ' · nothing saved yet'}
+                </div>
+              )}
             </div>
+          )}
+          {(c.exam_log?.length ?? 0) > 0 && (
+            <details className="mt-2">
+              <summary className="text-xs uppercase tracking-wider text-slate-400 cursor-pointer">
+                Written-exam record ({c.exam_log!.length})
+              </summary>
+              <ul className="mt-1 space-y-0.5">
+                {c.exam_log!.map((e, i) => (
+                  <li key={i} className="text-xs text-slate-300">
+                    <span className="text-slate-500">{fmt(e.at)}</span> ·{' '}
+                    <span className={e.event.startsWith('hand_in_') ? 'text-red-300' : ''}>
+                      {EXAM_EVENT[e.event] ?? e.event}
+                    </span>
+                    {examLogLine(e) ? ` · ${examLogLine(e)}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
           {/* Read before the oral examination: weakest competency first, so the
               interview can be aimed at what the paper says is thin. */}
@@ -1002,6 +1078,30 @@ export function CandidateCard({
                 </button>
               </div>
             </div>
+          )}
+
+          {c.exam_paper && c.exam_paper.answered > 0 && (
+            <button
+              type="button"
+              disabled={busy === key}
+              className="btn-secondary text-xs py-1.5 px-3"
+              title="Grades the answers the candidate saved, uses an attempt and emails the result to both of you"
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    `Hand in ${c.full_name || c.email}'s saved answers (${c.exam_paper!.answered} of ${c.exam_paper!.questions}) for grading? This uses attempt ${c.exam_attempts + 1} and emails the result to both of you.`,
+                  )
+                )
+                  return;
+                void run(
+                  key,
+                  () => api(`/api/admin/academy/certification/advanced/${c.id}/hand-in-saved`, { method: 'POST' }),
+                  'Saved answers handed in and graded. The result is on the card and has been emailed.',
+                );
+              }}
+            >
+              Hand in their saved answers
+            </button>
           )}
 
           {c.status === 'exam_failed' && (
