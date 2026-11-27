@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """What the Render cron job `proreadyengineer-session-reminders` runs every 10 minutes.
 
-It asks the live API to do two things, each with `X-Cron-Secret: {CRON_SECRET}`:
+It asks the live API to do three things, each with `X-Cron-Secret: {CRON_SECRET}`:
 
     POST {API_URL}/api/admin/session-reminders/run   — send the live-session
                                                        reminders that are due
@@ -9,14 +9,19 @@ It asks the live API to do two things, each with `X-Cron-Secret: {CRON_SECRET}`:
                                                        happened to recent customer
                                                        emails; alert on any that
                                                        were not delivered
+    POST {API_URL}/api/admin/academy/certification/exam-watch
+                                                     — written examinations open
+                                                       a day without a hand-in:
+                                                       alert the instructor,
+                                                       remind the candidate
 
 and prints both summaries so the run log on Render shows what happened.
 All the logic lives inside the API (app/session_reminders.py,
 app/delivery_watch.py), so this script needs no database access and nothing
 beyond `requests`.
 
-Both calls are always made, even if the first fails. Exit status is non-zero
-when either could not be reached or was refused, which Render shows as a
+Every call is always made, even if an earlier one fails. Exit status is non-zero
+when any could not be reached or was refused, which Render shows as a
 failed run.
 """
 from __future__ import annotations
@@ -31,6 +36,7 @@ SECRET = os.environ.get("CRON_SECRET", "")
 CALLS = (
     "/api/admin/session-reminders/run",
     "/api/admin/email-delivery/sweep",
+    "/api/admin/academy/certification/exam-watch",
 )
 
 
