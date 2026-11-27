@@ -69,6 +69,7 @@ KIND_LABELS: dict[str, str] = {
     "certificate_attendance": "Certificate of Attendance",
     "certificate_verified": "Certificate of Verified Competency",
     "access_granted": "Course access granted",
+    "course_offer": "Private price offer",
     "payment_receipt": "Payment receipt",
     "settlement_failed": "Payment failed",
     "settlement_failed_admin": "Payment failed",
