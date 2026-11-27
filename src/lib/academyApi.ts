@@ -349,6 +349,15 @@ export const academy = {
 
   advancedExam: (code: string) => request<AdvancedExamSet>(`/api/academy/advanced/${code}/exam`),
 
+  /** Autosave of the open paper. `keepalive` lets the last save finish
+   *  while the page is being closed. */
+  saveAdvancedExamDraft: (code: string, responses: Record<string, unknown>, keepalive = false) =>
+    request<{ saved_at: string; answered: number }>(`/api/academy/advanced/${code}/exam/draft`, {
+      method: 'POST',
+      body: JSON.stringify({ responses }),
+      keepalive,
+    }),
+
   submitAdvancedExam: (code: string, responses: Record<string, unknown>) =>
     request<AdvancedExamResult>(`/api/academy/advanced/${code}/exam`, {
       method: 'POST',
@@ -463,6 +472,8 @@ export type AdvancedState = {
   exam_attempts: number;
   exam_best_pct: number;
   exam_open: boolean;
+  /** A paper opened and not handed in yet; null when none is open. */
+  paper?: OpenPaper | null;
   can_propose: boolean;
   propose_blocked_reason: string;
   proposed_slots: string[];
@@ -552,6 +563,18 @@ export type AdvancedExamSet = {
   attempts_used: number;
   attempts_max: number;
   items: QuizItem[];
+  /** Answers saved on the server for this paper (autosave), by item code. */
+  draft?: Record<string, unknown>;
+  draft_saved_at?: string | null;
+  opened_at?: string | null;
+};
+
+/** The written examination the candidate has open and not handed in. */
+export type OpenPaper = {
+  opened_at: string | null;
+  questions: number;
+  answered: number;
+  saved_at: string | null;
 };
 
 export type AdvancedExamResult = {
