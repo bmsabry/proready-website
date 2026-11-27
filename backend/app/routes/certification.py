@@ -25,12 +25,13 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import academy as svc
+from .. import activity
 from .. import advanced_cert as adv
 from .. import certificates as certs
 from .. import exam_calendar as xcal
@@ -370,6 +371,7 @@ def _advanced_row(db: Session, learner: Learner, code: str):
 @router.get("/advanced/{code}/exam")
 def advanced_exam(
     code: str,
+    request: Request,
     db: Session = Depends(get_db),
     learner: Learner = Depends(require_learner),
 ) -> dict:
@@ -384,6 +386,14 @@ def advanced_exam(
         )
     settings = get_settings()
     items = adv.served_items(db, code, row)
+    on_paper = {i.code for i in items}
+    # On the Student Activity page, beside lessons and evaluations.
+    activity.record(
+        db, learner.id, "exam_open", request=request, product_code=code,
+        label=f"Opened the written examination — {product.title}",
+        detail={"questions": len(items), "answers_saved": len(row.exam_draft or {}),
+                "attempt_no": (row.exam_attempts or 0) + 1},
+    )
     return {
         "product": {"code": product.code, "title": product.title},
         "item_set": "advanced",
@@ -391,11 +401,39 @@ def advanced_exam(
         "attempts_used": row.exam_attempts,
         "attempts_max": settings.ADVANCED_EXAM_MAX_ATTEMPTS,
         "items": [_public_item(i) for i in items],
+        # The answers saved on the server for this paper, so they come back
+        # on any device and after any reload or closed tab.
+        "draft": {k: v for k, v in (row.exam_draft or {}).items() if k in on_paper},
+        "draft_saved_at": adv._aware(row.exam_draft_saved_at),
+        "opened_at": adv._aware(row.exam_opened_at),
     }
 
 
 class SubmitIn(BaseModel):
     responses: dict
+
+
+@router.post("/advanced/{code}/exam/draft")
+def save_advanced_exam_draft(
+    code: str,
+    body: SubmitIn,
+    db: Session = Depends(get_db),
+    learner: Learner = Depends(require_learner),
+) -> dict:
+    """Autosave: the answers so far, every few seconds while the paper is open."""
+    _product_or_404(db, code)
+    row = _advanced_row(db, learner, code)
+    try:
+        adv.save_draft(db, row, body.responses or {})
+    except ValueError:
+        raise HTTPException(
+            status_code=409,
+            detail="This paper is no longer open. Go back to your course page to see where you stand.",
+        )
+    return {
+        "saved_at": adv._aware(row.exam_draft_saved_at),
+        "answered": len(row.exam_draft or {}),
+    }
 
 
 @router.post("/advanced/{code}/exam")
@@ -412,14 +450,23 @@ def submit_advanced_exam(
     # counted as one attempt; the second now waits, then sees the first's
     # result. (SQLite, used in tests, has no row locks and ignores this.)
     db.refresh(row, with_for_update=True)
+    responses = body.responses or {}
+
+    def refuse(reason: str, exc: HTTPException) -> HTTPException:
+        # Every hand-in that does not become an attempt leaves a line on the
+        # paper's record, so "I handed it in" can always be checked.
+        adv.log_exam(row, "hand_in_refused", reason=reason, answers_sent=len(responses))
+        db.commit()
+        return exc
+
     if not adv.exam_open(row):
-        raise HTTPException(status_code=409, detail="The written examination is not open at this step.")
+        raise refuse("examination not open at this step", HTTPException(
+            status_code=409, detail="The written examination is not open at this step."))
     # A hand-in is graded only against the paper it answers. When the first
     # hand-in was graded but its reply never reached the browser (connection
     # dropped, laptop closed), pressing Submit again used to draw a NEW paper,
     # mark the old answers against it (0 %) and spend the candidate's last
     # attempt. Such a hand-in is now refused, and no attempt is used.
-    responses = body.responses or {}
     not_this_paper = HTTPException(
         status_code=409,
         detail=(
@@ -429,11 +476,35 @@ def submit_advanced_exam(
         ),
     )
     if not row.exam_item_codes:
-        raise not_this_paper
+        raise refuse("no open paper (already handed in)", not_this_paper)
     sat = {i.code for i in adv.served_items(db, code, row)}
     if any(key not in sat for key in responses):
-        raise not_this_paper
-    attempt = adv.grade_exam(db, learner, product, row, responses)
+        raise refuse("answers are to a different paper", not_this_paper)
+    # The answers are on the server before grading starts: whatever happens
+    # next, they are not lost. Saving commits, which lets go of the row lock,
+    # so take it again and check once more before grading: a second hand-in
+    # that slipped in meanwhile has either graded the paper (this one is then
+    # refused) or is waiting behind this one.
+    adv.save_draft(db, row, responses)
+    db.refresh(row, with_for_update=True)
+    if not adv.exam_open(row) or not row.exam_item_codes:
+        raise refuse("no open paper (already handed in)", not_this_paper)
+    if any(key not in set(row.exam_item_codes) for key in responses):
+        raise refuse("answers are to a different paper", not_this_paper)
+    try:
+        attempt = adv.grade_exam(db, learner, product, row, responses)
+    except Exception as exc:  # noqa: BLE001 — recorded, then reported
+        log.exception("Grading the written examination failed for row %s", row.id)
+        db.rollback()
+        adv.log_exam(row, "hand_in_failed", error=type(exc).__name__, answers_sent=len(responses))
+        db.commit()
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Your answers are saved, but the paper could not be graded just now. No attempt "
+                "has been used. Press Submit for grading again in a minute."
+            ),
+        ) from exc
     items = {c: True for c in sat}
     settings = get_settings()
     return {
