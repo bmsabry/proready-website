@@ -843,6 +843,45 @@ def enrollment_granted_html(
     return _shell("Access granted", "Your course is ready", body)
 
 
+def course_offer_html(
+    full_name: str,
+    course_title: str,
+    price_display: str,
+    list_price_display: str,
+    link: str,
+    expires_display: str,
+    note: str = "",
+) -> str:
+    """A private price on a course for one buyer, with the link to pay it.
+
+    The link works only for this email address and only once; the page it
+    opens shows the same price before sending them to the card form.
+    """
+    greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
+    body = _p(greeting)
+    body += _p(
+        f"Here is your personal price for <strong>{escape_html(course_title)}</strong>.",
+        margin="0 0 16px",
+    )
+    if note:
+        body += _p(escape_html(note), color=MUTED, size=14)
+    rows = [("Course", escape_html(course_title)),
+            ("Your price", f"<strong>{price_display}</strong>")]
+    if list_price_display:
+        rows.append(("Regular price", list_price_display))
+    rows.append(("Valid until", escape_html(expires_display)))
+    body += _kv_table(rows, size=14)
+    body += _cta_button("See the offer and pay", link)
+    body += _p(
+        "The link is for this email address only and works once. After payment you "
+        "get a sign-in link straight away; lifetime access, no subscription.",
+        size=13,
+        color=MUTED,
+        margin="0",
+    )
+    return _shell("Private offer", f"Your price for {escape_html(course_title)}", body)
+
+
 def payment_receipt_html(
     full_name: str, course_title: str, amount_display: str, reference: str
 ) -> str:

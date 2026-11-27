@@ -294,6 +294,15 @@ export const academy = {
       { method: 'POST' }
     ),
 
+  /* ---- private offers: one buyer, one course, one price ---- */
+  offer: (token: string) => request<CourseOfferView>(`/api/academy/offer/${encodeURIComponent(token)}`),
+
+  offerCheckout: (token: string) =>
+    request<{ url: string; session_id: string }>(
+      `/api/academy/offer/${encodeURIComponent(token)}/checkout`,
+      { method: 'POST' }
+    ),
+
   checkoutStatus: (sessionId: string) =>
     request<{ status: string; product_code: string; email: string }>(
       `/api/academy/checkout/${sessionId}`
@@ -520,6 +529,20 @@ export type BookingSlots = {
   /* UTC start times, ISO 8601. */
   slots: string[];
   notice?: string;
+};
+
+export type CourseOfferView = {
+  state: 'open' | 'expired' | 'paid' | 'revoked';
+  message?: string;
+  product: { code: string; title: string; subtitle: string };
+  email: string;
+  full_name: string;
+  price_cents: number;
+  list_price_cents: number;
+  currency: string;
+  percent_off: number;
+  note: string;
+  expires_at: string;
 };
 
 export type AdvancedExamSet = {

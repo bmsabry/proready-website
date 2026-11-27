@@ -645,6 +645,42 @@ class Order(Base):
     )
 
 
+class CourseOffer(Base):
+    """A private price on one course for one buyer (2026-11-27).
+
+    The instructor sets the price in the admin panel; the site makes a link
+    only that buyer can pay through: Stripe Checkout opens with their email
+    fixed and the offer price, and the paid session grants access like any
+    other purchase. The link is single-use and lapses at `expires_at`.
+    """
+
+    __tablename__ = "academy_offers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # The secret in the link; unguessable (token_urlsafe(24)).
+    token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    product_code: Mapped[str] = mapped_column(String(64), index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    full_name: Mapped[str] = mapped_column(String(200), default="")
+    price_cents: Mapped[int] = mapped_column(Integer)
+    # The course's regular price when the offer was made, for the "was" line.
+    list_price_cents: Mapped[int] = mapped_column(Integer, default=0)
+    currency: Mapped[str] = mapped_column(String(3), default="usd")
+    # Shown to the buyer on the offer page and in the email.
+    note: Mapped[str] = mapped_column(String(500), default="")
+    # 'open' | 'paid' | 'revoked' ('expired' is worked out from expires_at)
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)
+    order_id: Mapped[int | None] = mapped_column(Integer, default=None)
+    created_by: Mapped[str] = mapped_column(String(320), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    emailed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
 class Enrollment(Base):
     """The access grant itself. This row is what gates every protected read.
 

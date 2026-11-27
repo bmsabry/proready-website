@@ -37,6 +37,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import academy as svc
+from .. import offers
 from ..config import get_settings
 from ..db import get_db
 from ..emailer import purchase_welcome_html, send_email
@@ -153,6 +154,99 @@ def create_checkout(
     return {"url": session.url, "session_id": session.id}
 
 
+# -----------------------------------------------------------------------------
+# Private offers (app/offers.py): one buyer, one course, one price
+# -----------------------------------------------------------------------------
+
+_OFFER_CLOSED = {
+    "expired": "This offer has expired. Ask the instructor for a new link.",
+    "paid": "This offer has already been used. If that was you, sign in to open your course.",
+    "revoked": "This offer is no longer available. Ask the instructor for a new link.",
+}
+
+
+@router.get("/offer/{token}")
+def get_offer(token: str, db: Session = Depends(get_db)) -> dict:
+    """What the offer page shows. Public: the token is the secret."""
+    offer = offers.by_token(db, token)
+    if offer is None:
+        raise HTTPException(status_code=404, detail="This offer link is not valid.")
+    out = offers.public_out(db, offer)
+    if out["state"] != "open":
+        out["message"] = _OFFER_CLOSED[out["state"]]
+    return out
+
+
+@router.post("/offer/{token}/checkout")
+def offer_checkout(token: str, db: Session = Depends(get_db)) -> dict:
+    """Stripe Checkout at the offer price, with the buyer's email fixed."""
+    offer = offers.by_token(db, token)
+    if offer is None:
+        raise HTTPException(status_code=404, detail="This offer link is not valid.")
+    st = offers.state(offer)
+    if st != "open":
+        raise HTTPException(status_code=410, detail=_OFFER_CLOSED[st])
+    product = db.get(Product, offer.product_code)
+    if product is None or product.status != "live":
+        raise HTTPException(status_code=404, detail="Course not available.")
+    if offers.has_active_access(db, offer.email, product.code):
+        raise HTTPException(
+            status_code=409,
+            detail="You already have access to this course. Sign in to open it.",
+        )
+    settings = get_settings()
+    stripe = _stripe()
+    try:
+        session = stripe.checkout.Session.create(
+            mode="payment",
+            line_items=[
+                {
+                    "quantity": 1,
+                    "price_data": {
+                        "currency": offer.currency,
+                        "unit_amount": offer.price_cents,
+                        "product_data": {
+                            "name": product.title,
+                            "description": "Private price",
+                        },
+                    },
+                }
+            ],
+            # Stripe shows this address read-only, so access goes to the
+            # person the offer was made for, whoever opens the link.
+            customer_email=offer.email,
+            success_url=(
+                f"{settings.SITE_URL}/learn/welcome"
+                "?session_id={CHECKOUT_SESSION_ID}"
+            ),
+            cancel_url=offers.link(offer),
+            client_reference_id=product.code,
+            metadata={"product_code": product.code, "offer_id": str(offer.id)},
+            billing_address_collection="auto",
+            # The offer is the discount; no codes on top of it.
+            allow_promotion_codes=False,
+        )
+    except Exception as exc:
+        log.error("Stripe Checkout create failed for offer %s: %s", offer.id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not start checkout. Please try again.",
+        ) from exc
+    db.add(
+        Order(
+            product_code=product.code,
+            email=offer.email,
+            provider="stripe",
+            provider_ref=session.id,
+            amount_cents=offer.price_cents,
+            currency=offer.currency,
+            status="pending",
+        )
+    )
+    db.commit()
+    return {"url": session.url, "session_id": session.id}
+
+
 def _session_identity(session_obj: dict) -> tuple[str, str, str]:
     """(session_id, buyer_email, product_code) from a Checkout Session."""
     session_id = session_obj.get("id") or ""
@@ -232,6 +326,11 @@ def _fulfil(db: Session, session_obj: dict, *, provisional: bool = False) -> Non
         order.paid_at = datetime.now(_tz.utc)
     db.commit()
     db.refresh(order)
+
+    # A private-price sale: close the offer so its link cannot be paid again.
+    offer_id = (session_obj.get("metadata") or {}).get("offer_id")
+    if offer_id:
+        offers.mark_paid(db, offer_id, order)
 
     grant_and_welcome(
         db, order, product, learner,
