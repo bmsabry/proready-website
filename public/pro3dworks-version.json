@@ -1,6 +1,6 @@
 {
-  "latest": "3.2.6",
+  "latest": "3.2.7",
   "url": "https://www.proreadyengineer.com/products/pro3dworks?src=app-update",
   "installerUrl": "https://www.proreadyengineer.com/download/pro3dworks-installer",
-  "nativeKitUrl": "https://www.proreadyengineer.com/download/pro3dworks-installer"
+  "nativeKitUrl": "https://github.com/bmsabry/Pro3DWorks/releases/download/v3.2.7/Pro3DWorks-v3.2.7-Windows-Native-Kit.zip"
 }

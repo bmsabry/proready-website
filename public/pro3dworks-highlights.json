@@ -1,32 +1,40 @@
 {
-  "version": "3.2.6",
-  "name": "Engineering Metrology, Offline Security & Licensing Hardening",
-  "summary": "Pro3DWorks v3.2.6 strengthens mirrored-part CNC and printability geometry transforms, active-unit report and CSV exports, STEP AP242 and DXF parser resilience, strict clinical no-cache and air-gapped enterprise policy isolation, command-palette accuracy, and online/Stripe license revocation and seat reliability.",
+  "version": "3.2.7",
+  "name": "Editable limits, labelled approximate values and checks that say what they covered",
+  "summary": "Pro3DWorks v3.2.7 lets you see and change every size, time and count limit, marks mesh-based values as approximate and says plainly when a check could not run.",
   "highlights": [
     {
-      "title": "Mirrored-Part CNC Readiness & Printability Geometry Transforms",
-      "text": "Preserves accurate winding, face normals, pocket accessibility, overhang angles, and wall-thickness sampling across mirrored assembly occurrences and negative-determinant world transforms."
+      "title": "Every limit editable in Settings",
+      "text": "Help > Settings > Limits lists each size, time and count limit the app applies, with its unit and default. Change any of them; when one stops or shortens a job, the message names it."
     },
     {
-      "title": "Active-Unit Report & CSV Export Consistency",
-      "text": "Keeps Review Report HTML packages, RFQ material summaries, tolerance stack-ups, draft angle tables, and revision comparisons aligned with active display units, complete traceability fields, and clean empty-section suppression."
+      "title": "Approximate values are labelled",
+      "text": "Measurements and bounding boxes taken from the tessellated mesh are marked approximate, and a check that could not run reads 'not evaluated' with the reason."
     },
     {
-      "title": "STEP AP242 PMI & Waterjet DXF Parser Resilience",
-      "text": "Hardens bounded STEP AP242 semantic and graphical PMI extraction and Waterjet 2D Studio DXF preflight geometry parsing against edge-case entities, nested blocks, and unit scaling without external network dependencies."
+      "title": "Mass properties show what is missing",
+      "text": "Mass Properties counts the bodies it left out and why, BOM mass shows an unknown volume or density as unavailable, and densities come only from materials you assigned or the file states."
     },
     {
-      "title": "Clinical No-Cache Privacy & Air-Gapped Enterprise Policy Isolation",
-      "text": "Enforces machine-level registry and ProgramData policy precedence with fail-closed unreadable-policy protection, clinical no-cache session hygiene, and redacted error diagnostics that never expose local paths or license tokens."
+      "title": "DXF import finds hidden layers",
+      "text": "Direct DXF Preflight finds layers that are off or frozen and invisible entities, keeps them out of the cut paths until you approve them, and reports entities with unusable coordinates."
     },
     {
-      "title": "Command-Palette Accuracy & Licensing Seat Reliability",
-      "text": "Refines deterministic local command matching and guarded step execution while hardening online and Stripe seat activation, revocation refresh synchronization, and offline signed license file import."
+      "title": "Waterjet audit keeps small features",
+      "text": "The Waterjet Studio audit keeps short segments, small cutouts and arcs as drawn, and flags contours that stay open, are drawn twice or have gaps wider than the gap tolerance before anything is cut."
+    },
+    {
+      "title": "Third-party notices in Help",
+      "text": "Help lists the third-party components bundled in the app with their licences and copyright notices."
     }
   ],
   "notes": [
-    "All CAD geometry, RFQ intake, CNC DFM, DXF preflight, Release Review reconciliation, PDF-to-DXF/DWG conversions, and GPU renders run locally on your workstation — zero customer model uploads.",
+    "Pro tools run in the Windows desktop app with an active trial or licence; the downloaded HTML file runs the Free Basic tools.",
+    "Windows desktop app: the licence and the managed policy are checked again while the app is open, and Pro tools close when a licence ends.",
+    "Windows desktop app and Native Kit: the native SolidWorks and NX helper starts only with an active licence and a helper set up for it; the Native Kit launcher uses the helper set up for its own version.",
+    "AI endpoints: requests are not followed across redirects, plain http to another computer needs a per-host confirmation, and an image request is sent again automatically only after a 429, 503 or 529 reply.",
+    "All CAD geometry, RFQ intake, CNC DFM, DXF preflight, Release Review, PDF-to-DXF/DWG conversion and renders run on your computer; no model is uploaded.",
     "Managed offline mode ('no_external_network') provides technical egress controls and is not a claim of organizational ISO/IEC 27001 certification or TISAX assessment.",
-    "OpenCascade / occt-import-js (LGPL-2.1) is shipped in separate relinkable desktop files alongside LICENSE.md; see docs/SBOM.cdx.json."
+    "OpenCascade / occt-import-js (LGPL-2.1) is shipped in separate relinkable desktop files alongside LICENSE.md and the third-party notices; see docs/SBOM.cdx.json."
   ]
 }
