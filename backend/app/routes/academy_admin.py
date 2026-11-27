@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from .. import academy as svc
 from .. import learner_requests as lr
+from .. import offers as offers_svc
 from .. import provenance as prov
 from ..config import get_settings
 from ..db import get_db
@@ -32,6 +33,7 @@ from ..models import (
     AssetDelivery,
     AssetPing,
     Chapter,
+    CourseOffer,
     Enrollment,
     Learner,
     LearnerDevice,
@@ -682,6 +684,82 @@ def login_link(
         "expires_label": ttl_phrase(ttl),
         "emailed": bool(body.send_email),
     }
+
+
+# -----------------------------------------------------------------------------
+# Private offers — sell a course to one person at a price below the list
+# -----------------------------------------------------------------------------
+
+class OfferIn(BaseModel):
+    email: EmailStr
+    full_name: str = Field(default="", max_length=200)
+    product_code: str = Field(min_length=1, max_length=64)
+    price_cents: int = Field(ge=1, le=100_000_000)
+    valid_days: int = Field(default=offers_svc.DEFAULT_VALID_DAYS, ge=1, le=offers_svc.MAX_VALID_DAYS)
+    note: str = Field(default="", max_length=500)
+    send_email: bool = True
+
+
+@router.post("/offers")
+def create_offer(
+    body: OfferIn, db: Session = Depends(get_db), admin: str = Depends(require_admin)
+) -> dict:
+    """Make a private-price link for one buyer (and email it to them)."""
+    product = db.get(Product, body.product_code)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Course not found.")
+    try:
+        offer = offers_svc.create(
+            db, product=product, email=str(body.email), full_name=body.full_name,
+            price_cents=body.price_cents, valid_days=body.valid_days, note=body.note,
+            by=admin, send=body.send_email,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return offers_svc.admin_out(db, offer, {product.code: product.title})
+
+
+@router.get("/offers")
+def list_offers(
+    product_code: str = "", db: Session = Depends(get_db), _: str = Depends(require_admin)
+) -> dict:
+    q = select(CourseOffer).order_by(CourseOffer.id.desc()).limit(200)
+    if product_code:
+        q = q.where(CourseOffer.product_code == product_code)
+    rows = db.execute(q).scalars().all()
+    titles = {p.code: p.title for p in db.execute(select(Product)).scalars()}
+    return {"offers": [offers_svc.admin_out(db, o, titles) for o in rows]}
+
+
+@router.post("/offers/{offer_id}/revoke")
+def revoke_offer(
+    offer_id: int, db: Session = Depends(get_db), _: str = Depends(require_admin)
+) -> dict:
+    offer = db.get(CourseOffer, offer_id)
+    if offer is None:
+        raise HTTPException(status_code=404, detail="Offer not found.")
+    try:
+        offers_svc.revoke(db, offer)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return offers_svc.admin_out(db, offer)
+
+
+@router.post("/offers/{offer_id}/resend")
+def resend_offer(
+    offer_id: int, db: Session = Depends(get_db), _: str = Depends(require_admin)
+) -> dict:
+    offer = db.get(CourseOffer, offer_id)
+    if offer is None:
+        raise HTTPException(status_code=404, detail="Offer not found.")
+    if offers_svc.state(offer) != "open":
+        raise HTTPException(status_code=409, detail="Only an open offer can be emailed again.")
+    product = db.get(Product, offer.product_code)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Course not found.")
+    if not offers_svc.email_offer(db, offer, product):
+        raise HTTPException(status_code=502, detail="The email could not be sent; copy the link instead.")
+    return offers_svc.admin_out(db, offer)
 
 
 @router.get("/owners")
