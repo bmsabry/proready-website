@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, ShieldCheck, X } from 'lucide-react';
 import { usePageMeta } from '../../lib/meta';
@@ -27,6 +27,12 @@ const AdvancedExam: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  // Autosave to the server: what was last sent, when it was stored, and
+  // whether the last try worked. The page says plainly when it did not.
+  const [saved, setSaved] = useState<{ at: string | null; count: number }>({ at: null, count: 0 });
+  const [saveTrouble, setSaveTrouble] = useState<'' | 'offline' | 'signed_out' | 'closed'>('');
+  const [retryTick, setRetryTick] = useState(0);
+  const lastSent = useRef<string>('{}');
 
   usePageMeta('Written examination', 'ProReadyEngineer advanced written examination.', {
     noindex: true,
@@ -47,6 +53,14 @@ const AdvancedExam: React.FC = () => {
           navigate(`/learn/${productCode}`, { replace: true });
           return;
         }
+        // Answers saved on the site for this paper come back first; a copy
+        // kept by this browser tab (useAnswerDraft) is laid over them.
+        const draft = data.draft ?? {};
+        if (Object.keys(draft).length > 0) {
+          setAnswers(draft);
+          lastSent.current = JSON.stringify(draft);
+        }
+        setSaved({ at: data.draft_saved_at ?? null, count: Object.keys(draft).length });
         setExam(data);
       } catch (err) {
         if (cancelled) return;
@@ -82,9 +96,60 @@ const AdvancedExam: React.FC = () => {
       : null,
     exam ? exam.items.map((item) => item.code) : [],
     answers,
-    setAnswers,
+    (restored) => setAnswers((current) => ({ ...current, ...restored })),
     result !== null,
   );
+
+  // Save the answers on the site a few seconds after each change, and again
+  // when the page is hidden or closed. A hand-in that never arrives (a
+  // dropped connection, an expired sign-in, a closed tab) then loses nothing,
+  // and the instructor can see what was answered.
+  const saveNow = useCallback(
+    async (keepalive = false) => {
+      if (!exam || result) return;
+      const body = JSON.stringify(answers);
+      if (body === lastSent.current) return;
+      try {
+        const r = await academy.saveAdvancedExamDraft(productCode, answers, keepalive);
+        lastSent.current = body;
+        setSaved({ at: r.saved_at, count: r.answered });
+        setSaveTrouble('');
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) setSaveTrouble('signed_out');
+        else if (err instanceof ApiError && err.status === 409) setSaveTrouble('closed');
+        else setSaveTrouble('offline');
+      }
+    },
+    [exam, result, answers, productCode],
+  );
+
+  useEffect(() => {
+    const t = window.setTimeout(() => void saveNow(), 2500);
+    return () => window.clearTimeout(t);
+  }, [saveNow, retryTick]);
+
+  useEffect(() => {
+    if (!saveTrouble || saveTrouble === 'closed') return;
+    const t = window.setInterval(() => setRetryTick((n) => n + 1), 20000);
+    return () => window.clearInterval(t);
+  }, [saveTrouble]);
+
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState === 'hidden') void saveNow(true);
+    };
+    const onHide = () => void saveNow(true);
+    document.addEventListener('visibilitychange', flush);
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      document.removeEventListener('visibilitychange', flush);
+      window.removeEventListener('pagehide', onHide);
+    };
+  }, [saveNow]);
+
+  const savedClock = saved.at
+    ? new Date(saved.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+    : '';
 
   const submit = async () => {
     setSubmitting(true);
@@ -92,12 +157,27 @@ const AdvancedExam: React.FC = () => {
     try {
       const res = await academy.submitAdvancedExam(productCode, answers);
       setResult(res);
+      setConfirm(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not submit.');
+      // Say in so many words that nothing was handed in, keep the answers,
+      // and leave the Submit button where it is for the next try.
+      if (err instanceof ApiError && err.status === 401) {
+        setError(
+          'You are signed out. Your answers are kept on this page. Sign in using the link below (it opens a new tab), then come back to this tab and press Submit for grading again.',
+        );
+        setSaveTrouble('signed_out');
+      } else if (err instanceof ApiError && err.status !== 0) {
+        setError(err.message);
+      } else {
+        setError(
+          `The site could not be reached. Your answers are kept on this page${
+            savedClock ? ` and saved on the site as of ${savedClock}` : ''
+          }. Check your connection and press Submit for grading again.`,
+        );
+      }
     } finally {
       setSubmitting(false);
-      setConfirm(false);
     }
   };
 
@@ -145,6 +225,13 @@ const AdvancedExam: React.FC = () => {
             are graded on submission; no explanations are shown, so the bank stays examinable for
             the oral examination.
           </p>
+          {!result && (
+            <p className="text-xs text-slate-400 mt-3">
+              Your answers are saved on the site as you work, so a reload, a closed tab or another
+              device does not lose them. The paper is only graded when you press{' '}
+              <strong className="text-slate-200">Submit for grading</strong> and see your score.
+            </p>
+          )}
         </div>
 
         {result && (
@@ -169,7 +256,8 @@ const AdvancedExam: React.FC = () => {
                     ? 'Next: propose your interview windows from your course page.'
                     : result.status === 'exam_failed'
                     ? 'Both attempts are used. Write to info@proreadyengineer.com to discuss a further attempt.'
-                    : `You have ${result.attempts_max - result.attempts_used} attempt left. Review the material before retaking.`}
+                    : `You have ${result.attempts_max - result.attempts_used} attempt left. Review the material before retaking.`}{' '}
+                  Your result has also been emailed to you.
                 </p>
               </div>
               <Link to={`/learn/${productCode}`} className="btn-primary">
@@ -255,6 +343,37 @@ const AdvancedExam: React.FC = () => {
             <div className="text-sm text-slate-300">
               {answered} of {total} answered
               {answered < total && '. Unanswered questions count as incorrect.'}
+              <div className="text-xs mt-1">
+                {saveTrouble === 'signed_out' ? (
+                  <span className="text-red-300">
+                    Not saving: you are signed out.{' '}
+                    <a
+                      href={`/learn/signin?next=${encodeURIComponent(`/learn/advanced-exam/${productCode}`)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
+                      Sign in in a new tab
+                    </a>
+                    , then come back here.
+                  </span>
+                ) : saveTrouble === 'offline' ? (
+                  <span className="text-amber-300">
+                    Not saving: the site cannot be reached. Your answers stay on this page; saving
+                    resumes when the connection is back.
+                  </span>
+                ) : saveTrouble === 'closed' ? (
+                  <span className="text-amber-300">
+                    This paper is no longer open. Go back to your course page to see where you stand.
+                  </span>
+                ) : savedClock ? (
+                  <span className="text-slate-400">
+                    Saved on the site at {savedClock} ({saved.count} answered). Not handed in yet.
+                  </span>
+                ) : (
+                  <span className="text-slate-400">Not handed in yet.</span>
+                )}
+              </div>
             </div>
             {!confirm ? (
               <button type="button" className="btn-primary" onClick={() => setConfirm(true)}>
@@ -263,8 +382,8 @@ const AdvancedExam: React.FC = () => {
             ) : (
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-sm text-amber-200">
-                  This uses attempt {Math.min(exam.attempts_used + 1, exam.attempts_max)} of{' '}
-                  {exam.attempts_max}.
+                  Not handed in until you press Submit for grading. This uses attempt{' '}
+                  {Math.min(exam.attempts_used + 1, exam.attempts_max)} of {exam.attempts_max}.
                 </span>
                 <button type="button" className="btn-secondary" onClick={() => setConfirm(false)}>
                   Keep working
@@ -274,7 +393,24 @@ const AdvancedExam: React.FC = () => {
                 </button>
               </div>
             )}
-            {error && <p className="text-sm text-red-300 basis-full">{error}</p>}
+            {error && (
+              <div className="basis-full text-sm text-red-200 bg-red-950/50 border border-red-800/70 rounded-lg px-4 py-3">
+                <strong className="block mb-1">This hand-in did not go through.</strong>
+                {error}
+                {saveTrouble === 'signed_out' && (
+                  <div className="mt-2">
+                    <a
+                      href={`/learn/signin?next=${encodeURIComponent(`/learn/advanced-exam/${productCode}`)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline text-red-100"
+                    >
+                      Open the sign-in page in a new tab
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
