@@ -1200,6 +1200,25 @@ class AdvancedCertification(Base):
     # it is handed in — a reload must not reshuffle the questions, and grading
     # must score the paper the candidate actually sat.
     exam_item_codes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    # The open paper, kept on the server so it cannot be lost (2026-11-27).
+    # A candidate once answered a 100-question paper for hours and the answers
+    # lived only in the browser tab: a reload or a dropped session took them
+    # with no trace on the server, and nobody could tell what had happened.
+    #   exam_opened_at       when the open paper was drawn
+    #   exam_draft           the answers saved so far, autosaved every few
+    #                        seconds while the candidate works
+    #   exam_draft_saved_at  the last autosave
+    #   exam_stale_alerted_at  the "paper open but not handed in" alert went
+    #                        out for this paper (once per paper)
+    #   exam_log             every paper drawn, hand-in, refused hand-in and
+    #                        alert, oldest first: {at, event, ...}
+    exam_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    exam_draft: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    exam_draft_saved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    exam_stale_alerted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    exam_log: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
 
     # Learner's proposed 60-minute windows, ISO-8601 UTC, plus their IANA zone
     # so the admin sees both clocks.
