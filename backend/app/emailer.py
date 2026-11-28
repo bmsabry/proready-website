@@ -1425,15 +1425,23 @@ def advanced_purchased_html(
 
 
 def advanced_exam_passed_html(
-    full_name: str, course_title: str, score: float, slots_url: str, fee_due_display: str = "",
+    full_name: str, course_title: str, score: float | None, slots_url: str, fee_due_display: str = "",
     *, self_booking: bool = False,
 ) -> str:
+    """`score` None: the instructor recorded the pass himself (no graded paper)."""
     greeting = f"Hi {escape_html(full_name)}," if full_name else "Hi,"
     body = _p(greeting)
-    body += _p(
-        f"You passed the advanced written examination for <strong>{course_title}</strong> "
-        f"with <strong>{score:g}%</strong>. The next step is your live oral examination."
-    )
+    if score is None:
+        body += _p(
+            f"Your instructor has recorded the advanced written examination for "
+            f"<strong>{course_title}</strong> as <strong>passed</strong>. "
+            "The next step is your live oral examination."
+        )
+    else:
+        body += _p(
+            f"You passed the advanced written examination for <strong>{course_title}</strong> "
+            f"with <strong>{score:g}%</strong>. The next step is your live oral examination."
+        )
     if fee_due_display:
         # The instructor let them start before paying: the fee is due now.
         body += _p(
