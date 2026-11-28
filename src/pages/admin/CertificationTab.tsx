@@ -78,6 +78,8 @@ export type Candidate = {
     stale_alerted_at: string | null;
   } | null;
   exam_log?: ExamLogEntry[];
+  // Set when you awarded the written examination (no graded paper).
+  exam_pass_awarded?: { at: string; by: string; reason: string } | null;
   created_at: string;
 };
 
@@ -94,6 +96,8 @@ export type ExamLogEntry = {
   attempt_no?: number;
   minutes_open?: number;
   error?: string;
+  paper_closed?: boolean;
+  answers_set_aside?: number;
 };
 
 const EXAM_EVENT: Record<string, string> = {
@@ -103,6 +107,7 @@ const EXAM_EVENT: Record<string, string> = {
   hand_in_refused: 'Hand-in refused',
   hand_in_failed: 'Hand-in failed on the server',
   stale_alert: 'Open a day without a hand-in: you were alerted',
+  pass_awarded: 'Pass awarded by you (no graded paper)',
 };
 
 function examLogLine(e: ExamLogEntry): string {
@@ -115,6 +120,8 @@ function examLogLine(e: ExamLogEntry): string {
   }
   if (e.event === 'paper_drawn' && e.questions) bits.push(`${e.questions} questions, attempt ${e.attempt_no}`);
   if (e.reason) bits.push(e.reason);
+  if (e.paper_closed) bits.push('open paper closed');
+  if (e.answers_set_aside) bits.push(`${e.answers_set_aside} saved answers set aside`);
   if (e.answers_sent !== undefined) bits.push(`${e.answers_sent} answers sent`);
   if (e.error) bits.push(e.error);
   return bits.join(' · ');
@@ -611,6 +618,7 @@ export function CandidateCard({
   const [cancelNote, setCancelNote] = useState('');
   const [message, setMessage] = useState('');
   const [moveTo, setMoveTo] = useState('');
+  const [awardReason, setAwardReason] = useState('');
   const key = `cand-${c.id}`;
   // A deferred fee keeps the interview locked until it is paid or waived.
   const canSchedule =
@@ -666,6 +674,11 @@ export function CandidateCard({
                   {c.exam_paper.opened_estimated ? ' (or earlier)' : ''} ·{' '}
                   {c.exam_paper.answered} of {c.exam_paper.questions} answers saved
                   {c.exam_paper.saved_at ? ` · last saved ${fmt(c.exam_paper.saved_at)}` : ' · nothing saved yet'}
+                </div>
+              )}
+              {c.exam_pass_awarded && (
+                <div className="mt-1 text-xs text-emerald-200">
+                  Pass awarded by you on {fmt(c.exam_pass_awarded.at)} · {c.exam_pass_awarded.reason}
                 </div>
               )}
             </div>
@@ -1119,6 +1132,55 @@ export function CandidateCard({
             >
               Give the written exam back
             </button>
+          )}
+
+          {/* For a paper lost to a fault on the site's side: the journey goes on
+              as after a graded pass (email, then booking the oral exam). */}
+          {(c.status === 'purchased' || c.status === 'exam_failed') && (
+            <div className="rounded-lg border border-slate-800 p-3 space-y-2">
+              <div className="text-xs uppercase tracking-wider text-slate-400">Award a pass on the written exam</div>
+              <p className="text-xs text-slate-400">
+                Only when their paper was lost to a fault on the site's side. They are emailed that they
+                passed and can book the oral examination with you. No score is recorded and no attempt
+                is used.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  value={awardReason}
+                  onChange={(e) => setAwardReason(e.target.value)}
+                  placeholder="Why (kept on their record, not shown to them)"
+                  maxLength={1000}
+                  className="flex-1 rounded-lg bg-slate-950/70 border border-slate-800 px-2 py-1 text-white text-xs"
+                />
+                <button
+                  type="button"
+                  disabled={busy === key || awardReason.trim().length < 3}
+                  className="btn-secondary text-xs py-1.5 px-3"
+                  onClick={() => {
+                    const paper = c.exam_paper
+                      ? ` Their open paper is closed${c.exam_paper.answered ? ` and its ${c.exam_paper.answered} saved answers are set aside` : ''}.`
+                      : '';
+                    if (
+                      !window.confirm(
+                        `Record the written examination as PASSED for ${who}, without a graded paper?${paper} They are emailed now and can book the oral examination. This cannot be undone here.`,
+                      )
+                    )
+                      return;
+                    void run(
+                      key,
+                      () =>
+                        api(`/api/admin/academy/certification/advanced/${c.id}/award-pass`, {
+                          method: 'POST',
+                          body: JSON.stringify({ reason: awardReason.trim() }),
+                        }),
+                      'Pass awarded. The candidate has been emailed and can now book the oral examination.',
+                    );
+                  }}
+                >
+                  Award a pass
+                </button>
+              </div>
+            </div>
           )}
 
           {!closed && !isRequest && (
