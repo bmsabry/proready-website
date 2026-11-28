@@ -16,6 +16,9 @@
   POST /api/admin/academy/certification/advanced/{id}/outcome   pass|retake|fail
   POST /api/admin/academy/certification/advanced/{id}/reopen
   POST /api/admin/academy/certification/advanced/{id}/reset-exam
+  POST /api/admin/academy/certification/advanced/{id}/award-pass written exam
+                                                                  passed without
+                                                                  a graded paper
   POST /api/admin/academy/certification/advanced/{id}/cancel
   POST /api/admin/academy/certification/advanced/{id}/waiver    waive|defer|
                                                                   decline a
@@ -509,6 +512,28 @@ def hand_in_saved(row_id: int, db: Session = Depends(get_db), admin: str = Depen
     out = adv.admin_out(db, row)
     out["graded"] = {"score_pct": attempt.score_pct, "passed": attempt.passed}
     return out
+
+
+class AwardPassIn(BaseModel):
+    # Kept on the candidate's examination record; never shown to them.
+    reason: str = Field(default="", max_length=1000)
+
+
+@router.post("/advanced/{row_id}/award-pass")
+def award_pass(
+    row_id: int, body: AwardPassIn, db: Session = Depends(get_db), admin: str = Depends(require_admin)
+) -> dict:
+    """Record the written examination as passed without a graded paper, when
+    a candidate's paper was lost to a fault on the site's side. The candidate
+    gets the "passed" email and goes on to book the oral examination."""
+    row, _learner, _product = _row(db, row_id)
+    # The same lock a hand-in takes, so an award and a hand-in cannot both land.
+    db.refresh(row, with_for_update=True)
+    try:
+        adv.admin_award_pass(db, row, admin, body.reason)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return adv.admin_out(db, row)
 
 
 @router.post("/exam-watch")
