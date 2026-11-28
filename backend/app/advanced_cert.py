@@ -9,6 +9,10 @@
 Invariants that matter:
   * Nothing in this module issues a certificate except `record_outcome`
     with result='pass', which only the admin endpoint calls.
+  * The written examination is passed by a graded paper, or by the
+    instructor's award (`admin_award_pass`, with a reason on the record)
+    when a paper was lost to a fault on the site's side. Either way the
+    oral examination still decides the certificate.
   * The written examination is a product-level QuizItem set
     (item_set='advanced', module_id=0) graded by the same engine as the
     module quizzes; the answer key never leaves the server.
@@ -631,8 +635,8 @@ def log_exam(row: AdvancedCertification, event: str, **detail) -> None:
     """Append to the paper's record. The caller commits.
 
     Events: paper_drawn, paper_redrawn, handed_in, hand_in_refused,
-    hand_in_failed, stale_alert. A new list is assigned so the JSON column
-    is seen as changed."""
+    hand_in_failed, stale_alert, pass_awarded. A new list is assigned so the
+    JSON column is seen as changed."""
     entry = {"at": datetime.now(timezone.utc).isoformat(), "event": event}
     entry.update({k: v for k, v in detail.items() if v is not None})
     row.exam_log = (list(row.exam_log or []) + [entry])[-EXAM_LOG_KEEP:]
@@ -915,6 +919,72 @@ def _send_not_passed(
         ),
         template="advanced_exam_not_passed_admin",
     )
+
+
+# Where the instructor may award the written examination: a paper is open
+# (or not drawn yet), or both attempts are used.
+AWARDABLE = {"purchased", "exam_failed"}
+
+
+def admin_award_pass(db: Session, row: AdvancedCertification, by: str, reason: str) -> AdvancedCertification:
+    """The instructor records the written examination as passed without a
+    graded paper, for when a candidate's paper was lost to a fault on the
+    site's side (2026-11-27: a paper lost in the browser, never handed in).
+
+    Everything after a pass runs as it does for a graded pass: the candidate
+    is emailed that they passed and the booking step opens (or the fee
+    reminder, when a deferred fee is still due). No score is invented: no
+    attempt is recorded, the best score stays what it was, and the
+    examination record says who awarded it and why."""
+    reason = (reason or "").strip()
+    if len(reason) < 3:
+        raise ValueError("Say why you are awarding the pass: it goes on the candidate's record.")
+    if row.status not in AWARDABLE:
+        raise ValueError("The written examination is not the step this candidate is at.")
+    learner = db.get(Learner, row.learner_id)
+    product = db.get(Product, row.product_code)
+    if learner is None or product is None:
+        raise ValueError("Candidate or course not found.")
+    settings = get_settings()
+    had_paper = bool(row.exam_item_codes)
+    saved = len(_answered(row.exam_draft))
+    # The open paper is closed: nothing is left to hand in, and a hand-in
+    # from a tab still open on it is refused without using an attempt.
+    row.exam_item_codes = []
+    row.exam_draft = {}
+    row.exam_draft_saved_at = None
+    row.exam_opened_at = None
+    row.exam_stale_alerted_at = None
+    row.status = "exam_passed"
+    row.exam_passed_at = datetime.now(timezone.utc)
+    log_exam(
+        row, "pass_awarded", by=f"admin:{by}", reason=reason[:1000],
+        attempts_used=row.exam_attempts or 0,
+        paper_closed=True if had_paper else None,
+        answers_set_aside=saved or None,
+    )
+    db.commit()
+    send_email(
+        to=learner.email,
+        subject=f"Written examination passed — {product.title}",
+        html=advanced_exam_passed_html(
+            learner.full_name or "", product.title, None,
+            f"{settings.SITE_URL}/learn/{product.code}",
+            fee_due_display=money(row.amount_cents, row.currency) if fee_due(row) else "",
+            self_booking=booking_mode(db) == "calendar",
+        ),
+        db=db, scope_kind="product", scope_code=product.code,
+        template="advanced_exam_pass_awarded",
+    )
+    return row
+
+
+def pass_awarded(row: AdvancedCertification) -> dict | None:
+    """The instructor's award, when that is how the written examination was passed."""
+    for entry in reversed(list(row.exam_log or [])):
+        if entry.get("event") == "pass_awarded":
+            return {"at": entry.get("at"), "by": entry.get("by", ""), "reason": entry.get("reason", "")}
+    return None
 
 
 def admin_hand_in(db: Session, row: AdvancedCertification, by: str) -> QuizAttempt:
@@ -1697,6 +1767,8 @@ def admin_out(db: Session, row: AdvancedCertification) -> dict:
         # paper drawn, hand-in and refused hand-in, newest first.
         "exam_paper": _admin_paper(row),
         "exam_log": list(reversed(list(row.exam_log or [])))[:50],
+        # Set when the instructor awarded the written examination: when, and why.
+        "exam_pass_awarded": pass_awarded(row),
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }
