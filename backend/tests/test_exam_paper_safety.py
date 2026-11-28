@@ -206,3 +206,30 @@ def test_a_paper_from_before_opening_times_keeps_its_date(client):
     assert c["exam_log"][0]["event"] == "stale_alert"
     assert c["exam_log"][0]["candidate_reminded"] is False
     assert _mail("exam_paper_open_reminder", EMAIL) == 1, "no reminder when the opening time is unknown"
+
+
+def test_a_page_crash_in_the_browser_is_on_record(client):
+    """The error screen reports a crash: in the logs for anyone, and on the
+    Student Activity page for a signed-in learner (once per ten minutes)."""
+    from app.models import LearnerActivity
+
+    for _ in range(2):
+        r = client.post("/api/academy/client-error", json={
+            "path": f"/learn/advanced-exam/{PRODUCT}",
+            "message": "NotFoundError: Failed to execute 'removeChild' on 'Node'",
+        })
+        assert r.status_code == 200 and r.json() == {"ok": True}
+    db = SessionLocal()
+    try:
+        learner = db.query(Learner).filter(Learner.email == EMAIL).one()
+        rows = db.query(LearnerActivity).filter(
+            LearnerActivity.learner_id == learner.id, LearnerActivity.kind == "page_error").all()
+        assert len(rows) == 1, "one record per ten minutes, not one per retry"
+        assert rows[0].detail["path"] == f"/learn/advanced-exam/{PRODUCT}"
+        assert "removeChild" in rows[0].detail["error"]
+    finally:
+        db.close()
+    with TestClient(app, base_url="https://testserver") as anonymous:
+        r = anonymous.post("/api/academy/client-error", json={"path": "/", "message": "x" * 2000})
+        assert r.status_code == 422, "an oversized report is refused, not stored"
+        assert anonymous.post("/api/academy/client-error", json={"path": "/"}).status_code == 200

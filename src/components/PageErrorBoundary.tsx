@@ -18,6 +18,28 @@
  */
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { API_BASE } from '../lib/academyApi';
+
+/** Tell the server a page crashed, so the crash is on record (2026-11-27):
+ *  a written examination once vanished in a visitor's browser with no trace
+ *  anywhere. Fire-and-forget; reporting must never cause a second failure. */
+function reportCrash(error: Error): void {
+  try {
+    if (!API_BASE) return;
+    void fetch(`${API_BASE}/api/academy/client-error`, {
+      method: 'POST',
+      credentials: 'include',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: window.location.pathname.slice(0, 300),
+        message: `${error?.name ?? 'Error'}: ${error?.message ?? String(error)}`.slice(0, 500),
+      }),
+    }).catch(() => undefined);
+  } catch {
+    /* never let the report break the error screen */
+  }
+}
 
 type Props = {
   /** The current path: changing it clears a shown error. */
@@ -62,6 +84,7 @@ export default class PageErrorBoundary extends React.Component<Props, State> {
       return;
     }
     console.error('Page failed to render:', error, info.componentStack);
+    reportCrash(error);
   }
 
   componentDidUpdate(prev: Props) {

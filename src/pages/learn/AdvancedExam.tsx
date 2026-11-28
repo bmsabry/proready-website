@@ -341,8 +341,11 @@ const AdvancedExam: React.FC = () => {
         {!result && (
           <div className="card p-6 mt-8 flex flex-wrap items-center justify-between gap-4">
             <div className="text-sm text-slate-300">
-              {answered} of {total} answered
-              {answered < total && '. Unanswered questions count as incorrect.'}
+              {/* Each changing piece of text sits in its own element: a page
+                  translated in the browser crashed here when the last
+                  question was answered and this sentence disappeared. */}
+              <span>{answered}</span> of <span>{total}</span> answered
+              {answered < total && <span>. Unanswered questions count as incorrect.</span>}
               <div className="text-xs mt-1">
                 {saveTrouble === 'signed_out' ? (
                   <span className="text-red-300">
