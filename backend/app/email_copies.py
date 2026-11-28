@@ -81,6 +81,7 @@ KIND_LABELS: dict[str, str] = {
     "learner_request_completion_approved": "Request approved: completion marks",
     "advanced_purchased": "Verified Competency: purchased",
     "advanced_exam_passed": "Verified Competency: exam passed",
+    "advanced_exam_pass_awarded": "Verified Competency: exam pass awarded",
     "advanced_slots_admin": "Verified Competency: interview times",
     "advanced_scheduled": "Verified Competency: interview booked",
     "advanced_retake": "Verified Competency: retake",
