@@ -131,6 +131,10 @@ TEMPLATES = {
     "advanced_exam_passed_self_booking": lambda: E.advanced_exam_passed_html(
         "Ada", "Course X", 91.0, LINK, self_booking=True
     ),
+    # Awarded by the instructor: no score to print (2026-11-27).
+    "advanced_exam_pass_awarded": lambda: E.advanced_exam_passed_html(
+        "Ada", "Course X", None, LINK, self_booking=True
+    ),
     "advanced_extra_payment_admin": lambda: E.advanced_extra_payment_admin_html(
         learner_name="Ada", learner_email="ada@example.com", course_title="Course X",
         amount_display="$300", fee_state="waived", order_ref="#12 (cs_test)", admin_url=LINK,
@@ -357,3 +361,11 @@ def test_an_explicit_text_part_is_not_overwritten(monkeypatch):
         to="ada@example.com", subject="Hi", html="<p>ignored</p>", text="exact wording"
     )
     assert captured["text"] == "exact wording"
+
+
+def test_an_awarded_pass_prints_no_score():
+    html = E.advanced_exam_passed_html("Ada", "Course X", None, LINK)
+    assert "None" not in html
+    assert "recorded the advanced written examination" in html and "</strong>%" not in html
+    graded = E.advanced_exam_passed_html("Ada", "Course X", 91.0, LINK)
+    assert "91%" in graded
