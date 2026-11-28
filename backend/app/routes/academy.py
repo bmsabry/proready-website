@@ -239,6 +239,45 @@ def catalog_detail(
 
 
 # -----------------------------------------------------------------------------
+# A page that failed to draw in a visitor's browser
+# -----------------------------------------------------------------------------
+
+class ClientErrorIn(BaseModel):
+    path: str = Field(default="", max_length=300)
+    message: str = Field(default="", max_length=500)
+
+
+@router.post("/client-error", response_model=OkOut)
+def client_error(
+    body: ClientErrorIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    learner: Learner | None = Depends(optional_learner),
+) -> OkOut:
+    """The page error screen reports here (2026-11-27).
+
+    A page that crashes in the browser leaves no trace on the server: a
+    candidate's written examination once vanished that way, answers and all,
+    and nothing anywhere could say what had happened. Now every crash is in
+    the logs, and a signed-in learner's is on their Student Activity page.
+    """
+    path = body.path.strip()[:300]
+    message = " ".join(body.message.split())[:500]
+    log.warning(
+        "Page failed to draw in the browser: path=%s learner=%s error=%s",
+        path, learner.email if learner else "-", message,
+    )
+    if learner is not None:
+        activity.record(
+            db, learner.id, "page_error", request=request,
+            label=f"A page failed to draw on their screen — {path or 'unknown page'}",
+            detail={"path": path, "error": message},
+            dedupe=timedelta(minutes=10),
+        )
+    return OkOut()
+
+
+# -----------------------------------------------------------------------------
 # Auth
 # -----------------------------------------------------------------------------
 
